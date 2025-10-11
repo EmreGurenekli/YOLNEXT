@@ -1,0 +1,17 @@
+{
+  "name": "YolNet Kargo Platform",
+  "short_name": "YolNet",
+  "description": "Güvenilir kargo taşımacılığı platformu",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#3b82f6",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "any",
+      "type": "image/x-icon"
+    }
+  ]
+}
+
