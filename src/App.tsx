@@ -17,6 +17,9 @@ import CorporateDashboard from './pages/corporate/Dashboard'
 import CorporateCreateShipment from './pages/corporate/CreateShipment'
 import CorporateShipments from './pages/corporate/Shipments'
 import NakliyeciDashboard from './pages/nakliyeci/Dashboard'
+import NakliyeciJobs from './pages/nakliyeci/Jobs'
+import NakliyeciDrivers from './pages/nakliyeci/Drivers'
+import NakliyeciEarnings from './pages/nakliyeci/Earnings'
 import NakliyeciLoads from './pages/nakliyeci/Loads'
 import NakliyeciOpenShipments from './pages/nakliyeci/OpenShipments'
 import NakliyeciVehicleOptimization from './pages/nakliyeci/VehicleOptimization'
@@ -143,17 +146,21 @@ function App() {
                   {/* Nakliyeci Routes */}
                   <Route path="/nakliyeci" element={<NakliyeciLayout />}>
                     <Route path="dashboard" element={<NakliyeciDashboard />} />
-                    <Route path="loads" element={<NakliyeciLoads />} />
-                    <Route path="open-shipments" element={<NakliyeciOpenShipments />} />
+                    <Route path="jobs" element={<NakliyeciJobs />} />
+                    <Route path="drivers" element={<NakliyeciDrivers />} />
+                    <Route path="earnings" element={<NakliyeciEarnings />} />
                     <Route path="offers" element={<NakliyeciOffers />} />
-                    <Route path="vehicle-optimization" element={<NakliyeciVehicleOptimization />} />
-                    <Route path="notifications" element={<NakliyeciNotifications />} />
                     <Route path="shipments" element={<NakliyeciShipments />} />
-                    <Route path="carriers" element={<NakliyeciCarriers />} />
                     <Route path="analytics" element={<NakliyeciAnalytics />} />
                     <Route path="messages" element={<NakliyeciMessages />} />
+                    <Route path="notifications" element={<NakliyeciNotifications />} />
                     <Route path="settings" element={<NakliyeciSettings />} />
                     <Route path="help" element={<NakliyeciHelp />} />
+                    {/* Legacy routes */}
+                    <Route path="loads" element={<NakliyeciLoads />} />
+                    <Route path="open-shipments" element={<NakliyeciOpenShipments />} />
+                    <Route path="vehicle-optimization" element={<NakliyeciVehicleOptimization />} />
+                    <Route path="carriers" element={<NakliyeciCarriers />} />
                     <Route path="fleet-management" element={<FleetManagement />} />
                   </Route>
                   

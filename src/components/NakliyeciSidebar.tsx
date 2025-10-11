@@ -53,13 +53,12 @@ const NakliyeciSidebar: React.FC<NakliyeciSidebarProps> = ({ onLogout }) => {
   const location = useLocation();
 
   const navigation = [
-    { name: 'Dashboard', href: '/nakliyeci/dashboard', icon: Truck },
-    { name: 'Açık İlanlar', href: '/nakliyeci/open-shipments', icon: Package },
-    { name: 'Gönderiler', href: '/nakliyeci/shipments', icon: Package },
-    { name: 'Teklifler', href: '/nakliyeci/offers', icon: DollarSign },
-    { name: 'Taşıyıcılar', href: '/nakliyeci/carriers', icon: Users },
-    { name: 'Filo Yönetimi', href: '/nakliyeci/fleet-management', icon: Navigation },
-    { name: 'Yükler', href: '/nakliyeci/loads', icon: Package },
+    { name: 'Ana Sayfa', href: '/nakliyeci/dashboard', icon: Truck },
+    { name: 'Yeni Yük Ara', href: '/nakliyeci/jobs', icon: Search },
+    { name: 'Tekliflerim', href: '/nakliyeci/offers', icon: MessageSquare },
+    { name: 'Aktif Gönderiler', href: '/nakliyeci/shipments', icon: Package },
+    { name: 'Şoför Yönetimi', href: '/nakliyeci/drivers', icon: Users },
+    { name: 'Kazanç Raporu', href: '/nakliyeci/earnings', icon: DollarSign },
     { name: 'Analitik', href: '/nakliyeci/analytics', icon: BarChart3 },
     { name: 'Mesajlar', href: '/nakliyeci/messages', icon: MessageSquare },
     { name: 'Bildirimler', href: '/nakliyeci/notifications', icon: Bell },
