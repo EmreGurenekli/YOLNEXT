@@ -10,7 +10,7 @@ import {
   Plus, 
   Bell, 
   MessageSquare,
-  TrendingUp,
+  TrendingUp, 
   Truck,
   FileText,
   Settings,
@@ -76,23 +76,23 @@ const Dashboard = () => {
       availableJobs: 12
     },
     recentJobs: [
-      {
-        id: '1',
+    {
+      id: '1',
         jobId: 'JOB001234567',
         status: 'in_progress',
         from: 'İstanbul, Şişli',
-        to: 'Ankara, Çankaya',
+      to: 'Ankara, Çankaya',
         distance: '450 km',
         value: '₺450',
         date: '2024-01-15',
         description: 'Elektronik eşya - Laptop',
         vehicle: 'Kamyon',
         estimatedTime: '6 saat'
-      },
-      {
-        id: '2',
+    },
+    {
+      id: '2',
         jobId: 'JOB001234568',
-        status: 'completed',
+      status: 'completed',
         from: 'İstanbul, Beşiktaş',
         to: 'İzmir, Bornova',
         distance: '350 km',
@@ -101,11 +101,11 @@ const Dashboard = () => {
         description: 'Endüstriyel parça',
         vehicle: 'Tır',
         estimatedTime: '5 saat'
-      },
-      {
-        id: '3',
+    },
+    {
+      id: '3',
         jobId: 'JOB001234569',
-        status: 'pending',
+      status: 'pending',
         from: 'İstanbul, Şişli',
         to: 'İzmir, Konak',
         distance: '350 km',
@@ -269,320 +269,434 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
       <Helmet>
-        <title>Dashboard - YolNet</title>
+        <title>Dashboard - YolNet Taşıyıcı</title>
       </Helmet>
-      
-      <div className="p-6">
-        {/* Breadcrumb */}
-        <Breadcrumb
-          items={[
-            { label: 'Ana Sayfa', icon: <Package className="w-4 h-4" /> },
-            { label: 'Dashboard', icon: <BarChart3 className="w-4 h-4" /> }
-          ]}
-        />
 
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Merhaba {user?.firstName}! 👋
-          </h1>
-          <p className="text-gray-600">
-            Taşıyıcı işlerinizi takip edin ve yeni işler bulun
-          </p>
-        </div>
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
+        {/* Professional Header - Mobile Optimized */}
+        <div className="relative overflow-hidden bg-gradient-to-br from-slate-800 via-blue-900 to-indigo-900 rounded-3xl p-6 text-white shadow-2xl mb-8">
+          <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent"></div>
+          <div className="absolute top-0 right-0 w-80 h-80 bg-gradient-to-br from-blue-400/10 to-indigo-400/10 rounded-full -translate-y-40 translate-x-40"></div>
+          <div className="absolute bottom-0 left-0 w-64 h-64 bg-gradient-to-tr from-slate-400/10 to-blue-400/10 rounded-full translate-y-32 -translate-x-32"></div>
+          
+          <div className="relative z-10">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Toplam İş</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.totalJobs}</p>
-                <p className="text-sm text-green-600 flex items-center gap-1">
-                  <TrendingUp className="w-4 h-4" />
-                  +{stats.monthlyGrowth}% bu ay
-                </p>
+              <div className="flex-1">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="w-16 h-16 bg-gradient-to-br from-slate-800 to-blue-900 rounded-2xl flex items-center justify-center shadow-xl border border-white/20">
+              <User className="w-8 h-8 text-white" />
+                  </div>
+                  <div>
+                    <h1 className="text-3xl font-bold mb-2 bg-gradient-to-r from-white to-blue-200 bg-clip-text text-transparent">
+                      Merhaba {user?.firstName}! 👋
+                    </h1>
+                    <p className="text-slate-200 text-lg leading-relaxed">
+                      Taşıyıcı hizmetlerinize hoş geldiniz. 
+                      <br />
+                      <span className="text-blue-300 font-semibold">Esnek, karlı ve güvenli</span> işlerle kazanın.
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-2xl px-4 py-2 border border-white/20">
+                    <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse shadow-lg"></div>
+                    <span className="text-slate-200 font-medium">Çevrimiçi</span>
+                  </div>
+                  <div className="bg-white/10 backdrop-blur-sm rounded-2xl px-4 py-2 border border-white/20">
+                    <span className="text-slate-200 font-medium">{stats.totalJobs} İş</span>
+                  </div>
+                </div>
               </div>
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <Package className="w-6 h-6 text-blue-600" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Tamamlanan</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.completedJobs}</p>
-                <p className="text-sm text-green-600 flex items-center gap-1">
-                  <CheckCircle2 className="w-4 h-4" />
-                  %{stats.successRate} başarı
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <CheckCircle2 className="w-6 h-6 text-green-600" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Aktif İşler</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.activeJobs}</p>
-                <p className="text-sm text-blue-600 flex items-center gap-1">
-                  <Navigation className="w-4 h-4" />
-                  Şu anda yolda
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                <Navigation className="w-6 h-6 text-purple-600" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Toplam Kazanç</p>
-                <p className="text-2xl font-bold text-gray-900">₺{stats.totalEarnings.toFixed(2)}</p>
-                <p className="text-sm text-blue-600 flex items-center gap-1">
-                  <DollarSign className="w-4 h-4" />
-                  ₺{stats.thisMonthEarnings.toFixed(2)} bu ay
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-                <DollarSign className="w-6 h-6 text-yellow-600" />
+              
+              <div className="flex items-center gap-3">
+                <Link to="/tasiyici/messages" className="relative group">
+                  <button className="w-12 h-12 bg-white/10 backdrop-blur-sm rounded-2xl flex items-center justify-center hover:bg-white/20 transition-all duration-300 border border-white/20 group-hover:scale-110">
+                    <Bell size={20} className="text-white" />
+                    {unreadCount > 0 && (
+                      <span className="absolute -top-1 -right-1 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center font-bold shadow-lg">
+                        {unreadCount}
+                      </span>
+                    )}
+                  </button>
+                </Link>
+                <Link to="/tasiyici/jobs">
+                  <button className="bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 text-white px-6 py-3 rounded-lg font-medium transition-all duration-300 flex items-center gap-2 text-base shadow-lg hover:shadow-xl">
+                    <Plus size={20} />
+                    İş Ara
+                  </button>
+                </Link>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Additional Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Değerlendirme</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.rating}</p>
-                <p className="text-sm text-yellow-600 flex items-center gap-1">
-                  <Star className="w-4 h-4" />
-                  Ortalama puan
-                </p>
+        {/* Stats Grid - Ana Tasarım */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:border-blue-300 transition-all duration-300">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center">
+                <Package className="w-6 h-6 text-white" />
               </div>
-              <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-                <Star className="w-6 h-6 text-yellow-600" />
+              <div className="text-right">
+                <div className="text-2xl font-bold text-slate-900 mb-1">{stats.totalJobs}</div>
+                <div className="flex items-center gap-1">
+                  <svg className="w-3 h-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 17l9.2-9.2M17 17V7H7" />
+                  </svg>
+                  <span className="text-xs text-blue-600 font-semibold">+{stats.monthlyGrowth}% bu ay</span>
+                </div>
               </div>
             </div>
+            <div className="text-slate-700 font-semibold text-sm">Toplam İş</div>
+            <div className="mt-1 text-xs text-slate-500">Taşıyıcı iş sayısı</div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Toplam Yolculuk</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.totalTrips}</p>
-                <p className="text-sm text-blue-600 flex items-center gap-1">
-                  <Truck className="w-4 h-4" />
-                  Tamamlanan yolculuk
-                </p>
+          <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:border-blue-300 transition-all duration-300">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center">
+                <CheckCircle2 className="w-6 h-6 text-white" />
               </div>
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <Truck className="w-6 h-6 text-blue-600" />
+              <div className="text-right">
+                <div className="text-2xl font-bold text-slate-900 mb-1">{stats.completedJobs}</div>
+                <div className="flex items-center gap-1">
+                  <svg className="w-3 h-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 17l9.2-9.2M17 17V7H7" />
+                  </svg>
+                  <span className="text-xs text-blue-600 font-semibold">%{stats.successRate} başarı</span>
+                </div>
               </div>
             </div>
+            <div className="text-slate-700 font-semibold text-sm">Tamamlanan</div>
+            <div className="mt-1 text-xs text-slate-500">Başarıyla tamamlanan işler</div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Müsait İşler</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.availableJobs}</p>
-                <p className="text-sm text-green-600 flex items-center gap-1">
-                  <Plus className="w-4 h-4" />
-                  Başvurabilir
-                </p>
+          <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:border-blue-300 transition-all duration-300">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center">
+                <Navigation className="w-6 h-6 text-white" />
               </div>
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <Plus className="w-6 h-6 text-green-600" />
+              <div className="text-right">
+                <div className="text-2xl font-bold text-slate-900 mb-1">{stats.activeJobs}</div>
+                <div className="flex items-center gap-1">
+                  <svg className="w-3 h-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 17l9.2-9.2M17 17V7H7" />
+                  </svg>
+                  <span className="text-xs text-blue-600 font-semibold">Şu anda yolda</span>
+                </div>
               </div>
             </div>
+            <div className="text-slate-700 font-semibold text-sm">Aktif İşler</div>
+            <div className="mt-1 text-xs text-slate-500">Devam eden işler</div>
+          </div>
+
+          <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:border-blue-300 transition-all duration-300">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center">
+                <DollarSign className="w-6 h-6 text-white" />
+              </div>
+              <div className="text-right">
+                <div className="text-2xl font-bold text-slate-900 mb-1">₺{stats.totalEarnings.toLocaleString()}</div>
+                <div className="flex items-center gap-1">
+                  <svg className="w-3 h-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 17l9.2-9.2M17 17V7H7" />
+                  </svg>
+                  <span className="text-xs text-blue-600 font-semibold">₺{stats.thisMonthEarnings.toLocaleString()} bu ay</span>
+                </div>
+              </div>
+            </div>
+            <div className="text-slate-700 font-semibold text-sm">Toplam Kazanç</div>
+            <div className="mt-1 text-xs text-slate-500">Taşıyıcı kazançları</div>
+          </div>
+          </div>
+
+        {/* Additional Stats - Ana Tasarım */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:border-blue-300 transition-all duration-300">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center">
+                <Star className="w-6 h-6 text-white" />
+              </div>
+              <div className="text-right">
+                <div className="text-2xl font-bold text-slate-900 mb-1">{stats.rating}</div>
+                <div className="flex items-center gap-1">
+                  <svg className="w-3 h-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 17l9.2-9.2M17 17V7H7" />
+                  </svg>
+                  <span className="text-xs text-blue-600 font-semibold">Ortalama puan</span>
+                </div>
+              </div>
+            </div>
+            <div className="text-slate-700 font-semibold text-sm">Değerlendirme</div>
+            <div className="mt-1 text-xs text-slate-500">Müşteri puanlaması</div>
+          </div>
+
+          <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:border-blue-300 transition-all duration-300">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center">
+                <Truck className="w-6 h-6 text-white" />
+              </div>
+              <div className="text-right">
+                <div className="text-2xl font-bold text-slate-900 mb-1">{stats.totalTrips}</div>
+                <div className="flex items-center gap-1">
+                  <svg className="w-3 h-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 17l9.2-9.2M17 17V7H7" />
+                  </svg>
+                  <span className="text-xs text-blue-600 font-semibold">Tamamlanan yolculuk</span>
+                </div>
+              </div>
+            </div>
+            <div className="text-slate-700 font-semibold text-sm">Toplam Yolculuk</div>
+            <div className="mt-1 text-xs text-slate-500">Başarıyla tamamlanan</div>
+          </div>
+
+          <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:border-blue-300 transition-all duration-300">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center">
+                <Plus className="w-6 h-6 text-white" />
+              </div>
+              <div className="text-right">
+                <div className="text-2xl font-bold text-slate-900 mb-1">{stats.availableJobs}</div>
+                <div className="flex items-center gap-1">
+                  <svg className="w-3 h-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 17l9.2-9.2M17 17V7H7" />
+                  </svg>
+                  <span className="text-xs text-blue-600 font-semibold">Başvurabilir</span>
+                </div>
+              </div>
+            </div>
+            <div className="text-slate-700 font-semibold text-sm">Müsait İşler</div>
+            <div className="mt-1 text-xs text-slate-500">Yeni iş fırsatları</div>
           </div>
         </div>
 
-        {/* Quick Actions */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Hızlı İşlemler</h3>
-            <div className="space-y-3">
-              <Link
-                to="/tasiyici/jobs"
-                className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
-              >
-                <Plus className="w-5 h-5 text-blue-600" />
-                <span className="font-medium text-blue-900">Yeni İş Ara</span>
-              </Link>
-              <Link
-                to="/tasiyici/active-jobs"
-                className="flex items-center gap-3 p-3 bg-green-50 rounded-lg hover:bg-green-100 transition-colors"
-              >
-                <Navigation className="w-5 h-5 text-green-600" />
-                <span className="font-medium text-green-900">Aktif İşlerim</span>
-              </Link>
-              <Link
-                to="/tasiyici/completed-jobs"
-                className="flex items-center gap-3 p-3 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors"
-              >
-                <CheckCircle2 className="w-5 h-5 text-purple-600" />
-                <span className="font-medium text-purple-900">Tamamlanan İşler</span>
-              </Link>
-              <Link
-                to="/tasiyici/earnings"
-                className="flex items-center gap-3 p-3 bg-orange-50 rounded-lg hover:bg-orange-100 transition-colors"
-              >
-                <DollarSign className="w-5 h-5 text-orange-600" />
-                <span className="font-medium text-orange-900">Kazanç Raporu</span>
-              </Link>
+        {/* Quick Actions - Ana Tasarım */}
+        <div className="bg-white rounded-2xl p-8 shadow-xl border border-slate-200 mb-8">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h2 className="text-2xl font-bold text-slate-900 mb-2">Hızlı İşlemler</h2>
+              <p className="text-slate-600">Taşıyıcı hizmetlerimize hızlı erişim</p>
+            </div>
+            <div className="w-14 h-14 bg-gradient-to-br from-slate-800 to-blue-900 rounded-2xl flex items-center justify-center shadow-lg">
+              <User className="w-7 h-7 text-white" />
             </div>
           </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            <Link to="/tasiyici/jobs">
+              <div className="group bg-white rounded-2xl p-6 shadow-lg border border-slate-200 hover:shadow-xl hover:border-blue-300 transition-all duration-300 hover:-translate-y-2">
+                <div className="flex flex-col items-center text-center">
+                  <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-800 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300 mb-4">
+                    <Plus className="w-6 h-6 text-white" />
+                  </div>
+                  <h3 className="text-lg font-bold text-slate-900 mb-2">Yeni İş Ara</h3>
+                  <p className="text-sm text-slate-600">Müsait işleri keşfet</p>
+                  <div className="mt-3 w-8 h-1 bg-blue-600 rounded-full group-hover:w-12 transition-all duration-300"></div>
+                </div>
+              </div>
+            </Link>
 
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Son İşlerim</h3>
-            <div className="space-y-3">
+            <Link to="/tasiyici/active-jobs">
+              <div className="group bg-white rounded-2xl p-6 shadow-lg border border-slate-200 hover:shadow-xl hover:border-green-300 transition-all duration-300 hover:-translate-y-2">
+                <div className="flex flex-col items-center text-center">
+                  <div className="w-12 h-12 bg-gradient-to-br from-green-600 to-green-800 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300 mb-4">
+                    <Navigation className="w-6 h-6 text-white" />
+                  </div>
+                  <h3 className="text-lg font-bold text-slate-900 mb-2">Aktif İşlerim</h3>
+                  <p className="text-sm text-slate-600">Devam eden işler</p>
+                  <div className="mt-3 w-8 h-1 bg-green-600 rounded-full group-hover:w-12 transition-all duration-300"></div>
+                </div>
+              </div>
+            </Link>
+
+            <Link to="/tasiyici/completed-jobs">
+              <div className="group bg-white rounded-2xl p-6 shadow-lg border border-slate-200 hover:shadow-xl hover:border-purple-300 transition-all duration-300 hover:-translate-y-2">
+                <div className="flex flex-col items-center text-center">
+                  <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-purple-800 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300 mb-4">
+                    <CheckCircle2 className="w-6 h-6 text-white" />
+                  </div>
+                  <h3 className="text-lg font-bold text-slate-900 mb-2">Tamamlanan İşler</h3>
+                  <p className="text-sm text-slate-600">Geçmiş işleriniz</p>
+                  <div className="mt-3 w-8 h-1 bg-purple-600 rounded-full group-hover:w-12 transition-all duration-300"></div>
+                </div>
+                        </div>
+            </Link>
+
+            <Link to="/tasiyici/earnings">
+              <div className="group bg-white rounded-2xl p-6 shadow-lg border border-slate-200 hover:shadow-xl hover:border-orange-300 transition-all duration-300 hover:-translate-y-2">
+                <div className="flex flex-col items-center text-center">
+                  <div className="w-12 h-12 bg-gradient-to-br from-orange-600 to-orange-800 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300 mb-4">
+                    <DollarSign className="w-6 h-6 text-white" />
+                          </div>
+                  <h3 className="text-lg font-bold text-slate-900 mb-2">Kazanç Raporu</h3>
+                  <p className="text-sm text-slate-600">Gelir analizi</p>
+                  <div className="mt-3 w-8 h-1 bg-orange-600 rounded-full group-hover:w-12 transition-all duration-300"></div>
+                </div>
+              </div>
+            </Link>
+          </div>
+        </div>
+
+        {/* Recent Jobs & Available Jobs - Ana Tasarım */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+          {/* Son İşlerim */}
+          <div className="bg-white rounded-2xl p-8 shadow-xl border border-slate-200">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-2xl font-bold text-slate-900 mb-2">Son İşlerim</h2>
+                <p className="text-slate-600">Son tamamladığınız işler</p>
+              </div>
+              <div className="w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-xl flex items-center justify-center shadow-lg">
+                <Package className="w-6 h-6 text-white" />
+              </div>
+            </div>
+            <div className="space-y-4">
               {recentJobs.slice(0, 3).map((job) => (
-                <div key={job.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${getStatusColor(job.status)}`}>
+                <div key={job.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-xl hover:bg-blue-50 transition-colors">
+                  <div className="flex items-center gap-4">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${getStatusColor(job.status)}`}>
                       {getStatusIcon(job.status)}
-                    </div>
+                      </div>
                     <div>
-                      <p className="font-medium text-gray-900">{job.jobId}</p>
-                      <p className="text-sm text-gray-600">{job.from} → {job.to}</p>
+                      <p className="font-semibold text-slate-900">{job.jobId}</p>
+                      <p className="text-sm text-slate-600">{job.from} → {job.to}</p>
+                      <p className="text-xs text-slate-500">{job.vehicle}</p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-medium text-gray-900">{job.value}</p>
-                    <p className="text-xs text-gray-500">{job.vehicle}</p>
+                    <p className="text-lg font-bold text-blue-700">{job.value}</p>
+                    <p className="text-xs text-slate-500">{job.distance}</p>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
             <Link
               to="/tasiyici/active-jobs"
-              className="flex items-center gap-2 text-blue-600 hover:text-blue-800 mt-3"
+              className="flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium mt-4"
             >
-              <span className="text-sm font-medium">Tümünü Gör</span>
+              Tümünü Gör
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Müsait İşler</h3>
-            <div className="space-y-3">
+          {/* Müsait İşler */}
+          <div className="bg-white rounded-2xl p-8 shadow-xl border border-slate-200">
+              <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-2xl font-bold text-slate-900 mb-2">Müsait İşler</h2>
+                <p className="text-slate-600">Yeni iş fırsatları</p>
+              </div>
+              <div className="w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-xl flex items-center justify-center shadow-lg">
+                <Plus className="w-6 h-6 text-white" />
+              </div>
+              </div>
+              <div className="space-y-4">
               {availableJobs.slice(0, 3).map((job) => (
-                <div key={job.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                      <Package className="w-4 h-4 text-blue-600" />
+                <div key={job.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-xl hover:bg-green-50 transition-colors">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-800 rounded-xl flex items-center justify-center">
+                      <Package className="w-5 h-5 text-white" />
                     </div>
-                    <div>
-                      <p className="font-medium text-gray-900">{job.jobId}</p>
-                      <p className="text-sm text-gray-600">{job.from} → {job.to}</p>
+                      <div>
+                      <p className="font-semibold text-slate-900">{job.jobId}</p>
+                      <p className="text-sm text-slate-600">{job.from} → {job.to}</p>
+                      <p className="text-xs text-slate-500">{job.vehicle} • {job.estimatedTime}</p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-medium text-gray-900">{job.value}</p>
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getPriorityColor(job.priority)}`}>
+                    <p className="text-lg font-bold text-green-700">{job.value}</p>
+                    <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getPriorityColor(job.priority)}`}>
                       {getPriorityText(job.priority)}
                     </span>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
             <Link
               to="/tasiyici/jobs"
-              className="flex items-center gap-2 text-blue-600 hover:text-blue-800 mt-3"
+              className="flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium mt-4"
             >
-              <span className="text-sm font-medium">Tümünü Gör</span>
+              Tümünü Gör
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
         </div>
 
-        {/* Recent Jobs Table */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900">Son İşlerim</h3>
-          </div>
+        {/* Recent Jobs Table - Ana Tasarım */}
+        <div className="bg-white rounded-2xl p-8 shadow-xl border border-slate-200 mb-8">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-2xl font-bold text-slate-900 mb-2">Son İşlerim</h2>
+              <p className="text-slate-600">Tüm işlerinizi detaylı görüntüleyin</p>
+            </div>
+            <Link to="/tasiyici/active-jobs" className="text-blue-600 hover:text-blue-700 font-medium flex items-center gap-2">
+              Tümünü Gör
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+              </div>
+          
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    İş No
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Durum
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Güzergah
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Araç
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Mesafe
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Tutar
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Tarih
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    İşlemler
-                  </th>
+              <thead>
+                <tr className="border-b border-slate-200 bg-gradient-to-r from-slate-50 to-blue-50">
+                  <th className="text-left py-3 px-4 font-semibold text-slate-800">İş No</th>
+                  <th className="text-left py-3 px-4 font-semibold text-slate-800">Durum</th>
+                  <th className="text-left py-3 px-4 font-semibold text-slate-800">Güzergah</th>
+                  <th className="text-left py-3 px-4 font-semibold text-slate-800">Araç</th>
+                  <th className="text-left py-3 px-4 font-semibold text-slate-800">Mesafe</th>
+                  <th className="text-left py-3 px-4 font-semibold text-slate-800">Tutar</th>
+                  <th className="text-left py-3 px-4 font-semibold text-slate-800">Tarih</th>
+                  <th className="text-left py-3 px-4 font-semibold text-slate-800">İşlemler</th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody>
                 {recentJobs.map((job) => (
-                  <tr key={job.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">
-                      {job.jobId}
+                  <tr key={job.id} className="border-b border-slate-100 hover:bg-blue-50 transition-colors">
+                    <td className="py-4 px-4">
+                      <div className="font-mono text-sm font-semibold text-slate-800">{job.jobId}</div>
+                      <div className="text-xs text-slate-500">{job.date}</div>
+                      <div className="text-xs text-slate-500">{job.description}</div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(job.status)}`}>
+                    <td className="py-4 px-4">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        job.status === 'completed' ? 'bg-green-100 text-green-800' :
+                        job.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
+                        job.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-red-100 text-red-800'
+                      }`}>
+                        {job.status === 'in_progress' ? <Navigation className="w-3 h-3 mr-1" /> :
+                         job.status === 'pending' ? <Clock className="w-3 h-3 mr-1" /> :
+                         job.status === 'completed' ? <CheckCircle2 className="w-3 h-3 mr-1" /> :
+                         <X className="w-3 h-3 mr-1" />}
                         {getStatusText(job.status)}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {job.from} → {job.to}
+                    <td className="py-4 px-4">
+                      <div className="text-sm font-medium text-slate-900">{job.from} → {job.to}</div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {job.vehicle}
+                    <td className="py-4 px-4">
+                      <div className="text-sm font-medium text-slate-900">{job.vehicle}</div>
+                      <div className="text-xs text-slate-500">{job.estimatedTime}</div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {job.distance}
+                    <td className="py-4 px-4">
+                      <div className="text-sm font-medium text-slate-900">{job.distance}</div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {job.value}
+                    <td className="py-4 px-4">
+                      <div className="text-sm font-bold text-blue-700">{job.value}</div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {job.date}
+                    <td className="py-4 px-4">
+                      <div className="text-sm text-slate-500">{job.date}</div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="py-4 px-4">
                       <div className="flex items-center gap-2">
-                        <button className="text-blue-600 hover:text-blue-800">
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        <button className="text-yellow-600 hover:text-yellow-800">
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button className="text-red-600 hover:text-red-800">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
+                        <button className="px-3 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs font-medium rounded-lg transition-colors">
+                          Detay
+            </button>
+                        <button className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded-lg transition-colors">
+                          Mesaj
+            </button>
+              </div>
                     </td>
                   </tr>
                 ))}

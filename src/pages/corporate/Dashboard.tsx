@@ -30,7 +30,8 @@ import {
   Edit,
   Trash2,
   TrendingDown,
-  Activity
+  Activity,
+  X
 } from 'lucide-react';
 import Breadcrumb from '../../components/common/Breadcrumb';
 import EmptyState from '../../components/common/EmptyState';
@@ -153,7 +154,7 @@ const Dashboard = () => {
   useEffect(() => {
     // Simulate API call
     const loadData = async () => {
-      setIsLoading(true);
+    setIsLoading(true);
       
       // Simulate loading delay
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -168,7 +169,7 @@ const Dashboard = () => {
 
     loadData();
   }, []);
-
+  
   const getStatusColor = (status) => {
     switch (status) {
       case 'pending':
@@ -260,272 +261,289 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
       <Helmet>
-        <title>Dashboard - YolNet</title>
+        <title>Dashboard - YolNet Kurumsal</title>
       </Helmet>
-      
-      <div className="p-6">
-        {/* Breadcrumb */}
-        <Breadcrumb
-          items={[
-            { label: 'Ana Sayfa', icon: <Package className="w-4 h-4" /> },
-            { label: 'Dashboard', icon: <BarChart3 className="w-4 h-4" /> }
-          ]}
-        />
 
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Merhaba {user?.firstName}! 👋
-          </h1>
-          <p className="text-gray-600">
-            Kurumsal gönderilerinizi takip edin ve yeni gönderi oluşturun
-          </p>
-        </div>
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
+        {/* Professional Header - Mobile Optimized */}
+        <div className="relative overflow-hidden bg-gradient-to-br from-slate-800 via-blue-900 to-indigo-900 rounded-3xl p-6 text-white shadow-2xl mb-8">
+          <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent"></div>
+          <div className="absolute top-0 right-0 w-80 h-80 bg-gradient-to-br from-blue-400/10 to-indigo-400/10 rounded-full -translate-y-40 translate-x-40"></div>
+          <div className="absolute bottom-0 left-0 w-64 h-64 bg-gradient-to-tr from-slate-400/10 to-blue-400/10 rounded-full translate-y-32 -translate-x-32"></div>
+          
+          <div className="relative z-10">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Toplam Gönderi</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.totalShipments}</p>
-                <p className="text-sm text-green-600 flex items-center gap-1">
-                  <TrendingUp className="w-4 h-4" />
-                  +{stats.monthlyGrowth}% bu ay
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <Package className="w-6 h-6 text-blue-600" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Teslim Edilen</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.deliveredShipments}</p>
-                <p className="text-sm text-green-600 flex items-center gap-1">
-                  <CheckCircle2 className="w-4 h-4" />
-                  %{stats.successRate} başarı
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <CheckCircle2 className="w-6 h-6 text-green-600" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Aktif Nakliyeci</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.activeCarriers}</p>
-                <p className="text-sm text-blue-600 flex items-center gap-1">
-                  <Truck className="w-4 h-4" />
-                  Ortaklarınız
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                <Truck className="w-6 h-6 text-purple-600" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Toplam Harcama</p>
-                <p className="text-2xl font-bold text-gray-900">₺{stats.totalSpent.toFixed(2)}</p>
-                <p className="text-sm text-blue-600 flex items-center gap-1">
-                  <DollarSign className="w-4 h-4" />
-                  ₺{stats.thisMonthSpent.toFixed(2)} bu ay
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-                <DollarSign className="w-6 h-6 text-yellow-600" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Actions */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Hızlı İşlemler</h3>
-            <div className="space-y-3">
-              <Link
-                to="/corporate/shipments/new"
-                className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
-              >
-                <Plus className="w-5 h-5 text-blue-600" />
-                <span className="font-medium text-blue-900">Yeni Gönderi Oluştur</span>
-              </Link>
-              <Link
-                to="/corporate/offers"
-                className="flex items-center gap-3 p-3 bg-green-50 rounded-lg hover:bg-green-100 transition-colors"
-              >
-                <MessageSquare className="w-5 h-5 text-green-600" />
-                <span className="font-medium text-green-900">Teklifleri Görüntüle</span>
-              </Link>
-              <Link
-                to="/corporate/carriers"
-                className="flex items-center gap-3 p-3 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors"
-              >
-                <Truck className="w-5 h-5 text-purple-600" />
-                <span className="font-medium text-purple-900">Nakliyecileri Keşfet</span>
-              </Link>
-              <Link
-                to="/corporate/analytics"
-                className="flex items-center gap-3 p-3 bg-orange-50 rounded-lg hover:bg-orange-100 transition-colors"
-              >
-                <BarChart3 className="w-5 h-5 text-orange-600" />
-                <span className="font-medium text-orange-900">Analitik Raporlar</span>
-              </Link>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Son Gönderiler</h3>
-            <div className="space-y-3">
-              {recentShipments.slice(0, 3).map((shipment) => (
-                <div key={shipment.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${getStatusColor(shipment.status)}`}>
-                      {getStatusIcon(shipment.status)}
-                    </div>
-                    <div>
-                      <p className="font-medium text-gray-900">{shipment.trackingNumber}</p>
-                      <p className="text-sm text-gray-600">{shipment.from} → {shipment.to}</p>
-                    </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="w-16 h-16 bg-gradient-to-br from-slate-800 to-blue-900 rounded-2xl flex items-center justify-center shadow-xl border border-white/20">
+                    <Building2 className="w-8 h-8 text-white" />
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm font-medium text-gray-900">{shipment.value}</p>
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getPriorityColor(shipment.priority)}`}>
-                      {getPriorityText(shipment.priority)}
-                    </span>
+                  <div>
+                    <h1 className="text-3xl font-bold mb-2 bg-gradient-to-r from-white to-blue-200 bg-clip-text text-transparent">
+                      Merhaba {user?.firstName}! 👋
+                    </h1>
+                    <p className="text-slate-200 text-lg leading-relaxed">
+                      Kurumsal nakliye hizmetlerinize hoş geldiniz. 
+                      <br />
+                      <span className="text-blue-300 font-semibold">Profesyonel, güvenilir ve ekonomik</span> çözümlerimizle yanınızdayız.
+                    </p>
                   </div>
                 </div>
-              ))}
+                
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-2xl px-4 py-2 border border-white/20">
+                    <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse shadow-lg"></div>
+                    <span className="text-slate-200 font-medium">Çevrimiçi</span>
+                  </div>
+                  <div className="bg-white/10 backdrop-blur-sm rounded-2xl px-4 py-2 border border-white/20">
+                    <span className="text-slate-200 font-medium">{stats.totalShipments} Gönderi</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-3">
+                <Link to="/corporate/notifications" className="relative group">
+                  <button className="w-12 h-12 bg-white/10 backdrop-blur-sm rounded-2xl flex items-center justify-center hover:bg-white/20 transition-all duration-300 border border-white/20 group-hover:scale-110">
+                    <Bell size={20} className="text-white" />
+                    {unreadCount > 0 && (
+                      <span className="absolute -top-1 -right-1 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center font-bold shadow-lg">
+                        {unreadCount}
+                      </span>
+                    )}
+                  </button>
+                </Link>
+                <Link to="/corporate/shipments/new">
+                  <button className="bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 text-white px-6 py-3 rounded-lg font-medium transition-all duration-300 flex items-center gap-2 text-base shadow-lg hover:shadow-xl">
+                    <Plus size={20} />
+                    Gönderi Oluştur
+                  </button>
+                </Link>
+              </div>
             </div>
-            <Link
-              to="/corporate/shipments"
-              className="flex items-center gap-2 text-blue-600 hover:text-blue-800 mt-3"
-            >
-              <span className="text-sm font-medium">Tümünü Gör</span>
+          </div>
+        </div>
+
+        {/* Stats Grid - Ana Tasarım */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:border-blue-300 transition-all duration-300">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center">
+                <Package className="w-6 h-6 text-white" />
+              </div>
+              <div className="text-right">
+                <div className="text-2xl font-bold text-slate-900 mb-1">{stats.totalShipments}</div>
+                <div className="flex items-center gap-1">
+                  <svg className="w-3 h-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 17l9.2-9.2M17 17V7H7" />
+                  </svg>
+                  <span className="text-xs text-blue-600 font-semibold">+{stats.monthlyGrowth}% bu ay</span>
+                </div>
+              </div>
+            </div>
+            <div className="text-slate-700 font-semibold text-sm">Toplam Gönderi</div>
+            <div className="mt-1 text-xs text-slate-500">Kurumsal gönderi sayısı</div>
+          </div>
+
+          <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:border-blue-300 transition-all duration-300">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center">
+                <CheckCircle2 className="w-6 h-6 text-white" />
+              </div>
+              <div className="text-right">
+                <div className="text-2xl font-bold text-slate-900 mb-1">{stats.deliveredShipments}</div>
+                <div className="flex items-center gap-1">
+                  <svg className="w-3 h-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 17l9.2-9.2M17 17V7H7" />
+                  </svg>
+                  <span className="text-xs text-blue-600 font-semibold">+{Math.round(stats.deliveredShipments * 0.15)} bu ay</span>
+                </div>
+              </div>
+            </div>
+            <div className="text-slate-700 font-semibold text-sm">Teslim Edildi</div>
+            <div className="mt-1 text-xs text-slate-500">Başarıyla teslim edilen</div>
+          </div>
+
+          <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:border-blue-300 transition-all duration-300">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center">
+                <Truck className="w-6 h-6 text-white" />
+              </div>
+              <div className="text-right">
+                <div className="text-2xl font-bold text-slate-900 mb-1">{stats.activeCarriers}</div>
+                <div className="flex items-center gap-1">
+                  <svg className="w-3 h-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 17l9.2-9.2M17 17V7H7" />
+                  </svg>
+                  <span className="text-xs text-blue-600 font-semibold">Aktif ortaklar</span>
+                </div>
+              </div>
+            </div>
+            <div className="text-slate-700 font-semibold text-sm">Aktif Nakliyeci</div>
+            <div className="mt-1 text-xs text-slate-500">Çalışan ortaklarınız</div>
+          </div>
+
+          <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:border-blue-300 transition-all duration-300">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center">
+                <DollarSign className="w-6 h-6 text-white" />
+              </div>
+              <div className="text-right">
+                <div className="text-2xl font-bold text-slate-900 mb-1">₺{stats.totalSpent.toLocaleString()}</div>
+                <div className="flex items-center gap-1">
+                  <svg className="w-3 h-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 17l9.2-9.2M17 17V7H7" />
+                  </svg>
+                  <span className="text-xs text-blue-600 font-semibold">₺{stats.thisMonthSpent.toLocaleString()} bu ay</span>
+                </div>
+              </div>
+            </div>
+            <div className="text-slate-700 font-semibold text-sm">Toplam Harcama</div>
+            <div className="mt-1 text-xs text-slate-500">Nakliye harcamaları</div>
+          </div>
+        </div>
+
+        {/* Quick Actions - Ana Tasarım */}
+        <div className="bg-white rounded-2xl p-8 shadow-xl border border-slate-200 mb-8">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h2 className="text-2xl font-bold text-slate-900 mb-2">Hızlı İşlemler</h2>
+              <p className="text-slate-600">Kurumsal hizmetlerimize hızlı erişim</p>
+            </div>
+            <div className="w-14 h-14 bg-gradient-to-br from-slate-800 to-blue-900 rounded-2xl flex items-center justify-center shadow-lg">
+              <Building2 className="w-7 h-7 text-white" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            <Link to="/corporate/shipments/new">
+              <div className="group bg-white rounded-2xl p-6 shadow-lg border border-slate-200 hover:shadow-xl hover:border-blue-300 transition-all duration-300 hover:-translate-y-2">
+                <div className="flex flex-col items-center text-center">
+                  <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-800 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300 mb-4">
+                    <Plus className="w-6 h-6 text-white" />
+                  </div>
+                  <h3 className="text-lg font-bold text-slate-900 mb-2">Yeni Gönderi</h3>
+                  <p className="text-sm text-slate-600">Kurumsal gönderi oluştur</p>
+                  <div className="mt-3 w-8 h-1 bg-blue-600 rounded-full group-hover:w-12 transition-all duration-300"></div>
+                </div>
+              </div>
+            </Link>
+
+            <Link to="/corporate/offers">
+              <div className="group bg-white rounded-2xl p-6 shadow-lg border border-slate-200 hover:shadow-xl hover:border-green-300 transition-all duration-300 hover:-translate-y-2">
+                <div className="flex flex-col items-center text-center">
+                  <div className="w-12 h-12 bg-gradient-to-br from-green-600 to-green-800 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300 mb-4">
+                    <MessageSquare className="w-6 h-6 text-white" />
+                  </div>
+                  <h3 className="text-lg font-bold text-slate-900 mb-2">Teklifler</h3>
+                  <p className="text-sm text-slate-600">Teklifleri görüntüle</p>
+                  <div className="mt-3 w-8 h-1 bg-green-600 rounded-full group-hover:w-12 transition-all duration-300"></div>
+                </div>
+              </div>
+            </Link>
+
+            <Link to="/corporate/carriers">
+              <div className="group bg-white rounded-2xl p-6 shadow-lg border border-slate-200 hover:shadow-xl hover:border-purple-300 transition-all duration-300 hover:-translate-y-2">
+                <div className="flex flex-col items-center text-center">
+                  <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-purple-800 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300 mb-4">
+                    <Truck className="w-6 h-6 text-white" />
+                  </div>
+                  <h3 className="text-lg font-bold text-slate-900 mb-2">Nakliyeciler</h3>
+                  <p className="text-sm text-slate-600">Ortakları keşfet</p>
+                  <div className="mt-3 w-8 h-1 bg-purple-600 rounded-full group-hover:w-12 transition-all duration-300"></div>
+                </div>
+              </div>
+            </Link>
+
+            <Link to="/corporate/analytics">
+              <div className="group bg-white rounded-2xl p-6 shadow-lg border border-slate-200 hover:shadow-xl hover:border-orange-300 transition-all duration-300 hover:-translate-y-2">
+                <div className="flex flex-col items-center text-center">
+                  <div className="w-12 h-12 bg-gradient-to-br from-orange-600 to-orange-800 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300 mb-4">
+                    <BarChart3 className="w-6 h-6 text-white" />
+                  </div>
+                  <h3 className="text-lg font-bold text-slate-900 mb-2">Analitik</h3>
+                  <p className="text-sm text-slate-600">Raporları görüntüle</p>
+                  <div className="mt-3 w-8 h-1 bg-orange-600 rounded-full group-hover:w-12 transition-all duration-300"></div>
+                </div>
+              </div>
+            </Link>
+          </div>
+        </div>
+
+
+        {/* Recent Shipments Table - Ana Tasarım */}
+        <div className="bg-white rounded-2xl p-8 shadow-xl border border-slate-200 mb-8">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-2xl font-bold text-slate-900 mb-2">Son Gönderiler</h2>
+              <p className="text-slate-600">Kurumsal gönderilerinizi takip edin</p>
+            </div>
+            <Link to="/corporate/shipments" className="text-blue-600 hover:text-blue-700 font-medium flex items-center gap-2">
+              Tümünü Gör
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
-
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Son Teklifler</h3>
-            <div className="space-y-3">
-              {recentOffers.slice(0, 3).map((offer) => (
-                <div key={offer.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                      <Truck className="w-4 h-4 text-blue-600" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-gray-900">{offer.carrierName}</p>
-                      <p className="text-sm text-gray-600">{offer.deliveryTime}</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-medium text-gray-900">{offer.price}</p>
-                    <div className="flex items-center gap-1">
-                      <Star className="w-3 h-3 text-yellow-500 fill-current" />
-                      <span className="text-xs text-gray-500">{offer.rating}</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <Link
-              to="/corporate/offers"
-              className="flex items-center gap-2 text-blue-600 hover:text-blue-800 mt-3"
-            >
-              <span className="text-sm font-medium">Tümünü Gör</span>
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-          </div>
-        </div>
-
-        {/* Recent Shipments Table */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900">Son Gönderiler</h3>
-          </div>
+          
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Gönderi No
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Durum
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Güzergah
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Ağırlık
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Tutar
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Öncelik
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Tarih
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    İşlemler
-                  </th>
+              <thead>
+                <tr className="border-b border-slate-200 bg-gradient-to-r from-slate-50 to-blue-50">
+                  <th className="text-left py-3 px-4 font-semibold text-slate-800">Gönderi No</th>
+                  <th className="text-left py-3 px-4 font-semibold text-slate-800">Durum</th>
+                  <th className="text-left py-3 px-4 font-semibold text-slate-800">Güzergah</th>
+                  <th className="text-left py-3 px-4 font-semibold text-slate-800">Ağırlık</th>
+                  <th className="text-left py-3 px-4 font-semibold text-slate-800">Tutar</th>
+                  <th className="text-left py-3 px-4 font-semibold text-slate-800">Öncelik</th>
+                  <th className="text-left py-3 px-4 font-semibold text-slate-800">Tarih</th>
+                  <th className="text-left py-3 px-4 font-semibold text-slate-800">İşlemler</th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody>
                 {recentShipments.map((shipment) => (
-                  <tr key={shipment.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">
-                      {shipment.trackingNumber}
+                  <tr key={shipment.id} className="border-b border-slate-100 hover:bg-blue-50 transition-colors">
+                    <td className="py-4 px-4">
+                      <div className="font-mono text-sm font-semibold text-slate-800">{shipment.trackingNumber}</div>
+                      <div className="text-xs text-slate-500">{shipment.date}</div>
+                      <div className="text-xs text-slate-500">{shipment.description}</div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(shipment.status)}`}>
+                    <td className="py-4 px-4">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        shipment.status === 'delivered' ? 'bg-green-100 text-green-800' :
+                        shipment.status === 'in_transit' ? 'bg-blue-100 text-blue-800' :
+                        shipment.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-red-100 text-red-800'
+                      }`}>
+                        {shipment.status === 'in_transit' ? <Truck className="w-3 h-3 mr-1" /> :
+                         shipment.status === 'pending' ? <Clock className="w-3 h-3 mr-1" /> :
+                         shipment.status === 'delivered' ? <CheckCircle2 className="w-3 h-3 mr-1" /> :
+                         <X className="w-3 h-3 mr-1" />}
                         {getStatusText(shipment.status)}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {shipment.from} → {shipment.to}
+                    <td className="py-4 px-4">
+                      <div className="text-sm font-medium text-slate-900">{shipment.from} → {shipment.to}</div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {shipment.weight}
+                    <td className="py-4 px-4">
+                      <div className="text-sm font-medium text-slate-900">{shipment.weight}</div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {shipment.value}
+                    <td className="py-4 px-4">
+                      <div className="text-sm font-bold text-blue-700">{shipment.value}</div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getPriorityColor(shipment.priority)}`}>
+                    <td className="py-4 px-4">
+                      <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getPriorityColor(shipment.priority)}`}>
                         {getPriorityText(shipment.priority)}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {shipment.date}
+                    <td className="py-4 px-4">
+                      <div className="text-sm text-slate-500">{shipment.date}</div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="py-4 px-4">
                       <div className="flex items-center gap-2">
-                        <button className="text-blue-600 hover:text-blue-800">
-                          <Eye className="w-4 h-4" />
+                        <button className="px-3 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs font-medium rounded-lg transition-colors">
+                          Detay
                         </button>
-                        <button className="text-yellow-600 hover:text-yellow-800">
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button className="text-red-600 hover:text-red-800">
-                          <Trash2 className="w-4 h-4" />
+                        <button className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded-lg transition-colors">
+                          Mesaj
                         </button>
                       </div>
                     </td>
@@ -540,6 +558,7 @@ const Dashboard = () => {
         {showSuccessMessage && (
           <SuccessMessage
             message={successMessage}
+            isVisible={showSuccessMessage}
             onClose={() => setShowSuccessMessage(false)}
           />
         )}

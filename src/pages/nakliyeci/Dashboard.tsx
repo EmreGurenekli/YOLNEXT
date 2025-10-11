@@ -253,94 +253,146 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
       <Helmet>
-        <title>Dashboard - YolNet</title>
+        <title>Dashboard - YolNet Nakliyeci</title>
       </Helmet>
       
-      <div className="p-6">
-        {/* Breadcrumb */}
-        <Breadcrumb
-          items={[
-            { label: 'Ana Sayfa', icon: <Package className="w-4 h-4" /> },
-            { label: 'Dashboard', icon: <BarChart3 className="w-4 h-4" /> }
-          ]}
-        />
-
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Merhaba {user?.firstName}! 👋
-          </h1>
-          <p className="text-gray-600">
-            Nakliye işlerinizi takip edin ve yeni teklifler verin
-          </p>
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
+        {/* Professional Header - Mobile Optimized */}
+        <div className="relative overflow-hidden bg-gradient-to-br from-slate-800 via-blue-900 to-indigo-900 rounded-3xl p-6 text-white shadow-2xl mb-8">
+          <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent"></div>
+          <div className="absolute top-0 right-0 w-80 h-80 bg-gradient-to-br from-blue-400/10 to-indigo-400/10 rounded-full -translate-y-40 translate-x-40"></div>
+          <div className="absolute bottom-0 left-0 w-64 h-64 bg-gradient-to-tr from-slate-400/10 to-blue-400/10 rounded-full translate-y-32 -translate-x-32"></div>
+          
+          <div className="relative z-10">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="w-16 h-16 bg-gradient-to-br from-slate-800 to-blue-900 rounded-2xl flex items-center justify-center shadow-xl border border-white/20">
+                    <Truck className="w-8 h-8 text-white" />
+                  </div>
+                  <div>
+                    <h1 className="text-3xl font-bold mb-2 bg-gradient-to-r from-white to-blue-200 bg-clip-text text-transparent">
+                      Merhaba {user?.firstName}! 👋
+                    </h1>
+                    <p className="text-slate-200 text-lg leading-relaxed">
+                      Nakliye hizmetlerinize hoş geldiniz. 
+                      <br />
+                      <span className="text-blue-300 font-semibold">Güvenilir, hızlı ve karlı</span> işlerle büyüyün.
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-2xl px-4 py-2 border border-white/20">
+                    <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse shadow-lg"></div>
+                    <span className="text-slate-200 font-medium">Çevrimiçi</span>
+                  </div>
+                  <div className="bg-white/10 backdrop-blur-sm rounded-2xl px-4 py-2 border border-white/20">
+                    <span className="text-slate-200 font-medium">{stats.totalShipments} Gönderi</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-3">
+                <Link to="/nakliyeci/notifications" className="relative group">
+                  <button className="w-12 h-12 bg-white/10 backdrop-blur-sm rounded-2xl flex items-center justify-center hover:bg-white/20 transition-all duration-300 border border-white/20 group-hover:scale-110">
+                    <Bell size={20} className="text-white" />
+                    {unreadCount > 0 && (
+                      <span className="absolute -top-1 -right-1 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center font-bold shadow-lg">
+                        {unreadCount}
+                      </span>
+                    )}
+                  </button>
+                </Link>
+                <Link to="/nakliyeci/loads">
+                  <button className="bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 text-white px-6 py-3 rounded-lg font-medium transition-all duration-300 flex items-center gap-2 text-base shadow-lg hover:shadow-xl">
+                    <Plus size={20} />
+                    Yük Ara
+                  </button>
+                </Link>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Toplam Gönderi</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.totalShipments}</p>
-                <p className="text-sm text-green-600 flex items-center gap-1">
-                  <TrendingUp className="w-4 h-4" />
-                  +{stats.monthlyGrowth}% bu ay
-                </p>
+        {/* Stats Grid - Ana Tasarım */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:border-blue-300 transition-all duration-300">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center">
+                <Package className="w-6 h-6 text-white" />
               </div>
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <Package className="w-6 h-6 text-blue-600" />
+              <div className="text-right">
+                <div className="text-2xl font-bold text-slate-900 mb-1">{stats.totalShipments}</div>
+                <div className="flex items-center gap-1">
+                  <svg className="w-3 h-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 17l9.2-9.2M17 17V7H7" />
+                  </svg>
+                  <span className="text-xs text-blue-600 font-semibold">+{stats.monthlyGrowth}% bu ay</span>
+                </div>
               </div>
             </div>
+            <div className="text-slate-700 font-semibold text-sm">Toplam Gönderi</div>
+            <div className="mt-1 text-xs text-slate-500">Nakliye gönderi sayısı</div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Teslim Edilen</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.deliveredShipments}</p>
-                <p className="text-sm text-green-600 flex items-center gap-1">
-                  <CheckCircle2 className="w-4 h-4" />
-                  %{stats.successRate} başarı
-                </p>
+          <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:border-blue-300 transition-all duration-300">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center">
+                <CheckCircle2 className="w-6 h-6 text-white" />
               </div>
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <CheckCircle2 className="w-6 h-6 text-green-600" />
+              <div className="text-right">
+                <div className="text-2xl font-bold text-slate-900 mb-1">{stats.deliveredShipments}</div>
+                <div className="flex items-center gap-1">
+                  <svg className="w-3 h-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 17l9.2-9.2M17 17V7H7" />
+                  </svg>
+                  <span className="text-xs text-blue-600 font-semibold">%{stats.successRate} başarı</span>
+                </div>
               </div>
             </div>
+            <div className="text-slate-700 font-semibold text-sm">Teslim Edildi</div>
+            <div className="mt-1 text-xs text-slate-500">Başarıyla teslim edilen</div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Aktif Şoförler</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.activeDrivers}</p>
-                <p className="text-sm text-blue-600 flex items-center gap-1">
-                  <Users className="w-4 h-4" />
-                  Çalışan şoförler
-                </p>
+          <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:border-blue-300 transition-all duration-300">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center">
+                <Users className="w-6 h-6 text-white" />
               </div>
-              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                <Users className="w-6 h-6 text-purple-600" />
+              <div className="text-right">
+                <div className="text-2xl font-bold text-slate-900 mb-1">{stats.activeDrivers}</div>
+                <div className="flex items-center gap-1">
+                  <svg className="w-3 h-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 17l9.2-9.2M17 17V7H7" />
+                  </svg>
+                  <span className="text-xs text-blue-600 font-semibold">Aktif şoförler</span>
+                </div>
               </div>
             </div>
+            <div className="text-slate-700 font-semibold text-sm">Aktif Şoförler</div>
+            <div className="mt-1 text-xs text-slate-500">Çalışan şoför sayısı</div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Toplam Kazanç</p>
-                <p className="text-2xl font-bold text-gray-900">₺{stats.totalEarnings.toFixed(2)}</p>
-                <p className="text-sm text-blue-600 flex items-center gap-1">
-                  <DollarSign className="w-4 h-4" />
-                  ₺{stats.thisMonthEarnings.toFixed(2)} bu ay
-                </p>
+          <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:border-blue-300 transition-all duration-300">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center">
+                <DollarSign className="w-6 h-6 text-white" />
               </div>
-              <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-                <DollarSign className="w-6 h-6 text-yellow-600" />
+              <div className="text-right">
+                <div className="text-2xl font-bold text-slate-900 mb-1">₺{stats.totalEarnings.toLocaleString()}</div>
+                <div className="flex items-center gap-1">
+                  <svg className="w-3 h-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 17l9.2-9.2M17 17V7H7" />
+                  </svg>
+                  <span className="text-xs text-blue-600 font-semibold">₺{stats.thisMonthEarnings.toLocaleString()} bu ay</span>
+                </div>
               </div>
             </div>
+            <div className="text-slate-700 font-semibold text-sm">Toplam Kazanç</div>
+            <div className="mt-1 text-xs text-slate-500">Nakliye kazançları</div>
           </div>
         </div>
 
