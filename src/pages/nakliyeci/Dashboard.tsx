@@ -31,7 +31,8 @@ import {
   Trash2,
   TrendingDown,
   Activity,
-  X
+  X,
+  Search
 } from 'lucide-react';
 import Breadcrumb from '../../components/common/Breadcrumb';
 import EmptyState from '../../components/common/EmptyState';
