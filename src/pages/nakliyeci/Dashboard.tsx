@@ -317,58 +317,58 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Stats Grid - Temizlenmiş Tasarım */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-2xl p-8 shadow-xl border border-slate-200 hover:shadow-2xl hover:border-blue-300 transition-all duration-300">
-            <div className="flex items-center justify-between mb-6">
-              <div className="w-16 h-16 bg-gradient-to-br from-slate-800 to-blue-900 rounded-2xl flex items-center justify-center shadow-lg">
-                <Package className="w-8 h-8 text-white" />
+        {/* Stats Grid - Dengeli Tasarım */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <div className="bg-white rounded-xl p-6 shadow-lg border border-slate-200 hover:shadow-xl hover:border-blue-300 transition-all duration-300">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-xl flex items-center justify-center shadow-lg">
+                <Package className="w-6 h-6 text-white" />
               </div>
               <div className="text-right">
-                <div className="text-4xl font-bold text-slate-900 mb-2">{stats.totalShipments}</div>
-                <div className="text-sm text-blue-600 font-semibold">+22.5% bu ay</div>
+                <div className="text-2xl font-bold text-slate-900 mb-1">{stats.totalShipments}</div>
+                <div className="text-xs text-blue-600 font-semibold">+22.5% bu ay</div>
               </div>
             </div>
-            <div className="text-slate-700 font-bold text-xl">Toplam Gönderi</div>
+            <div className="text-slate-700 font-semibold text-sm">Toplam Gönderi</div>
           </div>
 
-          <div className="bg-white rounded-2xl p-8 shadow-xl border border-slate-200 hover:shadow-2xl hover:border-blue-300 transition-all duration-300">
-            <div className="flex items-center justify-between mb-6">
-              <div className="w-16 h-16 bg-gradient-to-br from-slate-800 to-blue-900 rounded-2xl flex items-center justify-center shadow-lg">
-                <CheckCircle2 className="w-8 h-8 text-white" />
+          <div className="bg-white rounded-xl p-6 shadow-lg border border-slate-200 hover:shadow-xl hover:border-blue-300 transition-all duration-300">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-xl flex items-center justify-center shadow-lg">
+                <CheckCircle2 className="w-6 h-6 text-white" />
               </div>
               <div className="text-right">
-                <div className="text-4xl font-bold text-slate-900 mb-2">{stats.deliveredShipments}</div>
-                <div className="text-sm text-green-600 font-semibold">%89 başarı</div>
+                <div className="text-2xl font-bold text-slate-900 mb-1">{stats.deliveredShipments}</div>
+                <div className="text-xs text-green-600 font-semibold">%89 başarı</div>
               </div>
             </div>
-            <div className="text-slate-700 font-bold text-xl">Teslim Edildi</div>
+            <div className="text-slate-700 font-semibold text-sm">Teslim Edildi</div>
           </div>
 
-          <div className="bg-white rounded-2xl p-8 shadow-xl border border-slate-200 hover:shadow-2xl hover:border-blue-300 transition-all duration-300">
-            <div className="flex items-center justify-between mb-6">
-              <div className="w-16 h-16 bg-gradient-to-br from-slate-800 to-blue-900 rounded-2xl flex items-center justify-center shadow-lg">
-                <Users className="w-8 h-8 text-white" />
+          <div className="bg-white rounded-xl p-6 shadow-lg border border-slate-200 hover:shadow-xl hover:border-blue-300 transition-all duration-300">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-xl flex items-center justify-center shadow-lg">
+                <Users className="w-6 h-6 text-white" />
               </div>
               <div className="text-right">
-                <div className="text-4xl font-bold text-slate-900 mb-2">{stats.activeDrivers}</div>
-                <div className="text-sm text-purple-600 font-semibold">Aktif şoförler</div>
+                <div className="text-2xl font-bold text-slate-900 mb-1">{stats.activeDrivers}</div>
+                <div className="text-xs text-purple-600 font-semibold">Aktif şoförler</div>
               </div>
             </div>
-            <div className="text-slate-700 font-bold text-xl">Aktif Şoförler</div>
+            <div className="text-slate-700 font-semibold text-sm">Aktif Şoförler</div>
           </div>
 
-          <div className="bg-white rounded-2xl p-8 shadow-xl border border-slate-200 hover:shadow-2xl hover:border-blue-300 transition-all duration-300">
-            <div className="flex items-center justify-between mb-6">
-              <div className="w-16 h-16 bg-gradient-to-br from-slate-800 to-blue-900 rounded-2xl flex items-center justify-center shadow-lg">
-                <DollarSign className="w-8 h-8 text-white" />
+          <div className="bg-white rounded-xl p-6 shadow-lg border border-slate-200 hover:shadow-xl hover:border-blue-300 transition-all duration-300">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-xl flex items-center justify-center shadow-lg">
+                <DollarSign className="w-6 h-6 text-white" />
               </div>
               <div className="text-right">
-                <div className="text-4xl font-bold text-slate-900 mb-2">₺{stats.totalEarnings.toLocaleString()}</div>
-                <div className="text-sm text-emerald-600 font-semibold">+₺4.200 bu ay</div>
+                <div className="text-2xl font-bold text-slate-900 mb-1">₺{stats.totalEarnings.toLocaleString()}</div>
+                <div className="text-xs text-emerald-600 font-semibold">+₺4.200 bu ay</div>
               </div>
             </div>
-            <div className="text-slate-700 font-bold text-xl">Toplam Kazanç</div>
+            <div className="text-slate-700 font-semibold text-sm">Toplam Kazanç</div>
           </div>
         </div>
 
