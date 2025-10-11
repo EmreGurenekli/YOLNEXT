@@ -43,7 +43,7 @@ const Dashboard = () => {
   const { user } = useAuth();
   const [stats, setStats] = useState({
     totalShipments: 0,
-    deliveredShipments: 0,
+    pendingOffers: 0,
     pendingShipments: 0,
     successRate: 0,
     totalEarnings: 0,
@@ -64,7 +64,7 @@ const Dashboard = () => {
   const mockData = {
     stats: {
       totalShipments: 28,
-      deliveredShipments: 24,
+      pendingOffers: 12,
       pendingShipments: 3,
       successRate: 89,
       totalEarnings: 18500.25,
@@ -317,7 +317,7 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Stats Grid - Dengeli Tasarım */}
+        {/* Stats Grid - Nakliyeci İşleyişi */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <div className="bg-white rounded-xl p-6 shadow-lg border border-slate-200 hover:shadow-xl hover:border-blue-300 transition-all duration-300">
             <div className="flex items-center justify-between mb-4">
@@ -329,20 +329,22 @@ const Dashboard = () => {
                 <div className="text-xs text-blue-600 font-semibold">+22.5% bu ay</div>
               </div>
             </div>
-            <div className="text-slate-700 font-semibold text-sm">Toplam Gönderi</div>
+            <div className="text-slate-700 font-semibold text-sm">Aktif Gönderiler</div>
+            <div className="text-xs text-slate-500">Şu anda taşınan</div>
           </div>
 
           <div className="bg-white rounded-xl p-6 shadow-lg border border-slate-200 hover:shadow-xl hover:border-blue-300 transition-all duration-300">
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-xl flex items-center justify-center shadow-lg">
-                <CheckCircle2 className="w-6 h-6 text-white" />
+                <MessageSquare className="w-6 h-6 text-white" />
               </div>
               <div className="text-right">
-                <div className="text-2xl font-bold text-slate-900 mb-1">{stats.deliveredShipments}</div>
-                <div className="text-xs text-green-600 font-semibold">%89 başarı</div>
+                <div className="text-2xl font-bold text-slate-900 mb-1">{stats.pendingOffers}</div>
+                <div className="text-xs text-orange-600 font-semibold">Bekleyen teklifler</div>
               </div>
             </div>
-            <div className="text-slate-700 font-semibold text-sm">Teslim Edildi</div>
+            <div className="text-slate-700 font-semibold text-sm">Bekleyen Teklifler</div>
+            <div className="text-xs text-slate-500">Müşteri onayını bekleyen</div>
           </div>
 
           <div className="bg-white rounded-xl p-6 shadow-lg border border-slate-200 hover:shadow-xl hover:border-blue-300 transition-all duration-300">
@@ -356,6 +358,7 @@ const Dashboard = () => {
               </div>
             </div>
             <div className="text-slate-700 font-semibold text-sm">Aktif Şoförler</div>
+            <div className="text-xs text-slate-500">Çalışan şoför sayısı</div>
           </div>
 
           <div className="bg-white rounded-xl p-6 shadow-lg border border-slate-200 hover:shadow-xl hover:border-blue-300 transition-all duration-300">
@@ -369,6 +372,7 @@ const Dashboard = () => {
               </div>
             </div>
             <div className="text-slate-700 font-semibold text-sm">Toplam Kazanç</div>
+            <div className="text-xs text-slate-500">Nakliye kazançları</div>
           </div>
         </div>
 
@@ -385,54 +389,54 @@ const Dashboard = () => {
             </div>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            <Link to="/nakliyeci/loads">
+            <Link to="/nakliyeci/jobs">
               <div className="group bg-white rounded-2xl p-6 shadow-lg border border-slate-200 hover:shadow-xl hover:border-blue-300 transition-all duration-300 hover:-translate-y-2">
                 <div className="flex flex-col items-center text-center">
                   <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-800 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300 mb-4">
-                    <Plus className="w-6 h-6 text-white" />
+                    <Search className="w-6 h-6 text-white" />
                   </div>
                   <h3 className="text-lg font-bold text-slate-900 mb-2">Yeni Yük Ara</h3>
-                  <p className="text-sm text-slate-600">Müsait yükleri keşfet</p>
+                  <p className="text-sm text-slate-600">Gelen talepleri görüntüle</p>
                   <div className="mt-3 w-8 h-1 bg-blue-600 rounded-full group-hover:w-12 transition-all duration-300"></div>
                 </div>
               </div>
             </Link>
 
             <Link to="/nakliyeci/offers">
-              <div className="group bg-white rounded-2xl p-6 shadow-lg border border-slate-200 hover:shadow-xl hover:border-green-300 transition-all duration-300 hover:-translate-y-2">
+              <div className="group bg-white rounded-2xl p-6 shadow-lg border border-slate-200 hover:shadow-xl hover:border-blue-300 transition-all duration-300 hover:-translate-y-2">
                 <div className="flex flex-col items-center text-center">
-                  <div className="w-12 h-12 bg-gradient-to-br from-green-600 to-green-800 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300 mb-4">
+                  <div className="w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300 mb-4">
                     <MessageSquare className="w-6 h-6 text-white" />
                         </div>
                   <h3 className="text-lg font-bold text-slate-900 mb-2">Tekliflerim</h3>
-                  <p className="text-sm text-slate-600">Verdiğiniz teklifler</p>
-                  <div className="mt-3 w-8 h-1 bg-green-600 rounded-full group-hover:w-12 transition-all duration-300"></div>
+                  <p className="text-sm text-slate-600">Verdiğim teklifleri yönet</p>
+                  <div className="mt-3 w-8 h-1 bg-gradient-to-r from-slate-800 to-blue-900 rounded-full group-hover:w-12 transition-all duration-300"></div>
                           </div>
                         </div>
             </Link>
 
-            <Link to="/nakliyeci/fleet">
-              <div className="group bg-white rounded-2xl p-6 shadow-lg border border-slate-200 hover:shadow-xl hover:border-purple-300 transition-all duration-300 hover:-translate-y-2">
+            <Link to="/nakliyeci/shipments">
+              <div className="group bg-white rounded-2xl p-6 shadow-lg border border-slate-200 hover:shadow-xl hover:border-green-300 transition-all duration-300 hover:-translate-y-2">
                 <div className="flex flex-col items-center text-center">
-                  <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-purple-800 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300 mb-4">
-                    <Truck className="w-6 h-6 text-white" />
+                  <div className="w-12 h-12 bg-gradient-to-br from-green-600 to-green-800 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300 mb-4">
+                    <Package className="w-6 h-6 text-white" />
                         </div>
-                  <h3 className="text-lg font-bold text-slate-900 mb-2">Filo Yönetimi</h3>
-                  <p className="text-sm text-slate-600">Araç filonuzu yönetin</p>
-                  <div className="mt-3 w-8 h-1 bg-purple-600 rounded-full group-hover:w-12 transition-all duration-300"></div>
+                  <h3 className="text-lg font-bold text-slate-900 mb-2">Aktif Gönderiler</h3>
+                  <p className="text-sm text-slate-600">Taşınan gönderileri takip et</p>
+                  <div className="mt-3 w-8 h-1 bg-green-600 rounded-full group-hover:w-12 transition-all duration-300"></div>
                       </div>
                     </div>
             </Link>
 
-            <Link to="/nakliyeci/earnings">
-              <div className="group bg-white rounded-2xl p-6 shadow-lg border border-slate-200 hover:shadow-xl hover:border-orange-300 transition-all duration-300 hover:-translate-y-2">
+            <Link to="/nakliyeci/drivers">
+              <div className="group bg-white rounded-2xl p-6 shadow-lg border border-slate-200 hover:shadow-xl hover:border-purple-300 transition-all duration-300 hover:-translate-y-2">
                 <div className="flex flex-col items-center text-center">
-                  <div className="w-12 h-12 bg-gradient-to-br from-orange-600 to-orange-800 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300 mb-4">
-                    <DollarSign className="w-6 h-6 text-white" />
+                  <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-purple-800 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300 mb-4">
+                    <Users className="w-6 h-6 text-white" />
                   </div>
-                  <h3 className="text-lg font-bold text-slate-900 mb-2">Kazanç Raporu</h3>
-                  <p className="text-sm text-slate-600">Gelir analizi</p>
-                  <div className="mt-3 w-8 h-1 bg-orange-600 rounded-full group-hover:w-12 transition-all duration-300"></div>
+                  <h3 className="text-lg font-bold text-slate-900 mb-2">Şoför Yönetimi</h3>
+                  <p className="text-sm text-slate-600">Filo ve şoför yönetimi</p>
+                  <div className="mt-3 w-8 h-1 bg-purple-600 rounded-full group-hover:w-12 transition-all duration-300"></div>
                 </div>
               </div>
             </Link>
