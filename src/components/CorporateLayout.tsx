@@ -15,9 +15,9 @@ export default function CorporateLayout() {
   // Dashboard sayfası için doğrudan component render et
   if (location.pathname === '/corporate/dashboard') {
     return (
-      <div className="flex h-screen bg-gray-50">
+      <div className="flex h-screen bg-gradient-to-br from-slate-800 via-slate-900 to-blue-900">
         <CorporateSidebar onLogout={handleLogout} />
-        <main className="flex-1 overflow-auto">
+        <main className="flex-1 overflow-auto bg-gradient-to-br from-slate-800 via-slate-900 to-blue-900">
           <CorporateDashboard />
         </main>
       </div>
@@ -25,9 +25,9 @@ export default function CorporateLayout() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-gradient-to-br from-slate-800 via-slate-900 to-blue-900">
       <CorporateSidebar onLogout={handleLogout} />
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 overflow-auto bg-gradient-to-br from-slate-800 via-slate-900 to-blue-900">
         <Outlet />
       </main>
     </div>

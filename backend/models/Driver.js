@@ -3,12 +3,12 @@ const { sequelize } = require('../config/database');
 
 const Driver = sequelize.define('Driver', {
   id: {
-    type: DataTypes.UUID,
-    defaultValue: DataTypes.UUIDV4,
+    type: DataTypes.INTEGER,
+    autoIncrement: true,
     primaryKey: true
   },
   userId: {
-    type: DataTypes.UUID,
+    type: DataTypes.INTEGER,
     allowNull: false,
     references: {
       model: 'users',
@@ -16,7 +16,7 @@ const Driver = sequelize.define('Driver', {
     }
   },
   carrierId: {
-    type: DataTypes.UUID,
+    type: DataTypes.INTEGER,
     allowNull: true,
     references: {
       model: 'carriers',

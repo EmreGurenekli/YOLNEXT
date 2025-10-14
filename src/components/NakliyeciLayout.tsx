@@ -11,9 +11,9 @@ const NakliyeciLayout: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen bg-gradient-to-br from-slate-50 to-slate-50">
+    <div className="flex h-screen bg-gradient-to-br from-slate-800 via-slate-900 to-blue-900">
       <NakliyeciSidebar onLogout={handleLogout} />
-      <main className="flex-1 overflow-auto bg-gradient-to-br from-slate-50 to-slate-50">
+      <main className="flex-1 overflow-auto bg-gradient-to-br from-slate-800 via-slate-900 to-blue-900">
         <div className="min-h-full">
           <Outlet />
         </div>

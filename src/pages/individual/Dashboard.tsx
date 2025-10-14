@@ -140,7 +140,7 @@ const Dashboard = () => {
   }
   
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
+    <div className="min-h-screen bg-white">
       <Helmet>
         <title>Ana Sayfa - YolNet Bireysel</title>
         <meta name="description" content="YolNet bireysel panel ana sayfası" />

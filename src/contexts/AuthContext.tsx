@@ -1,31 +1,15 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import api from '../services/api';
-
-interface User {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  userType: 'individual' | 'corporate' | 'carrier' | 'driver';
-  phone?: string;
-  avatar?: string;
-  isActive: boolean;
-  isVerified: boolean;
-  corporateProfile?: any;
-  carrierProfile?: any;
-  driverProfile?: any;
-}
+import { apiClient } from '../services/api';
+import { User } from '../types/auth';
 
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  error: string | null;
   login: (email: string, password: string) => Promise<{ success: boolean; user?: User }>;
   register: (userData: any) => Promise<void>;
   logout: () => void;
   updateUser: (userData: Partial<User>) => void;
-  refreshUser: () => Promise<void>;
   demoLogin: (userType: string) => Promise<{ success: boolean; user?: User }>;
   getPanelRoute: (panelType: string) => string;
 }
@@ -47,29 +31,24 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   const isAuthenticated = !!user;
 
   useEffect(() => {
     const initAuth = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('authToken');
         if (token) {
-      const response = await api.getCurrentUser();
-      if (response.success && response.data && typeof response.data === 'object' && 'user' in response.data) {
-        const userData = response.data.user as User;
-        setUser(userData);
-        localStorage.setItem('user', JSON.stringify(userData));
-      } else {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-      }
+          const response = await apiClient.verifyToken();
+          if (response && response.user) {
+            setUser(response.user);
+          } else {
+            localStorage.removeItem('authToken');
+          }
         }
       } catch (error) {
         console.error('Auth initialization error:', error);
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+        localStorage.removeItem('authToken');
       } finally {
         setIsLoading(false);
       }
@@ -80,56 +59,34 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const login = async (email: string, password: string) => {
     try {
-      setIsLoading(true);
-      setError(null);
-      
-      const response = await api.login(email, password);
-      if (response.success && response.data && typeof response.data === 'object' && 'user' in response.data) {
-        const userData = response.data.user as User;
-        setUser(userData);
-        localStorage.setItem('user', JSON.stringify(userData));
-        return { success: true, user: userData };
-      } else {
-        throw new Error(response.message || 'Giriş başarısız');
-      }
-    } catch (err: any) {
-      setError(err.message || 'Giriş yapılırken bir hata oluştu');
+      const response = await apiClient.login({ email, password });
+      setUser(response.user);
+      return { success: true, user: response.user };
+    } catch (error) {
       return { success: false };
-    } finally {
-      setIsLoading(false);
     }
   };
 
   const register = async (userData: any) => {
     try {
-      setIsLoading(true);
-      setError(null);
-      
-      const response = await api.register(userData);
-      if (response.success && response.data && typeof response.data === 'object' && 'user' in response.data) {
-        const userData = response.data.user as User;
-        setUser(userData);
-        localStorage.setItem('user', JSON.stringify(userData));
-      } else {
-        throw new Error(response.message || 'Kayıt başarısız');
-      }
-    } catch (err: any) {
-      setError(err.message || 'Kayıt olurken bir hata oluştu');
-      throw err;
-    } finally {
-      setIsLoading(false);
+      const response = await apiClient.register(userData);
+      setUser(response.user);
+    } catch (error) {
+      throw error;
     }
   };
 
-  const logout = async () => {
+  const logout = () => {
     try {
-      await api.logout();
+      apiClient.logout();
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
+      // Clear local state and storage
       setUser(null);
-      localStorage.removeItem('user');
-      localStorage.removeItem('token');
+      localStorage.removeItem('authToken');
+      
+      // Redirect to login page
       window.location.href = '/login';
     }
   };
@@ -138,34 +95,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setUser(prev => prev ? { ...prev, ...userData } : null);
   };
 
-  const refreshUser = async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      
-      const response = await api.getCurrentUser();
-      if (response.success && response.data && typeof response.data === 'object' && 'user' in response.data) {
-        const userData = response.data.user as User;
-        setUser(userData);
-        localStorage.setItem('user', JSON.stringify(userData));
-      } else {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        setUser(null);
-      }
-    } catch (err) {
-      console.error('Failed to refresh user:', err);
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      setUser(null);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const demoLogin = async (userType: string) => {
     try {
-      console.log('AuthContext demoLogin called with userType:', userType);
       const demoCredentials = {
         individual: { email: 'individual@demo.com', password: 'demo123' },
         corporate: { email: 'corporate@demo.com', password: 'demo123' },
@@ -174,28 +105,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       };
 
       const credentials = demoCredentials[userType as keyof typeof demoCredentials];
-      console.log('Demo credentials:', credentials);
       if (!credentials) {
-        console.log('No credentials found for userType:', userType);
         return { success: false };
       }
 
-      console.log('Calling API login with:', credentials.email);
-      const response = await api.login(credentials.email, credentials.password);
-      console.log('API login response:', response);
-      
-      if (response.success && response.data && typeof response.data === 'object' && 'user' in response.data) {
-        const userData = response.data.user as User;
-        console.log('Setting user data:', userData);
-        setUser(userData);
-        localStorage.setItem('user', JSON.stringify(userData));
-        return { success: true, user: userData };
-      } else {
-        console.log('Login failed - invalid response structure');
-        return { success: false };
-      }
+      const response = await apiClient.login(credentials);
+      setUser(response.user);
+      return { success: true, user: response.user };
     } catch (error) {
-      console.error('Demo login error:', error);
       return { success: false };
     }
   };
@@ -214,12 +131,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     user,
     isAuthenticated,
     isLoading,
-    error,
     login,
     register,
     logout,
     updateUser,
-    refreshUser,
     demoLogin,
     getPanelRoute,
   };

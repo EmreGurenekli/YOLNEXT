@@ -426,13 +426,12 @@ export default function CorporateShipments() {
                   <tr>
                     <td colSpan={6} className="py-12 text-center">
                       <EmptyState
-                        icon={Package}
+                        icon={<Package className="w-8 h-8 text-slate-400" />}
                         title="Gönderi bulunamadı"
                         description="Arama kriterlerinize uygun gönderi bulunamadı"
                         action={{
                           label: "Yeni Gönderi Oluştur",
-                          onClick: () => window.location.href = '/corporate/create-shipment',
-                          icon: Plus
+                          onClick: () => window.location.href = '/corporate/create-shipment'
                         }}
                       />
                     </td>

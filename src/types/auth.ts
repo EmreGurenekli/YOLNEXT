@@ -2,7 +2,9 @@ export interface User {
   id: string
   email: string
   fullName: string
+  firstName?: string
   role: 'individual' | 'corporate' | 'nakliyeci' | 'tasiyici'
+  panel_type?: 'individual' | 'corporate' | 'nakliyeci' | 'tasiyici'
   avatar?: string
   phone?: string
   company?: {

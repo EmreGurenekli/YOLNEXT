@@ -1,38 +1,38 @@
 import React from 'react';
-import { LucideIcon } from 'lucide-react';
+import { Package, Search, AlertCircle } from 'lucide-react';
 
 interface EmptyStateProps {
-  icon: LucideIcon;
+  icon?: React.ReactNode;
   title: string;
   description: string;
   action?: {
     label: string;
     onClick: () => void;
-    icon?: LucideIcon;
   };
   className?: string;
 }
 
-const EmptyState: React.FC<EmptyStateProps> = ({ 
-  icon: Icon, 
-  title, 
-  description, 
-  action, 
-  className = '' 
+const EmptyState: React.FC<EmptyStateProps> = ({
+  icon,
+  title,
+  description,
+  action,
+  className = ''
 }) => {
   return (
-    <div className={`bg-white rounded-2xl p-12 shadow-xl border border-slate-200 text-center ${className}`}>
-      <div className="w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-        <Icon className="w-16 h-16 text-slate-300" />
+    <div className={`flex flex-col items-center justify-center py-12 px-4 ${className}`}>
+      <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+        {icon || <Package className="w-8 h-8 text-slate-400" />}
       </div>
+      
       <h3 className="text-lg font-semibold text-slate-900 mb-2">{title}</h3>
-      <p className="text-slate-500 mb-6 max-w-md mx-auto">{description}</p>
+      <p className="text-slate-600 text-center mb-6 max-w-md">{description}</p>
+      
       {action && (
         <button
           onClick={action.onClick}
-          className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-slate-800 to-blue-900 text-white rounded-lg font-medium hover:from-slate-900 hover:to-blue-950 transition-all shadow-lg"
+          className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors"
         >
-          {action.icon && <action.icon className="w-5 h-5" />}
           {action.label}
         </button>
       )}
@@ -41,4 +41,3 @@ const EmptyState: React.FC<EmptyStateProps> = ({
 };
 
 export default EmptyState;
-

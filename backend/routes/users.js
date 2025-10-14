@@ -6,6 +6,33 @@ const { logger } = require('../utils/logger');
 
 const router = express.Router();
 
+// @route   GET /api/users
+// @desc    Get all users (admin only)
+// @access  Private
+router.get('/', auth, authorize(['admin']), async (req, res) => {
+  try {
+    const users = await User.findAll({
+      include: [
+        { association: 'corporateProfile' },
+        { association: 'carrierProfile' },
+        { association: 'driverProfile' }
+      ],
+      attributes: { exclude: ['password'] }
+    });
+
+    res.json({
+      success: true,
+      data: { users }
+    });
+  } catch (error) {
+    logger.error('Get users error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Sunucu hatası'
+    });
+  }
+});
+
 // @route   GET /api/users/profile
 // @desc    Get user profile
 // @access  Private

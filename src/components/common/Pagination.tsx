@@ -1,12 +1,10 @@
 import React from 'react';
-import { ChevronLeft, ChevronRight, MoreHorizontal } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface PaginationProps {
   currentPage: number;
   totalPages: number;
   onPageChange: (page: number) => void;
-  showPageNumbers?: boolean;
-  maxVisiblePages?: number;
   className?: string;
 }
 
@@ -14,105 +12,83 @@ const Pagination: React.FC<PaginationProps> = ({
   currentPage,
   totalPages,
   onPageChange,
-  showPageNumbers = true,
-  maxVisiblePages = 5,
   className = ''
 }) => {
-  if (totalPages <= 1) return null;
-
   const getVisiblePages = () => {
-    const pages: (number | string)[] = [];
-    const halfVisible = Math.floor(maxVisiblePages / 2);
-    
-    let startPage = Math.max(1, currentPage - halfVisible);
-    let endPage = Math.min(totalPages, currentPage + halfVisible);
+    const delta = 2;
+    const range = [];
+    const rangeWithDots = [];
 
-    // Eğer başlangıç 1'den uzaksa, sonu da ayarla
-    if (startPage === 1) {
-      endPage = Math.min(totalPages, maxVisiblePages);
-    }
-    
-    // Eğer son sayfa toplam sayfa ise, başlangıcı da ayarla
-    if (endPage === totalPages) {
-      startPage = Math.max(1, totalPages - maxVisiblePages + 1);
+    for (
+      let i = Math.max(2, currentPage - delta);
+      i <= Math.min(totalPages - 1, currentPage + delta);
+      i++
+    ) {
+      range.push(i);
     }
 
-    // İlk sayfa
-    if (startPage > 1) {
-      pages.push(1);
-      if (startPage > 2) {
-        pages.push('...');
-      }
+    if (currentPage - delta > 2) {
+      rangeWithDots.push(1, '...');
+    } else {
+      rangeWithDots.push(1);
     }
 
-    // Orta sayfalar
-    for (let i = startPage; i <= endPage; i++) {
-      pages.push(i);
+    rangeWithDots.push(...range);
+
+    if (currentPage + delta < totalPages - 1) {
+      rangeWithDots.push('...', totalPages);
+    } else if (totalPages > 1) {
+      rangeWithDots.push(totalPages);
     }
 
-    // Son sayfa
-    if (endPage < totalPages) {
-      if (endPage < totalPages - 1) {
-        pages.push('...');
-      }
-      pages.push(totalPages);
-    }
-
-    return pages;
+    return rangeWithDots;
   };
 
-  const visiblePages = getVisiblePages();
+  if (totalPages <= 1) return null;
 
   return (
-    <div className={`flex items-center justify-center gap-2 ${className}`}>
-      {/* Önceki Sayfa */}
+    <div className={`flex items-center justify-center space-x-2 ${className}`}>
       <button
         onClick={() => onPageChange(currentPage - 1)}
         disabled={currentPage === 1}
-        className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        className="flex items-center px-3 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        <ChevronLeft className="w-4 h-4" />
+        <ChevronLeft className="w-4 h-4 mr-1" />
         Önceki
       </button>
 
-      {/* Sayfa Numaraları */}
-      {showPageNumbers && (
-        <div className="flex items-center gap-1">
-          {visiblePages.map((page, index) => (
-            <React.Fragment key={index}>
-              {page === '...' ? (
-                <span className="px-3 py-2 text-slate-500">
-                  <MoreHorizontal className="w-4 h-4" />
-                </span>
-              ) : (
-                <button
-                  onClick={() => onPageChange(page as number)}
-                  className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-                    currentPage === page
-                      ? 'bg-gradient-to-r from-slate-800 to-blue-900 text-white shadow-lg'
-                      : 'text-slate-700 bg-white border border-slate-300 hover:bg-slate-50'
-                  }`}
-                >
-                  {page}
-                </button>
-              )}
-            </React.Fragment>
-          ))}
-        </div>
-      )}
+      {getVisiblePages().map((page, index) => (
+        <button
+          key={index}
+          onClick={() => typeof page === 'number' && onPageChange(page)}
+          disabled={page === '...'}
+          className={`px-3 py-2 text-sm font-medium rounded-lg ${
+            page === currentPage
+              ? 'bg-blue-600 text-white'
+              : page === '...'
+              ? 'text-slate-400 cursor-default'
+              : 'text-slate-600 bg-white border border-slate-300 hover:bg-slate-50'
+          }`}
+        >
+          {page}
+        </button>
+      ))}
 
-      {/* Sonraki Sayfa */}
       <button
         onClick={() => onPageChange(currentPage + 1)}
         disabled={currentPage === totalPages}
-        className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        className="flex items-center px-3 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         Sonraki
-        <ChevronRight className="w-4 h-4" />
+        <ChevronRight className="w-4 h-4 ml-1" />
       </button>
     </div>
   );
 };
 
 export default Pagination;
+
+
+
+
 

@@ -4,13 +4,14 @@ const jwt = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
 const { User, CorporateUser, Carrier, Driver } = require('../models');
 const { protect } = require('../middleware/auth');
+const auth = protect; // Alias for compatibility
 const logger = require('../utils/logger');
 
 const router = express.Router();
 
 // Generate JWT token
 const generateToken = (userId) => {
-  return jwt.sign({ userId }, process.env.JWT_SECRET, {
+  return jwt.sign({ userId }, process.env.JWT_SECRET || 'yolnet_super_secret_key_2024_development', {
     expiresIn: process.env.JWT_EXPIRES_IN || '7d'
   });
 };
@@ -44,12 +45,12 @@ router.post('/register', [
         success: false,
         message: 'Bu email adresi zaten kullanılıyor'
       });
-    }
+      }
 
-    // Hash password
+      // Hash password
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    // Create user
+      // Create user
     const user = await User.create({
       email,
       password: hashedPassword,
@@ -64,7 +65,7 @@ router.post('/register', [
 
     logger.info(`Yeni kullanıcı kaydı: ${email} (${userType})`);
 
-    res.status(201).json({
+          res.status(201).json({
       success: true,
       message: 'Kullanıcı başarıyla oluşturuldu',
       data: {
@@ -134,14 +135,14 @@ router.post('/login', [
 
     // Find user
     const user = await User.findOne({ where: { email } });
-    if (!user) {
+        if (!user) {
       return res.status(401).json({
         success: false,
         message: 'Geçersiz email veya şifre'
       });
-    }
+        }
 
-    // Check password
+        // Check password
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
       return res.status(401).json({
@@ -166,7 +167,7 @@ router.post('/login', [
 
     logger.info(`Kullanıcı girişi: ${email}`);
 
-    res.json({
+        res.json({
       success: true,
       message: 'Giriş başarılı',
       data: {

@@ -93,7 +93,9 @@ router.post('/', [
       deliveryDate: deliveryDate ? new Date(deliveryDate) : null,
               message,
       conditions: conditions || {},
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+      commissionAmount: price * 0.01, // %1 komisyon hesapla
+      commissionStatus: 'pending' // Eşleşme sonrası tahsil edilecek
     });
 
     logger.info(`Yeni teklif oluşturuldu: ${offer.id} - ${req.user.email}`);

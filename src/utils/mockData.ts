@@ -265,7 +265,3 @@ export const generateMockOffers = (shipments: ShipmentRequest[], carriers: Carri
 
 
 
-
-
-
-

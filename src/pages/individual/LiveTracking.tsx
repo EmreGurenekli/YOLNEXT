@@ -430,15 +430,15 @@ const IndividualLiveTracking: React.FC = () => {
       case 'pending':
         return <Clock3 className="w-6 h-6 text-yellow-500" />;
       case 'in-transit':
-        return <Truck2 className="w-6 h-6 text-blue-500" />;
+        return <Truck className="w-6 h-6 text-blue-500" />;
       case 'delivered':
         return <CheckCircle2 className="w-6 h-6 text-green-500" />;
       case 'exception':
         return <AlertTriangle className="w-6 h-6 text-red-500" />;
-      case 'cancelled':
-        return <XCircle2 className="w-6 h-6 text-gray-500" />;
+          case 'cancelled':
+            return <XCircle className="w-6 h-6 text-slate-500" />;
       default:
-        return <MapPin2 className="w-6 h-6 text-gray-500" />;
+        return <MapPin className="w-6 h-6 text-slate-500" />;
     }
   };
 
@@ -508,20 +508,20 @@ const IndividualLiveTracking: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center">
+      <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 bg-gradient-to-br from-amber-500 to-indigo-700 rounded-2xl flex items-center justify-center mx-auto mb-4 animate-pulse">
+          <div className="w-16 h-16 bg-gradient-to-br from-slate-800 to-blue-900 rounded-2xl flex items-center justify-center mx-auto mb-4 animate-pulse">
             <Navigation className="w-8 h-8 text-white" />
           </div>
-          <h2 className="text-xl font-semibold text-gray-900">Canlı takip yükleniyor...</h2>
-          <p className="text-gray-600 mt-2">Gönderileriniz hazırlanıyor</p>
+          <h2 className="text-xl font-semibold text-slate-900">Canlı takip yükleniyor...</h2>
+          <p className="text-slate-600 mt-2">Gönderileriniz hazırlanıyor</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50">
+    <div className="min-h-screen bg-white">
       <Helmet>
         <title>Canlı Takip - YolNet</title>
         <meta name="description" content="Gönderilerinizi gerçek zamanlı olarak takip edin" />
@@ -531,17 +531,17 @@ const IndividualLiveTracking: React.FC = () => {
         {/* Hero Section */}
         <div className="text-center mb-12">
           <div className="flex justify-center mb-6">
-            <div className="w-16 h-16 bg-gradient-to-br from-amber-500 to-indigo-700 rounded-2xl flex items-center justify-center shadow-lg">
+            <div className="w-16 h-16 bg-gradient-to-br from-slate-800 to-blue-900 rounded-2xl flex items-center justify-center shadow-lg">
               <Navigation className="w-8 h-8 text-white" />
             </div>
           </div>
-          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
+          <h1 className="text-4xl md:text-5xl font-bold text-slate-900 mb-4">
             Canlı{' '}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-500 to-indigo-700">
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-slate-800 to-blue-900">
               Takip
             </span>
           </h1>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+          <p className="text-xl text-slate-600 max-w-3xl mx-auto">
             Gönderilerinizi gerçek zamanlı olarak takip edin ve anlık güncellemeler alın
           </p>
         </div>
@@ -550,48 +550,48 @@ const IndividualLiveTracking: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
+              <div className="w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-xl flex items-center justify-center">
                 <Package className="w-6 h-6 text-white" />
               </div>
               <div>
-                <div className="text-2xl font-bold text-gray-900">{shipments.length}</div>
-                <div className="text-sm text-gray-600">Toplam Gönderi</div>
+                <div className="text-2xl font-bold text-slate-900">{shipments.length}</div>
+                <div className="text-sm text-slate-600">Toplam Gönderi</div>
               </div>
             </div>
           </div>
 
           <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center">
+              <div className="w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-xl flex items-center justify-center">
                 <Truck className="w-6 h-6 text-white" />
               </div>
               <div>
-                <div className="text-2xl font-bold text-gray-900">{shipments.filter(s => s.status === 'in-transit').length}</div>
-                <div className="text-sm text-gray-600">Yolda</div>
+                <div className="text-2xl font-bold text-slate-900">{shipments.filter(s => s.status === 'in-transit').length}</div>
+                <div className="text-sm text-slate-600">Yolda</div>
               </div>
             </div>
           </div>
 
           <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-yellow-500 to-orange-500 rounded-xl flex items-center justify-center">
+              <div className="w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-xl flex items-center justify-center">
                 <Clock className="w-6 h-6 text-white" />
               </div>
               <div>
-                <div className="text-2xl font-bold text-gray-900">{shipments.filter(s => s.status === 'pending').length}</div>
-                <div className="text-sm text-gray-600">Beklemede</div>
+                <div className="text-2xl font-bold text-slate-900">{shipments.filter(s => s.status === 'pending').length}</div>
+                <div className="text-sm text-slate-600">Beklemede</div>
               </div>
             </div>
           </div>
 
           <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center">
+              <div className="w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-xl flex items-center justify-center">
                 <Zap className="w-6 h-6 text-white" />
               </div>
               <div>
-                <div className="text-2xl font-bold text-gray-900">{shipments.filter(s => s.isLive).length}</div>
-                <div className="text-sm text-gray-600">Canlı Takip</div>
+                <div className="text-2xl font-bold text-slate-900">{shipments.filter(s => s.isLive).length}</div>
+                <div className="text-sm text-slate-600">Canlı Takip</div>
               </div>
             </div>
           </div>
@@ -604,11 +604,11 @@ const IndividualLiveTracking: React.FC = () => {
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
                 <div className={`w-3 h-3 rounded-full ${isLiveMode ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
-                <span className="font-semibold text-gray-900">
+                <span className="font-semibold text-slate-900">
                   {isLiveMode ? 'Canlı Mod Aktif' : 'Canlı Mod Kapalı'}
                 </span>
               </div>
-              <span className="text-sm text-gray-600">
+              <span className="text-sm text-slate-600">
                 Son güncelleme: {lastUpdate.toLocaleTimeString('tr-TR')}
               </span>
             </div>
@@ -627,7 +627,7 @@ const IndividualLiveTracking: React.FC = () => {
                 {isLiveMode ? 'Durdur' : 'Başlat'}
               </button>
               
-              <button className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2">
+              <button className="px-4 py-2 border border-gray-300 text-slate-700 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2">
                 <RefreshCw className="w-4 h-4" />
                 Yenile
               </button>
@@ -635,7 +635,7 @@ const IndividualLiveTracking: React.FC = () => {
               <button
                 onClick={() => setShowMap(!showMap)}
                 className={`px-4 py-2 rounded-lg transition-colors flex items-center gap-2 ${
-                  showMap ? 'bg-blue-600 text-white' : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
+                  showMap ? 'bg-slate-800 text-white hover:bg-slate-700' : 'border border-gray-300 text-slate-700 hover:bg-gray-50'
                 }`}
               >
                 <Map className="w-4 h-4" />
@@ -645,7 +645,7 @@ const IndividualLiveTracking: React.FC = () => {
               <button
                 onClick={() => setNotifications(!notifications)}
                 className={`px-4 py-2 rounded-lg transition-colors flex items-center gap-2 ${
-                  notifications ? 'bg-green-600 text-white' : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
+                  notifications ? 'bg-green-600 text-white' : 'border border-gray-300 text-slate-700 hover:bg-gray-50'
                 }`}
               >
                 {notifications ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
@@ -661,7 +661,7 @@ const IndividualLiveTracking: React.FC = () => {
             {/* Search */}
             <div className="flex-1">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
                 <input
                   type="text"
                   placeholder="Takip numarası, gönderi başlığı veya nakliyeci ara..."
@@ -712,16 +712,16 @@ const IndividualLiveTracking: React.FC = () => {
           <div className="lg:col-span-1">
             <div className="bg-white rounded-xl shadow-lg border border-gray-200">
               <div className="p-4 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-900">Aktif Gönderiler</h2>
-                <p className="text-sm text-gray-600">{filteredAndSortedShipments.length} gönderi</p>
+                <h2 className="text-lg font-semibold text-slate-900">Aktif Gönderiler</h2>
+                <p className="text-sm text-slate-600">{filteredAndSortedShipments.length} gönderi</p>
               </div>
               <div className="max-h-96 overflow-y-auto">
                 {filteredAndSortedShipments.map((shipment) => (
                   <div
                     key={shipment.id}
                     onClick={() => setSelectedShipment(shipment)}
-                    className={`p-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors ${
-                      selectedShipment?.id === shipment.id ? 'bg-blue-50 border-l-4 border-l-blue-500' : ''
+                    className={`p-4 border-b border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors ${
+                      selectedShipment?.id === shipment.id ? 'bg-slate-50 border-l-4 border-l-slate-800' : ''
                     }`}
                   >
                     <div className="flex items-start gap-3">
@@ -733,7 +733,7 @@ const IndividualLiveTracking: React.FC = () => {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between mb-1">
-                          <h3 className="font-semibold text-gray-900 truncate">{shipment.title}</h3>
+                          <h3 className="font-semibold text-slate-900 truncate">{shipment.title}</h3>
                           <div className="flex items-center gap-1">
                             <span className={`px-2 py-1 text-xs font-medium rounded-full border ${getStatusColor(shipment.status)}`}>
                               {getStatusText(shipment.status)}
@@ -741,12 +741,12 @@ const IndividualLiveTracking: React.FC = () => {
                             <div className={`w-2 h-2 rounded-full ${getPriorityColor(shipment.priority)}`} title={getPriorityText(shipment.priority)}></div>
                           </div>
                         </div>
-                        <p className="text-sm text-gray-600 mb-1">{shipment.trackingNumber}</p>
-                        <p className="text-sm text-gray-500 truncate">{shipment.carrier.name} - {shipment.carrier.company}</p>
-                        <p className="text-xs text-gray-400 mt-1">
+                        <p className="text-sm text-slate-600 mb-1">{shipment.trackingNumber}</p>
+                        <p className="text-sm text-slate-500 truncate">{shipment.carrier.name} - {shipment.carrier.company}</p>
+                        <p className="text-xs text-slate-400 mt-1">
                           {shipment.route.origin} → {shipment.route.destination}
                         </p>
-                        <p className="text-xs text-gray-400">
+                        <p className="text-xs text-slate-400">
                           Son güncelleme: {new Date(shipment.lastUpdate).toLocaleTimeString('tr-TR')}
                         </p>
                       </div>
@@ -772,8 +772,8 @@ const IndividualLiveTracking: React.FC = () => {
                         )}
                       </div>
                       <div>
-                        <h2 className="text-xl font-bold text-gray-900">{selectedShipment.title}</h2>
-                        <p className="text-gray-600">{selectedShipment.trackingNumber}</p>
+                        <h2 className="text-xl font-bold text-slate-900">{selectedShipment.title}</h2>
+                        <p className="text-slate-600">{selectedShipment.trackingNumber}</p>
                         <div className="flex items-center gap-2 mt-1">
                           <span className={`px-2 py-1 text-xs font-medium rounded-full border ${getStatusColor(selectedShipment.status)}`}>
                             {getStatusText(selectedShipment.status)}
@@ -784,35 +784,35 @@ const IndividualLiveTracking: React.FC = () => {
                     </div>
                     <div className="flex gap-2">
                       <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                        <Download className="w-4 h-4 text-gray-600" />
+                        <Download className="w-4 h-4 text-slate-500" />
                       </button>
                       <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                        <Share2 className="w-4 h-4 text-gray-600" />
+                        <Share2 className="w-4 h-4 text-slate-500" />
                       </button>
                       <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                        <MoreVertical className="w-4 h-4 text-gray-600" />
+                        <MoreVertical className="w-4 h-4 text-slate-500" />
                       </button>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                    <div className="flex items-center gap-2 text-gray-700">
-                      <MapPin className="w-4 h-4 text-gray-500" />
+                    <div className="flex items-center gap-2 text-white">
+                      <MapPin className="w-4 h-4 text-slate-500" />
                       <span className="font-medium">Mevcut Konum:</span>
                       <span>{selectedShipment.currentLocation}</span>
                     </div>
-                    <div className="flex items-center gap-2 text-gray-700">
-                      <Calendar className="w-4 h-4 text-gray-500" />
+                    <div className="flex items-center gap-2 text-white">
+                      <Calendar className="w-4 h-4 text-slate-500" />
                       <span className="font-medium">Tahmini Teslimat:</span>
                       <span>{selectedShipment.estimatedDelivery}</span>
                     </div>
-                    <div className="flex items-center gap-2 text-gray-700">
-                      <Route className="w-4 h-4 text-gray-500" />
+                    <div className="flex items-center gap-2 text-white">
+                      <Route className="w-4 h-4 text-slate-500" />
                       <span className="font-medium">Rota:</span>
                       <span>{selectedShipment.route.origin} → {selectedShipment.route.destination}</span>
                     </div>
-                    <div className="flex items-center gap-2 text-gray-700">
-                      <Package className="w-4 h-4 text-gray-500" />
+                    <div className="flex items-center gap-2 text-white">
+                      <Package className="w-4 h-4 text-slate-500" />
                       <span className="font-medium">Mesafe:</span>
                       <span>{selectedShipment.route.distance} km</span>
                     </div>
@@ -822,31 +822,31 @@ const IndividualLiveTracking: React.FC = () => {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                     <div className="bg-gray-50 rounded-lg p-3">
                       <div className="flex items-center gap-2 mb-1">
-                        <DollarSign className="w-4 h-4 text-gray-500" />
-                        <span className="text-sm font-medium text-gray-700">Değer</span>
+                        <DollarSign className="w-4 h-4 text-slate-500" />
+                        <span className="text-sm font-medium text-white">Değer</span>
                       </div>
-                      <p className="text-lg font-semibold text-gray-900">₺{selectedShipment.value.toLocaleString()}</p>
+                      <p className="text-lg font-semibold text-white">₺{selectedShipment.value.toLocaleString()}</p>
                     </div>
                     <div className="bg-gray-50 rounded-lg p-3">
                       <div className="flex items-center gap-2 mb-1">
-                        <Package className="w-4 h-4 text-gray-500" />
-                        <span className="text-sm font-medium text-gray-700">Ağırlık</span>
+                        <Package className="w-4 h-4 text-slate-500" />
+                        <span className="text-sm font-medium text-white">Ağırlık</span>
                       </div>
-                      <p className="text-lg font-semibold text-gray-900">{selectedShipment.weight} kg</p>
+                      <p className="text-lg font-semibold text-white">{selectedShipment.weight} kg</p>
                     </div>
                     <div className="bg-gray-50 rounded-lg p-3">
                       <div className="flex items-center gap-2 mb-1">
-                        <Timer className="w-4 h-4 text-gray-500" />
-                        <span className="text-sm font-medium text-gray-700">Süre</span>
+                        <Timer className="w-4 h-4 text-slate-500" />
+                        <span className="text-sm font-medium text-white">Süre</span>
                       </div>
-                      <p className="text-lg font-semibold text-gray-900">{selectedShipment.route.estimatedTime}</p>
+                      <p className="text-lg font-semibold text-white">{selectedShipment.route.estimatedTime}</p>
                     </div>
                   </div>
 
                   {/* Special Requirements */}
                   {selectedShipment.specialRequirements.length > 0 && (
                     <div className="mb-6">
-                      <h3 className="text-sm font-medium text-gray-700 mb-2">Özel Gereksinimler</h3>
+                      <h3 className="text-sm font-medium text-white mb-2">Özel Gereksinimler</h3>
                       <div className="flex flex-wrap gap-2">
                         {selectedShipment.specialRequirements.map((req, index) => (
                           <span key={index} className="px-2 py-1 bg-blue-100 text-blue-800 rounded-lg text-xs font-medium">
@@ -865,29 +865,29 @@ const IndividualLiveTracking: React.FC = () => {
                           <Truck className="w-6 h-6 text-white" />
                         </div>
                         <div>
-                          <h3 className="font-semibold text-gray-900">{selectedShipment.carrier.name}</h3>
-                          <p className="text-sm text-gray-600">{selectedShipment.carrier.company}</p>
+                          <h3 className="font-semibold text-white">{selectedShipment.carrier.name}</h3>
+                          <p className="text-sm text-gray-300">{selectedShipment.carrier.company}</p>
                           <div className="flex items-center gap-2 mt-1">
                             <div className="flex items-center gap-1">
                               <Star className="w-3 h-3 text-yellow-500" />
-                              <span className="text-sm text-gray-700">{selectedShipment.carrier.rating}/5</span>
+                              <span className="text-sm text-white">{selectedShipment.carrier.rating}/5</span>
                             </div>
-                            <span className="text-xs text-gray-500">•</span>
-                            <span className="text-xs text-gray-500">{selectedShipment.carrier.totalShipments} gönderi</span>
-                            <span className="text-xs text-gray-500">•</span>
-                            <span className="text-xs text-gray-500">%{selectedShipment.carrier.successRate} başarı</span>
+                            <span className="text-xs text-slate-500">•</span>
+                            <span className="text-xs text-slate-500">{selectedShipment.carrier.totalShipments} gönderi</span>
+                            <span className="text-xs text-slate-500">•</span>
+                            <span className="text-xs text-slate-500">%{selectedShipment.carrier.successRate} başarı</span>
                           </div>
                         </div>
                       </div>
                       <div className="flex gap-2">
                         <button className="p-2 hover:bg-gray-200 rounded-lg transition-colors">
-                          <Phone className="w-4 h-4 text-gray-600" />
+                          <Phone className="w-4 h-4 text-gray-300" />
                         </button>
                         <button className="p-2 hover:bg-gray-200 rounded-lg transition-colors">
-                          <MessageSquare className="w-4 h-4 text-gray-600" />
+                          <MessageSquare className="w-4 h-4 text-gray-300" />
                         </button>
                         <button className="p-2 hover:bg-gray-200 rounded-lg transition-colors">
-                          <ExternalLink className="w-4 h-4 text-gray-600" />
+                          <ExternalLink className="w-4 h-4 text-gray-300" />
                         </button>
                       </div>
                     </div>
@@ -897,7 +897,7 @@ const IndividualLiveTracking: React.FC = () => {
                 {/* Timeline */}
                 <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
                   <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-lg font-semibold text-gray-900">Gönderi Geçmişi</h3>
+                    <h3 className="text-lg font-semibold text-white">Gönderi Geçmişi</h3>
                     <button
                       onClick={() => setExpandedTimeline(!expandedTimeline)}
                       className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"
@@ -923,22 +923,22 @@ const IndividualLiveTracking: React.FC = () => {
                         <div className="flex-1">
                           <div className="flex items-start justify-between">
                             <div>
-                              <p className="font-medium text-gray-900">{event.description}</p>
-                              <p className="text-sm text-gray-600">{event.location}</p>
-                              <p className="text-xs text-gray-500 mt-1">
+                              <p className="font-medium text-white">{event.description}</p>
+                              <p className="text-sm text-gray-300">{event.location}</p>
+                              <p className="text-xs text-slate-500 mt-1">
                                 {new Date(event.timestamp).toLocaleString('tr-TR')}
                                 {event.actualTime && (
                                   <span className="ml-2 text-green-600">(Gerçek: {event.actualTime})</span>
                                 )}
                               </p>
                               {event.notes && (
-                                <p className="text-xs text-gray-500 mt-1 italic">{event.notes}</p>
+                                <p className="text-xs text-slate-500 mt-1 italic">{event.notes}</p>
                               )}
                             </div>
                             {event.estimatedTime && (
                               <div className="text-right">
-                                <p className="text-xs text-gray-500">Tahmini</p>
-                                <p className="text-sm font-medium text-gray-700">{event.estimatedTime}</p>
+                                <p className="text-xs text-slate-500">Tahmini</p>
+                                <p className="text-sm font-medium text-white">{event.estimatedTime}</p>
                               </div>
                             )}
                           </div>
@@ -961,9 +961,9 @@ const IndividualLiveTracking: React.FC = () => {
             ) : (
               <div className="bg-white rounded-xl shadow-lg border border-gray-200 h-96 flex items-center justify-center">
                 <div className="text-center">
-                  <Navigation className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Gönderi Seçin</h3>
-                  <p className="text-gray-600">Detayları görüntülemek için sol taraftan bir gönderi seçin</p>
+                  <Navigation className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-white mb-2">Gönderi Seçin</h3>
+                  <p className="text-gray-300">Detayları görüntülemek için sol taraftan bir gönderi seçin</p>
                 </div>
               </div>
             )}

@@ -165,7 +165,7 @@ export default function NakliyeciSettings() {
       ...prev,
       [section]: {
         ...prev[section],
-        [field]: value
+      [field]: value
       }
     }));
   };
@@ -175,7 +175,7 @@ export default function NakliyeciSettings() {
       ...prev,
       [section]: {
         ...prev[section],
-        [field]: !prev[section][field as keyof typeof prev[section]]
+        [field]: !(prev[section] as any)[field]
       }
     }));
   };
@@ -232,23 +232,23 @@ export default function NakliyeciSettings() {
             <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg border border-slate-200">
               <nav className="p-4">
                 <ul className="space-y-2">
-                  {tabs.map((tab) => (
+              {tabs.map((tab) => (
                     <li key={tab.id}>
-                      <button
-                        onClick={() => setActiveTab(tab.id)}
+                <button
+                  onClick={() => setActiveTab(tab.id)}
                         className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${
-                          activeTab === tab.id
+                    activeTab === tab.id
                             ? 'bg-slate-800 text-white'
                             : 'text-slate-700 hover:bg-slate-100'
-                        }`}
-                      >
+                  }`}
+                >
                         <tab.icon className="w-4 h-4" />
                         <span className="text-sm font-medium">{tab.name}</span>
-                      </button>
+                </button>
                     </li>
-                  ))}
+              ))}
                 </ul>
-              </nav>
+            </nav>
             </div>
           </div>
 
@@ -258,77 +258,77 @@ export default function NakliyeciSettings() {
               <div className="p-4 sm:p-6">
                 {/* Company Settings */}
                 {activeTab === 'company' && (
-                  <div className="space-y-6">
+              <div className="space-y-6">
                     <h3 className="text-lg font-semibold text-slate-900">Şirket Bilgileri</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
+                  <div>
                         <label className="block text-sm font-medium text-slate-700 mb-2">Şirket Adı</label>
-                        <input
-                          type="text"
+                    <input
+                      type="text"
                           value={settings.company.name}
                           onChange={(e) => handleInputChange('company', 'name', e.target.value)}
                           className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500"
-                        />
-                      </div>
-                      <div>
+                    />
+                  </div>
+                  <div>
                         <label className="block text-sm font-medium text-slate-700 mb-2">E-posta</label>
-                        <input
-                          type="email"
+                    <input
+                      type="email"
                           value={settings.company.email}
                           onChange={(e) => handleInputChange('company', 'email', e.target.value)}
                           className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500"
-                        />
-                      </div>
-                      <div>
+                    />
+                  </div>
+                  <div>
                         <label className="block text-sm font-medium text-slate-700 mb-2">Telefon</label>
-                        <input
-                          type="tel"
+                    <input
+                      type="tel"
                           value={settings.company.phone}
                           onChange={(e) => handleInputChange('company', 'phone', e.target.value)}
                           className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500"
-                        />
-                      </div>
-                      <div>
+                    />
+                  </div>
+                  <div>
                         <label className="block text-sm font-medium text-slate-700 mb-2">Vergi Numarası</label>
-                        <input
-                          type="text"
+                    <input
+                      type="text"
                           value={settings.company.taxNumber}
                           onChange={(e) => handleInputChange('company', 'taxNumber', e.target.value)}
                           className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500"
-                        />
-                      </div>
-                      <div className="md:col-span-2">
+                    />
+                  </div>
+                  <div className="md:col-span-2">
                         <label className="block text-sm font-medium text-slate-700 mb-2">Adres</label>
-                        <textarea
+                    <textarea
                           value={settings.company.address}
                           onChange={(e) => handleInputChange('company', 'address', e.target.value)}
-                          rows={3}
+                      rows={3}
                           className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500"
-                        />
-                      </div>
-                      <div>
+                    />
+                  </div>
+                  <div>
                         <label className="block text-sm font-medium text-slate-700 mb-2">Website</label>
-                        <input
-                          type="url"
+                    <input
+                      type="url"
                           value={settings.company.website}
                           onChange={(e) => handleInputChange('company', 'website', e.target.value)}
                           className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500"
-                        />
-                      </div>
-                    </div>
+                    />
                   </div>
-                )}
+                </div>
+              </div>
+            )}
 
                 {/* Notifications Settings */}
-                {activeTab === 'notifications' && (
-                  <div className="space-y-6">
+            {activeTab === 'notifications' && (
+              <div className="space-y-6">
                     <h3 className="text-lg font-semibold text-slate-900">Bildirim Ayarları</h3>
-                    <div className="space-y-4">
+                <div className="space-y-4">
                       <div className="flex items-center justify-between">
-                        <div>
+                    <div>
                           <h4 className="text-sm font-medium text-slate-900">E-posta Bildirimleri</h4>
                           <p className="text-sm text-slate-600">Önemli güncellemeler için e-posta alın</p>
-                        </div>
+                    </div>
                         <button
                           onClick={() => handleToggle('notifications', 'email')}
                           className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
@@ -341,12 +341,12 @@ export default function NakliyeciSettings() {
                             }`}
                           />
                         </button>
-                      </div>
+                  </div>
                       <div className="flex items-center justify-between">
-                        <div>
+                    <div>
                           <h4 className="text-sm font-medium text-slate-900">SMS Bildirimleri</h4>
                           <p className="text-sm text-slate-600">Acil durumlar için SMS alın</p>
-                        </div>
+                    </div>
                         <button
                           onClick={() => handleToggle('notifications', 'sms')}
                           className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
@@ -359,12 +359,12 @@ export default function NakliyeciSettings() {
                             }`}
                           />
                         </button>
-                      </div>
+                  </div>
                       <div className="flex items-center justify-between">
-                        <div>
+                    <div>
                           <h4 className="text-sm font-medium text-slate-900">İş Uyarıları</h4>
                           <p className="text-sm text-slate-600">Yeni iş fırsatları hakkında bilgilendirilme</p>
-                        </div>
+                    </div>
                         <button
                           onClick={() => handleToggle('notifications', 'jobAlerts')}
                           className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
@@ -377,18 +377,18 @@ export default function NakliyeciSettings() {
                             }`}
                           />
                         </button>
-                      </div>
-                    </div>
                   </div>
-                )}
+                </div>
+              </div>
+            )}
 
                 {/* Privacy Settings */}
                 {activeTab === 'privacy' && (
-                  <div className="space-y-6">
+              <div className="space-y-6">
                     <h3 className="text-lg font-semibold text-slate-900">Gizlilik Ayarları</h3>
-                    <div className="space-y-4">
+                <div className="space-y-4">
                       <div className="flex items-center justify-between">
-                        <div>
+                  <div>
                           <h4 className="text-sm font-medium text-slate-900">Profil Görünürlüğü</h4>
                           <p className="text-sm text-slate-600">Diğer kullanıcılar profilinizi görebilir</p>
                         </div>
@@ -410,7 +410,7 @@ export default function NakliyeciSettings() {
                           <h4 className="text-sm font-medium text-slate-900">Konum Paylaşımı</h4>
                           <p className="text-sm text-slate-600">Gerçek zamanlı konumunuzu paylaşın</p>
                         </div>
-                        <button
+                      <button
                           onClick={() => handleToggle('privacy', 'showLocation')}
                           className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                             settings.privacy.showLocation ? 'bg-slate-800' : 'bg-slate-200'
@@ -421,9 +421,9 @@ export default function NakliyeciSettings() {
                               settings.privacy.showLocation ? 'translate-x-6' : 'translate-x-1'
                             }`}
                           />
-                        </button>
-                      </div>
+                      </button>
                     </div>
+                  </div>
                   </div>
                 )}
 
@@ -433,7 +433,7 @@ export default function NakliyeciSettings() {
                     <h3 className="text-lg font-semibold text-slate-900">Güvenlik Ayarları</h3>
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
-                        <div>
+                  <div>
                           <h4 className="text-sm font-medium text-slate-900">İki Faktörlü Kimlik Doğrulama</h4>
                           <p className="text-sm text-slate-600">Hesabınızı ekstra güvenlik ile koruyun</p>
                         </div>
@@ -449,8 +449,8 @@ export default function NakliyeciSettings() {
                             }`}
                           />
                         </button>
-                      </div>
-                      <div>
+                  </div>
+                  <div>
                         <label className="block text-sm font-medium text-slate-700 mb-2">Oturum Zaman Aşımı (dakika)</label>
                         <select
                           value={settings.security.sessionTimeout}
@@ -462,17 +462,17 @@ export default function NakliyeciSettings() {
                           <option value={60}>1 saat</option>
                           <option value={120}>2 saat</option>
                         </select>
-                      </div>
-                    </div>
                   </div>
-                )}
+                </div>
+              </div>
+            )}
 
                 {/* Preferences Settings */}
                 {activeTab === 'preferences' && (
-                  <div className="space-y-6">
+              <div className="space-y-6">
                     <h3 className="text-lg font-semibold text-slate-900">Uygulama Tercihleri</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
+                  <div>
                         <label className="block text-sm font-medium text-slate-700 mb-2">Tema</label>
                         <select
                           value={settings.preferences.theme}
@@ -483,18 +483,18 @@ export default function NakliyeciSettings() {
                           <option value="dark">Koyu</option>
                           <option value="auto">Otomatik</option>
                         </select>
-                      </div>
-                      <div>
+                  </div>
+                  <div>
                         <label className="block text-sm font-medium text-slate-700 mb-2">Dil</label>
-                        <select
+                    <select
                           value={settings.preferences.language}
                           onChange={(e) => handleInputChange('preferences', 'language', e.target.value)}
                           className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500"
-                        >
-                          <option value="tr">Türkçe</option>
-                          <option value="en">English</option>
-                        </select>
-                      </div>
+                    >
+                      <option value="tr">Türkçe</option>
+                      <option value="en">English</option>
+                    </select>
+                  </div>
                       <div>
                         <label className="block text-sm font-medium text-slate-700 mb-2">Saat Dilimi</label>
                         <select
@@ -519,29 +519,29 @@ export default function NakliyeciSettings() {
                           <option value="EUR">€ Euro</option>
                         </select>
                       </div>
-                    </div>
-                  </div>
-                )}
+                </div>
+              </div>
+            )}
 
                 {/* Business Settings */}
-                {activeTab === 'business' && (
-                  <div className="space-y-6">
+            {activeTab === 'business' && (
+              <div className="space-y-6">
                     <h3 className="text-lg font-semibold text-slate-900">İş Ayarları</h3>
-                    <div className="space-y-4">
-                      <div>
+                <div className="space-y-4">
+                  <div>
                         <label className="block text-sm font-medium text-slate-700 mb-2">Komisyon Oranı (%)</label>
-                        <input
-                          type="number"
+                    <input
+                      type="number"
                           min="0"
                           max="10"
                           step="0.1"
                           value={settings.business.commissionRate}
                           onChange={(e) => handleInputChange('business', 'commissionRate', parseFloat(e.target.value))}
                           className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500"
-                        />
-                      </div>
+                    />
+                  </div>
                       <div className="flex items-center justify-between">
-                        <div>
+                  <div>
                           <h4 className="text-sm font-medium text-slate-900">Otomatik İş Kabul</h4>
                           <p className="text-sm text-slate-600">Uygun işleri otomatik olarak kabul et</p>
                         </div>
@@ -557,11 +557,11 @@ export default function NakliyeciSettings() {
                             }`}
                           />
                         </button>
-                      </div>
-                      <div>
+                  </div>
+                  <div>
                         <label className="block text-sm font-medium text-slate-700 mb-2">Maksimum Mesafe (km)</label>
-                        <input
-                          type="number"
+                    <input
+                      type="number"
                           min="10"
                           max="500"
                           value={settings.business.maxDistance}
@@ -594,17 +594,17 @@ export default function NakliyeciSettings() {
                                 end: e.target.value
                               })}
                               className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500"
-                            />
-                          </div>
-                        </div>
-                      </div>
+                    />
+                  </div>
+                </div>
+              </div>
                     </div>
                   </div>
                 )}
-              </div>
             </div>
           </div>
         </div>
+      </div>
       </div>
 
       {/* Success Message */}

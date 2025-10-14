@@ -142,27 +142,27 @@ const IndividualMessages: React.FC = () => {
 
   const handleSendMessage = () => {
     if (newMessage.trim() && selectedConversation) {
-      const message: Message = {
-        id: Date.now().toString(),
-        from: 'Siz',
+    const message: Message = {
+      id: Date.now().toString(),
+      from: 'Siz',
         fromType: 'carrier',
-        message: newMessage,
+      message: newMessage,
         timestamp: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
         isRead: true
-      };
+    };
 
-      setConversations(prev => prev.map(conv => 
-        conv.id === selectedConversation.id 
+    setConversations(prev => prev.map(conv => 
+      conv.id === selectedConversation.id 
           ? {
               ...conv,
               messages: [...conv.messages, message],
               lastMessage: message.message,
               lastMessageTime: message.timestamp
             }
-          : conv
-      ));
+        : conv
+    ));
 
-      setNewMessage('');
+    setNewMessage('');
     }
   };
 
@@ -231,7 +231,7 @@ const IndividualMessages: React.FC = () => {
                 <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
               </div>
             </div>
-          </div>
+        </div>
 
           <div className="bg-white rounded-xl shadow-lg border border-slate-200 p-3 sm:p-4">
             <div className="flex items-center justify-between">
@@ -278,17 +278,17 @@ const IndividualMessages: React.FC = () => {
 
         {/* Search - Mobile Optimized */}
         <div className="bg-white rounded-xl shadow-lg border border-slate-200 p-4 sm:p-6 mb-6 sm:mb-8">
-          <div className="relative">
+                <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-            <input
-              type="text"
+                  <input
+                    type="text"
               placeholder="Nakliyeci veya mesaj ara..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2.5 sm:py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-slate-50 focus:bg-white transition-colors"
-            />
-          </div>
-        </div>
+                  />
+                </div>
+              </div>
 
         {/* Messages Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -306,38 +306,38 @@ const IndividualMessages: React.FC = () => {
                   </div>
                 ) : (
                   <div className="divide-y divide-slate-200">
-                    {filteredConversations.map((conversation) => (
+                {filteredConversations.map((conversation) => (
                       <button
-                        key={conversation.id}
+                    key={conversation.id}
                         onClick={() => handleConversationSelect(conversation)}
                         className={`w-full p-4 text-left hover:bg-slate-50 transition-colors ${
                           selectedConversation?.id === conversation.id ? 'bg-blue-50 border-r-2 border-blue-500' : ''
                         }`}
                       >
                         <div className="flex items-start space-x-3">
-                          <div className="relative">
+                      <div className="relative">
                             <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
                               {conversation.carrierName === 'Sistem' ? (
                                 <Package className="w-5 h-5 text-white" />
                               ) : (
                                 <Truck className="w-5 h-5 text-white" />
                               )}
-                            </div>
-                            {conversation.isOnline && (
-                              <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between">
+                        </div>
+                        {conversation.isOnline && (
+                          <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
                               <h4 className="text-sm font-medium text-slate-900 truncate">
                                 {conversation.carrierName}
                               </h4>
-                              {conversation.unreadCount > 0 && (
+                          {conversation.unreadCount > 0 && (
                                 <span className="inline-flex items-center justify-center w-5 h-5 text-xs font-medium text-white bg-red-500 rounded-full">
-                                  {conversation.unreadCount}
-                                </span>
-                              )}
-                            </div>
+                              {conversation.unreadCount}
+                            </span>
+                          )}
+                        </div>
                             <p className="text-xs text-slate-500 truncate">
                               {conversation.carrierCompany}
                             </p>
@@ -346,11 +346,11 @@ const IndividualMessages: React.FC = () => {
                             </p>
                             <p className="text-xs text-slate-400 mt-1">
                               {conversation.lastMessageTime}
-                            </p>
-                          </div>
-                        </div>
+                        </p>
+                      </div>
+                    </div>
                       </button>
-                    ))}
+                ))}
                   </div>
                 )}
               </div>
@@ -370,20 +370,20 @@ const IndividualMessages: React.FC = () => {
                       ) : (
                         <Truck className="w-5 h-5 text-white" />
                       )}
-                    </div>
-                    <div>
+                      </div>
+                      <div>
                       <h3 className="text-lg font-medium text-slate-900">
                         {selectedConversation.carrierName}
                       </h3>
                       <p className="text-sm text-slate-500">
                         {selectedConversation.carrierCompany}
                       </p>
-                    </div>
+                      </div>
                     {selectedConversation.isOnline && (
                       <div className="flex items-center text-sm text-green-600">
                         <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
                         Çevrimiçi
-                      </div>
+                    </div>
                     )}
                   </div>
                 </div>
@@ -439,7 +439,7 @@ const IndividualMessages: React.FC = () => {
             ) : (
               <div className="bg-white rounded-xl shadow-lg border border-slate-200 h-96 lg:h-[600px] flex items-center justify-center">
                 <EmptyState
-                  icon={MessageSquare}
+                  icon={<MessageSquare className="w-8 h-8 text-slate-400" />}
                   title="Sohbet Seçin"
                   description="Bir sohbet seçerek mesajlaşmaya başlayın"
                 />

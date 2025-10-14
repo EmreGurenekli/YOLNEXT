@@ -3,12 +3,12 @@ const { sequelize } = require('../config/database');
 
 const Offer = sequelize.define('Offer', {
   id: {
-    type: DataTypes.UUID,
-    defaultValue: DataTypes.UUIDV4,
+    type: DataTypes.INTEGER,
+    autoIncrement: true,
     primaryKey: true
   },
   shipmentId: {
-    type: DataTypes.UUID,
+    type: DataTypes.INTEGER,
     allowNull: false,
     references: {
       model: 'shipments',
@@ -16,7 +16,7 @@ const Offer = sequelize.define('Offer', {
     }
   },
   carrierId: {
-    type: DataTypes.UUID,
+    type: DataTypes.INTEGER,
     allowNull: false,
     references: {
       model: 'carriers',
@@ -24,7 +24,7 @@ const Offer = sequelize.define('Offer', {
     }
   },
   driverId: {
-    type: DataTypes.UUID,
+    type: DataTypes.INTEGER,
     allowNull: true,
     references: {
       model: 'drivers',

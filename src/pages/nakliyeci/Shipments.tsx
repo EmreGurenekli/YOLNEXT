@@ -23,7 +23,6 @@ import {
   MoreHorizontal,
   AlertCircle,
   CheckCircle2,
-  XCircle2,
   Loader2
 } from 'lucide-react';
 import Breadcrumb from '../../components/common/Breadcrumb';
@@ -364,7 +363,7 @@ export default function NakliyeciShipments() {
         {/* Shipments List */}
         {currentShipments.length === 0 ? (
           <EmptyState
-            icon={Package}
+                        icon={<Package className="w-8 h-8 text-slate-400" />}
             title="Gönderi bulunamadı"
             description="Arama kriterlerinize uygun gönderi bulunamadı."
           />

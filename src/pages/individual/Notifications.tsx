@@ -577,7 +577,7 @@ const IndividualNotifications: React.FC = () => {
         <div className="space-y-4">
           {filteredNotifications.length === 0 ? (
             <EmptyState
-              icon={Bell}
+              icon={<Bell className="w-8 h-8 text-slate-400" />}
               title="Bildirim Bulunamadı"
               description="Arama kriterlerinize uygun bildirim bulunamadı."
             />

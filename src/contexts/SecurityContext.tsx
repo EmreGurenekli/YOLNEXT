@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import api from '../services/api';
+import { apiClient } from '../services/api';
 import { LoginCredentials, RegisterData, SecurityLog, PasswordStrength } from '../types/auth';
 
 interface SecurityContextType {
@@ -50,13 +50,9 @@ export const SecurityProvider: React.FC<SecurityProviderProps> = ({ children }) 
 
   const verifyToken = async () => {
     try {
-      const response = await api.getCurrentUser();
-      if (response.success && response.data && 'user' in response.data) {
-        setUser(response.data.user);
-        setIsAuthenticated(true);
-      } else {
-        throw new Error('Token verification failed');
-      }
+      const response = await apiClient.verifyToken();
+      setUser(response.user);
+      setIsAuthenticated(true);
     } catch (error) {
       console.error('Token verification failed:', error);
       localStorage.removeItem('authToken');
@@ -78,13 +74,10 @@ export const SecurityProvider: React.FC<SecurityProviderProps> = ({ children }) 
         throw new Error('Geçerli bir email adresi giriniz');
       }
       
-      const response = await api.login(credentials.email, credentials.password);
-      if (response.success && response.data && 'user' in response.data) {
-        setUser(response.data.user);
-        setIsAuthenticated(true);
-      } else {
-        throw new Error('Login failed');
-      }
+      const response = await apiClient.login(credentials);
+      apiClient.setToken(response.token);
+      setUser(response.user);
+      setIsAuthenticated(true);
       
       // Log security event
       await logSecurityEvent('login', 'User logged in successfully');
@@ -96,7 +89,7 @@ export const SecurityProvider: React.FC<SecurityProviderProps> = ({ children }) 
   };
 
   const logout = () => {
-    api.logout();
+    apiClient.setToken(null);
     setUser(null);
     setIsAuthenticated(false);
     logSecurityEvent('logout', 'User logged out');
@@ -104,21 +97,10 @@ export const SecurityProvider: React.FC<SecurityProviderProps> = ({ children }) 
 
   const register = async (data: RegisterData) => {
     try {
-      const response = await api.register({
-        email: data.email,
-        password: data.password,
-        firstName: data.name.split(' ')[0],
-        lastName: data.name.split(' ').slice(1).join(' '),
-        userType: data.panel_type as 'individual' | 'corporate' | 'carrier' | 'driver',
-        phone: data.phone
-      });
-      
-      if (response.success && response.data && 'user' in response.data) {
-        setUser(response.data.user);
-        setIsAuthenticated(true);
-      } else {
-        throw new Error('Registration failed');
-      }
+      const response = await apiClient.register(data);
+      apiClient.setToken(response.token);
+      setUser(response.user);
+      setIsAuthenticated(true);
       
       // Log security event
       await logSecurityEvent('register', 'New user registered');

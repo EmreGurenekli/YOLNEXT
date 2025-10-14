@@ -4,15 +4,15 @@ import {
   Bell, 
   Search, 
   Filter, 
-  CheckCircle,
+  CheckCircle, 
   XCircle,
-  AlertCircle,
-  Info,
+  AlertCircle, 
+  Info, 
   Clock,
   BarChart3,
   RefreshCw,
-  MarkAsRead,
-  MarkAsUnread,
+  Check,
+  X, 
   Trash2,
   MoreVertical
 } from 'lucide-react';
@@ -106,7 +106,7 @@ export default function NakliyeciNotifications() {
   const filteredNotifications = notifications.filter(notification => {
     const matchesSearch = searchTerm === '' ||
       notification.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      notification.message.toLowerCase().includes(searchTerm.toLowerCase());
+                         notification.message.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesType = filterType === 'all' || notification.type === filterType;
     const matchesCategory = filterCategory === 'all' || notification.category === filterCategory;
@@ -320,20 +320,20 @@ export default function NakliyeciNotifications() {
         {showFilters && (
           <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-lg border border-slate-200 mb-6 sm:mb-8">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="relative">
+            <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-                <input
-                  type="text"
-                  placeholder="Bildirim ara..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+              <input
+                type="text"
+                placeholder="Bildirim ara..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-sm"
-                />
-              </div>
-              
-              <select
-                value={filterType}
-                onChange={(e) => setFilterType(e.target.value)}
+              />
+            </div>
+            
+            <select
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value)}
                 className="px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-sm"
               >
                 <option value="all">Tüm Türler</option>
@@ -351,11 +351,11 @@ export default function NakliyeciNotifications() {
                 <option value="all">Tüm Kategoriler</option>
                 <option value="job">İş</option>
                 <option value="payment">Ödeme</option>
-                <option value="system">Sistem</option>
+              <option value="system">Sistem</option>
                 <option value="message">Mesaj</option>
                 <option value="alert">Uyarı</option>
-              </select>
-              
+            </select>
+
               <select
                 value={filterPriority}
                 onChange={(e) => setFilterPriority(e.target.value)}
@@ -381,23 +381,23 @@ export default function NakliyeciNotifications() {
               >
                 <RefreshCw className="w-4 h-4" />
                 Filtreleri Temizle
-              </button>
-            </div>
+            </button>
           </div>
+        </div>
         )}
 
         {/* Notifications List */}
         {currentNotifications.length === 0 ? (
           <EmptyState
-            icon={Bell}
+                        icon={<Bell className="w-8 h-8 text-slate-400" />}
             title="Bildirim bulunamadı"
             description="Arama kriterlerinize uygun bildirim bulunamadı."
           />
         ) : (
-          <div className="space-y-4">
+        <div className="space-y-4">
             {currentNotifications.map((notification) => (
-              <div
-                key={notification.id}
+            <div
+              key={notification.id}
                 className={`bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-lg border border-slate-200 hover:shadow-xl transition-all duration-200 ${
                   !notification.isRead ? 'border-l-4 border-l-slate-800' : ''
                 }`}
@@ -409,7 +409,7 @@ export default function NakliyeciNotifications() {
                   
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between mb-2">
-                      <div className="flex-1">
+                  <div className="flex-1">
                         <h3 className="text-lg font-semibold text-slate-900 mb-1">
                           {notification.title}
                         </h3>
@@ -436,41 +436,41 @@ export default function NakliyeciNotifications() {
                           >
                             {notification.actionText} →
                           </a>
-                        )}
-                      </div>
-                      
+                      )}
+                    </div>
+                    
                       <div className="flex items-center gap-2 ml-4">
                         {!notification.isRead ? (
-                          <button
-                            onClick={() => handleMarkAsRead(notification.id)}
+                    <button
+                      onClick={() => handleMarkAsRead(notification.id)}
                             className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
                             title="Okundu İşaretle"
-                          >
+                    >
                             <CheckCircle className="w-4 h-4" />
-                          </button>
+                    </button>
                         ) : (
-                          <button
+                  <button
                             onClick={() => handleMarkAsUnread(notification.id)}
                             className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
                             title="Okunmadı İşaretle"
                           >
                             <Clock className="w-4 h-4" />
-                          </button>
+                  </button>
                         )}
-                        <button
-                          onClick={() => handleDelete(notification.id)}
+                  <button
+                    onClick={() => handleDelete(notification.id)}
                           className="p-2 text-red-600 hover:text-red-900 hover:bg-red-100 rounded-lg transition-colors"
-                          title="Sil"
-                        >
+                    title="Sil"
+                  >
                           <Trash2 className="w-4 h-4" />
-                        </button>
+                  </button>
                       </div>
                     </div>
-                  </div>
                 </div>
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
+        </div>
         )}
 
         {/* Pagination */}

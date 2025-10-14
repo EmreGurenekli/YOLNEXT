@@ -1,12 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Search, X, Clock, TrendingUp } from 'lucide-react';
 
 interface SearchResult {
   id: string;
   title: string;
   description: string;
-  type: 'shipment' | 'carrier' | 'offer' | 'message' | 'page';
-  href: string;
+  type: 'shipment' | 'offer' | 'job' | 'user' | 'page';
+  url: string;
   icon?: React.ReactNode;
 }
 
@@ -20,61 +20,48 @@ const GlobalSearch: React.FC<GlobalSearchProps> = ({
   className = "" 
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedIndex, setSelectedIndex] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
-  const resultsRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLDivElement>(null);
 
-  // Mock search results - gerçek uygulamada API'den gelecek
+  // Mock search results
   const mockResults: SearchResult[] = [
     {
       id: '1',
-      title: 'CORP-2024-001',
-      description: 'İstanbul → Ankara - Gıda Ürünleri',
+      title: 'Gönderi #SH-2024-001',
+      description: 'İstanbul → Ankara, 15 kg, Elektronik',
       type: 'shipment',
-      href: '/corporate/shipments',
-      icon: <TrendingUp className="w-4 h-4" />
+      url: '/individual/my-shipments'
     },
     {
       id: '2',
-      title: 'Hızlı Lojistik A.Ş.',
-      description: 'Nakliyeci - 4.8/5 ⭐',
-      type: 'carrier',
-      href: '/corporate/carriers',
-      icon: <TrendingUp className="w-4 h-4" />
+      title: 'Teklif #OFF-2024-002',
+      description: '₺1,200, 2 gün, Kamyon',
+      type: 'offer',
+      url: '/individual/offers'
     },
     {
       id: '3',
-      title: 'OFF-001',
-      description: 'Teklif - ₺45,000',
-      type: 'offer',
-      href: '/corporate/offers',
-      icon: <TrendingUp className="w-4 h-4" />
+      title: 'İş İlanı #JOB-2024-003',
+      description: 'Ev eşyası taşıma, Bursa → İzmir',
+      type: 'job',
+      url: '/nakliyeci/jobs'
+    },
+    {
+      id: '4',
+      title: 'Ahmet Yılmaz',
+      description: 'Nakliyeci, 4.8 ⭐',
+      type: 'user',
+      url: '/individual/carriers'
     }
   ];
 
   useEffect(() => {
-    if (searchTerm.length > 2) {
-      setIsLoading(true);
-      // Simulate API call
-      setTimeout(() => {
-        const filteredResults = mockResults.filter(result =>
-          result.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          result.description.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-        setResults(filteredResults);
-        setIsLoading(false);
-      }, 300);
-    } else {
-      setResults([]);
-    }
-  }, [searchTerm]);
-
-  useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (resultsRef.current && !resultsRef.current.contains(event.target as Node)) {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
         setIsOpen(false);
       }
     };
@@ -83,155 +70,197 @@ const GlobalSearch: React.FC<GlobalSearchProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (!isOpen) return;
-
-    switch (e.key) {
-      case 'ArrowDown':
-        e.preventDefault();
-        setSelectedIndex(prev => 
-          prev < results.length - 1 ? prev + 1 : prev
+  useEffect(() => {
+    if (query.length > 2) {
+      setIsLoading(true);
+      // Simulate API call
+      setTimeout(() => {
+        const filteredResults = mockResults.filter(result =>
+          result.title.toLowerCase().includes(query.toLowerCase()) ||
+          result.description.toLowerCase().includes(query.toLowerCase())
         );
-        break;
-      case 'ArrowUp':
-        e.preventDefault();
-        setSelectedIndex(prev => prev > 0 ? prev - 1 : -1);
-        break;
-      case 'Enter':
-        e.preventDefault();
-        if (selectedIndex >= 0 && results[selectedIndex]) {
-          // React Router ile navigasyon
-          const href = results[selectedIndex].href;
-          if (href.startsWith('/')) {
-            window.location.href = href; // Internal navigation için geçici çözüm
-          } else {
-            window.open(href, '_blank');
-          }
-          setIsOpen(false);
-        }
-        break;
-      case 'Escape':
-        setIsOpen(false);
-        inputRef.current?.blur();
-        break;
-    }
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchTerm(e.target.value);
-    setIsOpen(true);
-    setSelectedIndex(-1);
-  };
-
-  const handleResultClick = (result: SearchResult) => {
-    // React Router ile navigasyon
-    if (result.href.startsWith('/')) {
-      window.location.href = result.href; // Internal navigation için geçici çözüm
+        setResults(filteredResults);
+        setIsLoading(false);
+      }, 300);
     } else {
-      window.open(result.href, '_blank');
+      setResults([]);
     }
-    setIsOpen(false);
-    setSearchTerm('');
+  }, [query]);
+
+  const handleSearch = (searchQuery: string) => {
+    if (searchQuery.trim()) {
+      setRecentSearches(prev => {
+        const newSearches = [searchQuery, ...prev.filter(s => s !== searchQuery)].slice(0, 5);
+        localStorage.setItem('recentSearches', JSON.stringify(newSearches));
+        return newSearches;
+      });
+        setIsOpen(false);
+      setQuery('');
+    }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && query.trim()) {
+      handleSearch(query);
+    }
+  };
+
+  const getResultIcon = (type: string) => {
+    switch (type) {
+      case 'shipment':
+        return <div className="w-2 h-2 bg-blue-500 rounded-full" />;
+      case 'offer':
+        return <div className="w-2 h-2 bg-green-500 rounded-full" />;
+      case 'job':
+        return <div className="w-2 h-2 bg-purple-500 rounded-full" />;
+      case 'user':
+        return <div className="w-2 h-2 bg-orange-500 rounded-full" />;
+      default:
+        return <div className="w-2 h-2 bg-gray-500 rounded-full" />;
+    }
   };
 
   const getTypeLabel = (type: string) => {
-    const labels = {
-      shipment: 'Gönderi',
-      carrier: 'Nakliyeci',
-      offer: 'Teklif',
-      message: 'Mesaj',
-      page: 'Sayfa'
-    };
-    return labels[type as keyof typeof labels] || type;
-  };
-
-  const getTypeColor = (type: string) => {
-    const colors = {
-      shipment: 'text-blue-600 bg-blue-50',
-      carrier: 'text-green-600 bg-green-50',
-      offer: 'text-purple-600 bg-purple-50',
-      message: 'text-orange-600 bg-orange-50',
-      page: 'text-slate-600 bg-slate-50'
-    };
-    return colors[type as keyof typeof colors] || 'text-slate-600 bg-slate-50';
+    switch (type) {
+      case 'shipment': return 'Gönderi';
+      case 'offer': return 'Teklif';
+      case 'job': return 'İş İlanı';
+      case 'user': return 'Kullanıcı';
+      default: return 'Sayfa';
+    }
   };
 
   return (
-    <div className={`relative ${className}`} ref={resultsRef}>
+    <div ref={searchRef} className={`relative ${className}`}>
       {/* Search Input */}
       <div className="relative">
         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-          <Search className="h-4 w-4 text-slate-400" />
+          <Search className="h-5 w-5 text-gray-400" />
         </div>
         <input
           ref={inputRef}
           type="text"
-          value={searchTerm}
-          onChange={handleInputChange}
-          onKeyDown={handleKeyDown}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
           onFocus={() => setIsOpen(true)}
+          onKeyPress={handleKeyPress}
           placeholder={placeholder}
-          className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+          className="block w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
         />
-        {searchTerm && (
+        {query && (
           <button
             onClick={() => {
-              setSearchTerm('');
+              setQuery('');
               setIsOpen(false);
             }}
             className="absolute inset-y-0 right-0 pr-3 flex items-center"
           >
-            <X className="h-4 w-4 text-slate-400 hover:text-slate-600" />
+            <X className="h-5 w-5 text-gray-400 hover:text-gray-600" />
           </button>
         )}
       </div>
 
-      {/* Search Results */}
+      {/* Search Results Dropdown */}
       {isOpen && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto">
+        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-96 overflow-y-auto">
+          {query.length > 2 ? (
+            <>
+      {/* Search Results */}
           {isLoading ? (
-            <div className="p-4 text-center text-slate-500">
-              <Clock className="w-4 h-4 animate-spin mx-auto mb-2" />
-              Aranıyor...
+                <div className="p-4 text-center text-gray-500">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
+                  <p className="mt-2">Aranıyor...</p>
             </div>
           ) : results.length > 0 ? (
             <div className="py-2">
-              {results.map((result, index) => (
+                  <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                    Sonuçlar
+                  </div>
+                  {results.map((result) => (
                 <button
                   key={result.id}
-                  onClick={() => handleResultClick(result)}
-                  className={`w-full px-4 py-3 text-left hover:bg-slate-50 transition-colors ${
-                    index === selectedIndex ? 'bg-slate-100' : ''
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={`px-2 py-1 rounded text-xs font-medium ${getTypeColor(result.type)}`}>
-                      {getTypeLabel(result.type)}
+                      onClick={() => handleSearch(result.title)}
+                      className="w-full px-4 py-3 text-left hover:bg-gray-50 focus:bg-gray-50 focus:outline-none"
+                    >
+                      <div className="flex items-start">
+                        <div className="flex-shrink-0 mt-1 mr-3">
+                          {getResultIcon(result.type)}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="font-medium text-slate-900 truncate">
+                          <div className="flex items-center justify-between">
+                            <p className="text-sm font-medium text-gray-900 truncate">
                         {result.title}
+                            </p>
+                            <span className="text-xs text-gray-500">
+                              {getTypeLabel(result.type)}
+                            </span>
                       </div>
-                      <div className="text-sm text-slate-500 truncate">
+                          <p className="text-sm text-gray-500 truncate">
                         {result.description}
+                          </p>
                       </div>
                     </div>
-                    {result.icon && (
-                      <div className="text-slate-400">
-                        {result.icon}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-4 text-center text-gray-500">
+                  <Search className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+                  <p>Sonuç bulunamadı</p>
                       </div>
                     )}
+            </>
+          ) : (
+            <>
+              {/* Recent Searches */}
+              {recentSearches.length > 0 && (
+                <div className="py-2">
+                  <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                    <Clock className="w-3 h-3 inline mr-1" />
+                    Son Aramalar
                   </div>
+                  {recentSearches.map((search, index) => (
+                    <button
+                      key={index}
+                      onClick={() => {
+                        setQuery(search);
+                        handleSearch(search);
+                      }}
+                      className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 focus:bg-gray-50 focus:outline-none"
+                    >
+                      {search}
                 </button>
               ))}
             </div>
-          ) : searchTerm.length > 2 ? (
-            <div className="p-4 text-center text-slate-500">
-              <Search className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-              <p>Sonuç bulunamadı</p>
-              <p className="text-sm">"{searchTerm}" için arama yapıldı</p>
+              )}
+
+              {/* Quick Actions */}
+              <div className="py-2 border-t border-gray-100">
+                <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                  <TrendingUp className="w-3 h-3 inline mr-1" />
+                  Hızlı Erişim
+                </div>
+                <button
+                  onClick={() => handleSearch('gönderilerim')}
+                  className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 focus:bg-gray-50 focus:outline-none"
+                >
+                  Gönderilerim
+                </button>
+                <button
+                  onClick={() => handleSearch('teklifler')}
+                  className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 focus:bg-gray-50 focus:outline-none"
+                >
+                  Teklifler
+                </button>
+                <button
+                  onClick={() => handleSearch('iş ilanları')}
+                  className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 focus:bg-gray-50 focus:outline-none"
+                >
+                  İş İlanları
+                </button>
             </div>
-          ) : null}
+            </>
+          )}
         </div>
       )}
     </div>
@@ -239,4 +268,19 @@ const GlobalSearch: React.FC<GlobalSearchProps> = ({
 };
 
 export default GlobalSearch;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

@@ -6,7 +6,6 @@ import { NotificationProvider } from './contexts/NotificationContext'
 import { SocketProvider } from './contexts/SocketContext'
 import { RealtimeProvider } from './contexts/RealtimeContext'
 import { SecurityProvider } from './contexts/SecurityContext'
-import { ToastProvider } from './contexts/ToastContext'
 import LandingPage from './pages/LandingPage'
 import Login from './pages/Login'
 import Register from './pages/Register'
@@ -15,32 +14,26 @@ import CorporateLayout from './components/CorporateLayout'
 import IndividualDashboard from './pages/individual/Dashboard'
 import CorporateDashboard from './pages/corporate/Dashboard'
 import CorporateCreateShipment from './pages/corporate/CreateShipment'
+import CorporateNewCreateShipment from './pages/corporate/NewCreateShipment'
 import CorporateShipments from './pages/corporate/Shipments'
 import NakliyeciDashboard from './pages/nakliyeci/Dashboard'
-import NakliyeciJobs from './pages/nakliyeci/Jobs'
-import NakliyeciDrivers from './pages/nakliyeci/Drivers'
-import NakliyeciEarnings from './pages/nakliyeci/Earnings'
 import NakliyeciLoads from './pages/nakliyeci/Loads'
-import NakliyeciOpenShipments from './pages/nakliyeci/OpenShipments'
 import NakliyeciVehicleOptimization from './pages/nakliyeci/VehicleOptimization'
 import NakliyeciOffers from './pages/nakliyeci/Offers'
 import NakliyeciNotifications from './pages/nakliyeci/Notifications'
 import TasiyiciDashboard from './pages/tasiyici/Dashboard'
-import IndividualCreateShipment from './pages/individual/CreateShipment'
+import CreateShipment from './pages/individual/CreateShipment'
 import IndividualMessages from './pages/individual/Messages'
-import IndividualProfile from './pages/individual/Profile'
 import IndividualOffers from './pages/individual/Offers'
 import IndividualAgreements from './pages/individual/Agreements'
 import IndividualShipments from './pages/individual/Shipments'
 import MyShipments from './pages/individual/MyShipments'
+import MyShipmentsNew from './pages/individual/MyShipmentsNew'
 import IndividualHistory from './pages/individual/History'
 import IndividualLiveTracking from './pages/individual/LiveTracking'
 import IndividualShipmentDetail from './pages/individual/ShipmentDetail'
 import IndividualNotifications from './pages/individual/Notifications'
 import IndividualDiscounts from './pages/individual/Discounts'
-import IndividualHelp from './pages/individual/Help'
-import IndividualHowItWorks from './pages/individual/HowItWorks'
-import IndividualAnalytics from './pages/individual/Analytics'
 import IndividualSettings from './pages/individual/Settings'
 import CorporateAnalytics from './pages/corporate/Analytics'
 import CorporateTeam from './pages/corporate/Team'
@@ -51,7 +44,7 @@ import CorporateSettings from './pages/corporate/Settings'
 import CorporateHelp from './pages/corporate/Help'
 import CorporateDiscounts from './pages/corporate/Discounts'
 import CorporateCarriers from './pages/corporate/Carriers'
-import CorporateOffers from './pages/corporate/Offers'
+import CorporateGuide from './pages/corporate/CorporateGuide'
 import NakliyeciShipments from './pages/nakliyeci/Shipments'
 import NakliyeciCarriers from './pages/nakliyeci/Carriers'
 import NakliyeciAnalytics from './pages/nakliyeci/Analytics'
@@ -77,7 +70,8 @@ import DepartmentReporting from './pages/corporate/DepartmentReporting'
 import WorkflowManagement from './components/workflow/WorkflowManagement'
 import DetailedReporting from './components/reports/DetailedReporting'
 import CostAnalysis from './components/analytics/CostAnalysis'
-import FleetManagement from './pages/nakliyeci/FleetManagement'
+import DebugRoutes from './pages/DebugRoutes'
+// import FleetManagement from './pages/nakliyeci/FleetManagement'
 import './App.css'
 
 function App() {
@@ -88,10 +82,10 @@ function App() {
           <RealtimeProvider>
             <NotificationProvider>
               <SocketProvider>
-                <ToastProvider>
-                  <div className="App">
+                <div className="App">
               <Routes>
                   <Route path="/" element={<LandingPage />} />
+                  <Route path="/debug/routes" element={<DebugRoutes />} />
                   <Route path="/login" element={<Login />} />
                   <Route path="/register" element={<Register />} />
                   <Route path="/dashboard" element={<IndividualDashboard />} />
@@ -104,7 +98,7 @@ function App() {
                     {/* Individual Routes */}
                     <Route path="/individual" element={<IndividualLayout />}>
                       <Route path="dashboard" element={<IndividualDashboard />} />
-                      <Route path="create-shipment" element={<IndividualCreateShipment />} />
+                      <Route path="create-shipment" element={<CreateShipment />} />
                             <Route path="offers" element={<IndividualOffers />} />
                             <Route path="agreements" element={<IndividualAgreements />} />
                             <Route path="shipments" element={<IndividualShipments />} />
@@ -115,19 +109,15 @@ function App() {
                       <Route path="messages" element={<IndividualMessages />} />
                       <Route path="notifications" element={<IndividualNotifications />} />
                       <Route path="discounts" element={<IndividualDiscounts />} />
-                    <Route path="help" element={<IndividualHelp />} />
-                    <Route path="how-it-works" element={<IndividualHowItWorks />} />
-                    <Route path="profile" element={<IndividualProfile />} />
-                    <Route path="analytics" element={<IndividualAnalytics />} />
+                    {/* help and how-it-works routes removed by request */}
                     <Route path="settings" element={<IndividualSettings />} />
                     </Route>
                   
                         {/* Corporate Routes */}
                         <Route path="/corporate" element={<CorporateLayout />}>
                           <Route path="dashboard" element={<CorporateDashboard />} />
-                          <Route path="create-shipment" element={<CorporateCreateShipment />} />
+                          <Route path="create-shipment" element={<CorporateNewCreateShipment />} />
                           <Route path="shipments" element={<CorporateShipments />} />
-                          <Route path="offers" element={<CorporateOffers />} />
                     <Route path="analytics" element={<CorporateAnalytics />} />
                     <Route path="team" element={<CorporateTeam />} />
                     <Route path="reports" element={<CorporateReports />} />
@@ -137,6 +127,7 @@ function App() {
                     <Route path="help" element={<CorporateHelp />} />
                     <Route path="discounts" element={<CorporateDiscounts />} />
                     <Route path="carriers" element={<CorporateCarriers />} />
+                    <Route path="guide" element={<CorporateGuide />} />
                     <Route path="department-reporting" element={<DepartmentReporting />} />
                     <Route path="workflow" element={<WorkflowManagement />} />
                     <Route path="detailed-reports" element={<DetailedReporting />} />
@@ -146,22 +137,17 @@ function App() {
                   {/* Nakliyeci Routes */}
                   <Route path="/nakliyeci" element={<NakliyeciLayout />}>
                     <Route path="dashboard" element={<NakliyeciDashboard />} />
-                    <Route path="jobs" element={<NakliyeciJobs />} />
-                    <Route path="drivers" element={<NakliyeciDrivers />} />
-                    <Route path="earnings" element={<NakliyeciEarnings />} />
+                    <Route path="loads" element={<NakliyeciLoads />} />
                     <Route path="offers" element={<NakliyeciOffers />} />
+                    <Route path="vehicle-optimization" element={<NakliyeciVehicleOptimization />} />
+                    <Route path="notifications" element={<NakliyeciNotifications />} />
                     <Route path="shipments" element={<NakliyeciShipments />} />
+                    <Route path="carriers" element={<NakliyeciCarriers />} />
                     <Route path="analytics" element={<NakliyeciAnalytics />} />
                     <Route path="messages" element={<NakliyeciMessages />} />
-                    <Route path="notifications" element={<NakliyeciNotifications />} />
                     <Route path="settings" element={<NakliyeciSettings />} />
                     <Route path="help" element={<NakliyeciHelp />} />
-                    {/* Legacy routes */}
-                    <Route path="loads" element={<NakliyeciLoads />} />
-                    <Route path="open-shipments" element={<NakliyeciOpenShipments />} />
-                    <Route path="vehicle-optimization" element={<NakliyeciVehicleOptimization />} />
-                    <Route path="carriers" element={<NakliyeciCarriers />} />
-                    <Route path="fleet-management" element={<FleetManagement />} />
+                    {/* <Route path="fleet-management" element={<FleetManagement />} /> */}
                   </Route>
                   
                   {/* Tasiyici Routes */}
@@ -176,11 +162,9 @@ function App() {
                     <Route path="settings" element={<TasiyiciSettings />} />
                     <Route path="help" element={<TasiyiciHelp />} />
                   </Route>
-                  
 
-            </Routes>
-                  </div>
-                </ToastProvider>
+                </Routes>
+                </div>
               </SocketProvider>
             </NotificationProvider>
           </RealtimeProvider>

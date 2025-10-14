@@ -3,8 +3,8 @@ const { sequelize } = require('../config/database');
 
 const Shipment = sequelize.define('Shipment', {
   id: {
-    type: DataTypes.UUID,
-    defaultValue: DataTypes.UUIDV4,
+    type: DataTypes.INTEGER,
+    autoIncrement: true,
     primaryKey: true
   },
   trackingNumber: {
@@ -13,7 +13,7 @@ const Shipment = sequelize.define('Shipment', {
     unique: true
   },
   senderId: {
-    type: DataTypes.UUID,
+    type: DataTypes.INTEGER,
     allowNull: false,
     references: {
       model: 'users',
@@ -21,7 +21,7 @@ const Shipment = sequelize.define('Shipment', {
     }
   },
   carrierId: {
-    type: DataTypes.UUID,
+    type: DataTypes.INTEGER,
     allowNull: true,
     references: {
       model: 'carriers',
@@ -29,7 +29,7 @@ const Shipment = sequelize.define('Shipment', {
     }
   },
   driverId: {
-    type: DataTypes.UUID,
+    type: DataTypes.INTEGER,
     allowNull: true,
     references: {
       model: 'drivers',

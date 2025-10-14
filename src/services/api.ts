@@ -1,26 +1,33 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+import { User, LoginCredentials, RegisterData } from '@/types/auth'
+import { mockApiClient } from './mock-api'
 
-interface ApiResponse<T = any> {
-  success: boolean;
-  message?: string;
-  data?: T;
-  error?: string;
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+
+class ApiError extends Error {
+  constructor(
+    message: string,
+    public status: number,
+    public statusText: string
+  ) {
+    super(message)
+    this.name = 'ApiError'
+  }
 }
 
-class ApiService {
-  private baseURL: string;
-  private token: string | null = null;
+class ApiClient {
+  private baseURL: string
+  private token: string | null = null
 
-  constructor() {
-    this.baseURL = API_BASE_URL;
-    this.token = localStorage.getItem('token');
+  constructor(baseURL: string) {
+    this.baseURL = baseURL
+    this.token = localStorage.getItem('authToken')
   }
 
   private async request<T>(
     endpoint: string,
     options: RequestInit = {}
-  ): Promise<ApiResponse<T>> {
-    const url = `${this.baseURL}${endpoint}`;
+  ): Promise<T> {
+    const url = `${this.baseURL}${endpoint}`
     
     const config: RequestInit = {
       headers: {
@@ -29,343 +36,379 @@ class ApiService {
         ...options.headers,
       },
       ...options,
-    };
+    }
 
     try {
-      const response = await fetch(url, config);
-      const data = await response.json();
-
+      const response = await fetch(url, config)
+      
       if (!response.ok) {
-        throw new Error(data.message || 'API request failed');
+        const errorData = await response.json().catch(() => ({}))
+        throw new ApiError(
+          errorData.message || response.statusText,
+          response.status,
+          response.statusText
+        )
       }
 
-      return data;
+      return await response.json()
     } catch (error) {
-      console.error('API request failed:', error);
-      throw error;
+      if (error instanceof ApiError) {
+        throw error
+      }
+      throw new ApiError(
+        'Network error occurred',
+        0,
+        'Network Error'
+      )
     }
   }
 
-  // Auth methods
-  async login(email: string, password: string) {
-    const response = await this.request('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ email, password }),
-    });
-    
-    if (response.success && response.data?.token) {
-      this.token = response.data.token;
-      localStorage.setItem('token', this.token);
+  setToken(token: string | null) {
+    this.token = token
+    if (token) {
+      localStorage.setItem('authToken', token)
+    } else {
+      localStorage.removeItem('authToken')
     }
-    
-    return response;
   }
 
-  async register(userData: {
-    email: string;
-    password: string;
-    firstName: string;
-    lastName: string;
-    userType: 'individual' | 'corporate' | 'carrier' | 'driver';
-    phone?: string;
-  }) {
-    const response = await this.request('/auth/register', {
-      method: 'POST',
-      body: JSON.stringify(userData),
-    });
-    
-    if (response.success && response.data?.token) {
-      this.token = response.data.token;
-      localStorage.setItem('token', this.token);
+  // Auth endpoints
+  async login(credentials: LoginCredentials) {
+    try {
+      return await this.request<{ user: User; token: string }>('/api/auth/login', {
+        method: 'POST',
+        body: JSON.stringify(credentials),
+      })
+    } catch (error) {
+      // Fallback to mock API if backend is not available
+      return mockApiClient.login(credentials)
     }
-    
-    return response;
   }
 
-  async getCurrentUser() {
-    return this.request('/auth/me');
+  async register(data: RegisterData) {
+    try {
+      return await this.request<{ user: User; token: string }>('/api/auth/register', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      })
+    } catch (error) {
+      // Fallback to mock API if backend is not available
+      return mockApiClient.register(data)
+    }
+  }
+
+  async verifyToken() {
+    try {
+      return await this.request<{ user: User }>('/api/auth/me')
+    } catch (error) {
+      // Fallback to mock API if backend is not available
+      return mockApiClient.verifyToken()
+    }
   }
 
   async logout() {
-    const response = await this.request('/auth/logout', {
-      method: 'POST',
-    });
-    
-    this.token = null;
-    localStorage.removeItem('token');
-    
-    return response;
+    try {
+      await this.request('/api/auth/logout', {
+        method: 'POST',
+      })
+    } catch (error) {
+      // Fallback to mock API if backend is not available
+      return mockApiClient.logout()
+    }
   }
 
-  // User methods
-  async getUserProfile() {
-    return this.request('/users/profile');
+  // User endpoints
+  async getProfile() {
+    return this.request<{ user: User }>('/api/users/profile')
   }
 
-  async updateUserProfile(profileData: any) {
-    return this.request('/users/profile', {
+  async updateProfile(data: Partial<User>) {
+    return this.request<{ user: User }>('/api/users/profile', {
       method: 'PUT',
-      body: JSON.stringify(profileData),
-    });
+      body: JSON.stringify(data),
+    })
   }
 
-  async createCorporateProfile(profileData: any) {
-    return this.request('/users/corporate-profile', {
-      method: 'POST',
-      body: JSON.stringify(profileData),
-    });
-  }
-
-  async createCarrierProfile(profileData: any) {
-    return this.request('/users/carrier-profile', {
-      method: 'POST',
-      body: JSON.stringify(profileData),
-    });
-  }
-
-  async createDriverProfile(profileData: any) {
-    return this.request('/users/driver-profile', {
-      method: 'POST',
-      body: JSON.stringify(profileData),
-    });
-  }
-
-  // Shipment methods
-  async createShipment(shipmentData: any) {
-    return this.request('/shipments', {
-      method: 'POST',
-      body: JSON.stringify(shipmentData),
-    });
-  }
-
-  async getShipments(params?: {
-    status?: string;
-    page?: number;
-    limit?: number;
-  }) {
-    const queryParams = new URLSearchParams();
-    if (params?.status) queryParams.append('status', params.status);
-    if (params?.page) queryParams.append('page', params.page.toString());
-    if (params?.limit) queryParams.append('limit', params.limit.toString());
-    
-    const queryString = queryParams.toString();
-    return this.request(`/shipments${queryString ? `?${queryString}` : ''}`);
+  // Shipment endpoints
+  async getShipments(params?: Record<string, any>) {
+    try {
+      const searchParams = new URLSearchParams(params)
+      return await this.request(`/api/shipments?${searchParams}`)
+    } catch (error) {
+      return mockApiClient.getShipments(params)
+    }
   }
 
   async getShipment(id: string) {
-    return this.request(`/shipments/${id}`);
+    return this.request(`/api/shipments/${id}`)
   }
 
-  async updateShipment(id: string, shipmentData: any) {
-    return this.request(`/shipments/${id}`, {
+  async createShipment(data: any) {
+    return this.request('/api/shipments', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async updateShipment(id: string, data: any) {
+    return this.request(`/api/shipments/${id}`, {
       method: 'PUT',
-      body: JSON.stringify(shipmentData),
-    });
+      body: JSON.stringify(data),
+    })
   }
 
-  async cancelShipment(id: string) {
-    return this.request(`/shipments/${id}`, {
+  async deleteShipment(id: string) {
+    return this.request(`/api/shipments/${id}`, {
       method: 'DELETE',
-    });
+    })
   }
 
-  async trackShipment(trackingNumber: string) {
-    return this.request(`/shipments/track/${trackingNumber}`);
+  // Message endpoints
+  async getMessages(params?: Record<string, any>) {
+    try {
+      const searchParams = new URLSearchParams(params)
+      return await this.request(`/api/messages?${searchParams}`)
+    } catch (error) {
+      return mockApiClient.getMessages(params)
+    }
   }
 
-  // Offer methods
+  async sendMessage(data: any) {
+    return this.request('/api/messages', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  // Offers endpoints
   async createOffer(offerData: any) {
-    return this.request('/offers', {
+    try {
+      return await this.request('/api/offers', {
+        method: 'POST',
+        body: JSON.stringify(offerData),
+      })
+    } catch (error) {
+      return mockApiClient.createOffer(offerData)
+    }
+  }
+
+  async getShipmentOffers(shipmentId: number) {
+    try {
+      return await this.request(`/api/offers/shipment/${shipmentId}`)
+    } catch (error) {
+      return mockApiClient.getShipmentOffers(shipmentId)
+    }
+  }
+
+  async getNakliyeciOffers(status?: string) {
+    try {
+      const url = status ? `/api/offers/nakliyeci?status=${status}` : '/api/offers/nakliyeci'
+      return await this.request(url)
+    } catch (error) {
+      return mockApiClient.getNakliyeciOffers(status)
+    }
+  }
+
+  async acceptOffer(offerId: number) {
+    try {
+      return await this.request(`/api/offers/${offerId}/accept`, {
+        method: 'PUT',
+      })
+    } catch (error) {
+      return mockApiClient.acceptOffer(offerId)
+    }
+  }
+
+  async rejectOffer(offerId: number) {
+    try {
+      return await this.request(`/api/offers/${offerId}/reject`, {
+        method: 'PUT',
+      })
+    } catch (error) {
+      return mockApiClient.rejectOffer(offerId)
+    }
+  }
+
+  // Agreements endpoints
+  async createAgreement(offerId: number) {
+    try {
+      return await this.request('/api/agreements', {
+        method: 'POST',
+        body: JSON.stringify({ offer_id: offerId }),
+      })
+    } catch (error) {
+      return mockApiClient.createAgreement(offerId)
+    }
+  }
+
+  async getSenderAgreements(status?: string) {
+    try {
+      const url = status ? `/api/agreements/sender?status=${status}` : '/api/agreements/sender'
+      return await this.request(url)
+    } catch (error) {
+      return mockApiClient.getSenderAgreements(status)
+    }
+  }
+
+  async getNakliyeciAgreements(status?: string) {
+    try {
+      const url = status ? `/api/agreements/nakliyeci?status=${status}` : '/api/agreements/nakliyeci'
+      return await this.request(url)
+    } catch (error) {
+      return mockApiClient.getNakliyeciAgreements(status)
+    }
+  }
+
+  async acceptAgreement(agreementId: number) {
+    try {
+      return await this.request(`/api/agreements/${agreementId}/accept`, {
+        method: 'PUT',
+      })
+    } catch (error) {
+      return mockApiClient.acceptAgreement(agreementId)
+    }
+  }
+
+  async rejectAgreement(agreementId: number) {
+    try {
+      return await this.request(`/api/agreements/${agreementId}/reject`, {
+        method: 'PUT',
+      })
+    } catch (error) {
+      return mockApiClient.rejectAgreement(agreementId)
+    }
+  }
+
+  // Tracking endpoints
+  async updateShipmentStatus(shipmentId: number, statusData: any) {
+    try {
+      return await this.request(`/api/tracking/${shipmentId}/status`, {
+        method: 'PUT',
+        body: JSON.stringify(statusData),
+      })
+    } catch (error) {
+      return mockApiClient.updateShipmentStatus(shipmentId, statusData)
+    }
+  }
+
+  async getTrackingHistory(shipmentId: number) {
+    try {
+      return await this.request(`/api/tracking/${shipmentId}/history`)
+    } catch (error) {
+      return mockApiClient.getTrackingHistory(shipmentId)
+    }
+  }
+
+  async getActiveShipments(userType: 'sender' | 'nakliyeci') {
+    try {
+      return await this.request(`/api/tracking/${userType}/active`)
+    } catch (error) {
+      return mockApiClient.getActiveShipments(userType)
+    }
+  }
+
+  async confirmDelivery(shipmentId: number, rating: number, feedback?: string) {
+    try {
+      return await this.request(`/api/tracking/${shipmentId}/deliver`, {
+        method: 'PUT',
+        body: JSON.stringify({ rating, feedback }),
+      })
+    } catch (error) {
+      return mockApiClient.confirmDelivery(shipmentId, rating, feedback)
+    }
+  }
+
+  // Commission endpoints
+  async calculateCommission(agreedPrice: number) {
+    try {
+      return await this.request('/api/commission/calculate', {
+        method: 'POST',
+        body: JSON.stringify({ agreedPrice }),
+      })
+    } catch (error) {
+      return mockApiClient.calculateCommission(agreedPrice)
+    }
+  }
+
+  async getCommissionRate() {
+    try {
+      return await this.request('/api/commission/rate')
+    } catch (error) {
+      return mockApiClient.getCommissionRate()
+    }
+  }
+
+  async getCommissionExamples() {
+    try {
+      return await this.request('/api/commission/examples')
+    } catch (error) {
+      return mockApiClient.getCommissionExamples()
+    }
+  }
+
+  // Analytics endpoints
+  async getAnalytics(params?: Record<string, any>) {
+    try {
+      const searchParams = new URLSearchParams(params)
+      return await this.request(`/api/analytics?${searchParams}`)
+    } catch (error) {
+      return mockApiClient.getAnalytics(params)
+    }
+  }
+
+  // Dashboard endpoints
+  async getDashboardStats() {
+    try {
+      return await this.request('/api/dashboard/stats')
+    } catch (error) {
+      return mockApiClient.getDashboardStats()
+    }
+  }
+
+  async getNotifications(params?: { limit?: number; offset?: number }) {
+    try {
+      const searchParams = new URLSearchParams(params as any)
+      return await this.request(`/api/notifications?${searchParams}`)
+    } catch (error) {
+      return mockApiClient.getNotifications(params)
+    }
+  }
+
+  async getUnreadNotificationCount() {
+    try {
+      return await this.request('/api/notifications/unread-count')
+    } catch (error) {
+      return mockApiClient.getUnreadNotificationCount()
+    }
+  }
+
+  async markNotificationAsRead(notificationId: number) {
+    try {
+      return await this.request(`/api/notifications/${notificationId}/read`, {
+        method: 'PUT',
+      })
+    } catch (error) {
+      return mockApiClient.markNotificationAsRead(notificationId)
+    }
+  }
+
+  // File upload
+  async uploadFile(file: File, endpoint: string = '/api/upload') {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    return this.request(endpoint, {
       method: 'POST',
-      body: JSON.stringify(offerData),
-    });
-  }
-
-  async getOffers(params?: {
-    status?: string;
-    page?: number;
-    limit?: number;
-  }) {
-    const queryParams = new URLSearchParams();
-    if (params?.status) queryParams.append('status', params.status);
-    if (params?.page) queryParams.append('page', params.page.toString());
-    if (params?.limit) queryParams.append('limit', params.limit.toString());
-    
-    const queryString = queryParams.toString();
-    return this.request(`/offers${queryString ? `?${queryString}` : ''}`);
-  }
-
-  async getOffer(id: string) {
-    return this.request(`/offers/${id}`);
-  }
-
-  async acceptOffer(id: string) {
-    return this.request(`/offers/${id}/accept`, {
-      method: 'PUT',
-    });
-  }
-
-  async rejectOffer(id: string) {
-    return this.request(`/offers/${id}/reject`, {
-      method: 'PUT',
-    });
-  }
-
-  async cancelOffer(id: string) {
-    return this.request(`/offers/${id}`, {
-      method: 'DELETE',
-    });
-  }
-
-  // Carrier methods
-  async getCarriers(params?: {
-    city?: string;
-    serviceArea?: string;
-    vehicleType?: string;
-    rating?: number;
-    page?: number;
-    limit?: number;
-  }) {
-    const queryParams = new URLSearchParams();
-    if (params?.city) queryParams.append('city', params.city);
-    if (params?.serviceArea) queryParams.append('serviceArea', params.serviceArea);
-    if (params?.vehicleType) queryParams.append('vehicleType', params.vehicleType);
-    if (params?.rating) queryParams.append('rating', params.rating.toString());
-    if (params?.page) queryParams.append('page', params.page.toString());
-    if (params?.limit) queryParams.append('limit', params.limit.toString());
-    
-    const queryString = queryParams.toString();
-    return this.request(`/carriers${queryString ? `?${queryString}` : ''}`);
-  }
-
-  async getCarrier(id: string) {
-    return this.request(`/carriers/${id}`);
-  }
-
-  async getCarrierOffers(id: string, params?: {
-    status?: string;
-    page?: number;
-    limit?: number;
-  }) {
-    const queryParams = new URLSearchParams();
-    if (params?.status) queryParams.append('status', params.status);
-    if (params?.page) queryParams.append('page', params.page.toString());
-    if (params?.limit) queryParams.append('limit', params.limit.toString());
-    
-    const queryString = queryParams.toString();
-    return this.request(`/carriers/${id}/offers${queryString ? `?${queryString}` : ''}`);
-  }
-
-  async getCarrierStats(id: string) {
-    return this.request(`/carriers/${id}/stats`);
-  }
-
-  // Driver methods
-  async getDrivers(params?: {
-    city?: string;
-    vehicleType?: string;
-    rating?: number;
-    isAvailable?: boolean;
-    page?: number;
-    limit?: number;
-  }) {
-    const queryParams = new URLSearchParams();
-    if (params?.city) queryParams.append('city', params.city);
-    if (params?.vehicleType) queryParams.append('vehicleType', params.vehicleType);
-    if (params?.rating) queryParams.append('rating', params.rating.toString());
-    if (params?.isAvailable !== undefined) queryParams.append('isAvailable', params.isAvailable.toString());
-    if (params?.page) queryParams.append('page', params.page.toString());
-    if (params?.limit) queryParams.append('limit', params.limit.toString());
-    
-    const queryString = queryParams.toString();
-    return this.request(`/drivers${queryString ? `?${queryString}` : ''}`);
-  }
-
-  async getDriver(id: string) {
-    return this.request(`/drivers/${id}`);
-  }
-
-  async updateDriverAvailability(id: string, availabilityData: {
-    isAvailable: boolean;
-    currentLocation?: { lat: number; lng: number };
-  }) {
-    return this.request(`/drivers/${id}/availability`, {
-      method: 'PUT',
-      body: JSON.stringify(availabilityData),
-    });
-  }
-
-  // Notification methods
-  async getNotifications(params?: {
-    page?: number;
-    limit?: number;
-    isRead?: boolean;
-  }) {
-    const queryParams = new URLSearchParams();
-    if (params?.page) queryParams.append('page', params.page.toString());
-    if (params?.limit) queryParams.append('limit', params.limit.toString());
-    if (params?.isRead !== undefined) queryParams.append('isRead', params.isRead.toString());
-    
-    const queryString = queryParams.toString();
-    return this.request(`/notifications${queryString ? `?${queryString}` : ''}`);
-  }
-
-  async markNotificationAsRead(id: string) {
-    return this.request(`/notifications/${id}/read`, {
-      method: 'PUT',
-    });
-  }
-
-  async markAllNotificationsAsRead() {
-    return this.request('/notifications/read-all', {
-      method: 'PUT',
-    });
-  }
-
-  async deleteNotification(id: string) {
-    return this.request(`/notifications/${id}`, {
-      method: 'DELETE',
-    });
-  }
-
-  // Payment methods
-  async createPaymentIntent(shipmentId: string, amount: number) {
-    return this.request('/payments/create-payment-intent', {
-      method: 'POST',
-      body: JSON.stringify({ shipmentId, amount }),
-    });
-  }
-
-  async confirmPayment(paymentIntentId: string, shipmentId: string) {
-    return this.request('/payments/confirm-payment', {
-      method: 'POST',
-      body: JSON.stringify({ paymentIntentId, shipmentId }),
-    });
-  }
-
-  async getPaymentHistory(params?: {
-    page?: number;
-    limit?: number;
-  }) {
-    const queryParams = new URLSearchParams();
-    if (params?.page) queryParams.append('page', params.page.toString());
-    if (params?.limit) queryParams.append('limit', params.limit.toString());
-    
-    const queryString = queryParams.toString();
-    return this.request(`/payments/history${queryString ? `?${queryString}` : ''}`);
-  }
-
-  async getCommissionHistory(params?: {
-    page?: number;
-    limit?: number;
-  }) {
-    const queryParams = new URLSearchParams();
-    if (params?.page) queryParams.append('page', params.page.toString());
-    if (params?.limit) queryParams.append('limit', params.limit.toString());
-    
-    const queryString = queryParams.toString();
-    return this.request(`/payments/commission-history${queryString ? `?${queryString}` : ''}`);
+      body: formData,
+      headers: {
+        // Don't set Content-Type for FormData, let browser set it
+        ...(this.token && { Authorization: `Bearer ${this.token}` }),
+      },
+    })
   }
 }
 
-export default new ApiService();
+export const apiClient = new ApiClient(API_BASE_URL)
+export { ApiError }
+
+

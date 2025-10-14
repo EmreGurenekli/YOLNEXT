@@ -6,6 +6,59 @@ const { createServer } = require('http');
 const { Server } = require('socket.io');
 require('dotenv').config();
 
+// Security middleware
+const {
+  generalLimiter,
+  authLimiter,
+  apiLimiter,
+  shipmentLimiter,
+  offerLimiter,
+  speedLimiter,
+  securityHeaders,
+  requestLogger,
+  suspiciousActivityDetection
+} = require('./middleware/security');
+
+// Advanced Security & Monitoring
+const {
+  advancedSecurityHeaders,
+  checkAdminAccess,
+  bruteForceProtection,
+  sqlInjectionProtection,
+  xssProtection,
+  contentModeration,
+  requestSizeLimiter,
+  advancedRateLimit,
+  slowDownProtection
+} = require('./middleware/advanced-security');
+
+// Load Balancing
+const {
+  rateLimitByIP,
+  concurrentRequestLimit,
+  requestQueue,
+  healthCheck
+} = require('./middleware/load-balancer');
+
+const {
+  performanceMonitoring,
+  securityMonitoring,
+  apiUsageMonitoring,
+  errorTracking,
+  uptimeMonitoring,
+  databaseHealthMonitoring,
+  requestLogging
+} = require('./middleware/monitoring');
+
+const {
+  googleAnalytics,
+  customAnalytics,
+  businessMetrics,
+  userBehaviorTracking,
+  performanceMetrics,
+  errorAnalytics
+} = require('./middleware/analytics');
+
 const { testConnection, syncDatabase } = require('./models/index');
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
@@ -13,6 +66,7 @@ const shipmentRoutes = require('./routes/shipments');
 const offerRoutes = require('./routes/offers');
 const carrierRoutes = require('./routes/carriers');
 const driverRoutes = require('./routes/drivers');
+const messageRoutes = require('./routes/messages');
 const notificationRoutes = require('./routes/notifications');
 const paymentRoutes = require('./routes/payments');
 const dashboardRoutes = require('./routes/dashboard');
@@ -31,21 +85,49 @@ const io = new Server(server, {
 const PORT = process.env.PORT || 5000;
 
 // Security middleware
-app.use(helmet());
+app.use(securityHeaders);
 app.use(cors({
   origin: process.env.CORS_ORIGIN || "http://localhost:5173",
   credentials: process.env.CORS_CREDENTIALS === 'true'
 }));
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100, // limit each IP to 100 requests per windowMs
-  message: {
-    error: 'Çok fazla istek gönderildi, lütfen daha sonra tekrar deneyin.'
-  }
-});
-app.use('/api/', limiter);
+// Advanced Security Middleware
+app.use(advancedSecurityHeaders);
+app.use(checkAdminAccess);
+app.use(bruteForceProtection);
+app.use(sqlInjectionProtection);
+app.use(xssProtection);
+app.use(contentModeration);
+app.use(requestSizeLimiter);
+app.use(advancedRateLimit);
+app.use(slowDownProtection);
+
+// Load Balancing Middleware
+app.use(rateLimitByIP);
+app.use(concurrentRequestLimit);
+app.use(requestQueue);
+app.use(healthCheck);
+
+// Monitoring Middleware
+app.use(performanceMonitoring);
+app.use(securityMonitoring);
+app.use(apiUsageMonitoring);
+app.use(uptimeMonitoring);
+app.use(databaseHealthMonitoring);
+app.use(requestLogging);
+
+// Analytics Middleware
+app.use(googleAnalytics);
+app.use(customAnalytics);
+app.use(businessMetrics);
+app.use(userBehaviorTracking);
+app.use(performanceMetrics);
+
+// Legacy Security (keeping for compatibility)
+app.use(requestLogger);
+app.use(suspiciousActivityDetection);
+app.use(speedLimiter);
+app.use(generalLimiter);
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
@@ -70,16 +152,17 @@ app.get('/health', (req, res) => {
   });
 });
 
-// API routes
-app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/shipments', shipmentRoutes);
-app.use('/api/offers', offerRoutes);
-app.use('/api/carriers', carrierRoutes);
-app.use('/api/drivers', driverRoutes);
-app.use('/api/notifications', notificationRoutes);
-app.use('/api/payments', paymentRoutes);
-app.use('/api/dashboard', dashboardRoutes);
+// API routes with specific rate limiting
+app.use('/api/auth', authLimiter, authRoutes);
+app.use('/api/users', apiLimiter, userRoutes);
+app.use('/api/shipments', shipmentLimiter, shipmentRoutes);
+app.use('/api/offers', offerLimiter, offerRoutes);
+app.use('/api/carriers', apiLimiter, carrierRoutes);
+app.use('/api/drivers', apiLimiter, driverRoutes);
+app.use('/api/messages', apiLimiter, messageRoutes);
+app.use('/api/notifications', apiLimiter, notificationRoutes);
+app.use('/api/payments', apiLimiter, paymentRoutes);
+app.use('/api/dashboard', apiLimiter, dashboardRoutes);
 
 // Socket.io connection handling
 io.on('connection', (socket) => {
@@ -104,6 +187,8 @@ io.on('connection', (socket) => {
 app.set('io', io);
 
 // Error handling middleware
+app.use(errorTracking);
+app.use(errorAnalytics);
 app.use(notFound);
 app.use(errorHandler);
 
@@ -114,7 +199,7 @@ const startServer = async () => {
     await testConnection();
     
     // Sync database models
-    await syncDatabase(process.env.NODE_ENV === 'development');
+    await syncDatabase(true); // Force sync to recreate tables
     
     // Start server
     server.listen(PORT, () => {
