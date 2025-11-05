@@ -59,8 +59,8 @@ async function apiCall(endpoint, options = {}) {
 
     return await response.json();
   } catch (error) {
-    // Only log in development
-    if (import.meta.env.DEV) {
+    // Only log in development and don't log authentication errors
+    if (import.meta.env.DEV && !error.message?.includes('Invalid or expired token') && !error.message?.includes('403')) {
       console.error('API call failed:', error);
     }
 

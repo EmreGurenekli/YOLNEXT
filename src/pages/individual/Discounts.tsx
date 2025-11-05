@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Helmet } from 'react-helmet-async';
-import { Percent, Tag, Award } from 'lucide-react';
+import { Tag } from 'lucide-react';
 
 const IndividualDiscounts: React.FC = () => {
   const discounts = [

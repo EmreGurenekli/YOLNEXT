@@ -71,10 +71,13 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
     });
 
     newSocket.on('connect_error', error => {
-      console.warn(
-        '🔌 WebSocket connection error (continuing without real-time features):',
-        error.message
-      );
+      // Only log WebSocket errors if they're not namespace/auth related
+      if (!error.message?.includes('Invalid namespace') && !error.message?.includes('Authentication')) {
+        console.warn(
+          '🔌 WebSocket connection error (continuing without real-time features):',
+          error.message
+        );
+      }
       // Don't set isConnected to false here to avoid repeated error messages
     });
 
