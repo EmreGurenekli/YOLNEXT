@@ -20,6 +20,7 @@ import { Link } from 'react-router-dom';
 import { createApiUrl } from '../../config/api';
 import { formatCurrency, formatDate } from '../../utils/format';
 import Pagination from '../../components/common/Pagination';
+import { exportShipmentsToCSV, exportShipmentsToExcel } from '../../utils/export';
 
 interface Shipment {
   id: string;
@@ -259,6 +260,14 @@ const IndividualMyShipments: React.FC = () => {
     console.log('Gönderi takibi:', shipmentId);
   };
 
+  const handleExportCSV = () => {
+    exportShipmentsToCSV(filteredShipments, `gonderilerim_${new Date().toISOString().split('T')[0]}.csv`);
+  };
+
+  const handleExportExcel = async () => {
+    await exportShipmentsToExcel(filteredShipments, `gonderilerim_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
   // Arama backend'de yapıldığı için sadece status filtresi uygulanıyor
   const filteredShipments = shipments.filter(shipment => {
     const matchesStatus =
@@ -317,7 +326,7 @@ const IndividualMyShipments: React.FC = () => {
 
         {/* Filters Card */}
         <div className='bg-white rounded-2xl p-8 shadow-xl border border-slate-200 mb-8'>
-          <div className='grid grid-cols-1 md:grid-cols-4 gap-4'>
+          <div className='grid grid-cols-1 md:grid-cols-4 gap-4 mb-4'>
             <div className='relative'>
               <Search className='absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4' />
               <input
@@ -356,6 +365,26 @@ const IndividualMyShipments: React.FC = () => {
               Filtrele
             </button>
           </div>
+
+          {/* Export Buttons */}
+          {filteredShipments.length > 0 && (
+            <div className='flex items-center justify-end gap-3 pt-4 border-t border-slate-200'>
+              <button
+                onClick={handleExportCSV}
+                className='flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors'
+              >
+                <Download className='w-4 h-4' />
+                CSV İndir
+              </button>
+              <button
+                onClick={handleExportExcel}
+                className='flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors'
+              >
+                <Download className='w-4 h-4' />
+                Excel İndir
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Shipments Table */}

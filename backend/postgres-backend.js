@@ -160,6 +160,27 @@ app.use((req, res, next) => {
 app.use(express.json({ limit: '1mb' }));
 app.use(morgan('combined'));
 
+// ============= ENHANCED SECURITY HEADERS =============
+app.use((req, res, next) => {
+  // Security headers
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+  
+  // Content Security Policy
+  if (process.env.NODE_ENV === 'production') {
+    res.setHeader(
+      'Content-Security-Policy',
+      "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:;"
+    );
+  }
+  
+  next();
+});
+
 // ============= ENHANCED RATE LIMITING =============
 
 // Strict auth limiter (login/register)
@@ -1018,6 +1039,8 @@ app.get(
 
 // Create tables if not exist
 async function createTables() {
+  // Create error_logs table first
+  await createErrorLogsTable();
   if (!pool) {
     console.error('❌ No database pool available');
     return false;
@@ -1129,6 +1152,7 @@ async function createTables() {
         userId INTEGER REFERENCES users(id) ON DELETE CASCADE,
         title VARCHAR(255) NOT NULL,
         description TEXT,
+        productDescription TEXT,
         category VARCHAR(50),
         subCategory VARCHAR(50),
         pickupCity VARCHAR(100) NOT NULL,
@@ -1165,6 +1189,9 @@ async function createTables() {
     );
     await pool.query(
       'ALTER TABLE shipments ADD COLUMN IF NOT EXISTS description TEXT'
+    );
+    await pool.query(
+      'ALTER TABLE shipments ADD COLUMN IF NOT EXISTS productDescription TEXT'
     );
     await pool.query(
       'ALTER TABLE shipments ADD COLUMN IF NOT EXISTS category VARCHAR(50)'
@@ -1804,6 +1831,7 @@ app.post(
       const {
         title,
         description,
+        productDescription,
         category,
         pickupCity,
         pickupDistrict,
@@ -1832,24 +1860,69 @@ app.post(
       // Generate tracking number
       const trackingNumber = 'TRK' + Date.now().toString().slice(-10);
 
+      // For demo users, check if user exists or create a temporary user
+      let finalUserId = userId;
+      if (req.user.isDemo) {
+        try {
+          // Check if demo user exists in database, if not create one
+          const userCheck = await pool.query('SELECT id FROM users WHERE id = $1', [userId]);
+          if (userCheck.rows.length === 0) {
+            // Create a temporary demo user with unique email
+            const demoEmail = req.user.email || `demo_${userId}_${Date.now()}@yolnext.com`;
+            const demoUserResult = await pool.query(
+              `INSERT INTO users (email, password, fullName, role, isVerified, isActive)
+               VALUES ($1, $2, $3, $4, $5, $6)
+               RETURNING id`,
+              [
+                demoEmail,
+                '$2a$10$dummy', // Dummy password hash
+                req.user.fullName || 'Demo User',
+                req.user.role || 'individual',
+                true,
+                true
+              ]
+            );
+            finalUserId = demoUserResult.rows[0]?.id || userId;
+          } else {
+            finalUserId = userCheck.rows[0].id;
+          }
+        } catch (userError) {
+          // If user creation fails, try to get existing user by email
+          console.warn('Demo user creation failed, trying to find existing user:', userError.message);
+          try {
+            const existingUser = await pool.query(
+              'SELECT id FROM users WHERE email = $1 LIMIT 1',
+              [req.user.email || `demo_${userId}@yolnext.com`]
+            );
+            if (existingUser.rows.length > 0) {
+              finalUserId = existingUser.rows[0].id;
+            }
+          } catch (e) {
+            console.error('Could not find or create demo user:', e.message);
+            // Continue with original userId - will fail if foreign key constraint exists
+          }
+        }
+      }
+
       // For demo users, we still insert but use a special handling
       // Demo users don't need to exist in users table for shipment creation
       const result = await pool.query(
         `
       INSERT INTO shipments (
-        userId, title, description, category,
+        userId, title, description, productDescription, category,
         pickupCity, pickupDistrict, pickupAddress, pickupDate,
         deliveryCity, deliveryDistrict, deliveryAddress, deliveryDate,
         weight, volume, dimensions, value, requiresInsurance,
         specialRequirements, status, trackingNumber, metadata
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
       RETURNING *
     `,
         [
-          userId,
+          finalUserId,
           title || `${pickupCity} → ${deliveryCity}`,
           description,
+          req.body.productDescription || description || '',
           category || 'general',
           pickupCity,
           pickupDistrict,
@@ -1873,16 +1946,20 @@ app.post(
 
       const shipment = result.rows[0];
 
-      // Create notification for user
-      await createNotification(
-        userId,
-        'shipment_created',
-        'Gönderi Oluşturuldu',
-        `Gönderiniz başarıyla oluşturuldu. Takip numaranız: ${trackingNumber}`,
-        `/shipments/${shipment.id}`,
-        'normal',
-        { shipmentId: shipment.id, trackingNumber }
-      );
+      // Create notification for user (best effort, don't fail if it fails)
+      try {
+        await createNotification(
+          finalUserId,
+          'shipment_created',
+          'Gönderi Oluşturuldu',
+          `Gönderiniz başarıyla oluşturuldu. Takip numaranız: ${trackingNumber}`,
+          `/shipments/${shipment.id}`,
+          'normal',
+          { shipmentId: shipment.id, trackingNumber }
+        );
+      } catch (notifError) {
+        console.warn('Notification creation failed (non-critical):', notifError.message);
+      }
 
       res.status(201).json({
         success: true,
@@ -1894,10 +1971,14 @@ app.post(
       });
     } catch (error) {
       console.error('Error creating shipment:', error);
+      console.error('Error stack:', error.stack);
+      console.error('Request body:', JSON.stringify(req.body, null, 2));
+      console.error('User:', req.user);
       res.status(500).json({
         success: false,
         error: 'Gönderi oluşturulamadı',
         details: error.message,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
       });
     }
   }
@@ -2316,10 +2397,10 @@ app.get('/api/shipments/open', authenticateToken, async (req, res) => {
     const { search, q, category } = req.query;
     const searchTerm = search || q || '';
     
-    // Build WHERE conditions
-    let whereConditions = ['s.status = $1'];
-    const queryParams = ['open'];
-    let paramIndex = 2;
+    // Build WHERE conditions - open shipments are pending or open
+    let whereConditions = ['(s.status = $1 OR s.status = $2)'];
+    const queryParams = ['pending', 'open'];
+    let paramIndex = 3;
 
     // Add search filter if provided
     if (searchTerm && searchTerm.trim()) {
@@ -2327,6 +2408,7 @@ app.get('/api/shipments/open', authenticateToken, async (req, res) => {
       whereConditions.push(
         `(s.title ILIKE $${paramIndex} OR 
           s.description ILIKE $${paramIndex} OR 
+          s.productDescription ILIKE $${paramIndex} OR
           s.pickupCity ILIKE $${paramIndex} OR 
           s.deliveryCity ILIKE $${paramIndex} OR
           s.pickupAddress ILIKE $${paramIndex} OR
@@ -2376,15 +2458,16 @@ app.get('/api/shipments/open', authenticateToken, async (req, res) => {
       );
     }
     // Build count query with same conditions
-    let countWhereConditions = ['status = $1'];
-    const countParams = ['open'];
-    let countParamIndex = 2;
+    let countWhereConditions = ['(status = $1 OR status = $2)'];
+    const countParams = ['pending', 'open'];
+    let countParamIndex = 3;
     
     if (searchTerm && searchTerm.trim()) {
       const searchParam = `%${searchTerm.trim()}%`;
       countWhereConditions.push(
         `(title ILIKE $${countParamIndex} OR 
           description ILIKE $${countParamIndex} OR 
+          productDescription ILIKE $${countParamIndex} OR
           pickupCity ILIKE $${countParamIndex} OR 
           deliveryCity ILIKE $${countParamIndex} OR
           pickupAddress ILIKE $${countParamIndex} OR
@@ -3626,7 +3709,40 @@ app.get('/api/shipments/individual/history', async (req, res) => {
   }
 });
 
-// Tasiyici shipments endpoint
+// Tasiyici shipments endpoints
+app.get('/api/shipments/tasiyici', async (req, res) => {
+  try {
+    if (!pool) {
+      return res.status(500).json({
+        success: false,
+        error: 'Database not available',
+      });
+    }
+
+    // Get active shipments assigned to tasiyici (carrier)
+    // This should get shipments where the carrier is assigned
+    const result = await pool.query(
+      `SELECT s.*, o.carrier_id, o.carrier_name 
+       FROM shipments s 
+       LEFT JOIN offers o ON s.id = o.shipment_id 
+       WHERE o.status = 'accepted' 
+       AND (s.status = 'in_progress' OR s.status = 'pending')
+       ORDER BY s.createdAt DESC`
+    );
+    res.json({
+      success: true,
+      data: result.rows,
+    });
+  } catch (error) {
+    console.error('Error fetching tasiyici shipments:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch shipments',
+      details: error.message,
+    });
+  }
+});
+
 app.get('/api/shipments/tasiyici/completed', async (req, res) => {
   try {
     if (!pool) {
@@ -3637,8 +3753,12 @@ app.get('/api/shipments/tasiyici/completed', async (req, res) => {
     }
 
     const result = await pool.query(
-      'SELECT * FROM shipments WHERE status = $1 ORDER BY createdAt DESC',
-      ['delivered']
+      `SELECT s.*, o.carrier_id, o.carrier_name 
+       FROM shipments s 
+       LEFT JOIN offers o ON s.id = o.shipment_id 
+       WHERE o.status = 'accepted' 
+       AND s.status = 'delivered'
+       ORDER BY s.createdAt DESC`
     );
     res.json({
       success: true,

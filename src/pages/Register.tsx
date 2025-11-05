@@ -56,11 +56,7 @@ const Register = () => {
     vehicleCount: '',
     serviceAreas: '',
 
-    // Taşıyıcı özel bilgiler
-    driverLicenseNumber: '',
-    vehicleType: '',
-    vehiclePlate: '',
-    experienceYears: '',
+    // Taşıyıcı özel bilgiler (kaldırıldı: driverLicenseNumber, vehicleType, vehiclePlate, experienceYears)
 
     // Bireysel özel bilgiler
     address: '',
@@ -108,7 +104,8 @@ const Register = () => {
       });
     }
 
-    if (name === 'driverLicenseNumber' && value) {
+    // Kaldırıldı: driverLicenseNumber validation
+    if (false && name === 'driverLicenseNumber' && value) {
       verifyDriverLicense(value).then(isValid => {
         if (!isValid) {
           setError('Geçersiz ehliyet numarası (11 haneli olmalı)');
@@ -155,10 +152,7 @@ const Register = () => {
       case 'tasiyici':
         return [
           ...baseFields,
-          'driverLicenseNumber',
-          'vehicleType',
-          'vehiclePlate',
-          'experienceYears',
+          // Kaldırıldı: 'driverLicenseNumber', 'vehicleType', 'vehiclePlate', 'experienceYears',
           'address',
           'city',
         ];
@@ -388,11 +382,12 @@ const Register = () => {
         }
       }
 
-      if (formData.userType === 'tasiyici') {
-        if (!(await verifyDriverLicense(formData.driverLicenseNumber))) {
-          errors.push('Geçersiz ehliyet numarası (11 haneli olmalı)');
-        }
-      }
+      // Kaldırıldı: Driver license verification for tasiyici
+      // if (formData.userType === 'tasiyici') {
+      //   if (!(await verifyDriverLicense(formData.driverLicenseNumber))) {
+      //     errors.push('Geçersiz ehliyet numarası (11 haneli olmalı)');
+      //   }
+      // }
 
       if (errors.length > 0) {
         setVerificationStatus('rejected');
@@ -1056,72 +1051,6 @@ const Register = () => {
               {/* Taşıyıcı Alanları */}
               {formData.userType === 'tasiyici' && (
                 <>
-                  <div className='grid grid-cols-2 gap-4'>
-                    <div>
-                      <label className='text-gray-700 text-sm font-medium'>
-                        Ehliyet Numarası
-                      </label>
-                      <input
-                        type='text'
-                        name='driverLicenseNumber'
-                        value={formData.driverLicenseNumber}
-                        onChange={handleInputChange}
-                        className='w-full mt-1 px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
-                        placeholder='12345678901'
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className='text-gray-700 text-sm font-medium'>
-                        Deneyim (Yıl)
-                      </label>
-                      <input
-                        type='number'
-                        name='experienceYears'
-                        value={formData.experienceYears}
-                        onChange={handleInputChange}
-                        className='w-full mt-1 px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
-                        placeholder='5'
-                        min='0'
-                        required
-                      />
-                    </div>
-                  </div>
-                  <div className='grid grid-cols-2 gap-4'>
-                    <div>
-                      <label className='text-gray-700 text-sm font-medium'>
-                        Araç Tipi
-                      </label>
-                      <select
-                        name='vehicleType'
-                        value={formData.vehicleType}
-                        onChange={handleInputChange}
-                        className='w-full mt-1 px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
-                        required
-                      >
-                        <option value=''>Araç tipi seçin</option>
-                        <option value='kamyon'>Kamyon</option>
-                        <option value='tir'>TIR</option>
-                        <option value='van'>Van</option>
-                        <option value='pickup'>Pickup</option>
-                        <option value='minibus'>Minibüs</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className='text-gray-700 text-sm font-medium'>
-                        Araç Plakası
-                      </label>
-                      <input
-                        type='text'
-                        name='vehiclePlate'
-                        value={formData.vehiclePlate}
-                        onChange={handleInputChange}
-                        className='w-full mt-1 px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
-                        placeholder='34 ABC 123'
-                        required
-                      />
-                    </div>
-                  </div>
                   <div>
                     <label className='text-gray-700 text-sm font-medium'>
                       Adres

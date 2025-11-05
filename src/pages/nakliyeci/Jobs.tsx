@@ -79,7 +79,7 @@ const Jobs: React.FC = () => {
   useEffect(() => {
     loadJobs();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pagination.page, statusFilter]);
+  }, [pagination.page, statusFilter, searchTerm]);
 
   const loadJobs = async () => {
     try {
@@ -93,6 +93,10 @@ const Jobs: React.FC = () => {
 
       if (statusFilter !== 'all') {
         params.append('status', statusFilter);
+      }
+
+      if (searchTerm && searchTerm.trim()) {
+        params.append('search', searchTerm.trim());
       }
 
       const response = await fetch(

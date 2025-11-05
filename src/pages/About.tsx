@@ -1,4 +1,5 @@
 import React from 'react';
+import Footer from '../components/common/Footer';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import { Truck, Users, Shield } from 'lucide-react';

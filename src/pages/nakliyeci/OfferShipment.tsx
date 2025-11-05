@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { shipmentAPI } from '../../services/api';
+import { createApiUrl } from '../../config/api';
 
 interface Shipment {
   id: string;
@@ -62,54 +63,99 @@ const OfferShipment: React.FC = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  // Demo gönderi verisi
-  const demoShipment: Shipment = {
-    id: id || '1',
-    title: 'Ev Taşınması',
-    description:
-      '3+1 ev taşınması - Yatak odası takımı, mutfak eşyaları, kırılabilir eşyalar var',
-    pickupAddress: 'Kadıköy, İstanbul - Moda Mahallesi, Bağdat Caddesi No:123',
-    deliveryAddress:
-      'Çankaya, Ankara - Kızılay Mahallesi, Atatürk Bulvarı No:456',
-    pickupDate: '2024-11-01',
-    deliveryDate: '2024-11-02',
-    weight: 150,
-    specialRequirements: 'Kırılabilir eşyalar var, dikkatli taşıma gerekli',
-    category: 'house_move',
-    userId: 'user1',
-    createdAt: '2024-10-25T10:00:00Z',
-  };
-
   useEffect(() => {
     loadShipment();
   }, [id]);
 
   const loadShipment = async () => {
+    if (!id) {
+      setError('Gönderi ID bulunamadı');
+      setIsLoading(false);
+      return;
+    }
+
     try {
       setIsLoading(true);
+      setError('');
 
-      // Gerçek API çağrısı
-      try {
-        const response = await shipmentAPI.getAll();
-        if (response.success && response.data) {
-          const foundShipment = response.data.find(
-            (s: Shipment) => s.id === id
+      // Gerçek API çağrısı - Open shipments endpoint'inden gönderiyi al
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(
+        createApiUrl(`/api/shipments/open?id=${id}`),
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        // Eğer open shipments'da yoksa, tüm shipments'tan ara
+        const allShipmentsResponse = await fetch(
+          createApiUrl('/api/shipments/open'),
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+
+        if (allShipmentsResponse.ok) {
+          const allData = await allShipmentsResponse.json();
+          const foundShipment = allData.data?.shipments?.find(
+            (s: any) => s.id?.toString() === id || s.id === id
           );
+          
           if (foundShipment) {
-            setShipment(foundShipment);
+            // API'den gelen veriyi formatla
+            setShipment({
+              id: foundShipment.id?.toString() || id,
+              title: foundShipment.title || foundShipment.productDescription || 'Gönderi',
+              description: foundShipment.description || foundShipment.productDescription || '',
+              pickupAddress: foundShipment.pickupAddress || '',
+              deliveryAddress: foundShipment.deliveryAddress || '',
+              pickupDate: foundShipment.pickupDate || '',
+              deliveryDate: foundShipment.deliveryDate || '',
+              weight: foundShipment.weight || 0,
+              specialRequirements: foundShipment.specialRequirements || '',
+              category: foundShipment.category || 'general',
+              userId: foundShipment.userId?.toString() || '',
+              createdAt: foundShipment.createdAt || new Date().toISOString(),
+            });
           } else {
-            setShipment(demoShipment);
+            setError('Gönderi bulunamadı');
           }
         } else {
-          setShipment(demoShipment);
+          throw new Error('Gönderi yüklenemedi');
         }
-      } catch (error) {
-        console.log('API hatası, demo veri kullanılıyor:', error);
-        setShipment(demoShipment);
+      } else {
+        const data = await response.json();
+        const shipmentData = data.data?.shipment || data.data || data;
+        
+        if (shipmentData) {
+          setShipment({
+            id: shipmentData.id?.toString() || id,
+            title: shipmentData.title || shipmentData.productDescription || 'Gönderi',
+            description: shipmentData.description || shipmentData.productDescription || '',
+            pickupAddress: shipmentData.pickupAddress || '',
+            deliveryAddress: shipmentData.deliveryAddress || '',
+            pickupDate: shipmentData.pickupDate || '',
+            deliveryDate: shipmentData.deliveryDate || '',
+            weight: shipmentData.weight || 0,
+            specialRequirements: shipmentData.specialRequirements || '',
+            category: shipmentData.category || 'general',
+            userId: shipmentData.userId?.toString() || '',
+            createdAt: shipmentData.createdAt || new Date().toISOString(),
+          });
+        } else {
+          setError('Gönderi verisi bulunamadı');
+        }
       }
     } catch (error) {
       console.error('Gönderi yüklenirken hata:', error);
-      setShipment(demoShipment);
+      setError('Gönderi yüklenirken bir hata oluştu. Lütfen tekrar deneyin.');
     } finally {
       setIsLoading(false);
     }
@@ -168,7 +214,7 @@ const OfferShipment: React.FC = () => {
       };
 
       // Gerçek API çağrısı
-      const response = await fetch('/api/offers', {
+      const response = await fetch(createApiUrl('/api/offers'), {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${localStorage.getItem('authToken')}`,

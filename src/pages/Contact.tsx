@@ -1,4 +1,5 @@
 import React from 'react';
+import Footer from '../components/common/Footer';
 import { Helmet } from 'react-helmet-async';
 import { Mail, Phone, MapPin, Send } from 'lucide-react';
 

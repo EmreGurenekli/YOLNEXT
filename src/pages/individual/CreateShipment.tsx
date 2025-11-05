@@ -11,7 +11,6 @@ import {
   Ruler,
   Thermometer,
   AlertTriangle,
-  Shield,
   Star,
   Calendar,
   Clock,
@@ -145,8 +144,8 @@ export default function CreateShipment() {
 
   const handleNext = () => {
     if (validateStep(currentStep)) {
-      if (currentStep < steps.length) {
-        setCurrentStep(currentStep + 1);
+    if (currentStep < steps.length) {
+      setCurrentStep(currentStep + 1);
         setErrors({});
       }
     }
@@ -158,7 +157,7 @@ export default function CreateShipment() {
     }
   };
 
-  const handlePublish = () => {
+  const handlePublish = async () => {
     // Tüm adımları validate et
     if (!validateStep(1) || !validateStep(2)) {
       // Hatalar gösterildi, yayınlama yapma
@@ -168,12 +167,64 @@ export default function CreateShipment() {
 
     setIsLoading(true);
     
-    setTimeout(() => {
+    try {
+      const token = localStorage.getItem('authToken');
+      
+      // Prepare shipment data - match backend expectations
+      const shipmentData = {
+        title: formData.productDescription || 'Ev Taşınması',
+        description: formData.productDescription || '',
+        productDescription: formData.productDescription || '',
+        category: formData.mainCategory || 'general',
+        pickupCity: formData.pickupAddress?.split(',')[0]?.trim() || 'İstanbul',
+        pickupDistrict: formData.pickupAddress?.split(',')[1]?.trim() || '',
+        pickupAddress: formData.pickupAddress,
+        pickupDate: formData.pickupDate,
+        deliveryCity: formData.deliveryAddress?.split(',')[0]?.trim() || 'İstanbul',
+        deliveryDistrict: formData.deliveryAddress?.split(',')[1]?.trim() || '',
+        deliveryAddress: formData.deliveryAddress,
+        deliveryDate: formData.deliveryDate,
+        weight: formData.weight ? parseFloat(formData.weight) : 0,
+        volume: 0,
+        dimensions: formData.dimensions.length && formData.dimensions.width && formData.dimensions.height
+          ? `${formData.dimensions.length}x${formData.dimensions.width}x${formData.dimensions.height}`
+          : null,
+        value: 0,
+        requiresInsurance: false,
+        specialRequirements: [
+          formData.roomCount ? `Oda Sayısı: ${formData.roomCount}` : null,
+          formData.buildingType ? `Bina Tipi: ${formData.buildingType}` : null,
+          formData.pickupFloor ? `Toplama Katı: ${formData.pickupFloor}` : null,
+          formData.deliveryFloor ? `Teslimat Katı: ${formData.deliveryFloor}` : null,
+          formData.hasElevatorPickup ? 'Toplama adresinde asansör var' : null,
+          formData.hasElevatorDelivery ? 'Teslimat adresinde asansör var' : null,
+          formData.needsPackaging ? 'Ambalaj ve paketleme hizmeti gerekli' : null,
+          formData.specialItems || null,
+        ].filter(Boolean).join(', '),
+      };
+
+      const response = await fetch('http://localhost:5000/api/shipments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(shipmentData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || errorData.message || 'Gönderi yayınlanamadı');
+      }
+
+      await response.json();
+      
       setIsLoading(false);
       setSuccessMessage('Gönderiniz başarıyla yayınlandı! Nakliyecilerden teklifler almaya başlayacaksınız.');
       setShowSuccessMessage(true);
       
       setTimeout(() => {
+        // Reset form
         setFormData({
           mainCategory: '',
           productDescription: '',
@@ -201,7 +252,13 @@ export default function CreateShipment() {
         setShowSuccessMessage(false);
         setErrors({});
       }, 3000);
-    }, 2000);
+    } catch (error) {
+      console.error('Error publishing shipment:', error);
+      setIsLoading(false);
+      setErrors({ publish: error instanceof Error ? error.message : 'Gönderi yayınlanamadı' });
+      setSuccessMessage('');
+      setShowSuccessMessage(false);
+    }
   };
 
 
@@ -248,7 +305,7 @@ export default function CreateShipment() {
                       <FileText className="w-4 h-4 inline mr-2" />
                       {formData.mainCategory === 'special_cargo' ? 'Detaylı Açıklama *' : 'Yük Açıklaması *'}
                     </label>
-                      <textarea
+                    <textarea
                       value={formData.productDescription}
                       onChange={(e) => {
                         handleInputChange('productDescription', e.target.value);
@@ -432,11 +489,11 @@ export default function CreateShipment() {
                         <textarea
                           value={formData.specialItems}
                           onChange={(e) => handleInputChange('specialItems', e.target.value)}
-                          rows={3}
+                      rows={3}
                           className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md resize-none"
                           placeholder="Varsa özel eşyalarınızı belirtin (piano, antika, sanat eseri, kırılgan değerli eşyalar vb.)"
-                        />
-                      </div>
+                    />
+                  </div>
                     </div>
                   )}
 
@@ -518,15 +575,15 @@ export default function CreateShipment() {
 
                   {/* Diğer ve Özel Yük - Standart Alanlar */}
                   {(formData.mainCategory === 'other' || formData.mainCategory === 'special_cargo') && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">
-                          <Weight className="w-4 h-4 inline mr-2" />
-                          Ağırlık (kg) *
-                        </label>
-                        <input
-                          type="number"
-                          value={formData.weight}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        <Weight className="w-4 h-4 inline mr-2" />
+                        Ağırlık (kg) *
+                      </label>
+                      <input
+                        type="number"
+                        value={formData.weight}
                           onChange={(e) => {
                             handleInputChange('weight', e.target.value);
                             if (errors.weight) {
@@ -542,55 +599,55 @@ export default function CreateShipment() {
                         {errors.weight && (
                           <p className="mt-2 text-sm text-red-600">{errors.weight}</p>
                         )}
-                      </div>
-                      <div className="space-y-2">
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">
-                          <Package className="w-4 h-4 inline mr-2" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        <Package className="w-4 h-4 inline mr-2" />
                           Miktar
-                        </label>
+                      </label>
+                      <input
+                        type="number"
+                        value={formData.quantity}
+                        onChange={(e) => handleInputChange('quantity', e.target.value)}
+                        className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md"
+                          min="1"
+                      />
+                    </div>
+                      <div className="md:col-span-2">
+                    <label className="block text-sm font-semibold text-gray-700 mb-4">
+                      <Ruler className="w-4 h-4 inline mr-2" />
+                          Boyutlar (cm) - Opsiyonel
+                    </label>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <label className="block text-xs font-medium text-gray-500 mb-1">Uzunluk</label>
                         <input
                           type="number"
-                          value={formData.quantity}
-                          onChange={(e) => handleInputChange('quantity', e.target.value)}
-                          className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md"
-                          min="1"
+                          value={formData.dimensions.length}
+                          onChange={(e) => handleDimensionsChange('length', e.target.value)}
+                          className="w-full p-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md"
                         />
                       </div>
-                      <div className="md:col-span-2">
-                        <label className="block text-sm font-semibold text-gray-700 mb-4">
-                          <Ruler className="w-4 h-4 inline mr-2" />
-                          Boyutlar (cm) - Opsiyonel
-                        </label>
-                        <div className="grid grid-cols-3 gap-4">
-                          <div className="space-y-2">
-                            <label className="block text-xs font-medium text-gray-500 mb-1">Uzunluk</label>
-                            <input
-                              type="number"
-                              value={formData.dimensions.length}
-                              onChange={(e) => handleDimensionsChange('length', e.target.value)}
-                              className="w-full p-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <label className="block text-xs font-medium text-gray-500 mb-1">Genişlik</label>
-                            <input
-                              type="number"
-                              value={formData.dimensions.width}
-                              onChange={(e) => handleDimensionsChange('width', e.target.value)}
-                              className="w-full p-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <label className="block text-xs font-medium text-gray-500 mb-1">Yükseklik</label>
-                            <input
-                              type="number"
-                              value={formData.dimensions.height}
-                              onChange={(e) => handleDimensionsChange('height', e.target.value)}
-                              className="w-full p-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md"
-                            />
-                          </div>
-                        </div>
+                      <div className="space-y-2">
+                        <label className="block text-xs font-medium text-gray-500 mb-1">Genişlik</label>
+                        <input
+                          type="number"
+                          value={formData.dimensions.width}
+                          onChange={(e) => handleDimensionsChange('width', e.target.value)}
+                          className="w-full p-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md"
+                        />
                       </div>
+                      <div className="space-y-2">
+                        <label className="block text-xs font-medium text-gray-500 mb-1">Yükseklik</label>
+                        <input
+                          type="number"
+                          value={formData.dimensions.height}
+                          onChange={(e) => handleDimensionsChange('height', e.target.value)}
+                          className="w-full p-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md"
+                        />
+                      </div>
+                    </div>
+                  </div>
                     </div>
                   )}
 
@@ -605,10 +662,10 @@ export default function CreateShipment() {
                           ];
                         case 'special_cargo':
                           return [
-                            { id: 'fragile', name: 'Kırılgan', icon: AlertTriangle, color: 'red' },
-                            { id: 'urgent', name: 'Acil', icon: Clock, color: 'orange' },
-                            { id: 'temperature', name: 'Soğuk Zincir', icon: Thermometer, color: 'cyan' },
-                            { id: 'valuable', name: 'Değerli', icon: Star, color: 'yellow' }
+                        { id: 'fragile', name: 'Kırılgan', icon: AlertTriangle, color: 'red' },
+                        { id: 'urgent', name: 'Acil', icon: Clock, color: 'orange' },
+                        { id: 'temperature', name: 'Soğuk Zincir', icon: Thermometer, color: 'cyan' },
+                        { id: 'valuable', name: 'Değerli', icon: Star, color: 'yellow' }
                           ];
                         default:
                           return [
@@ -669,8 +726,8 @@ export default function CreateShipment() {
                           </button>
                         );
                       })}
-                        </div>
-                      </div>
+                    </div>
+                  </div>
                     );
                   })()}
                 </div>
@@ -921,24 +978,24 @@ export default function CreateShipment() {
                     {(formData.mainCategory === 'other' || formData.mainCategory === 'special_cargo') && (
                       <>
                         {formData.weight && (
-                          <div className="flex justify-between">
-                            <span className="text-slate-600">Ağırlık:</span>
-                            <span className="font-medium text-slate-900">{formData.weight} kg</span>
-                          </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">Ağırlık:</span>
+                      <span className="font-medium text-slate-900">{formData.weight} kg</span>
+                    </div>
                         )}
                         {formData.quantity && (
-                          <div className="flex justify-between">
-                            <span className="text-slate-600">Miktar:</span>
-                            <span className="font-medium text-slate-900">{formData.quantity}</span>
-                          </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">Miktar:</span>
+                      <span className="font-medium text-slate-900">{formData.quantity}</span>
+                    </div>
                         )}
                         {formData.dimensions.length && formData.dimensions.width && formData.dimensions.height && (
-                          <div className="flex justify-between">
-                            <span className="text-slate-600">Boyut:</span>
-                            <span className="font-medium text-slate-900">
-                              {formData.dimensions.length} x {formData.dimensions.width} x {formData.dimensions.height} cm
-                            </span>
-                          </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">Boyut:</span>
+                      <span className="font-medium text-slate-900">
+                        {formData.dimensions.length} x {formData.dimensions.width} x {formData.dimensions.height} cm
+                      </span>
+                    </div>
                         )}
                       </>
                     )}

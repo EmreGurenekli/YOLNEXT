@@ -16,6 +16,7 @@ import {
   X as XIcon,
 } from 'lucide-react';
 import YolNextLogo from '../components/common/yolnextLogo';
+import Footer from '../components/common/Footer';
 import { useNavigate } from 'react-router-dom';
 
 const LandingPage: React.FC = () => {
@@ -1044,138 +1045,13 @@ const LandingPage: React.FC = () => {
       </section>
 
       {/* 9. FOOTER */}
-      <footer
-        id='contact'
-        className='bg-white border-t border-gray-200 py-12 sm:py-16'
-      >
-        <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
-          <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8'>
-            <div className='sm:col-span-2 lg:col-span-2'>
-              <YolNextLogo
-                variant='banner'
-                className='text-gray-900 h-6 sm:h-8 mb-4'
-              />
-              <p className='text-gray-600 mb-4 max-w-md text-sm sm:text-base'>
-                Rekabetçi fiyatlarla lojistikte yeni çağ. 4 farklı kullanıcı
-                tipi için özel tasarlanmış platform.
-              </p>
-              <div className='bg-green-50 border border-green-200 rounded-lg p-3 mb-6'>
-                <div className='text-green-700 font-semibold text-sm'>
-                  🎉 TAMAMEN ÜCRETSİZ
-                </div>
-                <div className='text-green-600 text-xs'>
-                  %0 üyelik • %0 gönderi • Sadece nakliyeci %1 komisyon
-                </div>
-              </div>
-              <div className='flex space-x-4'>
-                <a
-                  href='#'
-                  className='min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors'
-                >
-                  <Phone className='w-5 h-5' />
-                </a>
-                <a
-                  href='#'
-                  className='min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors'
-                >
-                  <Mail className='w-5 h-5' />
-                </a>
-                <a
-                  href='#'
-                  className='min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors'
-                >
-                  <Globe className='w-5 h-5' />
-                </a>
-              </div>
-            </div>
-            <div>
-              <h3 className='text-base sm:text-lg font-semibold text-gray-900 mb-4'>
-                Kullanıcı Tipleri
-              </h3>
-              <ul className='space-y-2'>
-                <li>
-                  <a
-                    href='#'
-                    className='min-h-[44px] flex items-center text-gray-600 hover:text-gray-900 transition-colors text-sm sm:text-base'
-                  >
-                    Bireysel Gönderici
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href='#'
-                    className='min-h-[44px] flex items-center text-gray-600 hover:text-gray-900 transition-colors text-sm sm:text-base'
-                  >
-                    Kurumsal Gönderici
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href='#'
-                    className='min-h-[44px] flex items-center text-gray-600 hover:text-gray-900 transition-colors text-sm sm:text-base'
-                  >
-                    Nakliyeci
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href='#'
-                    className='min-h-[44px] flex items-center text-gray-600 hover:text-gray-900 transition-colors text-sm sm:text-base'
-                  >
-                    Taşıyıcı
-                  </a>
-                </li>
-              </ul>
-            </div>
-            <div>
-              <h3 className='text-base sm:text-lg font-semibold text-gray-900 mb-4'>
-                Destek
-              </h3>
-              <ul className='space-y-2'>
-                <li>
-                  <a
-                    href='#'
-                    className='min-h-[44px] flex items-center text-gray-600 hover:text-gray-900 transition-colors text-sm sm:text-base'
-                  >
-                    Yardım
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href='#'
-                    className='min-h-[44px] flex items-center text-gray-600 hover:text-gray-900 transition-colors text-sm sm:text-base'
-                  >
-                    İletişim
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href='#'
-                    className='min-h-[44px] min-w-[44px] flex items-center text-gray-600 hover:text-gray-900 transition-colors text-sm sm:text-base'
-                  >
-                    API
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href='#'
-                    className='min-h-[44px] flex items-center text-gray-600 hover:text-gray-900 transition-colors text-sm sm:text-base'
-                  >
-                    Güvenlik
-                  </a>
-                </li>
-              </ul>
-            </div>
-          </div>
-          <div className='border-t border-gray-200 mt-8 sm:mt-12 pt-6 sm:pt-8 text-center'>
-            <p className='text-gray-500 text-sm sm:text-base'>
-              © 2024 YolNext. Tüm hakları saklıdır.
-            </p>
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 };
+
+import Footer from '../components/common/Footer';
+
+// ... existing code ...
 
 export default LandingPage;

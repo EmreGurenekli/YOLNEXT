@@ -156,7 +156,7 @@ const Dashboard = () => {
           setUnreadCount(0);
         }
       } catch (error) {
-        console.log('API hatası, demo notifications kullanılıyor:', error);
+        console.error('Bildirim sayısı alınamadı:', error);
         setUnreadCount(0);
       }
     } catch (error) {

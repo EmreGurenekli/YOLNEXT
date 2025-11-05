@@ -14,6 +14,9 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import About from './pages/About';
 import Contact from './pages/Contact';
+import Terms from './pages/Terms';
+import Privacy from './pages/Privacy';
+import CookiePolicy from './pages/CookiePolicy';
 import NotFoundPage from './pages/NotFound';
 import IndividualLayout from './components/IndividualLayout';
 import CorporateLayout from './components/CorporateLayout';
@@ -37,6 +40,7 @@ import IndividualShipmentDetail from './pages/individual/ShipmentDetail';
 import IndividualNotifications from './pages/individual/Notifications';
 import IndividualDiscounts from './pages/individual/Discounts';
 import IndividualSettings from './pages/individual/Settings';
+import IndividualHelp from './pages/individual/Help';
 import CorporateAnalytics from './pages/corporate/Analytics';
 import CorporateTeam from './pages/corporate/Team';
 import CorporateReports from './pages/corporate/Reports';
@@ -70,6 +74,7 @@ import TasiyiciSettings from './pages/tasiyici/Settings';
 import TasiyiciActiveJobs from './pages/tasiyici/ActiveJobs';
 import TasiyiciCompletedJobs from './pages/tasiyici/CompletedJobs';
 import TasiyiciMarket from './pages/tasiyici/Market';
+import TasiyiciHelp from './pages/tasiyici/Help';
 import TasiyiciLayout from './components/TasiyiciLayout';
 import MobileOptimizedLayout from './components/mobile/MobileOptimizedLayout';
 import OnboardingWizard from './components/onboarding/OnboardingWizard';
@@ -99,6 +104,9 @@ function App() {
                     <Route path='/register' element={<Register />} />
                     <Route path='/about' element={<About />} />
                     <Route path='/contact' element={<Contact />} />
+                    <Route path='/terms' element={<Terms />} />
+                    <Route path='/privacy' element={<Privacy />} />
+                    <Route path='/cookie-policy' element={<CookiePolicy />} />
                     <Route
                       path='/dashboard'
                       element={<IndividualDashboard />}
@@ -171,6 +179,7 @@ function App() {
                         element={<IndividualDiscounts />}
                       />
                       <Route path='settings' element={<IndividualSettings />} />
+                      <Route path='help' element={<IndividualHelp />} />
                     </Route>
 
                     {/* Corporate Routes */}

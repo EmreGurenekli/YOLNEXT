@@ -60,7 +60,17 @@ export const API_ENDPOINTS = {
 // Create full URL
 export const createApiUrl = (endpoint: string): string => {
   const config = getApiConfig();
-  return `${config.baseURL}${endpoint}`;
+  // Remove trailing slash from baseURL
+  const base = config.baseURL.replace(/\/$/, '');
+  // Ensure endpoint starts with /
+  const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  
+  // If baseURL ends with /api and endpoint starts with /api, remove /api from base
+  if (base.endsWith('/api') && path.startsWith('/api')) {
+    return `${base.replace(/\/api$/, '')}${path}`;
+  }
+  
+  return `${base}${path}`;
 };
 
 // Default export

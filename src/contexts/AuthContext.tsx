@@ -99,7 +99,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               // Silently fail - we already have user from localStorage
               // Only log if it's not a token/auth error
               if (import.meta.env.DEV && !error?.message?.includes('Invalid or expired token') && !error?.message?.includes('403')) {
-                console.debug('Profile API call failed (non-critical):', error?.status || error?.message);
+              console.debug('Profile API call failed (non-critical):', error?.status || error?.message);
               }
             });
         } else if (storedUser && storedToken) {

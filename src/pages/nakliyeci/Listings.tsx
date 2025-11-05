@@ -195,8 +195,8 @@ const Listings: React.FC = () => {
               </div>
               <div>
                 <h1 className="text-3xl sm:text-4xl font-bold mb-2 bg-gradient-to-r from-white to-blue-200 bg-clip-text text-transparent">
-                  Taşıyıcı İlanlarım
-                </h1>
+            Taşıyıcı İlanlarım
+          </h1>
                 <p className="text-slate-200 text-lg leading-relaxed">
                   Açık ilanlarınızı yönetin ve taşıyıcılardan gelen teklifleri kabul edin
                 </p>
@@ -228,7 +228,7 @@ const Listings: React.FC = () => {
               <Link
                 to="/nakliyeci/active-shipments"
                 className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-lg font-semibold transition-all duration-300 shadow-lg hover:shadow-xl"
-              >
+          >
                 <ArrowRight className="w-4 h-4" />
                 Aktif Yükler Sayfasına Git
               </Link>
@@ -258,14 +258,14 @@ const Listings: React.FC = () => {
               <span className="text-sm text-slate-600">
                 Toplam {listings.length} ilan
               </span>
-            </div>
+          </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
               {listings.map((listing) => (
-                <div
+              <div
                   key={listing.id}
                   className="bg-white rounded-2xl p-6 shadow-lg border border-slate-200 hover:shadow-xl transition-all duration-300"
-                >
+              >
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-3">
@@ -285,7 +285,7 @@ const Listings: React.FC = () => {
                       {listing.minPrice && (
                         <div className="flex items-center gap-2 mb-3 p-3 bg-green-50 rounded-xl border border-green-200">
                           <DollarSign className="w-5 h-5 text-green-600" />
-                          <div>
+                  <div>
                             <div className="text-xs text-green-600 font-medium">Minimum Fiyat</div>
                             <div className="text-lg font-bold text-green-700">
                               ₺{listing.minPrice.toLocaleString('tr-TR')}
@@ -304,7 +304,7 @@ const Listings: React.FC = () => {
                               year: 'numeric',
                             })}
                           </span>
-                        </div>
+                    </div>
                         <div className="flex items-center gap-2">
                           <Clock className="w-4 h-4" />
                           <span>
@@ -313,7 +313,7 @@ const Listings: React.FC = () => {
                               minute: '2-digit',
                             })}
                           </span>
-                        </div>
+                    </div>
                       </div>
 
                       {getStatusBadge(listing.status)}
@@ -332,7 +332,7 @@ const Listings: React.FC = () => {
                       </>
                     ) : (
                       <>
-                        Teklifleri Gör
+                    Teklifleri Gör
                         <ChevronDown className="w-4 h-4" />
                       </>
                     )}
@@ -352,14 +352,14 @@ const Listings: React.FC = () => {
                           <p className="text-sm text-slate-500 mt-1">
                             Taşıyıcılar teklif vermeye başladığında burada görünecek
                           </p>
-                        </div>
+                </div>
                       ) : (
                         <div className="space-y-3">
                           <h4 className="text-sm font-semibold text-slate-700 mb-3">
                             Teklifler ({bids.length})
                           </h4>
                           {bids.map((bid) => (
-                            <div
+                        <div
                               key={bid.id}
                               className="bg-gradient-to-br from-slate-50 to-blue-50 rounded-xl p-4 border border-slate-200 hover:shadow-md transition-all duration-300"
                             >
@@ -403,13 +403,13 @@ const Listings: React.FC = () => {
 
                                 <div className="ml-4">
                                   {bid.status === 'pending' ? (
-                                    <button
+                            <button
                                       onClick={() => acceptBid(bid.id)}
                                       className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl flex items-center gap-2"
-                                    >
+                            >
                                       <CheckCircle className="w-5 h-5" />
-                                      Kabul Et
-                                    </button>
+                              Kabul Et
+                            </button>
                                   ) : bid.status === 'accepted' ? (
                                     <span className="inline-flex items-center px-3 py-2 rounded-xl text-sm font-medium bg-green-100 text-green-800">
                                       <CheckCircle className="w-4 h-4 mr-1" />
@@ -425,11 +425,11 @@ const Listings: React.FC = () => {
                             </div>
                           ))}
                         </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))}
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
             </div>
           </div>
         )}

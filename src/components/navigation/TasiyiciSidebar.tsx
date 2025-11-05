@@ -39,6 +39,7 @@ const TasiyiciSidebar: React.FC<TasiyiciSidebarProps> = ({ onLogout }) => {
     },
     { name: 'Mesajlar', href: '/tasiyici/messages', icon: MessageSquare },
     { name: 'Ayarlar', href: '/tasiyici/settings', icon: Settings },
+    { name: 'Yardım', href: '/tasiyici/help', icon: HelpCircle },
   ];
 
   const isActive = (href: string) => {

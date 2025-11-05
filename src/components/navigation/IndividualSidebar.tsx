@@ -60,6 +60,7 @@ const IndividualSidebar: React.FC<IndividualSidebarProps> = ({ onLogout }) => {
       title: 'Hesap',
       items: [
         { name: 'Ayarlar', href: '/individual/settings', icon: Settings },
+        { name: 'Yardım', href: '/individual/help', icon: FileText },
         { name: 'Çıkış Yap', href: '#', icon: LogOut, onClick: onLogout },
       ],
     },

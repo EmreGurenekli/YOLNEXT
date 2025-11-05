@@ -525,15 +525,15 @@ const ActiveShipments = () => {
                           Taşıyıcı Atandı
                         </div>
                       )}
-                      <div className='flex gap-2'>
-                        <button className='flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center justify-center gap-2'>
-                          <Eye className='w-4 h-4' />
-                          Detay
-                        </button>
-                        <button className='flex-1 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center justify-center gap-2'>
-                          <MessageSquare className='w-4 h-4' />
-                          Mesaj
-                        </button>
+                    <div className='flex gap-2'>
+                      <button className='flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center justify-center gap-2'>
+                        <Eye className='w-4 h-4' />
+                        Detay
+                      </button>
+                      <button className='flex-1 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center justify-center gap-2'>
+                        <MessageSquare className='w-4 h-4' />
+                        Mesaj
+                      </button>
                       </div>
                     </div>
                   </div>
