@@ -5,13 +5,13 @@ const options = {
   definition: {
     openapi: '3.0.0',
     info: {
-      title: 'YolNet Kargo Pazaryeri API',
+      title: 'YolNext Kargo Pazaryeri API',
       version: '2.0.0',
       description: 'Türkiye\'nin en kapsamlı kargo pazaryeri platformu API dokümantasyonu',
       contact: {
-        name: 'YolNet API Support',
-        email: 'api@yolnet.com',
-        url: 'https://yolnet.com/support'
+        name: 'YolNext API Support',
+        email: 'api@YolNext.com',
+        url: 'https://YolNext.com/support'
       },
       license: {
         name: 'MIT',
@@ -24,7 +24,7 @@ const options = {
         description: 'Development server'
       },
       {
-        url: 'https://api.yolnet.com',
+        url: 'https://api.YolNext.com',
         description: 'Production server'
       }
     ],

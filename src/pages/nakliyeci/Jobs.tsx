@@ -1,405 +1,635 @@
 import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { 
-  Search, 
-  Package, 
-  MapPin, 
-  Clock, 
-  DollarSign, 
-  Truck, 
-  Filter, 
-  Eye,
-  MessageSquare,
-  Calendar,
-  Weight,
-  Ruler,
-  User,
+import {
+  Truck,
+  MapPin,
+  Clock,
+  DollarSign,
+  Package,
   Star,
-  ArrowRight,
+  Filter,
+  Search,
+  Calendar,
+  User,
+  Phone,
+  Mail,
+  Eye,
+  CheckCircle,
+  XCircle,
+  AlertCircle,
+  BarChart3,
+  RefreshCw,
+  TrendingUp,
+  Navigation,
+  Target,
+  Zap,
   Plus,
-  X
+  Minus,
 } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 import Breadcrumb from '../../components/common/Breadcrumb';
-import EmptyState from '../../components/common/EmptyState';
 import LoadingState from '../../components/common/LoadingState';
+import EmptyState from '../../components/common/EmptyState';
+import Modal from '../../components/common/Modal';
+import SuccessMessage from '../../components/common/SuccessMessage';
+import Pagination from '../../components/common/Pagination';
+import { createApiUrl } from '../../config/api';
+import { formatCurrency, formatDate } from '../../utils/format';
 
-const Jobs = () => {
-  const [jobs, setJobs] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [filters, setFilters] = useState({
-    from: '',
-    to: '',
-    category: '',
-    minPrice: '',
-    maxPrice: '',
-    date: ''
-  });
+interface Job {
+  id: number;
+  title: string;
+  description: string;
+  pickupAddress: string;
+  deliveryAddress: string;
+  pickupDate: string;
+  weight: number;
+  dimensions: string;
+  specialRequirements: string;
+  price: number;
+  status: string;
+  createdAt: string;
+  shipperName?: string;
+  shipperEmail?: string;
+  shipperPhone?: string;
+}
+
+const Jobs: React.FC = () => {
+  const { user } = useAuth();
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [priceFilter, setPriceFilter] = useState('all');
   const [showFilters, setShowFilters] = useState(false);
-
-  // Mock data - Gerçek API'den gelecek
-  const mockJobs = [
-    {
-      id: '1',
-      title: 'Elektronik Eşya Taşıma',
-      from: 'İstanbul, Şişli',
-      to: 'Ankara, Çankaya',
-      category: 'Elektronik',
-      subCategory: 'Bilgisayar',
-      weight: '50 kg',
-      volume: '0.5 m³',
-      price: 1200,
-      estimatedDelivery: '2 gün',
-      pickupDate: '2024-01-25',
-      description: 'Laptop ve monitör taşıma işi. Özel ambalaj gerekiyor.',
-      customer: {
-        name: 'Ahmet Yılmaz',
-        rating: 4.8,
-        completedShipments: 15
-      },
-      requirements: ['Özel ambalaj', 'Sigortalı taşıma'],
-      createdAt: '2024-01-23T10:30:00Z'
-    },
-    {
-      id: '2',
-      title: 'Ev Eşyası Taşıma',
-      from: 'İzmir, Konak',
-      to: 'Bursa, Osmangazi',
-      category: 'Ev Eşyası',
-      subCategory: 'Daire Eşyası',
-      weight: '500 kg',
-      volume: '12 m³',
-      price: 2500,
-      estimatedDelivery: '1 gün',
-      pickupDate: '2024-01-26',
-      description: '3+1 daire eşyası taşıma. Montaj ve demontaj dahil.',
-      customer: {
-        name: 'Fatma Demir',
-        rating: 4.9,
-        completedShipments: 8
-      },
-      requirements: ['Montaj hizmeti', 'Sigortalı taşıma', 'Temizlik'],
-      createdAt: '2024-01-23T09:15:00Z'
-    },
-    {
-      id: '3',
-      title: 'Ofis Mobilyası',
-      from: 'Ankara, Keçiören',
-      to: 'İstanbul, Beşiktaş',
-      category: 'Ofis Mobilyası',
-      subCategory: 'Mobilya',
-      weight: '200 kg',
-      volume: '4 m³',
-      price: 1800,
-      estimatedDelivery: '3 gün',
-      pickupDate: '2024-01-27',
-      description: 'Ofis masaları ve sandalyeleri taşıma.',
-      customer: {
-        name: 'Mehmet Kaya',
-        rating: 4.7,
-        completedShipments: 23
-      },
-      requirements: ['Dikkatli taşıma', 'Sigortalı taşıma'],
-      createdAt: '2024-01-22T16:45:00Z'
-    }
-  ];
+  const [showOfferModal, setShowOfferModal] = useState(false);
+  const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  const [offerPrice, setOfferPrice] = useState('');
+  const [offerMessage, setOfferMessage] = useState('');
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [pagination, setPagination] = useState({
+    page: 1,
+    pages: 1,
+    total: 0,
+    limit: 20,
+  });
 
   useEffect(() => {
-    const loadJobs = async () => {
-      setIsLoading(true);
-      // Simüle edilmiş API çağrısı
-      setTimeout(() => {
-        setJobs(mockJobs);
-        setIsLoading(false);
-      }, 1000);
-    };
     loadJobs();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pagination.page, statusFilter]);
 
-  const handleFilterChange = (key: string, value: string) => {
-    setFilters(prev => ({ ...prev, [key]: value }));
+  const loadJobs = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const params = new URLSearchParams({
+        page: pagination.page.toString(),
+        limit: pagination.limit.toString(),
+      });
+
+      if (statusFilter !== 'all') {
+        params.append('status', statusFilter);
+      }
+
+      const response = await fetch(
+        `${createApiUrl('/api/shipments/open')}?${params.toString()}`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('authToken')}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Gönderiler yüklenemedi');
+      }
+
+      const data = await response.json();
+
+      if (data.success) {
+        setJobs(data.data || []);
+        if (data.pagination) {
+          setPagination(prev => ({
+            ...prev,
+            page: data.pagination.page,
+            pages: data.pagination.pages,
+            total: data.pagination.total,
+          }));
+        }
+      } else {
+        throw new Error(data.message || 'Gönderiler yüklenemedi');
+      }
+    } catch (err) {
+      console.error('Gönderiler yüklenemedi:', err);
+      setError(err instanceof Error ? err.message : 'Bilinmeyen hata');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const applyFilters = () => {
-    // Filtreleme mantığı burada olacak
-    console.log('Filters applied:', filters);
+  const submitOffer = async () => {
+    if (!selectedJob || !offerPrice) return;
+
+    try {
+      const response = await fetch(createApiUrl('/api/offers'), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('authToken')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          shipmentId: selectedJob.id,
+          price: parseFloat(offerPrice),
+          message: offerMessage,
+          estimatedDelivery: new Date(
+            Date.now() + 3 * 24 * 60 * 60 * 1000
+          ).toISOString(), // 3 gün sonra
+        }),
+      });
+
+      if (response.ok) {
+        setShowOfferModal(false);
+        setOfferPrice('');
+        setOfferMessage('');
+        setSuccessMessage('Teklifiniz başarıyla gönderildi!');
+        setShowSuccessMessage(true);
+        // Bu nakliyeci için ilgili ilanı listeden kaldır
+        setJobs(prev => prev.filter(j => j.id !== selectedJob.id));
+        setSelectedJob(null);
+      } else {
+        console.error('Failed to submit offer');
+        setError('Teklif gönderilemedi');
+      }
+    } catch (error) {
+      console.error('Error submitting offer:', error);
+      setError('Teklif gönderilemedi');
+    }
   };
 
-  const handleMakeOffer = (jobId: string) => {
-    // Teklif verme modalı açılacak
-    console.log('Make offer for job:', jobId);
+  const handleOfferSubmit = async () => {
+    if (!selectedJob || !offerPrice) return;
+
+    try {
+      const response = await fetch(createApiUrl('/api/offers'), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('authToken')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          shipmentId: selectedJob.id,
+          price: parseFloat(offerPrice),
+          message: offerMessage,
+          estimatedDelivery: new Date(
+            Date.now() + 7 * 24 * 60 * 60 * 1000
+          ).toISOString(),
+        }),
+      });
+
+      if (response.ok) {
+        setSuccessMessage('Teklifiniz başarıyla gönderildi!');
+        setShowSuccessMessage(true);
+        setShowOfferModal(false);
+        setOfferPrice('');
+        setOfferMessage('');
+        // Bu nakliyeci için ilgili ilanı listeden kaldır
+        setJobs(prev => prev.filter(j => j.id !== selectedJob.id));
+        setSelectedJob(null);
+      } else {
+        setError('Teklif gönderilirken hata oluştu');
+      }
+    } catch (err) {
+      console.error('Teklif gönderme hatası:', err);
+      setError('Teklif gönderilirken hata oluştu');
+    }
   };
 
-  const getCategoryColor = (category: string) => {
-    const colors = {
-      'Elektronik': 'bg-blue-100 text-blue-800',
-      'Ev Eşyası': 'bg-green-100 text-green-800',
-      'Ofis Mobilyası': 'bg-purple-100 text-purple-800',
-      'Kişisel Eşya': 'bg-orange-100 text-orange-800'
+  const openOfferModal = (job: Job) => {
+    setSelectedJob(job);
+    setOfferPrice('');
+    setOfferMessage('');
+    setShowOfferModal(true);
+  };
+
+  const inferLoadType = (job: Job) => {
+    const text = `${job.title} ${job.description}`.toLowerCase();
+    if (text.includes('mobilya') || text.includes('ev')) return 'mobilya';
+    if (
+      text.includes('beyaz eşya') ||
+      text.includes('buzdolabı') ||
+      text.includes('çamaşır')
+    )
+      return 'beyaz_esya';
+    if (text.includes('palet')) return 'palet';
+    if (text.includes('araç') || text.includes('oto')) return 'arac';
+    return 'diger';
+  };
+
+  const normalize = (s: string) =>
+    (s || '')
+      .toLowerCase()
+      .replace(/ğ/g, 'g')
+      .replace(/ü/g, 'u')
+      .replace(/ş/g, 's')
+      .replace(/ı/g, 'i')
+      .replace(/ö/g, 'o')
+      .replace(/ç/g, 'c')
+      .replace(/İ/g, 'i');
+
+  // Parse inline filters from the single search input
+  // Supports: from:istanbul  to:ankara  type:palet
+  // Also supports Turkish: cikis:, çıkış:, varis:, varış:, yuk:, yük:
+  const parseSearchFilters = (text: string) => {
+    const src = normalize(text || '');
+    const get = (keys: string[]) => {
+      for (const k of keys) {
+        const re = new RegExp(`${k}:(\"[^\"]+\"|[^\s]+)`, 'i');
+        const m = src.match(re);
+        if (m) return m[1].replace(/\"/g, '').replace(/^\"|\"$/g, '');
+      }
+      return '';
     };
-    return colors[category] || 'bg-gray-100 text-gray-800';
+    const from = get(['from', 'cikis', 'çıkış']);
+    const to = get(['to', 'varis', 'varış']);
+    const type = get(['type', 'yuk', 'yük']);
+    // Remove these tokens to get free text
+    const cleaned = src
+      .replace(/(from|cikis|çıkış):("[^"]+"|\S+)/gi, '')
+      .replace(/(to|varis|varış):("[^"]+"|\S+)/gi, '')
+      .replace(/(type|yuk|yük):("[^"]+"|\S+)/gi, '')
+      .trim();
+    return { from, to, type, free: cleaned };
   };
 
-  const getPriorityColor = (createdAt: string) => {
-    const now = new Date();
-    const jobDate = new Date(createdAt);
-    const hoursDiff = (now.getTime() - jobDate.getTime()) / (1000 * 60 * 60);
-    
-    if (hoursDiff < 2) return 'bg-red-100 text-red-800';
-    if (hoursDiff < 6) return 'bg-orange-100 text-orange-800';
-    return 'bg-green-100 text-green-800';
-  };
+  const { from, to, type, free } = parseSearchFilters(searchTerm);
+  const filteredJobs = jobs.filter(job => {
+    const jt = normalize(job.title);
+    const jd = normalize(job.description);
+    const jp = normalize(job.pickupAddress);
+    const jv = normalize(job.deliveryAddress);
+    const matchesSearch =
+      !free ||
+      jt.includes(free) ||
+      jd.includes(free) ||
+      jp.includes(free) ||
+      jv.includes(free);
 
-  if (isLoading) {
-    return <LoadingState />;
+    const matchesStatus = statusFilter === 'all' || job.status === statusFilter;
+
+    const matchesPrice =
+      priceFilter === 'all' ||
+      (priceFilter === 'low' && job.price < 500) ||
+      (priceFilter === 'medium' && job.price >= 500 && job.price < 1000) ||
+      (priceFilter === 'high' && job.price >= 1000);
+
+    const matchesFrom = !from || jp.includes(from);
+    const matchesTo = !to || jv.includes(to);
+    const inferred = inferLoadType(job);
+    const matchesType = !type || inferred === type;
+
+    return (
+      matchesSearch &&
+      matchesStatus &&
+      matchesPrice &&
+      matchesFrom &&
+      matchesTo &&
+      matchesType
+    );
+  });
+
+  // Using format helpers from utils/format.ts
+  const formatPrice = formatCurrency;
+
+  const breadcrumbItems = [
+    {
+      label: 'Ana Sayfa',
+      icon: <BarChart3 className='w-4 h-4' />,
+      href: '/nakliyeci/dashboard',
+    },
+    { label: 'İş İlanları', icon: <Truck className='w-4 h-4' /> },
+  ];
+
+  if (loading) {
+    return (
+      <div className='min-h-screen bg-gradient-to-br from-slate-50 to-slate-50'>
+        <div className='max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6'>
+          <LoadingState message='İş ilanları yükleniyor...' />
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
+    <div className='min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50'>
       <Helmet>
-        <title>Yeni Yük Ara - YolNet Nakliyeci</title>
-        <meta name="description" content="Nakliyeci için yeni yük fırsatları" />
+        <title>İş İlanları - Nakliyeci Panel - YolNext</title>
+        <meta
+          name='description'
+          content='Nakliyeci için açık iş ilanları ve gönderi teklifleri'
+        />
       </Helmet>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className='max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6'>
+        {/* Breadcrumb */}
+        <div className='mb-4 sm:mb-6'>
+          <Breadcrumb items={breadcrumbItems} />
+        </div>
+
         {/* Header */}
-        <div className="mb-8">
-          <Breadcrumb items={[
-            { name: 'Ana Sayfa', href: '/nakliyeci/dashboard' },
-            { name: 'Yeni Yük Ara', href: '/nakliyeci/jobs' }
-          ]} />
-          
-          <div className="mt-6">
-            <div className="flex items-center gap-4 mb-4">
-              <div className="w-16 h-16 bg-gradient-to-br from-slate-800 to-blue-900 rounded-2xl flex items-center justify-center shadow-lg">
-                <Search className="w-8 h-8 text-white" />
-              </div>
-              <div>
-                <h1 className="text-4xl font-bold text-slate-900 mb-2">
-                  Yeni Yük Ara
-                </h1>
-                <p className="text-slate-600 text-lg">
-                  Müsait yük fırsatlarını keşfedin ve teklif verin
-                </p>
-              </div>
+        <div className='text-center mb-8 sm:mb-12'>
+          <div className='flex justify-center mb-4 sm:mb-6'>
+            <div className='w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-br from-slate-800 to-blue-900 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-lg'>
+              <Target className='w-6 h-6 sm:w-8 sm:h-8 text-white' />
             </div>
+          </div>
+          <h1 className='text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-slate-900 mb-2 sm:mb-3'>
+            İş{' '}
+            <span className='text-transparent bg-clip-text bg-gradient-to-r from-slate-800 to-blue-900'>
+              İlanları
+            </span>
+          </h1>
+          <p className='text-sm sm:text-base md:text-lg text-slate-600 px-4'>
+            Açık gönderiler için teklif verin ve iş alın
+          </p>
+        </div>
+
+        {/* İstatistikler - Başlığın hemen altında */}
+
+        {/* Action Buttons */}
+        <div className='flex justify-center mb-8'>
+          <div className='flex flex-wrap gap-2 sm:gap-3'>
+            <button
+              onClick={loadJobs}
+              className='flex items-center gap-2 px-4 py-2 bg-white text-slate-700 rounded-lg hover:bg-slate-50 transition-colors shadow-lg border border-slate-200'
+            >
+              <RefreshCw className='w-4 h-4' />
+              Yenile
+            </button>
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className='flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-slate-800 to-blue-900 text-white rounded-lg hover:shadow-lg transition-all duration-200 font-medium'
+            >
+              <Filter className='w-4 h-4' />
+              Filtrele
+            </button>
           </div>
         </div>
 
         {/* Filters */}
-        <div className="bg-white rounded-2xl p-6 shadow-lg border border-slate-200 mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-slate-900">Filtreler</h2>
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
-            >
-              <Filter className="w-4 h-4" />
-              {showFilters ? 'Filtreleri Gizle' : 'Filtreleri Göster'}
-            </button>
-          </div>
-
-          {showFilters && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Nereden</label>
+        {showFilters && (
+          <div className='bg-white rounded-xl p-4 sm:p-5 shadow-lg border border-slate-200 mb-4 sm:mb-6'>
+            <div className='flex items-end gap-3'>
+              <div className='relative flex-1'>
+                <label className='block text-xs font-medium text-slate-600 mb-1'>
+                  Arama ve Filtre
+                </label>
+                <Search className='absolute left-3 top-9 -mt-2 text-slate-400 w-4 h-4' />
                 <input
-                  type="text"
-                  value={filters.from}
-                  onChange={(e) => handleFilterChange('from', e.target.value)}
-                  placeholder="Şehir, İlçe"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  type='text'
+                  placeholder='örn: from:istanbul to:ankara type:palet + anahtar kelime'
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                  className='w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-sm'
                 />
+                <p className='mt-1 text-[11px] text-slate-500'>
+                  İpuçları: from:İstanbul to:Ankara type:mobilya
+                </p>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Nereye</label>
-                <input
-                  type="text"
-                  value={filters.to}
-                  onChange={(e) => handleFilterChange('to', e.target.value)}
-                  placeholder="Şehir, İlçe"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Kategori</label>
-                <select
-                  value={filters.category}
-                  onChange={(e) => handleFilterChange('category', e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="">Tüm Kategoriler</option>
-                  <option value="Elektronik">Elektronik</option>
-                  <option value="Ev Eşyası">Ev Eşyası</option>
-                  <option value="Ofis Mobilyası">Ofis Mobilyası</option>
-                  <option value="Kişisel Eşya">Kişisel Eşya</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Min. Fiyat</label>
-                <input
-                  type="number"
-                  value={filters.minPrice}
-                  onChange={(e) => handleFilterChange('minPrice', e.target.value)}
-                  placeholder="₺0"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Max. Fiyat</label>
-                <input
-                  type="number"
-                  value={filters.maxPrice}
-                  onChange={(e) => handleFilterChange('maxPrice', e.target.value)}
-                  placeholder="₺10000"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Tarih</label>
-                <input
-                  type="date"
-                  value={filters.date}
-                  onChange={(e) => handleFilterChange('date', e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
+              <button
+                onClick={() => {
+                  setSearchTerm('');
+                  setStatusFilter('all');
+                  setPriceFilter('all');
+                }}
+                className='inline-flex items-center gap-2 px-3 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-all duration-200 text-sm'
+              >
+                <RefreshCw className='w-4 h-4' />
+                Temizle
+              </button>
             </div>
-          )}
-
-          <div className="flex justify-end mt-4">
-            <button
-              onClick={applyFilters}
-              className="px-6 py-2 bg-gradient-to-r from-slate-800 to-blue-900 text-white rounded-lg hover:from-slate-700 hover:to-blue-800 transition-all duration-300"
-            >
-              Filtreleri Uygula
-            </button>
           </div>
-        </div>
+        )}
+
+        {/* Error State */}
+        {error && (
+          <div className='bg-red-50 border border-red-200 rounded-xl p-4 mb-4 sm:mb-6'>
+            <div className='flex items-center'>
+              <AlertCircle className='w-5 h-5 text-red-400 mr-2' />
+              <p className='text-red-800'>{error}</p>
+            </div>
+          </div>
+        )}
 
         {/* Jobs List */}
-        <div className="space-y-6">
-          {jobs.length > 0 ? (
-            jobs.map((job) => (
-              <div key={job.id} className="bg-white rounded-2xl p-6 shadow-lg border border-slate-200 hover:shadow-xl transition-all duration-300">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-xl font-bold text-slate-900">{job.title}</h3>
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${getCategoryColor(job.category)}`}>
-                        {job.category}
-                      </span>
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${getPriorityColor(job.createdAt)}`}>
-                        {new Date(job.createdAt).getHours() < 2 ? 'Yeni' : 'Normal'}
-                      </span>
+        {!loading && filteredJobs.length === 0 ? (
+          <EmptyState
+            icon={Package}
+            title='Henüz iş ilanı yok'
+            description='Şu anda görüntülenecek açık gönderi bulunmuyor.'
+            action={{
+              label: 'Yeniden Yükle',
+              onClick: loadJobs,
+            }}
+          />
+        ) : (
+          <div className='grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6'>
+            {filteredJobs.map(job => (
+              <div
+                key={job.id}
+                className='bg-white rounded-xl shadow-lg border border-slate-200 hover:shadow-xl transition-all duration-200 overflow-hidden'
+              >
+                {/* Header */}
+                <div className='p-4 sm:p-6 border-b border-slate-200'>
+                  <div className='flex items-start justify-between mb-3'>
+                    <div className='flex-1'>
+                      <h3 className='text-lg font-bold text-slate-900 mb-1'>
+                        {job.title}
+                      </h3>
+                      <p className='text-sm text-slate-600 line-clamp-2'>
+                        {job.description}
+                      </p>
                     </div>
-                    <p className="text-slate-600 mb-3">{job.description}</p>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-2xl font-bold text-blue-700 mb-1">₺{job.price.toLocaleString()}</div>
-                    <div className="text-sm text-slate-500">{job.estimatedDelivery}</div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                  <div className="flex items-center gap-2">
-                    <MapPin className="w-4 h-4 text-slate-400" />
-                    <div>
-                      <div className="text-sm font-medium text-slate-900">{job.from}</div>
-                      <div className="text-xs text-slate-500">Nereden</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <MapPin className="w-4 h-4 text-slate-400" />
-                    <div>
-                      <div className="text-sm font-medium text-slate-900">{job.to}</div>
-                      <div className="text-xs text-slate-500">Nereye</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Weight className="w-4 h-4 text-slate-400" />
-                    <div>
-                      <div className="text-sm font-medium text-slate-900">{job.weight}</div>
-                      <div className="text-xs text-slate-500">Ağırlık</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Ruler className="w-4 h-4 text-slate-400" />
-                    <div>
-                      <div className="text-sm font-medium text-slate-900">{job.volume}</div>
-                      <div className="text-xs text-slate-500">Hacim</div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2">
-                      <User className="w-4 h-4 text-slate-400" />
-                      <div>
-                        <div className="text-sm font-medium text-slate-900">{job.customer.name}</div>
-                        <div className="flex items-center gap-1">
-                          <Star className="w-3 h-3 text-yellow-400 fill-current" />
-                          <span className="text-xs text-slate-500">{job.customer.rating} ({job.customer.completedShipments} gönderi)</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-slate-400" />
-                      <div>
-                        <div className="text-sm font-medium text-slate-900">{job.pickupDate}</div>
-                        <div className="text-xs text-slate-500">Alım Tarihi</div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors flex items-center gap-2">
-                      <Eye className="w-4 h-4" />
-                      Detay
-                    </button>
-                    <button 
-                      onClick={() => handleMakeOffer(job.id)}
-                      className="px-4 py-2 bg-gradient-to-r from-slate-800 to-blue-900 text-white rounded-lg hover:from-slate-700 hover:to-blue-800 transition-all duration-300 flex items-center gap-2"
+                    <span
+                      className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        job.status === 'pending'
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : job.status === 'accepted'
+                            ? 'bg-green-100 text-green-800'
+                            : job.status === 'in_progress'
+                              ? 'bg-blue-100 text-blue-800'
+                              : 'bg-slate-100 text-slate-800'
+                      }`}
                     >
-                      <MessageSquare className="w-4 h-4" />
+                      {job.status === 'pending'
+                        ? 'Bekleyen'
+                        : job.status === 'accepted'
+                          ? 'Kabul Edilen'
+                          : job.status === 'in_progress'
+                            ? 'Devam Eden'
+                            : job.status}
+                    </span>
+                  </div>
+
+                  <div className='flex items-center gap-2 text-slate-600 mb-3'>
+                    <MapPin className='w-4 h-4' />
+                    <span className='text-sm'>
+                      {job.pickupAddress} → {job.deliveryAddress}
+                    </span>
+                  </div>
+
+                  <div className='flex items-center gap-4 text-sm text-slate-600'>
+                    <div className='flex items-center gap-1'>
+                      <Package className='w-4 h-4' />
+                      <span>{job.weight}kg</span>
+                    </div>
+                    <div className='flex items-center gap-1'>
+                      <Clock className='w-4 h-4' />
+                      <span>{formatDate(job.pickupDate, 'long')}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Content */}
+                <div className='p-4 sm:p-6'>
+                  <div className='flex items-center justify-between mb-4'>
+                    <div>
+                      <div className='text-2xl font-bold text-slate-900'>
+                        {formatPrice(job.price)}
+                      </div>
+                      <div className='text-sm text-slate-600'>
+                        Teklif fiyatı
+                      </div>
+                    </div>
+                    <div className='text-right'>
+                      <div className='text-sm text-slate-600'>Gönderen</div>
+                      <div className='font-medium text-slate-900'>
+                        {job.shipperName || 'Bilinmiyor'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {job.specialRequirements && (
+                    <div className='mb-4 p-3 bg-slate-50 rounded-lg'>
+                      <div className='text-sm font-medium text-slate-700 mb-1'>
+                        Özel Gereksinimler:
+                      </div>
+                      <div className='text-sm text-slate-600'>
+                        {job.specialRequirements}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className='flex gap-2'>
+                    <button
+                      onClick={() => openOfferModal(job)}
+                      className='flex-1 bg-gradient-to-r from-slate-800 to-blue-900 text-white py-2 px-4 rounded-lg hover:shadow-lg transition-all duration-200 text-sm font-medium'
+                    >
                       Teklif Ver
                     </button>
+                    <button className='p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors'>
+                      <Eye className='w-4 h-4' />
+                    </button>
                   </div>
                 </div>
-
-                {job.requirements && job.requirements.length > 0 && (
-                  <div className="mt-4 pt-4 border-t border-slate-200">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Truck className="w-4 h-4 text-slate-400" />
-                      <span className="text-sm font-medium text-slate-700">Gereksinimler:</span>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {job.requirements.map((req, index) => (
-                        <span key={index} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
-                          {req}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
-            ))
-          ) : (
-            <EmptyState
-              icon={Search}
-              title="Yük bulunamadı"
-              description="Arama kriterlerinize uygun yük bulunamadı. Filtreleri değiştirerek tekrar deneyin."
-              actionText="Filtreleri Temizle"
-              onAction={() => setFilters({
-                from: '',
-                to: '',
-                category: '',
-                minPrice: '',
-                maxPrice: '',
-                date: ''
-              })}
+            ))}
+          </div>
+        )}
+
+        {/* Pagination */}
+        {!loading && pagination.pages > 1 && (
+          <div className='mt-6 sm:mt-8'>
+            <Pagination
+              currentPage={pagination.page}
+              totalPages={pagination.pages}
+              onPageChange={(page) =>
+                setPagination((prev) => ({ ...prev, page }))
+              }
             />
-          )}
-        </div>
+          </div>
+        )}
+
+        {/* Offer Modal */}
+        {showOfferModal && selectedJob && (
+          <Modal
+            isOpen={showOfferModal}
+            onClose={() => setShowOfferModal(false)}
+            title='Teklif Ver'
+          >
+            <div className='space-y-4'>
+              <div className='p-4 bg-slate-50 rounded-lg'>
+                <h4 className='font-medium text-slate-900 mb-2'>
+                  {selectedJob.title}
+                </h4>
+                <p className='text-sm text-slate-600'>
+                  {selectedJob.pickupAddress} → {selectedJob.deliveryAddress}
+                </p>
+              </div>
+
+              <div>
+                <label className='block text-sm font-medium text-slate-700 mb-2'>
+                  Teklif Fiyatı (₺)
+                </label>
+                <input
+                  type='number'
+                  min='1'
+                  step='1'
+                  value={offerPrice}
+                  onChange={e => setOfferPrice(e.target.value)}
+                  className='w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500'
+                  placeholder='Teklif fiyatınızı girin'
+                />
+              </div>
+
+              <div>
+                <label className='block text-sm font-medium text-slate-700 mb-2'>
+                  Mesaj (Opsiyonel)
+                </label>
+                <textarea
+                  value={offerMessage}
+                  onChange={e => setOfferMessage(e.target.value)}
+                  className='w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500'
+                  rows={3}
+                  placeholder='Göndericiye mesajınızı yazın...'
+                />
+              </div>
+
+              <div className='flex gap-3 pt-4'>
+                <button
+                  onClick={submitOffer}
+                  disabled={
+                    !offerPrice ||
+                    isNaN(parseFloat(offerPrice)) ||
+                    parseFloat(offerPrice) <= 0
+                  }
+                  className={`flex-1 py-2 px-4 rounded-lg transition-all duration-200 font-medium ${!offerPrice || isNaN(parseFloat(offerPrice)) || parseFloat(offerPrice) <= 0 ? 'bg-slate-300 text-slate-500 cursor-not-allowed' : 'bg-gradient-to-r from-slate-800 to-blue-900 text-white hover:shadow-lg'}`}
+                >
+                  Teklif Gönder
+                </button>
+                <button
+                  onClick={() => setShowOfferModal(false)}
+                  className='px-4 py-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors'
+                >
+                  İptal
+                </button>
+              </div>
+            </div>
+          </Modal>
+        )}
+
+        {/* Success Message */}
+        {showSuccessMessage && (
+          <SuccessMessage
+            message={successMessage}
+            isVisible={showSuccessMessage}
+            onClose={() => setShowSuccessMessage(false)}
+          />
+        )}
       </div>
     </div>
   );

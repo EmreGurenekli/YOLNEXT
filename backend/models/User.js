@@ -1,117 +1,163 @@
-const { DataTypes } = require('sequelize');
-const { sequelize } = require('../config/database');
+const { query } = require('../database/connection');
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
-const User = sequelize.define('User', {
-  id: {
-    type: DataTypes.UUID,
-    defaultValue: DataTypes.UUIDV4,
-    primaryKey: true
-  },
-  email: {
-    type: DataTypes.STRING,
-    allowNull: false,
-    unique: true,
-    validate: {
-      isEmail: true
+class User {
+    constructor(data) {
+        this.id = data.id;
+        this.firstName = data.first_name;
+        this.lastName = data.last_name;
+        this.email = data.email;
+        this.userType = data.user_type;
+        this.phone = data.phone;
+        this.companyName = data.company_name;
+        this.taxNumber = data.tax_number;
+        this.driverLicenseNumber = data.driver_license_number;
+        this.vehicleType = data.vehicle_type;
+        this.vehiclePlate = data.vehicle_plate;
+        this.experienceYears = data.experience_years;
+        this.isVerified = data.is_verified;
+        this.isActive = data.is_active;
+        this.createdAt = data.created_at;
+        this.updatedAt = data.updated_at;
     }
-  },
-  password: {
-    type: DataTypes.STRING,
-    allowNull: false,
-    validate: {
-      len: [6, 100]
-    }
-  },
-  firstName: {
-    type: DataTypes.STRING,
-    allowNull: false,
-    validate: {
-      len: [2, 50]
-    }
-  },
-  lastName: {
-    type: DataTypes.STRING,
-    allowNull: false,
-    validate: {
-      len: [2, 50]
-    }
-  },
-  phone: {
-    type: DataTypes.STRING,
-    allowNull: true,
-    validate: {
-      is: /^[\+]?[1-9][\d]{0,15}$/
-    }
-  },
-  userType: {
-    type: DataTypes.ENUM('individual', 'corporate', 'carrier', 'logistics'),
-    allowNull: false
-  },
-  isActive: {
-    type: DataTypes.BOOLEAN,
-    defaultValue: true
-  },
-  isVerified: {
-    type: DataTypes.BOOLEAN,
-    defaultValue: false
-  },
-  verificationToken: {
-    type: DataTypes.STRING,
-    allowNull: true
-  },
-  resetPasswordToken: {
-    type: DataTypes.STRING,
-    allowNull: true
-  },
-  resetPasswordExpires: {
-    type: DataTypes.DATE,
-    allowNull: true
-  },
-  lastLogin: {
-    type: DataTypes.DATE,
-    allowNull: true
-  },
-  avatar: {
-    type: DataTypes.STRING,
-    allowNull: true
-  },
-  preferences: {
-    type: DataTypes.JSONB,
-    defaultValue: {}
-  }
-}, {
-  tableName: 'users',
-  hooks: {
-    beforeCreate: async (user) => {
-      if (user.password) {
-        user.password = await bcrypt.hash(user.password, 12);
-      }
-    },
-    beforeUpdate: async (user) => {
-      if (user.changed('password')) {
-        user.password = await bcrypt.hash(user.password, 12);
-      }
-    }
-  }
-});
 
-// Instance methods
-User.prototype.comparePassword = async function(candidatePassword) {
-  return await bcrypt.compare(candidatePassword, this.password);
-};
+    // Create new user
+    static async create(userData) {
+        const {
+            firstName,
+            lastName,
+            email,
+            password,
+            userType,
+            phone,
+            companyName,
+            taxNumber,
+            driverLicenseNumber,
+            vehicleType,
+            vehiclePlate,
+            experienceYears
+        } = userData;
 
-User.prototype.getFullName = function() {
-  return `${this.firstName} ${this.lastName}`;
-};
+        // Hash password
+        const passwordHash = await bcrypt.hash(password, 10);
 
-User.prototype.toJSON = function() {
-  const values = Object.assign({}, this.get());
-  delete values.password;
-  delete values.verificationToken;
-  delete values.resetPasswordToken;
-  delete values.resetPasswordExpires;
-  return values;
-};
+        const result = await query(
+            `INSERT INTO users (first_name, last_name, email, password_hash, user_type, phone, 
+             company_name, tax_number, driver_license_number, vehicle_type, vehicle_plate, experience_years)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
+            [firstName, lastName, email, passwordHash, userType, phone, companyName, 
+             taxNumber, driverLicenseNumber, vehicleType, vehiclePlate, experienceYears]
+        );
 
-module.exports = User;
+        return new User(result.rows[0]);
+    }
+
+    // Find user by email
+    static async findByEmail(email) {
+        const result = await query('SELECT * FROM users WHERE email = $1', [email]);
+        return result.rows.length > 0 ? new User(result.rows[0]) : null;
+    }
+
+    // Find user by ID
+    static async findById(id) {
+        const result = await query('SELECT * FROM users WHERE id = $1', [id]);
+        return result.rows.length > 0 ? new User(result.rows[0]) : null;
+    }
+
+    // Verify password
+    async verifyPassword(password) {
+        const result = await query('SELECT password_hash FROM users WHERE id = $1', [this.id]);
+        return await bcrypt.compare(password, result.rows[0].password_hash);
+    }
+
+    // Generate JWT token
+    generateToken() {
+        return jwt.sign(
+            { 
+                id: this.id, 
+                email: this.email, 
+                userType: this.userType 
+            },
+            process.env.JWT_SECRET || 'your-super-secret-jwt-key-here',
+            { expiresIn: '24h' }
+        );
+    }
+
+    // Update user
+    async update(updateData) {
+        const fields = [];
+        const values = [];
+        let paramCount = 1;
+
+        Object.keys(updateData).forEach(key => {
+            if (updateData[key] !== undefined) {
+                fields.push(`${key} = $${paramCount}`);
+                values.push(updateData[key]);
+                paramCount++;
+            }
+        });
+
+        if (fields.length === 0) return this;
+
+        values.push(this.id);
+        const result = await query(
+            `UPDATE users SET ${fields.join(', ')}, updated_at = CURRENT_TIMESTAMP 
+             WHERE id = $${paramCount} RETURNING *`,
+            values
+        );
+
+        return new User(result.rows[0]);
+    }
+
+    // Get user statistics
+    async getStats() {
+        const stats = {};
+
+        // Get shipment count
+        const shipmentResult = await query(
+            'SELECT COUNT(*) as count FROM shipments WHERE user_id = $1',
+            [this.id]
+        );
+        stats.shipmentCount = parseInt(shipmentResult.rows[0].count);
+
+        // Get offer count
+        const offerResult = await query(
+            'SELECT COUNT(*) as count FROM offers WHERE user_id = $1',
+            [this.id]
+        );
+        stats.offerCount = parseInt(offerResult.rows[0].count);
+
+        // Get message count
+        const messageResult = await query(
+            'SELECT COUNT(*) as count FROM messages WHERE sender_id = $1 OR receiver_id = $1',
+            [this.id]
+        );
+        stats.messageCount = parseInt(messageResult.rows[0].count);
+
+        return stats;
+    }
+
+    // Convert to JSON (remove sensitive data)
+    toJSON() {
+        return {
+            id: this.id,
+            firstName: this.firstName,
+            lastName: this.lastName,
+            email: this.email,
+            userType: this.userType,
+            phone: this.phone,
+            companyName: this.companyName,
+            taxNumber: this.taxNumber,
+            driverLicenseNumber: this.driverLicenseNumber,
+            vehicleType: this.vehicleType,
+            vehiclePlate: this.vehiclePlate,
+            experienceYears: this.experienceYears,
+            isVerified: this.isVerified,
+            isActive: this.isActive,
+            createdAt: this.createdAt,
+            updatedAt: this.updatedAt
+        };
+    }
+}
+

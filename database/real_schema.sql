@@ -1,4 +1,4 @@
--- YolNet Gerçek Pazaryeri Veritabanı Şeması
+-- YolNext Gerçek Pazaryeri Veritabanı Şeması
 -- PostgreSQL için optimize edilmiş
 
 -- Kullanıcılar tablosu (genişletilmiş)
@@ -376,7 +376,7 @@ CREATE INDEX idx_drivers_user_id ON drivers(user_id);
 
 -- Başlangıç verileri
 INSERT INTO system_settings (key, value, description, is_public) VALUES
-('platform_name', 'YolNet', 'Platform adı', true),
+('platform_name', 'YolNext', 'Platform adı', true),
 ('platform_version', '2.0', 'Platform versiyonu', true),
 ('commission_rate', '5.00', 'Platform komisyon oranı (%)', false),
 ('min_withdrawal_amount', '50.00', 'Minimum çekim tutarı', false),

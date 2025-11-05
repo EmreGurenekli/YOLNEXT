@@ -153,13 +153,9 @@ const errorHandler = (error, req, res, next) => {
   // Yanıt gönder
   res.status(apiError.statusCode).json({
     success: false,
-    error: {
-      message: apiError.message,
-      code: apiError.code,
-      statusCode: apiError.statusCode,
-      details: apiError.details,
-      timestamp: apiError.timestamp
-    }
+    message: apiError.message,
+    code: apiError.code,
+    ...(apiError.details && { details: apiError.details })
   });
 };
 

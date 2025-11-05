@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { 
-  MessageSquare, 
-  Search, 
-  Send, 
+import { useSearchParams } from 'react-router-dom';
+import {
+  MessageSquare,
+  Search,
+  Send,
   MoreVertical,
   Phone,
   Video,
@@ -15,13 +16,15 @@ import {
   User,
   BarChart3,
   Filter,
-  RefreshCw
+  RefreshCw,
 } from 'lucide-react';
 import Breadcrumb from '../../components/common/Breadcrumb';
 import EmptyState from '../../components/common/EmptyState';
 import LoadingState from '../../components/common/LoadingState';
-import Modal from '../../components/common/Modal';
 import SuccessMessage from '../../components/common/SuccessMessage';
+import Pagination from '../../components/common/Pagination';
+import { createApiUrl } from '../../config/api';
+import { formatDateTime, formatDate } from '../../utils/format';
 
 interface Message {
   id: number;
@@ -41,7 +44,9 @@ interface Message {
 interface Conversation {
   id: number;
   participant: string;
-  participantType: 'client' | 'admin';
+  participantType?: 'client' | 'admin' | 'nakliyeci' | 'individual' | 'corporate' | 'tasiyici';
+  participantId?: number;
+  participantPhone?: string;
   lastMessage: string;
   lastMessageTime: string;
   unreadCount: number;
@@ -50,60 +55,12 @@ interface Conversation {
   status: 'active' | 'archived' | 'blocked';
 }
 
-const generateMockConversations = (count: number): Conversation[] => {
-  const participants = ['TechCorp A.Ş.', 'E-Ticaret Ltd.', 'Gıda A.Ş.', 'Lojistik Pro', 'Hızlı Kargo', 'Mega Nakliyat'];
-  const messages = [
-    'Merhaba, iş hakkında konuşalım',
-    'Teslimat zamanı hakkında bilgi alabilir miyim?',
-    'Fiyat teklifiniz nedir?',
-    'Teşekkürler, görüşürüz',
-    'Yarın sabah teslim edebilir misiniz?'
-  ];
-
-  return Array.from({ length: count }, (_, i) => ({
-    id: i + 1,
-    participant: participants[Math.floor(Math.random() * participants.length)],
-    participantType: Math.random() > 0.5 ? 'client' : 'admin',
-    lastMessage: messages[Math.floor(Math.random() * messages.length)],
-    lastMessageTime: `2024-01-${String(Math.floor(Math.random() * 28) + 1).padStart(2, '0')} ${String(Math.floor(Math.random() * 24)).padStart(2, '0')}:${String(Math.floor(Math.random() * 60)).padStart(2, '0')}`,
-    unreadCount: Math.floor(Math.random() * 5),
-    isOnline: Math.random() > 0.5,
-    avatar: `https://ui-avatars.com/api/?name=${participants[Math.floor(Math.random() * participants.length)]}&background=random`,
-    status: 'active'
-  }));
-};
-
-const generateMockMessages = (conversationId: number): Message[] => {
-  const messages = [
-    'Merhaba, iş hakkında konuşalım',
-    'Teslimat zamanı hakkında bilgi alabilir miyim?',
-    'Fiyat teklifiniz nedir?',
-    'Teşekkürler, görüşürüz',
-    'Yarın sabah teslim edebilir misiniz?',
-    'Evet, sabah 8:00\'da başlayabilirim',
-    'Mükemmel, o zaman görüşürüz',
-    'İyi günler'
-  ];
-
-  return Array.from({ length: 10 }, (_, i) => ({
-    id: i + 1,
-    sender: i % 2 === 0 ? 'Siz' : 'Müşteri',
-    senderType: i % 2 === 0 ? 'client' : 'admin',
-    message: messages[Math.floor(Math.random() * messages.length)],
-    timestamp: `2024-01-${String(Math.floor(Math.random() * 28) + 1).padStart(2, '0')} ${String(Math.floor(Math.random() * 24)).padStart(2, '0')}:${String(Math.floor(Math.random() * 60)).padStart(2, '0')}`,
-    isRead: i % 3 === 0,
-    isDelivered: i % 2 === 0,
-    attachments: Math.random() > 0.8 ? [{
-      name: 'dokuman.pdf',
-      type: 'PDF',
-      size: '2.5 MB'
-    }] : undefined
-  }));
-};
-
 export default function TasiyiciMessages() {
+  const [searchParams] = useSearchParams();
+  const userIdParam = searchParams.get('userId');
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
+  const [selectedConversation, setSelectedConversation] =
+    useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -111,44 +68,213 @@ export default function TasiyiciMessages() {
   const [showFilters, setShowFilters] = useState(false);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  const [pagination, setPagination] = useState({
+    page: 1,
+    pages: 1,
+    total: 0,
+    limit: 20,
+  });
+
+  const loadConversations = async () => {
+    try {
+      setIsLoading(true);
+
+      // Get auth token
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        throw new Error('No auth token found');
+      }
+
+      // Get user ID from localStorage
+      const userRaw = localStorage.getItem('user');
+      const currentUserId = userRaw ? JSON.parse(userRaw || '{}').id : undefined;
+
+      // Fetch real data from API
+      const params = new URLSearchParams({
+        page: pagination.page.toString(),
+        limit: pagination.limit.toString(),
+      });
+      const response = await fetch(
+        `${createApiUrl('/api/messages')}?${params.toString()}`,
+        {
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'X-User-Id': currentUserId || '',
+          },
+        }
+      );
+
+        if (response.ok) {
+          const responseData = await response.json();
+          // Handle both array and { success: true, data: [...] } formats
+          const messagesData = Array.isArray(responseData) 
+            ? responseData 
+            : (responseData.data || responseData.messages || []);
+          
+          // Group messages by conversation
+          const conversationMap = new Map();
+
+          messagesData.forEach((msg: any) => {
+          // Determine conversation partner (other user)
+          const senderId = msg.sender_id || msg.senderId;
+          const receiverId = msg.receiver_id || msg.receiverId;
+          const otherUserId = senderId === currentUserId ? receiverId : senderId;
+          const otherUserType = senderId === currentUserId 
+            ? (msg.receiverType || msg.receiver_type) 
+            : (msg.senderType || msg.sender_type);
+          const otherUserPhone = senderId === currentUserId 
+            ? (msg.receiverPhone || msg.receiver_phone) 
+            : (msg.senderPhone || msg.sender_phone);
+          const otherUserName = senderId === currentUserId 
+            ? (msg.receiverName || msg.receiver_name) 
+            : (msg.senderName || msg.sender_name);
+          
+          const conversationId = msg.conversation_id || otherUserId || msg.other_user_id;
+          if (!conversationMap.has(conversationId)) {
+            conversationMap.set(conversationId, {
+              id: conversationId,
+              participant: otherUserName || msg.sender_name || msg.receiver_name || 'Müşteri',
+              participantId: otherUserId,
+              participantType: (otherUserType || 'client') as Conversation['participantType'],
+              participantPhone: otherUserPhone,
+              lastMessage: msg.message,
+              lastMessageTime: msg.created_at || msg.createdAt,
+              timestamp: msg.created_at,
+              unreadCount: 0,
+              isOnline: false,
+              avatar: '',
+              status: 'active' as const,
+            });
+          }
+        });
+
+        const conversationsList = Array.from(conversationMap.values());
+        setConversations(conversationsList);
+
+        // If userId param exists, auto-select that conversation
+        if (userIdParam && conversationsList.length > 0) {
+          const targetConv = conversationsList.find(
+            (conv: any) => conv.id === userIdParam || conv.participantId === userIdParam
+          );
+          if (targetConv) {
+            setSelectedConversation(targetConv);
+          }
+        }
+      } else {
+        throw new Error('Failed to fetch conversations');
+      }
+    } catch (error) {
+      console.error('Error loading conversations:', error);
+      setConversations([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    setIsLoading(true);
-    setTimeout(() => {
-      setConversations(generateMockConversations(8));
-      setIsLoading(false);
-    }, 1000);
-  }, []);
+    loadConversations();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pagination.page]);
+
+  useEffect(() => {
+    if (userIdParam) {
+      // If userId is provided in URL, find and select that conversation
+      loadConversations().then(() => {
+        const conversation = conversations.find(
+          (c) => c.participantId?.toString() === userIdParam
+        );
+        if (conversation) {
+          setSelectedConversation(conversation);
+        }
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userIdParam]);
+
+  useEffect(() => {
+    // This useEffect is now only for initial load when userIdParam exists
+    if (!userIdParam) {
+      loadConversations();
+    }
+  }, [userIdParam]);
 
   useEffect(() => {
     if (selectedConversation) {
-      setMessages(generateMockMessages(selectedConversation.id));
+      setMessages([]);
     }
   }, [selectedConversation]);
 
   const breadcrumbItems = [
-    { label: 'Ana Sayfa', icon: <BarChart3 className="w-4 h-4" />, href: '/tasiyici/dashboard' },
-    { label: 'Mesajlar', icon: <MessageSquare className="w-4 h-4" /> }
+    {
+      label: 'Ana Sayfa',
+      icon: <BarChart3 className='w-4 h-4' />,
+      href: '/tasiyici/dashboard',
+    },
+    { label: 'Mesajlar', icon: <MessageSquare className='w-4 h-4' /> },
   ];
 
-  const filteredConversations = conversations.filter(conv => 
+  const filteredConversations = conversations.filter(conv =>
     conv.participant.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleSendMessage = () => {
-    if (newMessage.trim()) {
-      const message: Message = {
-        id: messages.length + 1,
-        sender: 'Siz',
-        senderType: 'client',
-        message: newMessage,
-        timestamp: new Date().toLocaleString('tr-TR'),
-        isRead: true,
-        isDelivered: false
-      };
-      setMessages([...messages, message]);
-      setNewMessage('');
-      setSuccessMessage('Mesaj gönderildi');
+  const handleSendMessage = async () => {
+    // Block messaging to nakliyeci
+    if (selectedConversation?.participantType === 'nakliyeci') {
+      setSuccessMessage('Nakliyeci ile mesajlaşma yapılamaz. Lütfen telefon numarası üzerinden iletişime geçin.');
+      setShowSuccessMessage(true);
+      return;
+    }
+
+    if (!newMessage.trim() || !selectedConversation || !selectedConversation.participantId) return;
+
+    try {
+      const token = localStorage.getItem('authToken');
+      const userRaw = localStorage.getItem('user');
+      const currentUserId = userRaw ? JSON.parse(userRaw || '{}').id : undefined;
+
+      if (!token || !currentUserId) {
+        throw new Error('Eksik bilgi');
+      }
+
+      const response = await fetch(createApiUrl('/api/messages'), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'X-User-Id': currentUserId,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          receiver_id: selectedConversation.participantId,
+          message: newMessage.trim(),
+          shipment_id: null, // Optional
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const sentMessage: Message = {
+          id: data.data?.id || messages.length + 1,
+          sender: 'Siz',
+          senderType: 'client',
+          message: newMessage.trim(),
+          timestamp: formatDateTime(new Date()),
+          isRead: true,
+          isDelivered: true,
+        };
+        setMessages([...messages, sentMessage]);
+        setNewMessage('');
+        setSuccessMessage('Mesaj gönderildi');
+        setShowSuccessMessage(true);
+        
+        // Reload conversations to update last message
+        loadConversations();
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Mesaj gönderilemedi');
+      }
+    } catch (error: any) {
+      if (import.meta.env.DEV) console.error('Error sending message:', error);
+      setSuccessMessage(error?.message || 'Mesaj gönderilemedi. Lütfen tekrar deneyin.');
       setShowSuccessMessage(true);
     }
   };
@@ -164,9 +290,12 @@ export default function TasiyiciMessages() {
     const date = new Date(timestamp);
     const now = new Date();
     const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
-    
+
     if (diffInHours < 24) {
-      return date.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+      return date.toLocaleTimeString('tr-TR', {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
     } else {
       return date.toLocaleDateString('tr-TR');
     }
@@ -174,111 +303,119 @@ export default function TasiyiciMessages() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-50">
-        <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
-          <LoadingState text="Mesajlar yükleniyor..." />
+      <div className='min-h-screen bg-gradient-to-br from-slate-50 to-slate-50'>
+        <div className='max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6'>
+          <LoadingState message='Mesajlar yükleniyor...' />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-50">
+    <div className='min-h-screen bg-gradient-to-br from-slate-50 to-slate-50'>
       <Helmet>
-        <title>Mesajlar - Taşıyıcı Panel - YolNet</title>
-        <meta name="description" content="Taşıyıcı mesaj yönetimi" />
+        <title>Mesajlar - Taşıyıcı Panel - YolNext</title>
+        <meta name='description' content='Taşıyıcı mesaj yönetimi' />
       </Helmet>
 
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
+      <div className='max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6'>
         {/* Breadcrumb */}
-        <div className="mb-4 sm:mb-6">
+        <div className='mb-4 sm:mb-6'>
           <Breadcrumb items={breadcrumbItems} />
         </div>
 
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6">
-          <div className="flex items-center gap-3 mb-4 sm:mb-0">
-            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-xl flex items-center justify-center shadow-lg">
-              <MessageSquare className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+        <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6'>
+          <div className='flex items-center gap-3 mb-4 sm:mb-0'>
+            <div className='w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-xl flex items-center justify-center shadow-lg'>
+              <MessageSquare className='w-5 h-5 sm:w-6 sm:h-6 text-white' />
             </div>
             <div>
-              <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Mesajlar</h1>
-              <p className="text-sm text-slate-600">Müşterilerle iletişim kurun</p>
+              <h1 className='text-xl sm:text-2xl font-bold text-slate-900'>
+                Mesajlar
+              </h1>
+              <p className='text-sm text-slate-600'>
+                Müşterilerle iletişim kurun
+              </p>
             </div>
           </div>
-          
-          <div className="flex flex-wrap gap-2 sm:gap-3">
+
+          <div className='flex flex-wrap gap-2 sm:gap-3'>
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className="flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-3 bg-white border border-slate-200 text-slate-700 rounded-lg sm:rounded-xl hover:bg-slate-50 transition-all duration-200 text-sm font-medium"
+              className='flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-3 bg-white border border-slate-200 text-slate-700 rounded-lg sm:rounded-xl hover:bg-slate-50 transition-all duration-200 text-sm font-medium'
             >
-              <Filter className="w-4 h-4 sm:w-5 sm:h-5" />
-              <span className="hidden sm:inline">Filtreler</span>
+              <Filter className='w-4 h-4 sm:w-5 sm:h-5' />
+              <span className='hidden sm:inline'>Filtreler</span>
             </button>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className='grid grid-cols-1 lg:grid-cols-3 gap-6'>
           {/* Conversations List */}
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg border border-slate-200">
-              <div className="p-4 border-b border-slate-200">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+          <div className='lg:col-span-1'>
+            <div className='bg-white rounded-xl sm:rounded-2xl shadow-lg border border-slate-200'>
+              <div className='p-4 border-b border-slate-200'>
+                <div className='relative'>
+                  <Search className='absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4' />
                   <input
-                    type="text"
-                    placeholder="Konuşma ara..."
+                    type='text'
+                    placeholder='Konuşma ara...'
                     value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-sm"
+                    onChange={e => setSearchTerm(e.target.value)}
+                    className='w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-sm'
                   />
                 </div>
               </div>
-              
-              <div className="max-h-96 overflow-y-auto">
+
+              <div className='max-h-96 overflow-y-auto'>
                 {filteredConversations.length === 0 ? (
                   <EmptyState
                     icon={MessageSquare}
-                    title="Konuşma bulunamadı"
-                    description="Arama kriterlerinize uygun konuşma bulunamadı."
+                    title='Konuşma bulunamadı'
+                    description='Arama kriterlerinize uygun konuşma bulunamadı.'
                   />
                 ) : (
-                  <div className="space-y-1">
-                    {filteredConversations.map((conversation) => (
+                  <div className='space-y-1'>
+                    {filteredConversations.map(conversation => (
                       <div
                         key={conversation.id}
                         onClick={() => setSelectedConversation(conversation)}
                         className={`p-4 cursor-pointer hover:bg-slate-50 transition-colors ${
-                          selectedConversation?.id === conversation.id ? 'bg-slate-100 border-r-2 border-slate-800' : ''
+                          selectedConversation?.id === conversation.id
+                            ? 'bg-slate-100 border-r-2 border-slate-800'
+                            : ''
                         }`}
                       >
-                        <div className="flex items-center gap-3">
-                          <div className="relative">
-                            <div className="w-10 h-10 bg-slate-200 rounded-full flex items-center justify-center">
-                              <User className="w-5 h-5 text-slate-600" />
+                        <div className='flex items-center gap-3'>
+                          <div className='relative'>
+                            <div className='w-10 h-10 bg-slate-200 rounded-full flex items-center justify-center'>
+                              <User className='w-5 h-5 text-slate-600' />
                             </div>
                             {conversation.isOnline && (
-                              <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
+                              <div className='absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white'></div>
                             )}
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between">
-                              <h3 className="text-sm font-medium text-slate-900 truncate">
+                          <div className='flex-1 min-w-0'>
+                            <div className='flex items-center justify-between'>
+                              <h3 className='text-sm font-medium text-slate-900 truncate'>
                                 {conversation.participant}
                               </h3>
-                              <span className="text-xs text-slate-500">
+                              <span className='text-xs text-slate-500'>
                                 {formatTime(conversation.lastMessageTime)}
                               </span>
                             </div>
-                            <p className="text-sm text-slate-600 truncate">
+                            <p className='text-sm text-slate-600 truncate'>
                               {conversation.lastMessage}
                             </p>
                             {conversation.unreadCount > 0 && (
-                              <div className="flex items-center justify-between mt-1">
-                                <span className="text-xs text-slate-500">
-                                  {conversation.participantType === 'client' ? 'Müşteri' : 'Admin'}
+                              <div className='flex items-center justify-between mt-1'>
+                                <span className='text-xs text-slate-500'>
+                                  {conversation.participantType === 'client'
+                                    ? 'Müşteri'
+                                    : 'Admin'}
                                 </span>
-                                <span className="bg-slate-800 text-white text-xs rounded-full px-2 py-1">
+                                <span className='bg-slate-800 text-white text-xs rounded-full px-2 py-1'>
                                   {conversation.unreadCount}
                                 </span>
                               </div>
@@ -294,38 +431,91 @@ export default function TasiyiciMessages() {
           </div>
 
           {/* Chat Area */}
-          <div className="lg:col-span-2">
-            {selectedConversation ? (
-              <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg border border-slate-200 flex flex-col h-96">
+          <div className='lg:col-span-2'>
+            {!selectedConversation ? (
+              <div className='bg-white rounded-xl sm:rounded-2xl shadow-lg border border-slate-200 h-96 flex items-center justify-center'>
+                <EmptyState
+                  icon={MessageSquare}
+                  title='Konuşma seçin'
+                  description='Bir konuşma seçerek mesajlaşmaya başlayın.'
+                />
+              </div>
+            ) : selectedConversation.participantType === 'nakliyeci' && selectedConversation.participantPhone ? (
+              <div className='bg-white rounded-xl sm:rounded-2xl shadow-lg border border-slate-200 flex flex-col h-96 items-center justify-center p-8'>
+                <div className='text-center max-w-md'>
+                  <div className='w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4'>
+                    <Phone className='w-8 h-8 text-blue-600' />
+                  </div>
+                  <h3 className='text-xl font-bold text-slate-900 mb-2'>
+                    {selectedConversation.participant}
+                  </h3>
+                  <p className='text-slate-600 mb-6'>
+                    Nakliyeci ile mesajlaşma yapılamaz. Lütfen telefon numarası üzerinden iletişime geçin.
+                  </p>
+                  <div className='flex items-center justify-between p-4 bg-blue-50 rounded-lg border border-blue-200 mb-4'>
+                    <div className='flex items-center gap-3 flex-1'>
+                      <Phone className='w-5 h-5 text-blue-600' />
+                      <div>
+                        <div className='text-xs text-slate-500 mb-1'>Telefon</div>
+                        <a
+                          href={`tel:${selectedConversation.participantPhone}`}
+                          className='font-bold text-blue-600 hover:text-blue-700 text-lg'
+                        >
+                          {selectedConversation.participantPhone}
+                        </a>
+                      </div>
+                    </div>
+                    <a
+                      href={`tel:${selectedConversation.participantPhone}`}
+                      className='px-6 py-3 bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 text-white rounded-lg font-medium transition-all duration-300 flex items-center gap-2 shadow-md hover:shadow-lg whitespace-nowrap'
+                    >
+                      <Phone className='w-5 h-5' />
+                      Ara
+                    </a>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className='bg-white rounded-xl sm:rounded-2xl shadow-lg border border-slate-200 flex flex-col h-96'>
                 {/* Chat Header */}
-                <div className="p-4 border-b border-slate-200 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-slate-200 rounded-full flex items-center justify-center">
-                      <User className="w-4 h-4 text-slate-600" />
+                <div className='p-4 border-b border-slate-200 flex items-center justify-between'>
+                  <div className='flex items-center gap-3'>
+                    <div className='w-8 h-8 bg-slate-200 rounded-full flex items-center justify-center'>
+                      <User className='w-4 h-4 text-slate-600' />
                     </div>
                     <div>
-                      <h3 className="font-medium text-slate-900">{selectedConversation.participant}</h3>
-                      <p className="text-sm text-slate-600">
-                        {selectedConversation.isOnline ? 'Çevrimiçi' : 'Çevrimdışı'}
+                      <h3 className='font-medium text-slate-900'>
+                        {selectedConversation.participant}
+                      </h3>
+                      <p className='text-sm text-slate-600'>
+                        {selectedConversation.isOnline
+                          ? 'Çevrimiçi'
+                          : 'Çevrimdışı'}
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <button className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors">
-                      <Phone className="w-4 h-4" />
+                  <div className='flex items-center gap-2'>
+                    {selectedConversation.participantPhone && (
+                      <a
+                        href={`tel:${selectedConversation.participantPhone}`}
+                        className='p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors'
+                        title='Telefon ara'
+                      >
+                        <Phone className='w-4 h-4' />
+                      </a>
+                    )}
+                    <button className='p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors'>
+                      <Video className='w-4 h-4' />
                     </button>
-                    <button className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors">
-                      <Video className="w-4 h-4" />
-                    </button>
-                    <button className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors">
-                      <MoreVertical className="w-4 h-4" />
+                    <button className='p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors'>
+                      <MoreVertical className='w-4 h-4' />
                     </button>
                   </div>
                 </div>
 
                 {/* Messages */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                  {messages.map((message) => (
+                <div className='flex-1 overflow-y-auto p-4 space-y-4'>
+                  {messages.map(message => (
                     <div
                       key={message.id}
                       className={`flex ${message.sender === 'Siz' ? 'justify-end' : 'justify-start'}`}
@@ -337,27 +527,29 @@ export default function TasiyiciMessages() {
                             : 'bg-slate-100 text-slate-900'
                         }`}
                       >
-                        <p className="text-sm">{message.message}</p>
-                        <div className="flex items-center justify-between mt-1">
-                          <span className="text-xs opacity-70">
+                        <p className='text-sm'>{message.message}</p>
+                        <div className='flex items-center justify-between mt-1'>
+                          <span className='text-xs opacity-70'>
                             {formatTime(message.timestamp)}
                           </span>
                           {message.sender === 'Siz' && (
-                            <div className="flex items-center gap-1">
+                            <div className='flex items-center gap-1'>
                               {message.isDelivered && (
-                                <CheckCircle2 className="w-3 h-3" />
+                                <CheckCircle2 className='w-3 h-3' />
                               )}
                               {message.isRead && (
-                                <CheckCircle2 className="w-3 h-3 text-blue-400" />
+                                <CheckCircle2 className='w-3 h-3 text-blue-400' />
                               )}
                             </div>
                           )}
                         </div>
                         {message.attachments && (
-                          <div className="mt-2 p-2 bg-white bg-opacity-20 rounded">
-                            <div className="flex items-center gap-2">
-                              <Paperclip className="w-3 h-3" />
-                              <span className="text-xs">{message.attachments[0].name}</span>
+                          <div className='mt-2 p-2 bg-white bg-opacity-20 rounded'>
+                            <div className='flex items-center gap-2'>
+                              <Paperclip className='w-3 h-3' />
+                              <span className='text-xs'>
+                                {message.attachments[0].name}
+                              </span>
                             </div>
                           </div>
                         )}
@@ -367,40 +559,32 @@ export default function TasiyiciMessages() {
                 </div>
 
                 {/* Message Input */}
-                <div className="p-4 border-t border-slate-200">
-                  <div className="flex items-center gap-2">
-                    <button className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors">
-                      <Paperclip className="w-4 h-4" />
+                <div className='p-4 border-t border-slate-200'>
+                  <div className='flex items-center gap-2'>
+                    <button className='p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors'>
+                      <Paperclip className='w-4 h-4' />
                     </button>
-                    <div className="flex-1 relative">
+                    <div className='flex-1 relative'>
                       <input
-                        type="text"
+                        type='text'
                         value={newMessage}
-                        onChange={(e) => setNewMessage(e.target.value)}
+                        onChange={e => setNewMessage(e.target.value)}
                         onKeyPress={handleKeyPress}
-                        placeholder="Mesajınızı yazın..."
-                        className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-sm"
+                        placeholder='Mesajınızı yazın...'
+                        className='w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-sm'
                       />
                     </div>
-                    <button className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors">
-                      <Smile className="w-4 h-4" />
+                    <button className='p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors'>
+                      <Smile className='w-4 h-4' />
                     </button>
                     <button
                       onClick={handleSendMessage}
-                      className="p-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition-colors"
+                      className='p-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition-colors'
                     >
-                      <Send className="w-4 h-4" />
+                      <Send className='w-4 h-4' />
                     </button>
                   </div>
                 </div>
-              </div>
-            ) : (
-              <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg border border-slate-200 h-96 flex items-center justify-center">
-                <EmptyState
-                  icon={MessageSquare}
-                  title="Konuşma seçin"
-                  description="Bir konuşma seçerek mesajlaşmaya başlayın."
-                />
               </div>
             )}
           </div>

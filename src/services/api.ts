@@ -1,414 +1,255 @@
-import { User, LoginCredentials, RegisterData } from '@/types/auth'
-import { mockApiClient } from './mock-api'
+import { getApiConfig, createApiUrl, API_ENDPOINTS } from '../config/api';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+// API Response interface
+interface ApiResponse<T = any> {
+  success: boolean;
+  data?: T;
+  message?: string;
+  error?: string;
+  status?: number;
+}
 
+// API Error class
 class ApiError extends Error {
-  constructor(
-    message: string,
-    public status: number,
-    public statusText: string
-  ) {
-    super(message)
-    this.name = 'ApiError'
+  status: number;
+  response?: Response;
+  data?: any;
+
+  constructor(message: string, status: number, response?: Response) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.response = response;
   }
 }
 
-class ApiClient {
-  private baseURL: string
-  private token: string | null = null
+// Retry function
+const retryRequest = async <T>(
+  requestFn: () => Promise<T>,
+  retries: number,
+  delay: number = 1000
+): Promise<T> => {
+  try {
+    return await requestFn();
+  } catch (error) {
+    if (retries > 0) {
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return retryRequest(requestFn, retries - 1, delay * 2);
+    }
+    throw error;
+  }
+};
 
-  constructor(baseURL: string) {
-    this.baseURL = baseURL
-    this.token = localStorage.getItem('authToken')
+// Base API request function
+const apiRequest = async <T = any>(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<ApiResponse<T>> => {
+  const config = getApiConfig();
+  const url = createApiUrl(endpoint);
+
+  // Default headers
+  const defaultHeaders: HeadersInit = {
+    'Content-Type': 'application/json',
+  };
+
+  // Add auth token if available
+  const token = localStorage.getItem('authToken');
+  if (token) {
+    defaultHeaders['Authorization'] = `Bearer ${token}`;
   }
 
-  private async request<T>(
-    endpoint: string,
-    options: RequestInit = {}
-  ): Promise<T> {
-    const url = `${this.baseURL}${endpoint}`
+  // Merge headers
+  const headers = {
+    ...defaultHeaders,
+    ...options.headers,
+  };
+
+  // Create abort controller for timeout
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), config.timeout);
+
+  try {
+    const response = await retryRequest(
+      () =>
+        fetch(url, {
+          ...options,
+          headers,
+          signal: controller.signal,
+        }),
+      config.retryAttempts
+    );
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      // Try to get error details from response
+      let errorData;
+      try {
+        errorData = await response.json();
+      } catch {
+        errorData = { message: response.statusText };
+      }
+
+      const error = new ApiError(
+        errorData.details ||
+          errorData.message ||
+          `HTTP ${response.status}: ${response.statusText}`,
+        response.status,
+        response
+      );
+      error.data = errorData; // Attach full error response
+      throw error;
+    }
+
+    // Safely parse JSON response
+    let data;
+    try {
+      const text = await response.text();
+      if (!text || text.trim().length === 0) {
+        // Empty response - return empty success object instead of throwing
+        return { success: false, message: 'Empty server response' };
+      }
+      data = JSON.parse(text);
+    } catch (parseError) {
+      // If JSON parse fails, return error object instead of throwing
+      // This prevents React from crashing
+      return {
+        success: false,
+        error: `Invalid server response: ${parseError instanceof Error ? parseError.message : 'Parse error'}`,
+        status: response.status,
+      };
+    }
     
-    const config: RequestInit = {
-      headers: {
-        'Content-Type': 'application/json',
-        ...(this.token && { Authorization: `Bearer ${this.token}` }),
-        ...options.headers,
-      },
+    return data;
+  } catch (error) {
+    clearTimeout(timeoutId);
+
+    if (error instanceof ApiError) {
+      throw error;
+    }
+
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new ApiError('Request timeout', 408);
+    }
+
+    // Handle JSON parse errors (e.g., empty response, HTML error pages)
+    if (error instanceof TypeError && error.message.includes('JSON')) {
+      throw new ApiError('Invalid server response', 500);
+    }
+
+    throw new ApiError(
+      error instanceof Error ? error.message : 'Network error',
+      0
+    );
+  }
+};
+
+// API methods
+export const api = {
+  // GET request
+  get: <T = any>(endpoint: string, options?: RequestInit) =>
+    apiRequest<T>(endpoint, { ...options, method: 'GET' }),
+
+  // POST request
+  post: <T = any>(endpoint: string, data?: any, options?: RequestInit) =>
+    apiRequest<T>(endpoint, {
       ...options,
-    }
+      method: 'POST',
+      body: data ? JSON.stringify(data) : undefined,
+    }),
 
-    try {
-      const response = await fetch(url, config)
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new ApiError(
-          errorData.message || response.statusText,
-          response.status,
-          response.statusText
-        )
-      }
-
-      return await response.json()
-    } catch (error) {
-      if (error instanceof ApiError) {
-        throw error
-      }
-      throw new ApiError(
-        'Network error occurred',
-        0,
-        'Network Error'
-      )
-    }
-  }
-
-  setToken(token: string | null) {
-    this.token = token
-    if (token) {
-      localStorage.setItem('authToken', token)
-    } else {
-      localStorage.removeItem('authToken')
-    }
-  }
-
-  // Auth endpoints
-  async login(credentials: LoginCredentials) {
-    try {
-      return await this.request<{ user: User; token: string }>('/api/auth/login', {
-        method: 'POST',
-        body: JSON.stringify(credentials),
-      })
-    } catch (error) {
-      // Fallback to mock API if backend is not available
-      return mockApiClient.login(credentials)
-    }
-  }
-
-  async register(data: RegisterData) {
-    try {
-      return await this.request<{ user: User; token: string }>('/api/auth/register', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      })
-    } catch (error) {
-      // Fallback to mock API if backend is not available
-      return mockApiClient.register(data)
-    }
-  }
-
-  async verifyToken() {
-    try {
-      return await this.request<{ user: User }>('/api/auth/me')
-    } catch (error) {
-      // Fallback to mock API if backend is not available
-      return mockApiClient.verifyToken()
-    }
-  }
-
-  async logout() {
-    try {
-      await this.request('/api/auth/logout', {
-        method: 'POST',
-      })
-    } catch (error) {
-      // Fallback to mock API if backend is not available
-      return mockApiClient.logout()
-    }
-  }
-
-  // User endpoints
-  async getProfile() {
-    return this.request<{ user: User }>('/api/users/profile')
-  }
-
-  async updateProfile(data: Partial<User>) {
-    return this.request<{ user: User }>('/api/users/profile', {
+  // PUT request
+  put: <T = any>(endpoint: string, data?: any, options?: RequestInit) =>
+    apiRequest<T>(endpoint, {
+      ...options,
       method: 'PUT',
-      body: JSON.stringify(data),
-    })
-  }
+      body: data ? JSON.stringify(data) : undefined,
+    }),
 
-  // Shipment endpoints
-  async getShipments(params?: Record<string, any>) {
-    try {
-      const searchParams = new URLSearchParams(params)
-      return await this.request(`/api/shipments?${searchParams}`)
-    } catch (error) {
-      return mockApiClient.getShipments(params)
+  // DELETE request
+  delete: <T = any>(endpoint: string, options?: RequestInit) =>
+    apiRequest<T>(endpoint, { ...options, method: 'DELETE' }),
+
+  // PATCH request
+  patch: <T = any>(endpoint: string, data?: any, options?: RequestInit) =>
+    apiRequest<T>(endpoint, {
+      ...options,
+      method: 'PATCH',
+      body: data ? JSON.stringify(data) : undefined,
+    }),
+};
+
+// Specific API calls
+export const authApi = {
+  login: (credentials: { email: string; password: string }) =>
+    api.post(API_ENDPOINTS.LOGIN, credentials),
+
+  register: (userData: any) => api.post(API_ENDPOINTS.REGISTER, userData),
+
+  // Demo login sadece development ortamında kullanılabilir
+  demoLogin: (userType: string) => {
+    if (import.meta.env.MODE === 'production') {
+      throw new Error('Demo login production ortamında devre dışı');
     }
-  }
+    return api.post(API_ENDPOINTS.DEMO_LOGIN, { userType });
+  },
 
-  async getShipment(id: string) {
-    return this.request(`/api/shipments/${id}`)
-  }
+  getProfile: () => api.get(API_ENDPOINTS.PROFILE),
+};
 
-  async createShipment(data: any) {
-    return this.request('/api/shipments', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    })
-  }
+export const shipmentsApi = {
+  getAll: () => api.get(API_ENDPOINTS.SHIPMENTS),
 
-  async updateShipment(id: string, data: any) {
-    return this.request(`/api/shipments/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    })
-  }
+  getOpen: () => api.get(API_ENDPOINTS.SHIPMENTS_OPEN),
 
-  async deleteShipment(id: string) {
-    return this.request(`/api/shipments/${id}`, {
-      method: 'DELETE',
-    })
-  }
+  getNakliyeci: () => api.get(API_ENDPOINTS.SHIPMENTS_NAKLIYECI),
 
-  // Message endpoints
-  async getMessages(params?: Record<string, any>) {
-    try {
-      const searchParams = new URLSearchParams(params)
-      return await this.request(`/api/messages?${searchParams}`)
-    } catch (error) {
-      return mockApiClient.getMessages(params)
-    }
-  }
+  getOffers: () => api.get(API_ENDPOINTS.SHIPMENTS_OFFERS),
 
-  async sendMessage(data: any) {
-    return this.request('/api/messages', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    })
-  }
+  getRecentShipments: (userType: string) =>
+    api.get(`/api/shipments/recent/${userType}`),
 
-  // Offers endpoints
-  async createOffer(offerData: any) {
-    try {
-      return await this.request('/api/offers', {
-        method: 'POST',
-        body: JSON.stringify(offerData),
-      })
-    } catch (error) {
-      return mockApiClient.createOffer(offerData)
-    }
-  }
+  create: (shipmentData: any) =>
+    api.post(API_ENDPOINTS.SHIPMENTS, shipmentData),
 
-  async getShipmentOffers(shipmentId: number) {
-    try {
-      return await this.request(`/api/offers/shipment/${shipmentId}`)
-    } catch (error) {
-      return mockApiClient.getShipmentOffers(shipmentId)
-    }
-  }
+  update: (id: string, data: any) =>
+    api.put(`${API_ENDPOINTS.SHIPMENTS}/${id}`, data),
 
-  async getNakliyeciOffers(status?: string) {
-    try {
-      const url = status ? `/api/offers/nakliyeci?status=${status}` : '/api/offers/nakliyeci'
-      return await this.request(url)
-    } catch (error) {
-      return mockApiClient.getNakliyeciOffers(status)
-    }
-  }
+  delete: (id: string) => api.delete(`${API_ENDPOINTS.SHIPMENTS}/${id}`),
+};
 
-  async acceptOffer(offerId: number) {
-    try {
-      return await this.request(`/api/offers/${offerId}/accept`, {
-        method: 'PUT',
-      })
-    } catch (error) {
-      return mockApiClient.acceptOffer(offerId)
-    }
-  }
+export const offersApi = {
+  create: (offerData: any) => api.post(API_ENDPOINTS.OFFERS, offerData),
 
-  async rejectOffer(offerId: number) {
-    try {
-      return await this.request(`/api/offers/${offerId}/reject`, {
-        method: 'PUT',
-      })
-    } catch (error) {
-      return mockApiClient.rejectOffer(offerId)
-    }
-  }
+  accept: (id: string) =>
+    api.post(API_ENDPOINTS.OFFERS_ACCEPT.replace(':id', id)),
 
-  // Agreements endpoints
-  async createAgreement(offerId: number) {
-    try {
-      return await this.request('/api/agreements', {
-        method: 'POST',
-        body: JSON.stringify({ offer_id: offerId }),
-      })
-    } catch (error) {
-      return mockApiClient.createAgreement(offerId)
-    }
-  }
+  reject: (id: string) => api.post(`${API_ENDPOINTS.OFFERS}/${id}/reject`),
+};
 
-  async getSenderAgreements(status?: string) {
-    try {
-      const url = status ? `/api/agreements/sender?status=${status}` : '/api/agreements/sender'
-      return await this.request(url)
-    } catch (error) {
-      return mockApiClient.getSenderAgreements(status)
-    }
-  }
+// Additional API exports for compatibility
+export const authAPI = authApi;
+export const userAPI = authApi;
+export const dashboardAPI = {
+  getStats: (userType: string) => api.get(`/api/dashboard/stats/${userType}`),
+};
+export const notificationAPI = {
+  getUnreadCount: () => api.get('/api/notifications/unread-count'),
+  getNotifications: () => api.get('/api/notifications'),
+  markAsRead: (id: number) => api.put(`/api/notifications/${id}/read`),
+  markAllAsRead: () => api.put('/api/notifications/mark-all-read'),
+  deleteNotification: (id: number) => api.delete(`/api/notifications/${id}`),
+  deleteAllNotifications: () => api.delete('/api/notifications'),
+};
+export const shipmentAPI = shipmentsApi;
+export const messageAPI = {
+  getAll: () => api.get('/api/messages'),
+  send: (messageData: any) => api.post('/api/messages', messageData),
+};
 
-  async getNakliyeciAgreements(status?: string) {
-    try {
-      const url = status ? `/api/agreements/nakliyeci?status=${status}` : '/api/agreements/nakliyeci'
-      return await this.request(url)
-    } catch (error) {
-      return mockApiClient.getNakliyeciAgreements(status)
-    }
-  }
+// Health check
+export const healthCheck = () => api.get(API_ENDPOINTS.HEALTH);
 
-  async acceptAgreement(agreementId: number) {
-    try {
-      return await this.request(`/api/agreements/${agreementId}/accept`, {
-        method: 'PUT',
-      })
-    } catch (error) {
-      return mockApiClient.acceptAgreement(agreementId)
-    }
-  }
-
-  async rejectAgreement(agreementId: number) {
-    try {
-      return await this.request(`/api/agreements/${agreementId}/reject`, {
-        method: 'PUT',
-      })
-    } catch (error) {
-      return mockApiClient.rejectAgreement(agreementId)
-    }
-  }
-
-  // Tracking endpoints
-  async updateShipmentStatus(shipmentId: number, statusData: any) {
-    try {
-      return await this.request(`/api/tracking/${shipmentId}/status`, {
-        method: 'PUT',
-        body: JSON.stringify(statusData),
-      })
-    } catch (error) {
-      return mockApiClient.updateShipmentStatus(shipmentId, statusData)
-    }
-  }
-
-  async getTrackingHistory(shipmentId: number) {
-    try {
-      return await this.request(`/api/tracking/${shipmentId}/history`)
-    } catch (error) {
-      return mockApiClient.getTrackingHistory(shipmentId)
-    }
-  }
-
-  async getActiveShipments(userType: 'sender' | 'nakliyeci') {
-    try {
-      return await this.request(`/api/tracking/${userType}/active`)
-    } catch (error) {
-      return mockApiClient.getActiveShipments(userType)
-    }
-  }
-
-  async confirmDelivery(shipmentId: number, rating: number, feedback?: string) {
-    try {
-      return await this.request(`/api/tracking/${shipmentId}/deliver`, {
-        method: 'PUT',
-        body: JSON.stringify({ rating, feedback }),
-      })
-    } catch (error) {
-      return mockApiClient.confirmDelivery(shipmentId, rating, feedback)
-    }
-  }
-
-  // Commission endpoints
-  async calculateCommission(agreedPrice: number) {
-    try {
-      return await this.request('/api/commission/calculate', {
-        method: 'POST',
-        body: JSON.stringify({ agreedPrice }),
-      })
-    } catch (error) {
-      return mockApiClient.calculateCommission(agreedPrice)
-    }
-  }
-
-  async getCommissionRate() {
-    try {
-      return await this.request('/api/commission/rate')
-    } catch (error) {
-      return mockApiClient.getCommissionRate()
-    }
-  }
-
-  async getCommissionExamples() {
-    try {
-      return await this.request('/api/commission/examples')
-    } catch (error) {
-      return mockApiClient.getCommissionExamples()
-    }
-  }
-
-  // Analytics endpoints
-  async getAnalytics(params?: Record<string, any>) {
-    try {
-      const searchParams = new URLSearchParams(params)
-      return await this.request(`/api/analytics?${searchParams}`)
-    } catch (error) {
-      return mockApiClient.getAnalytics(params)
-    }
-  }
-
-  // Dashboard endpoints
-  async getDashboardStats() {
-    try {
-      return await this.request('/api/dashboard/stats')
-    } catch (error) {
-      return mockApiClient.getDashboardStats()
-    }
-  }
-
-  async getNotifications(params?: { limit?: number; offset?: number }) {
-    try {
-      const searchParams = new URLSearchParams(params as any)
-      return await this.request(`/api/notifications?${searchParams}`)
-    } catch (error) {
-      return mockApiClient.getNotifications(params)
-    }
-  }
-
-  async getUnreadNotificationCount() {
-    try {
-      return await this.request('/api/notifications/unread-count')
-    } catch (error) {
-      return mockApiClient.getUnreadNotificationCount()
-    }
-  }
-
-  async markNotificationAsRead(notificationId: number) {
-    try {
-      return await this.request(`/api/notifications/${notificationId}/read`, {
-        method: 'PUT',
-      })
-    } catch (error) {
-      return mockApiClient.markNotificationAsRead(notificationId)
-    }
-  }
-
-  // File upload
-  async uploadFile(file: File, endpoint: string = '/api/upload') {
-    const formData = new FormData()
-    formData.append('file', file)
-
-    return this.request(endpoint, {
-      method: 'POST',
-      body: formData,
-      headers: {
-        // Don't set Content-Type for FormData, let browser set it
-        ...(this.token && { Authorization: `Bearer ${this.token}` }),
-      },
-    })
-  }
-}
-
-export const apiClient = new ApiClient(API_BASE_URL)
-export { ApiError }
-
-
+export { ApiError };
+export default api;

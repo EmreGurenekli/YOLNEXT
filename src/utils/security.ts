@@ -18,10 +18,10 @@ export const escapeHtml = (text: string): string => {
     '<': '&lt;',
     '>': '&gt;',
     '"': '&quot;',
-    "'": '&#039;'
+    "'": '&#039;',
   };
-  
-  return text.replace(/[&<>"']/g, (m) => map[m]);
+
+  return text.replace(/[&<>"']/g, m => map[m]);
 };
 
 /**
@@ -35,32 +35,34 @@ export const isValidEmail = (email: string): boolean => {
 /**
  * Validate password strength
  */
-export const validatePassword = (password: string): { isValid: boolean; errors: string[] } => {
+export const validatePassword = (
+  password: string
+): { isValid: boolean; errors: string[] } => {
   const errors: string[] = [];
-  
+
   if (password.length < 8) {
     errors.push('Şifre en az 8 karakter olmalıdır');
   }
-  
+
   if (!/[A-Z]/.test(password)) {
     errors.push('Şifre en az bir büyük harf içermelidir');
   }
-  
+
   if (!/[a-z]/.test(password)) {
     errors.push('Şifre en az bir küçük harf içermelidir');
   }
-  
+
   if (!/\d/.test(password)) {
     errors.push('Şifre en az bir rakam içermelidir');
   }
-  
+
   if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
     errors.push('Şifre en az bir özel karakter içermelidir');
   }
-  
+
   return {
     isValid: errors.length === 0,
-    errors
+    errors,
   };
 };
 
@@ -92,9 +94,9 @@ export const containsDangerousContent = (text: string): boolean => {
     /<object/i,
     /<embed/i,
     /<link/i,
-    /<meta/i
+    /<meta/i,
   ];
-  
+
   return dangerousPatterns.some(pattern => pattern.test(text));
 };
 
@@ -103,25 +105,28 @@ export const containsDangerousContent = (text: string): boolean => {
  */
 export class RateLimiter {
   private attempts: Map<string, number[]> = new Map();
-  
-  constructor(private maxAttempts: number, private windowMs: number) {}
-  
+
+  constructor(
+    private maxAttempts: number,
+    private windowMs: number
+  ) {}
+
   isAllowed(key: string): boolean {
     const now = Date.now();
     const attempts = this.attempts.get(key) || [];
-    
+
     // Remove old attempts outside the window
     const validAttempts = attempts.filter(time => now - time < this.windowMs);
-    
+
     if (validAttempts.length >= this.maxAttempts) {
       return false;
     }
-    
+
     validAttempts.push(now);
     this.attempts.set(key, validAttempts);
     return true;
   }
-  
+
   reset(key: string): void {
     this.attempts.delete(key);
   }
@@ -134,18 +139,9 @@ export const generateCSRFToken = (): string => {
   return generateSecureToken(32);
 };
 
-export const validateCSRFToken = (token: string, sessionToken: string): boolean => {
+export const validateCSRFToken = (
+  token: string,
+  sessionToken: string
+): boolean => {
   return token === sessionToken && token.length === 64;
 };
-
-
-
-
-
-
-
-
-
-
-
-

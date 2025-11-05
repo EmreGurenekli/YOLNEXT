@@ -1,68 +1,50 @@
-const mongoose = require('mongoose');
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../config/database');
 
-const individualUserSchema = new mongoose.Schema({
+const IndividualUser = sequelize.define('IndividualUser', {
+  id: {
+    type: DataTypes.UUID,
+    defaultValue: DataTypes.UUIDV4,
+    primaryKey: true
+  },
   userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true,
-    unique: true
-  },
-  name: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  phone: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  address: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  city: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  profileImage: {
-    type: String,
-    default: null
-  },
-  preferences: {
-    notifications: {
-      email: { type: Boolean, default: true },
-      sms: { type: Boolean, default: false },
-      push: { type: Boolean, default: true }
-    },
-    language: {
-      type: String,
-      default: 'tr'
+    type: DataTypes.UUID,
+    allowNull: false,
+    references: {
+      model: 'Users',
+      key: 'id'
     }
   },
-  stats: {
-    totalShipments: { type: Number, default: 0 },
-    completedShipments: { type: Number, default: 0 },
-    totalSavings: { type: Number, default: 0 },
-    averageRating: { type: Number, default: 0 }
+  preferences: {
+    type: DataTypes.JSON,
+    allowNull: true,
+    defaultValue: {
+      notifications: {
+        email: true,
+        sms: true,
+        push: true
+      },
+      language: 'tr',
+      currency: 'TRY'
+    }
   },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
+  notificationSettings: {
+    type: DataTypes.JSON,
+    allowNull: true,
+    defaultValue: {
+      email: true,
+      sms: true,
+      push: true
+    }
   }
+}, {
+  tableName: 'individual_users',
+  timestamps: true,
+  indexes: [
+    {
+      fields: ['userId']
+    }
+  ]
 });
 
-module.exports = mongoose.model('IndividualUser', individualUserSchema);
-
-
-
-
-
-
-
+module.exports = IndividualUser;

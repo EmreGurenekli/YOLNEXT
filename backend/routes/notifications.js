@@ -1,216 +1,203 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
-const { Notification, User } = require('../models');
-const { auth } = require('../middleware/auth');
-const { logger } = require('../utils/logger');
-
+const Notification = require('../models/Notification');
 const router = express.Router();
 
-// @route   GET /api/notifications
-// @desc    Get user notifications
-// @access  Private
-router.get('/', auth, async (req, res) => {
+// Get all notifications
+router.get('/', async (req, res) => {
   try {
-    const { page = 1, limit = 20, type, category, isRead } = req.query;
+    const userId = req.user?.id;
+    const { page = 1, limit = 10, unread } = req.query;
     const offset = (page - 1) * limit;
 
-    const whereClause = { userId: req.user.id };
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required',
+      });
+    }
 
-    if (type) whereClause.type = type;
-    if (category) whereClause.category = category;
-    if (isRead !== undefined) whereClause.isRead = isRead === 'true';
+    const whereClause = { userId };
+    if (unread === 'true') {
+      whereClause.isRead = false;
+    }
 
     const notifications = await Notification.findAndCountAll({
       where: whereClause,
-      include: [
-        {
-          model: User,
-          as: 'user',
-          attributes: ['id', 'firstName', 'lastName']
-        }
-      ],
-      order: [['createdAt', 'DESC']],
       limit: parseInt(limit),
-      offset: parseInt(offset)
+      offset: parseInt(offset),
+      order: [['createdAt', 'DESC']],
     });
 
     res.json({
       success: true,
-      data: {
-        notifications: notifications.rows,
-        pagination: {
-          currentPage: parseInt(page),
-          totalPages: Math.ceil(notifications.count / limit),
-          totalItems: notifications.count,
-          itemsPerPage: parseInt(limit)
-        }
-      }
+      data: notifications.rows,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: notifications.count,
+        pages: Math.ceil(notifications.count / limit),
+      },
     });
   } catch (error) {
-    logger.error('Get notifications error:', error);
+    console.error('Get notifications error:', error);
     res.status(500).json({
       success: false,
-      message: 'Bildirimler alınırken hata oluştu.'
+      message: 'Internal server error',
     });
   }
 });
 
-// @route   POST /api/notifications
-// @desc    Create notification
-// @access  Private
-router.post('/', [
-  auth,
-  body('title').trim().isLength({ min: 1, max: 100 }).withMessage('Başlık 1-100 karakter arasında olmalı'),
-  body('message').trim().isLength({ min: 1, max: 500 }).withMessage('Mesaj 1-500 karakter arasında olmalı'),
-  body('type').isIn(['info', 'success', 'warning', 'error', 'offer', 'shipment', 'payment', 'system']).withMessage('Geçersiz bildirim tipi'),
-  body('category').isIn(['shipment', 'offer', 'payment', 'system', 'message', 'reminder']).withMessage('Geçersiz bildirim kategorisi'),
-  body('actionUrl').optional().isURL().withMessage('Geçerli URL gerekli')
-], async (req, res) => {
+// Get notification by ID
+router.get('/:id', async (req, res) => {
   try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
+    const { id } = req.params;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
         success: false,
-        message: 'Geçersiz veri',
-        errors: errors.array()
+        message: 'Authentication required',
       });
     }
 
-    const { title, message, type, category, actionUrl, metadata = {} } = req.body;
+    const notification = await Notification.findByPk(id);
+    if (!notification) {
+      return res.status(404).json({
+        success: false,
+        message: 'Notification not found',
+      });
+    }
 
-    const notification = await Notification.create({
-      userId: req.user.id,
-      title,
-      message,
-      type,
-      category,
-      actionUrl,
-      metadata
-    });
+    if (notification.userId !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied',
+      });
+    }
 
-    res.status(201).json({
+    res.json({
       success: true,
       data: notification,
-      message: 'Bildirim oluşturuldu.'
     });
   } catch (error) {
-    logger.error('Create notification error:', error);
+    console.error('Get notification error:', error);
     res.status(500).json({
       success: false,
-      message: 'Bildirim oluşturulurken hata oluştu.'
+      message: 'Internal server error',
     });
   }
 });
 
-// @route   PUT /api/notifications/:id/read
-// @desc    Mark notification as read
-// @access  Private
-router.put('/:id/read', auth, async (req, res) => {
+// Mark notification as read
+router.put('/:id/read', async (req, res) => {
   try {
-    const notification = await Notification.findOne({
-      where: {
-        id: req.params.id,
-        userId: req.user.id
-      }
-    });
+    const { id } = req.params;
+    const userId = req.user?.id;
 
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required',
+      });
+    }
+
+    const notification = await Notification.findByPk(id);
     if (!notification) {
       return res.status(404).json({
         success: false,
-        message: 'Bildirim bulunamadı.'
+        message: 'Notification not found',
+      });
+    }
+
+    if (notification.userId !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied',
       });
     }
 
     await notification.update({
       isRead: true,
-      readAt: new Date()
+      readAt: new Date(),
     });
 
     res.json({
       success: true,
-      message: 'Bildirim okundu olarak işaretlendi.'
+      message: 'Notification marked as read',
     });
   } catch (error) {
-    logger.error('Mark notification as read error:', error);
+    console.error('Mark notification as read error:', error);
     res.status(500).json({
       success: false,
-      message: 'Bildirim işaretlenirken hata oluştu.'
+      message: 'Internal server error',
     });
   }
 });
 
-// @route   PUT /api/notifications/read-all
-// @desc    Mark all notifications as read
-// @access  Private
-router.put('/read-all', auth, async (req, res) => {
+// Mark all notifications as read
+router.put('/read-all', async (req, res) => {
   try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required',
+      });
+    }
+
     await Notification.update(
       {
         isRead: true,
-        readAt: new Date()
+        readAt: new Date(),
       },
       {
         where: {
-          userId: req.user.id,
-          isRead: false
-        }
+          userId,
+          isRead: false,
+        },
       }
     );
 
     res.json({
       success: true,
-      message: 'Tüm bildirimler okundu olarak işaretlendi.'
+      message: 'All notifications marked as read',
     });
   } catch (error) {
-    logger.error('Mark all notifications as read error:', error);
+    console.error('Mark all notifications as read error:', error);
     res.status(500).json({
       success: false,
-      message: 'Bildirimler işaretlenirken hata oluştu.'
+      message: 'Internal server error',
     });
   }
 });
 
-// @route   GET /api/notifications/unread-count
-// @desc    Get unread notifications count
-// @access  Private
-router.get('/unread-count', auth, async (req, res) => {
+// Delete notification
+router.delete('/:id', async (req, res) => {
   try {
-    const count = await Notification.count({
-      where: {
-        userId: req.user.id,
-        isRead: false
-      }
-    });
+    const { id } = req.params;
+    const userId = req.user?.id;
 
-    res.json({
-      success: true,
-      data: { count }
-    });
-  } catch (error) {
-    logger.error('Get unread count error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Okunmamış bildirim sayısı alınırken hata oluştu.'
-    });
-  }
-});
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required',
+      });
+    }
 
-// @route   DELETE /api/notifications/:id
-// @desc    Delete notification
-// @access  Private
-router.delete('/:id', auth, async (req, res) => {
-  try {
-    const notification = await Notification.findOne({
-      where: {
-        id: req.params.id,
-        userId: req.user.id
-      }
-    });
-
+    const notification = await Notification.findByPk(id);
     if (!notification) {
       return res.status(404).json({
         success: false,
-        message: 'Bildirim bulunamadı.'
+        message: 'Notification not found',
+      });
+    }
+
+    if (notification.userId !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied',
       });
     }
 
@@ -218,13 +205,45 @@ router.delete('/:id', auth, async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Bildirim silindi.'
+      message: 'Notification deleted successfully',
     });
   } catch (error) {
-    logger.error('Delete notification error:', error);
+    console.error('Delete notification error:', error);
     res.status(500).json({
       success: false,
-      message: 'Bildirim silinirken hata oluştu.'
+      message: 'Internal server error',
+    });
+  }
+});
+
+// Get unread count
+router.get('/unread-count', async (req, res) => {
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required',
+      });
+    }
+
+    const count = await Notification.count({
+      where: {
+        userId,
+        isRead: false,
+      },
+    });
+
+    res.json({
+      success: true,
+      count,
+    });
+  } catch (error) {
+    console.error('Get unread count error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
     });
   }
 });

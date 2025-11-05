@@ -9,7 +9,8 @@ const router = express.Router();
 // Konuşmaları listele
 router.get('/conversations', authenticateToken, async (req, res) => {
   try {
-    const conversations = await db.all(`
+    const conversations = await db.all(
+      `
       SELECT c.*, 
              s.title as shipment_title,
              s.pickup_city, s.delivery_city,
@@ -37,78 +38,106 @@ router.get('/conversations', authenticateToken, async (req, res) => {
       )
       WHERE (c.participant1_id = ? OR c.participant2_id = ?) AND c.is_active = true
       ORDER BY c.last_message_at DESC
-    `, [req.user.id, req.user.id, req.user.id, req.user.id, req.user.id]);
+    `,
+      [req.user.id, req.user.id, req.user.id, req.user.id, req.user.id]
+    );
 
     res.json({
       success: true,
-      data: conversations
+      data: conversations,
     });
-
   } catch (error) {
     console.error('Konuşma listeleme hatası:', error);
     res.status(500).json({
       success: false,
       message: 'Sunucu hatası',
-      error: error.message
+      error: error.message,
     });
   }
 });
 
 // Konuşma oluştur veya getir
-router.post('/conversations', authenticateToken, [
-  body('shipment_id').isInt().withMessage('Geçerli gönderi ID gerekli'),
-  body('other_participant_id').isInt().withMessage('Geçerli katılımcı ID gerekli')
-], async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Geçersiz veri',
-        errors: errors.array()
-      });
-    }
+router.post(
+  '/conversations',
+  authenticateToken,
+  [
+    body('shipment_id').isInt().withMessage('Geçerli gönderi ID gerekli'),
+    body('other_participant_id')
+      .isInt()
+      .withMessage('Geçerli katılımcı ID gerekli'),
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Geçersiz veri',
+          errors: errors.array(),
+        });
+      }
 
-    const { shipment_id, other_participant_id } = req.body;
+      const { shipment_id, other_participant_id } = req.body;
 
-    // Gönderi kontrolü
-    const shipment = await db.get('SELECT * FROM shipments WHERE id = ?', [shipment_id]);
-    if (!shipment) {
-      return res.status(404).json({
-        success: false,
-        message: 'Gönderi bulunamadı'
-      });
-    }
+      // Gönderi kontrolü
+      const shipment = await db.get('SELECT * FROM shipments WHERE id = ?', [
+        shipment_id,
+      ]);
+      if (!shipment) {
+        return res.status(404).json({
+          success: false,
+          message: 'Gönderi bulunamadı',
+        });
+      }
 
-    // Katılımcı kontrolü
-    const otherParticipant = await db.get('SELECT * FROM users WHERE id = ? AND is_active = true', [other_participant_id]);
-    if (!otherParticipant) {
-      return res.status(404).json({
-        success: false,
-        message: 'Kullanıcı bulunamadı'
-      });
-    }
+      // Katılımcı kontrolü
+      const otherParticipant = await db.get(
+        'SELECT * FROM users WHERE id = ? AND is_active = true',
+        [other_participant_id]
+      );
+      if (!otherParticipant) {
+        return res.status(404).json({
+          success: false,
+          message: 'Kullanıcı bulunamadı',
+        });
+      }
 
-    // Mevcut konuşma kontrolü
-    let conversation = await db.get(`
+      // Mevcut konuşma kontrolü
+      let conversation = await db.get(
+        `
       SELECT * FROM conversations 
       WHERE shipment_id = ? AND 
             ((participant1_id = ? AND participant2_id = ?) OR 
              (participant1_id = ? AND participant2_id = ?))
-    `, [shipment_id, req.user.id, other_participant_id, other_participant_id, req.user.id]);
+    `,
+        [
+          shipment_id,
+          req.user.id,
+          other_participant_id,
+          other_participant_id,
+          req.user.id,
+        ]
+      );
 
-    if (!conversation) {
-      // Yeni konuşma oluştur
-      const result = await db.run(`
+      if (!conversation) {
+        // Yeni konuşma oluştur
+        const result = await db.run(
+          `
         INSERT INTO conversations (shipment_id, participant1_id, participant2_id)
         VALUES (?, ?, ?)
-      `, [shipment_id, req.user.id, other_participant_id]);
+      `,
+          [shipment_id, req.user.id, other_participant_id]
+        );
 
-      conversation = await db.get('SELECT * FROM conversations WHERE id = ?', [result.lastID]);
-    }
+        conversation = await db.get(
+          'SELECT * FROM conversations WHERE id = ?',
+          [result.lastID]
+        );
+      }
 
-    // Konuşma detaylarını getir
-    const conversationDetails = await db.get(`
+      // Konuşma detaylarını getir
+      const conversationDetails = await db.get(
+        `
       SELECT c.*, 
              s.title as shipment_title,
              s.pickup_city, s.delivery_city,
@@ -123,45 +152,54 @@ router.post('/conversations', authenticateToken, [
       JOIN users u1 ON c.participant1_id = u1.id
       JOIN users u2 ON c.participant2_id = u2.id
       WHERE c.id = ?
-    `, [conversation.id]);
+    `,
+        [conversation.id]
+      );
 
-    res.json({
-      success: true,
-      data: conversationDetails
-    });
-
-  } catch (error) {
-    console.error('Konuşma oluşturma hatası:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Sunucu hatası',
-      error: error.message
-    });
-  }
-});
-
-// Mesajları getir
-router.get('/conversations/:id/messages', authenticateToken, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { page = 1, limit = 50 } = req.query;
-    const offset = (page - 1) * limit;
-
-    // Konuşma erişim kontrolü
-    const conversation = await db.get(`
-      SELECT * FROM conversations 
-      WHERE id = ? AND (participant1_id = ? OR participant2_id = ?) AND is_active = true
-    `, [id, req.user.id, req.user.id]);
-
-    if (!conversation) {
-      return res.status(404).json({
+      res.json({
+        success: true,
+        data: conversationDetails,
+      });
+    } catch (error) {
+      console.error('Konuşma oluşturma hatası:', error);
+      res.status(500).json({
         success: false,
-        message: 'Konuşma bulunamadı'
+        message: 'Sunucu hatası',
+        error: error.message,
       });
     }
+  }
+);
 
-    // Mesajları getir
-    const messages = await db.all(`
+// Mesajları getir
+router.get(
+  '/conversations/:id/messages',
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { page = 1, limit = 50 } = req.query;
+      const offset = (page - 1) * limit;
+
+      // Konuşma erişim kontrolü
+      const conversation = await db.get(
+        `
+      SELECT * FROM conversations 
+      WHERE id = ? AND (participant1_id = ? OR participant2_id = ?) AND is_active = true
+    `,
+        [id, req.user.id, req.user.id]
+      );
+
+      if (!conversation) {
+        return res.status(404).json({
+          success: false,
+          message: 'Konuşma bulunamadı',
+        });
+      }
+
+      // Mesajları getir
+      const messages = await db.all(
+        `
       SELECT m.*, 
              u.first_name, u.last_name, u.avatar_url, u.company_name
       FROM messages m
@@ -169,173 +207,223 @@ router.get('/conversations/:id/messages', authenticateToken, async (req, res) =>
       WHERE m.conversation_id = ?
       ORDER BY m.created_at DESC
       LIMIT ? OFFSET ?
-    `, [id, parseInt(limit), parseInt(offset)]);
+    `,
+        [id, parseInt(limit), parseInt(offset)]
+      );
 
-    // Mesajları okundu olarak işaretle
-    await db.run(`
+      // Mesajları okundu olarak işaretle
+      await db.run(
+        `
       UPDATE messages 
       SET is_read = true, read_at = CURRENT_TIMESTAMP 
       WHERE conversation_id = ? AND sender_id != ? AND is_read = false
-    `, [id, req.user.id]);
+    `,
+        [id, req.user.id]
+      );
 
-    res.json({
-      success: true,
-      data: messages.reverse() // En eski mesajlar önce
-    });
-
-  } catch (error) {
-    console.error('Mesaj listeleme hatası:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Sunucu hatası',
-      error: error.message
-    });
+      res.json({
+        success: true,
+        data: messages.reverse(), // En eski mesajlar önce
+      });
+    } catch (error) {
+      console.error('Mesaj listeleme hatası:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Sunucu hatası',
+        error: error.message,
+      });
+    }
   }
-});
+);
 
 // Mesaj gönder
-router.post('/conversations/:id/messages', authenticateToken, [
-  body('content').notEmpty().withMessage('Mesaj içeriği gerekli'),
-  body('message_type').optional().isIn(['text', 'image', 'file', 'location']).withMessage('Geçerli mesaj tipi gerekli')
-], async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Geçersiz veri',
-        errors: errors.array()
-      });
-    }
+router.post(
+  '/conversations/:id/messages',
+  authenticateToken,
+  [
+    body('content').notEmpty().withMessage('Mesaj içeriği gerekli'),
+    body('message_type')
+      .optional()
+      .isIn(['text', 'image', 'file', 'location'])
+      .withMessage('Geçerli mesaj tipi gerekli'),
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Geçersiz veri',
+          errors: errors.array(),
+        });
+      }
 
-    const { id } = req.params;
-    const { content, message_type = 'text' } = req.body;
+      const { id } = req.params;
+      const { content, message_type = 'text' } = req.body;
 
-    // Konuşma erişim kontrolü
-    const conversation = await db.get(`
+      // Konuşma erişim kontrolü
+      const conversation = await db.get(
+        `
       SELECT * FROM conversations 
       WHERE id = ? AND (participant1_id = ? OR participant2_id = ?) AND is_active = true
-    `, [id, req.user.id, req.user.id]);
+    `,
+        [id, req.user.id, req.user.id]
+      );
 
-    if (!conversation) {
-      return res.status(404).json({
-        success: false,
-        message: 'Konuşma bulunamadı'
-      });
-    }
+      if (!conversation) {
+        return res.status(404).json({
+          success: false,
+          message: 'Konuşma bulunamadı',
+        });
+      }
 
-    // Mesaj oluştur
-    const result = await db.run(`
+      // Mesaj oluştur
+      const result = await db.run(
+        `
       INSERT INTO messages (conversation_id, sender_id, content, message_type)
       VALUES (?, ?, ?, ?)
-    `, [id, req.user.id, content, message_type]);
+    `,
+        [id, req.user.id, content, message_type]
+      );
 
-    // Konuşmanın son mesaj zamanını güncelle
-    await db.run(`
+      // Konuşmanın son mesaj zamanını güncelle
+      await db.run(
+        `
       UPDATE conversations 
       SET last_message_at = CURRENT_TIMESTAMP 
       WHERE id = ?
-    `, [id]);
+    `,
+        [id]
+      );
 
-    // Mesaj detaylarını getir
-    const message = await db.get(`
+      // Mesaj detaylarını getir
+      const message = await db.get(
+        `
       SELECT m.*, 
              u.first_name, u.last_name, u.avatar_url, u.company_name
       FROM messages m
       JOIN users u ON m.sender_id = u.id
       WHERE m.id = ?
-    `, [result.lastID]);
+    `,
+        [result.lastID]
+      );
 
-    res.json({
-      success: true,
-      message: 'Mesaj gönderildi',
-      data: message
-    });
-
-  } catch (error) {
-    console.error('Mesaj gönderme hatası:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Sunucu hatası',
-      error: error.message
-    });
+      res.json({
+        success: true,
+        message: 'Mesaj gönderildi',
+        data: message,
+      });
+    } catch (error) {
+      console.error('Mesaj gönderme hatası:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Sunucu hatası',
+        error: error.message,
+      });
+    }
   }
-});
+);
 
 // Dosya yükleme (resim, belge)
-router.post('/conversations/:id/upload', authenticateToken, upload.single('file'), async (req, res) => {
-  try {
-    const { id } = req.params;
+router.post(
+  '/conversations/:id/upload',
+  authenticateToken,
+  upload.single('file'),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
 
-    if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        message: 'Dosya gerekli'
-      });
-    }
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          message: 'Dosya gerekli',
+        });
+      }
 
-    // Konuşma erişim kontrolü
-    const conversation = await db.get(`
+      // Konuşma erişim kontrolü
+      const conversation = await db.get(
+        `
       SELECT * FROM conversations 
       WHERE id = ? AND (participant1_id = ? OR participant2_id = ?) AND is_active = true
-    `, [id, req.user.id, req.user.id]);
+    `,
+        [id, req.user.id, req.user.id]
+      );
 
-    if (!conversation) {
-      return res.status(404).json({
-        success: false,
-        message: 'Konuşma bulunamadı'
-      });
-    }
+      if (!conversation) {
+        return res.status(404).json({
+          success: false,
+          message: 'Konuşma bulunamadı',
+        });
+      }
 
-    // Dosya tipini belirle
-    const mimeType = req.file.mimetype;
-    let messageType = 'file';
-    if (mimeType.startsWith('image/')) {
-      messageType = 'image';
-    }
+      // Dosya tipini belirle
+      const mimeType = req.file.mimetype;
+      let messageType = 'file';
+      if (mimeType.startsWith('image/')) {
+        messageType = 'image';
+      }
 
-    // Mesaj oluştur
-    const result = await db.run(`
+      // Mesaj oluştur
+      const result = await db.run(
+        `
       INSERT INTO messages (conversation_id, sender_id, content, message_type, file_url, file_name, file_size, mime_type)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `, [id, req.user.id, req.file.originalname, messageType, req.file.path, req.file.originalname, req.file.size, mimeType]);
+    `,
+        [
+          id,
+          req.user.id,
+          req.file.originalname,
+          messageType,
+          req.file.path,
+          req.file.originalname,
+          req.file.size,
+          mimeType,
+        ]
+      );
 
-    // Konuşmanın son mesaj zamanını güncelle
-    await db.run(`
+      // Konuşmanın son mesaj zamanını güncelle
+      await db.run(
+        `
       UPDATE conversations 
       SET last_message_at = CURRENT_TIMESTAMP 
       WHERE id = ?
-    `, [id]);
+    `,
+        [id]
+      );
 
-    // Mesaj detaylarını getir
-    const message = await db.get(`
+      // Mesaj detaylarını getir
+      const message = await db.get(
+        `
       SELECT m.*, 
              u.first_name, u.last_name, u.avatar_url, u.company_name
       FROM messages m
       JOIN users u ON m.sender_id = u.id
       WHERE m.id = ?
-    `, [result.lastID]);
+    `,
+        [result.lastID]
+      );
 
-    res.json({
-      success: true,
-      message: 'Dosya yüklendi',
-      data: message
-    });
-
-  } catch (error) {
-    console.error('Dosya yükleme hatası:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Sunucu hatası',
-      error: error.message
-    });
+      res.json({
+        success: true,
+        message: 'Dosya yüklendi',
+        data: message,
+      });
+    } catch (error) {
+      console.error('Dosya yükleme hatası:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Sunucu hatası',
+        error: error.message,
+      });
+    }
   }
-});
+);
 
 // Okunmamış mesaj sayısı
 router.get('/unread-count', authenticateToken, async (req, res) => {
   try {
-    const result = await db.get(`
+    const result = await db.get(
+      `
       SELECT COUNT(*) as count
       FROM messages m
       JOIN conversations c ON m.conversation_id = c.id
@@ -343,63 +431,68 @@ router.get('/unread-count', authenticateToken, async (req, res) => {
         AND m.sender_id != ? 
         AND m.is_read = false
         AND c.is_active = true
-    `, [req.user.id, req.user.id, req.user.id]);
+    `,
+      [req.user.id, req.user.id, req.user.id]
+    );
 
     res.json({
       success: true,
       data: {
-        unread_count: result.count
-      }
+        unread_count: result.count,
+      },
     });
-
   } catch (error) {
     console.error('Okunmamış mesaj sayısı hatası:', error);
     res.status(500).json({
       success: false,
       message: 'Sunucu hatası',
-      error: error.message
+      error: error.message,
     });
   }
 });
 
 // Konuşmayı arşivle
-router.patch('/conversations/:id/archive', authenticateToken, async (req, res) => {
-  try {
-    const { id } = req.params;
+router.patch(
+  '/conversations/:id/archive',
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const { id } = req.params;
 
-    // Konuşma erişim kontrolü
-    const conversation = await db.get(`
+      // Konuşma erişim kontrolü
+      const conversation = await db.get(
+        `
       SELECT * FROM conversations 
       WHERE id = ? AND (participant1_id = ? OR participant2_id = ?)
-    `, [id, req.user.id, req.user.id]);
+    `,
+        [id, req.user.id, req.user.id]
+      );
 
-    if (!conversation) {
-      return res.status(404).json({
+      if (!conversation) {
+        return res.status(404).json({
+          success: false,
+          message: 'Konuşma bulunamadı',
+        });
+      }
+
+      // Konuşmayı arşivle
+      await db.run('UPDATE conversations SET is_active = false WHERE id = ?', [
+        id,
+      ]);
+
+      res.json({
+        success: true,
+        message: 'Konuşma arşivlendi',
+      });
+    } catch (error) {
+      console.error('Konuşma arşivleme hatası:', error);
+      res.status(500).json({
         success: false,
-        message: 'Konuşma bulunamadı'
+        message: 'Sunucu hatası',
+        error: error.message,
       });
     }
-
-    // Konuşmayı arşivle
-    await db.run('UPDATE conversations SET is_active = false WHERE id = ?', [id]);
-
-    res.json({
-      success: true,
-      message: 'Konuşma arşivlendi'
-    });
-
-  } catch (error) {
-    console.error('Konuşma arşivleme hatası:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Sunucu hatası',
-      error: error.message
-    });
   }
-});
+);
 
 module.exports = router;
-
-
-
-

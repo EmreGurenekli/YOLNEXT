@@ -5,7 +5,7 @@ const { ShipmentRequest, Offer, User } = require('../models');
 // Gönderi durumları
 const SHIPMENT_STATUS = {
   DRAFT: 'draft',
-  ACTIVE: 'active', 
+  ACTIVE: 'active',
   BIDDING: 'bidding',
   ACCEPTED: 'accepted',
   IN_PROGRESS: 'in_progress',
@@ -13,7 +13,7 @@ const SHIPMENT_STATUS = {
   IN_TRANSIT: 'in_transit',
   DELIVERED: 'delivered',
   COMPLETED: 'completed',
-  CANCELLED: 'cancelled'
+  CANCELLED: 'cancelled',
 };
 
 // 1. Gönderi oluşturma (Bireysel)
@@ -24,7 +24,7 @@ router.post('/create', async (req, res) => {
       status: SHIPMENT_STATUS.DRAFT,
       trackingCode: generateTrackingCode(),
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
 
     const shipment = await ShipmentRequest.create(shipmentData);
@@ -39,16 +39,18 @@ router.post('/:id/publish', async (req, res) => {
   try {
     const shipment = await ShipmentRequest.findByIdAndUpdate(
       req.params.id,
-      { 
+      {
         status: SHIPMENT_STATUS.ACTIVE,
         publishedAt: new Date(),
-        updatedAt: new Date()
+        updatedAt: new Date(),
       },
       { new: true }
     );
 
     if (!shipment) {
-      return res.status(404).json({ success: false, message: 'Gönderi bulunamadı' });
+      return res
+        .status(404)
+        .json({ success: false, message: 'Gönderi bulunamadı' });
     }
 
     // Nakliyecilere bildirim gönder
@@ -64,7 +66,7 @@ router.post('/:id/publish', async (req, res) => {
 router.get('/active', async (req, res) => {
   try {
     const { page = 1, limit = 10, cargoType, fromCity, toCity } = req.query;
-    
+
     const filter = { status: SHIPMENT_STATUS.ACTIVE };
     if (cargoType) filter.cargoType = cargoType;
     if (fromCity) filter['sender.city'] = new RegExp(fromCity, 'i');
@@ -85,8 +87,8 @@ router.get('/active', async (req, res) => {
       pagination: {
         current: page,
         pages: Math.ceil(total / limit),
-        total
-      }
+        total,
+      },
     });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -97,7 +99,7 @@ router.get('/active', async (req, res) => {
 router.post('/:id/offer', async (req, res) => {
   try {
     const { carrierId, price, estimatedDays, notes, vehicleType } = req.body;
-    
+
     const offer = new Offer({
       shipmentId: req.params.id,
       carrierId,
@@ -106,7 +108,7 @@ router.post('/:id/offer', async (req, res) => {
       notes,
       vehicleType,
       status: 'pending',
-      createdAt: new Date()
+      createdAt: new Date(),
     });
 
     await offer.save();
@@ -114,7 +116,7 @@ router.post('/:id/offer', async (req, res) => {
     // Gönderi durumunu güncelle
     await ShipmentRequest.findByIdAndUpdate(req.params.id, {
       status: SHIPMENT_STATUS.BIDDING,
-      updatedAt: new Date()
+      updatedAt: new Date(),
     });
 
     // Göndericiye bildirim gönder
@@ -143,11 +145,11 @@ router.get('/:id/offers', async (req, res) => {
 router.post('/:id/accept-offer/:offerId', async (req, res) => {
   try {
     const { offerId } = req.params;
-    
+
     // Teklifi kabul et
     await Offer.findByIdAndUpdate(offerId, {
       status: 'accepted',
-      acceptedAt: new Date()
+      acceptedAt: new Date(),
     });
 
     // Diğer teklifleri reddet
@@ -160,7 +162,7 @@ router.post('/:id/accept-offer/:offerId', async (req, res) => {
     await ShipmentRequest.findByIdAndUpdate(req.params.id, {
       status: SHIPMENT_STATUS.ACCEPTED,
       acceptedOfferId: offerId,
-      updatedAt: new Date()
+      updatedAt: new Date(),
     });
 
     // Nakliyeciye bildirim gönder
@@ -176,12 +178,12 @@ router.post('/:id/accept-offer/:offerId', async (req, res) => {
 router.post('/:id/assign-driver', async (req, res) => {
   try {
     const { driverId } = req.body;
-    
+
     await ShipmentRequest.findByIdAndUpdate(req.params.id, {
       assignedDriverId: driverId,
       status: SHIPMENT_STATUS.IN_PROGRESS,
       assignedAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     });
 
     // Taşıyıcıya bildirim gönder
@@ -197,10 +199,10 @@ router.post('/:id/assign-driver', async (req, res) => {
 router.post('/:id/update-status', async (req, res) => {
   try {
     const { status, location, notes, photos } = req.body;
-    
+
     const updateData = {
       status,
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
 
     if (location) updateData.currentLocation = location;
@@ -232,7 +234,9 @@ router.get('/:id/track', async (req, res) => {
       .populate('acceptedOfferId');
 
     if (!shipment) {
-      return res.status(404).json({ success: false, message: 'Gönderi bulunamadı' });
+      return res
+        .status(404)
+        .json({ success: false, message: 'Gönderi bulunamadı' });
     }
 
     res.json({ success: true, shipment });
@@ -245,12 +249,12 @@ router.get('/:id/track', async (req, res) => {
 router.post('/:id/cancel', async (req, res) => {
   try {
     const { reason } = req.body;
-    
+
     await ShipmentRequest.findByIdAndUpdate(req.params.id, {
       status: SHIPMENT_STATUS.CANCELLED,
       cancelReason: reason,
       cancelledAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     });
 
     // İlgili taraflara bildirim gönder
@@ -298,8 +302,3 @@ async function notifyCancellation(shipmentId, reason) {
 }
 
 module.exports = router;
-
-
-
-
-

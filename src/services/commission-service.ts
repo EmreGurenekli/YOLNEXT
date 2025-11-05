@@ -1,9 +1,9 @@
 export interface CommissionCalculation {
-  agreedPrice: number;        // Anlaşılan fiyat
-  commissionRate: 0.01;       // %1 sabit
-  commissionAmount: number;   // Komisyon tutarı
-  nakliyeciReceives: number;  // Nakliyeci alacağı
-  yolnetReceives: number;     // YolNet alacağı
+  agreedPrice: number; // Anlaşılan fiyat
+  commissionRate: 0.01; // %1 sabit
+  commissionAmount: number; // Komisyon tutarı
+  nakliyeciReceives: number; // Nakliyeci alacağı
+  YolNextReceives: number; // YolNext alacağı
 }
 
 export interface PaymentFlow {
@@ -23,14 +23,14 @@ export class CommissionService {
   static calculateCommission(agreedPrice: number): CommissionCalculation {
     const commissionAmount = agreedPrice * this.COMMISSION_RATE;
     const nakliyeciReceives = agreedPrice - commissionAmount;
-    const yolnetReceives = commissionAmount;
+    const YolNextReceives = commissionAmount;
 
     return {
       agreedPrice,
       commissionRate: this.COMMISSION_RATE,
       commissionAmount,
       nakliyeciReceives,
-      yolnetReceives
+      YolNextReceives,
     };
   }
 
@@ -46,29 +46,29 @@ export class CommissionService {
         amount: agreedPrice,
         commission: 0, // Gönderen hiç komisyon ödemez
         netAmount: agreedPrice,
-        status: 'pending'
+        status: 'pending',
       },
       {
         stage: 'escrow',
         amount: agreedPrice,
         commission: 0,
         netAmount: agreedPrice,
-        status: 'processing'
+        status: 'processing',
       },
       {
         stage: 'release',
         amount: commission.nakliyeciReceives,
         commission: commission.commissionAmount, // Sadece nakliyeci'den kesilir
         netAmount: commission.nakliyeciReceives,
-        status: 'pending'
+        status: 'pending',
       },
       {
         stage: 'completed',
         amount: commission.nakliyeciReceives,
         commission: commission.commissionAmount,
         netAmount: commission.nakliyeciReceives,
-        status: 'completed'
-      }
+        status: 'completed',
+      },
     ];
   }
 
@@ -82,7 +82,9 @@ export class CommissionService {
   /**
    * Toplam komisyon hesaplama (aylık)
    */
-  static calculateMonthlyCommission(transactions: Array<{ agreedPrice: number }>) {
+  static calculateMonthlyCommission(
+    transactions: Array<{ agreedPrice: number }>
+  ) {
     let totalCommission = 0;
     let totalVolume = 0;
 
@@ -96,7 +98,7 @@ export class CommissionService {
       totalCommission,
       totalVolume,
       averageRate: totalVolume > 0 ? (totalCommission / totalVolume) * 100 : 0,
-      transactionCount: transactions.length
+      transactionCount: transactions.length,
     };
   }
 
@@ -105,18 +107,17 @@ export class CommissionService {
    */
   static getCommissionExamples() {
     const examples = [100, 500, 1000, 5000, 10000];
-    
+
     return examples.map(price => {
       const commission = this.calculateCommission(price);
       return {
         agreedPrice: price,
         nakliyeciReceives: commission.nakliyeciReceives,
-        yolnetCommission: commission.commissionAmount,
-        percentage: '1%'
+        YolNextCommission: commission.commissionAmount,
+        percentage: '1%',
       };
     });
   }
 }
 
 export default CommissionService;
-

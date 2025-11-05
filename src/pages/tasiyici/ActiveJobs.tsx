@@ -1,533 +1,276 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { 
-  Clock, 
-  Search, 
-  Filter, 
-  Eye,
-  MapPin,
-  Calendar,
-  DollarSign,
-  Truck,
-  Package,
-  CheckCircle,
-  XCircle,
-  AlertCircle,
-  ArrowRight,
-  RefreshCw,
-  BarChart3
-} from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Clock, MapPin, DollarSign, Truck, CheckCircle, ArrowRight, Package, Search } from 'lucide-react';
 import Breadcrumb from '../../components/common/Breadcrumb';
-import EmptyState from '../../components/common/EmptyState';
 import LoadingState from '../../components/common/LoadingState';
-import Modal from '../../components/common/Modal';
-import SuccessMessage from '../../components/common/SuccessMessage';
-import Pagination from '../../components/common/Pagination';
 
-interface ActiveJob {
-  id: number;
-  jobNumber: string;
-  title: string;
-  from: string;
-  to: string;
-  status: 'accepted' | 'in_progress' | 'loading' | 'delivering';
-  priority: 'low' | 'normal' | 'high' | 'urgent';
-  value: number;
-  distance: number;
-  estimatedTime: string;
-  startDate: string;
-  endDate: string;
-  client: string;
-  description: string;
-  weight: string;
-  category: string;
-  vehicleType: string;
-  progress: number;
-}
-
-const generateMockActiveJobs = (count: number): ActiveJob[] => {
-  const statuses = ['accepted', 'in_progress', 'loading', 'delivering'];
-  const priorities = ['low', 'normal', 'high', 'urgent'];
-  const cities = ['İstanbul', 'Ankara', 'İzmir', 'Bursa', 'Antalya', 'Adana', 'Gaziantep', 'Konya'];
-  const clients = ['TechCorp A.Ş.', 'E-Ticaret Ltd.', 'Gıda A.Ş.', 'Lojistik Pro', 'Hızlı Kargo'];
-  const categories = ['Döküman', 'Koli', 'Palet', 'Ev Eşyası', 'Elektronik', 'Gıda'];
-  const vehicleTypes = ['Kamyon', 'Kamyonet', 'Minibüs', 'Van'];
-
-  return Array.from({ length: count }, (_, i) => ({
-    id: i + 1,
-    jobNumber: `JOB-${1000 + i}`,
-    title: `Taşıma İşi ${i + 1}`,
-    from: cities[Math.floor(Math.random() * cities.length)],
-    to: cities[Math.floor(Math.random() * cities.length)],
-    status: statuses[Math.floor(Math.random() * statuses.length)] as any,
-    priority: priorities[Math.floor(Math.random() * priorities.length)] as any,
-    value: Math.floor(Math.random() * 5000) + 500,
-    distance: Math.floor(Math.random() * 500) + 50,
-    estimatedTime: `${Math.floor(Math.random() * 8) + 1} saat`,
-    startDate: `2024-01-${String(Math.floor(Math.random() * 28) + 1).padStart(2, '0')}`,
-    endDate: `2024-01-${String(Math.floor(Math.random() * 28) + 1).padStart(2, '0')}`,
-    client: clients[Math.floor(Math.random() * clients.length)],
-    description: `Detaylı açıklama ${i + 1}`,
-    weight: `${(Math.random() * 10 + 1).toFixed(1)} ton`,
-    category: categories[Math.floor(Math.random() * categories.length)],
-    vehicleType: vehicleTypes[Math.floor(Math.random() * vehicleTypes.length)],
-    progress: Math.floor(Math.random() * 100),
-  }));
-};
-
-export default function TasiyiciActiveJobs() {
-  const [activeJobs, setActiveJobs] = useState<ActiveJob[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+const ActiveJobs: React.FC = () => {
+  const [jobs, setJobs] = useState<any[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [filterPriority, setFilterPriority] = useState('all');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
-  const [showFilters, setShowFilters] = useState(false);
-  const [selectedJob, setSelectedJob] = useState<ActiveJob | null>(null);
-  const [showDetailModal, setShowDetailModal] = useState(false);
-  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const jobsPerPage = 10;
 
   useEffect(() => {
-    setIsLoading(true);
-    setTimeout(() => {
-      setActiveJobs(generateMockActiveJobs(15));
-      setIsLoading(false);
-    }, 1000);
+    const loadActiveJobs = async () => {
+      try {
+        setLoading(true);
+        const userRaw = localStorage.getItem('user');
+        const userId = userRaw ? JSON.parse(userRaw || '{}').id : undefined;
+        const token = localStorage.getItem('authToken');
+        const response = await fetch('/api/shipments/tasiyici', {
+          headers: {
+            Authorization: `Bearer ${token || ''}`,
+            'X-User-Id': userId || '',
+            'Content-Type': 'application/json',
+          },
+        });
+        if (!response.ok) throw new Error('Aktif işler alınamadı');
+        const data = await response.json();
+        const rows = (Array.isArray(data) ? data : data.data || []) as any[];
+        const mapped = rows.map(row => ({
+          id: row.id,
+          title:
+            row.title || `${row.pickupCity || ''} → ${row.deliveryCity || ''}`,
+          from: row.pickupAddress || row.pickupCity || '-',
+          to: row.deliveryAddress || row.deliveryCity || '-',
+          pickupCity: row.pickupCity || '',
+          deliveryCity: row.deliveryCity || '',
+          price:
+            typeof row.price === 'number'
+              ? row.price
+              : parseFloat(row.price?.replace(/[^0-9.,]/g, '').replace(',', '.')) || 0,
+          status: row.status || 'accepted',
+          estimatedTime: row.deliveryDate || '-',
+          pickupDate: row.pickupDate,
+          weight: row.weight,
+          volume: row.volume,
+        }));
+        setJobs(mapped);
+      } catch (e) {
+        if (import.meta.env.DEV) console.error(e);
+        setJobs([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadActiveJobs();
   }, []);
 
-  const breadcrumbItems = [
-    { label: 'Ana Sayfa', icon: <BarChart3 className="w-4 h-4" />, href: '/tasiyici/dashboard' },
-    { label: 'Aktif İşler', icon: <Clock className="w-4 h-4" /> }
-  ];
+  // Extract city names from addresses
+  const getCity = (address?: string, city?: string) => {
+    if (city) return city;
+    if (!address) return '';
+    const parts = address.split(',');
+    return parts[parts.length - 1]?.trim() || address;
+  };
 
-  const filteredJobs = activeJobs.filter(job => {
-    const matchesSearch = searchTerm === '' ||
-      job.jobNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      job.from.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      job.to.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      job.client.toLowerCase().includes(searchTerm.toLowerCase());
-
-    const matchesStatus = filterStatus === 'all' || job.status === filterStatus;
-    const matchesPriority = filterPriority === 'all' || job.priority === filterPriority;
-
-    return matchesSearch && matchesStatus && matchesPriority;
+  const filteredJobs = jobs.filter(job => {
+    if (!searchTerm) return true;
+    const term = searchTerm.toLowerCase();
+    return (
+      job.title?.toLowerCase().includes(term) ||
+      job.pickupCity?.toLowerCase().includes(term) ||
+      job.deliveryCity?.toLowerCase().includes(term) ||
+      job.from?.toLowerCase().includes(term) ||
+      job.to?.toLowerCase().includes(term)
+    );
   });
 
-  const indexOfLastJob = currentPage * jobsPerPage;
-  const indexOfFirstJob = indexOfLastJob - jobsPerPage;
-  const currentJobs = filteredJobs.slice(indexOfFirstJob, indexOfLastJob);
-  const totalPages = Math.ceil(filteredJobs.length / jobsPerPage);
-
-  const getStatusStyle = (status: ActiveJob['status']) => {
-    switch (status) {
-      case 'accepted': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'in_progress': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'loading': return 'bg-purple-100 text-purple-800 border-purple-200';
-      case 'delivering': return 'bg-green-100 text-green-800 border-green-200';
-      default: return 'bg-slate-100 text-slate-800 border-slate-200';
-    }
-  };
-
-  const getStatusText = (status: ActiveJob['status']) => {
-    switch (status) {
-      case 'accepted': return 'Kabul Edildi';
-      case 'in_progress': return 'Devam Ediyor';
-      case 'loading': return 'Yükleniyor';
-      case 'delivering': return 'Teslim Ediliyor';
-      default: return 'Bilinmiyor';
-    }
-  };
-
-  const getStatusIcon = (status: ActiveJob['status']) => {
-    switch (status) {
-      case 'accepted': return <CheckCircle className="w-4 h-4" />;
-      case 'in_progress': return <Clock className="w-4 h-4" />;
-      case 'loading': return <Package className="w-4 h-4" />;
-      case 'delivering': return <Truck className="w-4 h-4" />;
-      default: return <Clock className="w-4 h-4" />;
-    }
-  };
-
-  const getPriorityStyle = (priority: ActiveJob['priority']) => {
-    switch (priority) {
-      case 'urgent': return 'bg-red-100 text-red-800';
-      case 'high': return 'bg-orange-100 text-orange-800';
-      case 'normal': return 'bg-slate-100 text-slate-800';
-      case 'low': return 'bg-green-100 text-green-800';
-      default: return 'bg-slate-100 text-slate-800';
-    }
-  };
-
-  const handleViewDetails = (job: ActiveJob) => {
-    setSelectedJob(job);
-    setShowDetailModal(true);
-  };
-
-  const handleCompleteJob = (id: number) => {
-    setIsLoading(true);
-    setTimeout(() => {
-      setActiveJobs(activeJobs.filter(job => job.id !== id));
-      setSuccessMessage('İş başarıyla tamamlandı!');
-      setShowSuccessMessage(true);
-      setIsLoading(false);
-    }, 500);
-  };
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-50">
-        <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
-          <LoadingState text="Aktif işler yükleniyor..." />
-        </div>
-      </div>
-    );
+  if (loading) {
+    return <LoadingState />;
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-50">
+    <div className='min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50'>
       <Helmet>
-        <title>Aktif İşler - Taşıyıcı Panel - YolNet</title>
-        <meta name="description" content="Taşıyıcı aktif iş yönetimi" />
+        <title>Aktif İşler - Taşıyıcı Panel - YolNext</title>
       </Helmet>
 
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
+      <div className='max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6'>
         {/* Breadcrumb */}
-        <div className="mb-4 sm:mb-6">
-          <Breadcrumb items={breadcrumbItems} />
+        <div className='mb-4 sm:mb-6'>
+          <Breadcrumb items={[{ label: 'Aktif İşler', href: '/tasiyici/active-jobs' }]} />
         </div>
 
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6">
-          <div className="flex items-center gap-3 mb-4 sm:mb-0">
-            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-xl flex items-center justify-center shadow-lg">
-              <Clock className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Aktif İşler</h1>
-              <p className="text-sm text-slate-600">Devam eden işlerinizi takip edin</p>
-            </div>
-          </div>
-          
-          <div className="flex flex-wrap gap-2 sm:gap-3">
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className="flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-3 bg-white border border-slate-200 text-slate-700 rounded-lg sm:rounded-xl hover:bg-slate-50 transition-all duration-200 text-sm font-medium"
-            >
-              <Filter className="w-4 h-4 sm:w-5 sm:h-5" />
-              <span className="hidden sm:inline">Filtreler</span>
-            </button>
-          </div>
-        </div>
+        {/* Hero Section */}
+        <div className='relative overflow-hidden bg-gradient-to-br from-slate-800 via-blue-900 to-indigo-900 rounded-3xl p-6 sm:p-8 text-white shadow-2xl mb-6'>
+          <div className='absolute inset-0 bg-gradient-to-br from-white/5 to-transparent'></div>
+          <div className='absolute top-0 right-0 w-80 h-80 bg-gradient-to-br from-blue-400/10 to-indigo-400/10 rounded-full -translate-y-40 translate-x-40'></div>
+          <div className='absolute bottom-0 left-0 w-64 h-64 bg-gradient-to-tr from-slate-400/10 to-blue-400/10 rounded-full translate-y-32 -translate-x-32'></div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
-          <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-lg border border-slate-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-600">Toplam Aktif İş</p>
-                <p className="text-2xl sm:text-3xl font-bold text-slate-900">{activeJobs.length}</p>
-              </div>
-              <div className="w-10 h-10 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center">
-                <Clock className="w-5 h-5 text-white" />
-              </div>
-            </div>
-          </div>
+          <div className='relative z-10'>
+            <div className='flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4'>
+              <div className='flex items-center gap-4'>
+                <div className='w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl flex items-center justify-center shadow-xl border border-white/20'>
+                  <Truck className='w-8 h-8 text-white' />
+                </div>
+                <div>
+                  <h1 className='text-3xl font-bold mb-2 bg-gradient-to-r from-white to-blue-200 bg-clip-text text-transparent'>
+                    Aktif İşler
+                  </h1>
+                  <p className='text-slate-200 text-base sm:text-lg leading-relaxed'>
+                    Devam eden işlerinizi buradan takip edin ve yönetin
+                  </p>
+                </div>
+                      </div>
+              <div className='bg-white/10 backdrop-blur-sm rounded-xl px-4 py-2 border border-white/20'>
+                <span className='text-slate-200 font-medium'>
+                  {jobs.length} {jobs.length === 1 ? 'Aktif İş' : 'Aktif İş'}
+                </span>
+                      </div>
+                      </div>
+                    </div>
+                  </div>
 
-          <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-lg border border-slate-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-600">Devam Eden</p>
-                <p className="text-2xl sm:text-3xl font-bold text-yellow-600">
-                  {activeJobs.filter(j => j.status === 'in_progress').length}
-                </p>
-              </div>
-              <div className="w-10 h-10 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-lg flex items-center justify-center">
-                <Package className="w-5 h-5 text-white" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-lg border border-slate-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-600">Teslim Ediliyor</p>
-                <p className="text-2xl sm:text-3xl font-bold text-green-600">
-                  {activeJobs.filter(j => j.status === 'delivering').length}
-                </p>
-              </div>
-              <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center">
-                <Truck className="w-5 h-5 text-white" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-lg border border-slate-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-600">Toplam Kazanç</p>
-                <p className="text-2xl sm:text-3xl font-bold text-blue-600">
-                  ₺{activeJobs.reduce((sum, job) => sum + job.value, 0).toLocaleString()}
-                </p>
-              </div>
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
-                <DollarSign className="w-5 h-5 text-white" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Filters */}
-        {showFilters && (
-          <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-lg border border-slate-200 mb-6 sm:mb-8">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-                <input
-                  type="text"
-                  placeholder="İş ara..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-sm"
-                />
-              </div>
-              
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className="px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-sm"
-              >
-                <option value="all">Tüm Durumlar</option>
-                <option value="accepted">Kabul Edildi</option>
-                <option value="in_progress">Devam Ediyor</option>
-                <option value="loading">Yükleniyor</option>
-                <option value="delivering">Teslim Ediliyor</option>
-              </select>
-              
-              <select
-                value={filterPriority}
-                onChange={(e) => setFilterPriority(e.target.value)}
-                className="px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-sm"
-              >
-                <option value="all">Tüm Öncelikler</option>
-                <option value="urgent">Acil</option>
-                <option value="high">Yüksek</option>
-                <option value="normal">Normal</option>
-                <option value="low">Düşük</option>
-              </select>
-            </div>
-            <div className="flex justify-end mt-4">
-              <button
-                onClick={() => {
-                  setSearchTerm('');
-                  setFilterStatus('all');
-                  setFilterPriority('all');
-                  setShowFilters(false);
-                }}
-                className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-all duration-200"
-              >
-                <RefreshCw className="w-4 h-4" />
-                Filtreleri Temizle
-              </button>
+        {/* Search */}
+        {jobs.length > 0 && (
+          <div className='bg-white rounded-xl p-4 shadow-lg border border-gray-100 mb-6'>
+            <div className='relative'>
+              <Search className='absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400' />
+              <input
+                type='text'
+                placeholder='İş ara... (başlık, şehir, adres)'
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className='w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+              />
             </div>
           </div>
         )}
 
         {/* Jobs List */}
-        {currentJobs.length === 0 ? (
-          <EmptyState
-            icon={Clock}
-            title="Aktif iş bulunamadı"
-            description="Arama kriterlerinize uygun aktif iş bulunamadı."
-          />
+        {jobs.length === 0 ? (
+          <div className='bg-white rounded-xl shadow-lg border border-gray-100 p-12 text-center'>
+            <Truck className='w-16 h-16 text-gray-400 mx-auto mb-4' />
+            <h3 className='text-lg font-semibold text-gray-900 mb-2'>
+              Aktif iş bulunmuyor
+            </h3>
+            <p className='text-gray-600 mb-4'>
+              Henüz aktif bir işiniz bulunmamaktadır. Yeni iş fırsatları için pazara göz atın.
+            </p>
+            <Link to='/tasiyici/market'>
+              <button className='px-6 py-2 bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 text-white rounded-lg font-medium transition-all duration-300 flex items-center gap-2 shadow-lg hover:shadow-xl mx-auto'>
+                <ArrowRight className='w-4 h-4' />
+                Pazara Git
+              </button>
+            </Link>
+          </div>
+        ) : filteredJobs.length === 0 ? (
+          <div className='bg-white rounded-xl shadow-lg border border-gray-100 p-12 text-center'>
+            <Search className='w-16 h-16 text-gray-400 mx-auto mb-4' />
+            <h3 className='text-lg font-semibold text-gray-900 mb-2'>
+              Arama sonucu bulunamadı
+            </h3>
+            <p className='text-gray-600 mb-4'>
+              Arama kriterlerinize uygun aktif iş bulunamadı.
+            </p>
+            <button
+              onClick={() => setSearchTerm('')}
+              className='px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-all duration-300'
+            >
+              Aramayı Temizle
+            </button>
+          </div>
         ) : (
-          <div className="space-y-4">
-            {currentJobs.map((job) => (
-              <div key={job.id} className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-lg border border-slate-200 hover:shadow-xl transition-all duration-200">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-lg font-semibold text-slate-900">#{job.jobNumber}</h3>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getStatusStyle(job.status)}`}>
-                        {getStatusIcon(job.status)} {getStatusText(job.status)}
-                      </span>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPriorityStyle(job.priority)}`}>
-                        {job.priority === 'urgent' ? 'Acil' : job.priority === 'high' ? 'Yüksek' : job.priority === 'normal' ? 'Normal' : 'Düşük'}
-                      </span>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                      <div>
-                        <p className="text-xs text-slate-500 mb-1">Güzergah</p>
-                        <p className="text-sm font-medium text-slate-900">{job.from} <ArrowRight className="w-3 h-3 inline-block mx-1" /> {job.to}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-slate-500 mb-1">Müşteri</p>
-                        <p className="text-sm font-medium text-slate-900">{job.client}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-slate-500 mb-1">Değer</p>
-                        <p className="text-sm font-medium text-slate-900">₺{job.value.toLocaleString()}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-slate-500 mb-1">Mesafe</p>
-                        <p className="text-sm font-medium text-slate-900">{job.distance} km</p>
-                      </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-                      <div>
-                        <p className="text-xs text-slate-500 mb-1">Ağırlık</p>
-                        <p className="text-sm font-medium text-slate-900">{job.weight}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-slate-500 mb-1">Kategori</p>
-                        <p className="text-sm font-medium text-slate-900">{job.category}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-slate-500 mb-1">Araç Tipi</p>
-                        <p className="text-sm font-medium text-slate-900">{job.vehicleType}</p>
-                      </div>
-                    </div>
-                    
-                    <div className="mb-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-slate-600">İlerleme</span>
-                        <span className="text-sm font-medium text-slate-900">%{job.progress}</span>
-                      </div>
-                      <div className="w-full bg-slate-200 rounded-full h-2">
-                        <div 
-                          className="bg-gradient-to-r from-slate-800 to-blue-900 h-2 rounded-full transition-all duration-300"
-                          style={{ width: `${job.progress}%` }}
-                        ></div>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-4 text-xs text-slate-500">
-                      <div className="flex items-center gap-1">
-                        <Calendar className="w-3 h-3" />
-                        <span>Başlangıç: {new Date(job.startDate).toLocaleDateString('tr-TR')}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        <span>Tahmini: {job.estimatedTime}</span>
-                      </div>
-                    </div>
-                  </div>
+          <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3'>
+            {filteredJobs.map(job => {
+              const pickupCity = getCity(job.from, job.pickupCity);
+              const deliveryCity = getCity(job.to, job.deliveryCity);
+
+              return (
+                <div
+                  key={job.id}
+                  className='bg-white rounded-lg p-3 shadow-md border border-gray-100 hover:shadow-lg hover:border-blue-300 transition-all duration-300 flex flex-col'
+                >
+                  {/* Title */}
+                  <h3 className='text-sm font-bold text-slate-900 mb-2 line-clamp-1'>
+                    {job.title}
+                  </h3>
                   
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handleViewDetails(job)}
-                      className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
-                    >
-                      <Eye className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => handleCompleteJob(job.id)}
-                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
-                    >
-                      Tamamla
-                    </button>
+                  {/* Route - Compact */}
+                  <div className='mb-2.5'>
+                    <div className='flex items-center gap-1 mb-1'>
+                      <MapPin className='w-3 h-3 text-blue-600 flex-shrink-0' />
+                      <span className='text-xs font-medium text-slate-900 truncate'>
+                        {pickupCity || 'Belirtilmemiş'}
+                      </span>
+                    </div>
+                    <div className='flex items-center gap-1'>
+                      <ArrowRight className='w-2.5 h-2.5 text-slate-400 mx-1.5' />
+                      <MapPin className='w-3 h-3 text-blue-600 flex-shrink-0' />
+                      <span className='text-xs font-medium text-slate-900 truncate'>
+                        {deliveryCity || 'Belirtilmemiş'}
+                      </span>
+                    </div>
                   </div>
+
+                  {/* Details - Inline */}
+                  <div className='flex flex-wrap items-center gap-2 mb-2.5 text-xs text-slate-600'>
+                    {job.pickupDate && (
+                      <div className='flex items-center gap-1'>
+                        <Clock className='w-3 h-3' />
+                        <span>
+                          {new Date(job.pickupDate).toLocaleDateString('tr-TR', {
+                            day: 'numeric',
+                            month: 'short',
+                          })}
+                  </span>
                 </div>
+                    )}
+                    {typeof job.weight === 'number' && (
+                      <div className='flex items-center gap-1'>
+                        <Truck className='w-3 h-3' />
+                        <span>{job.weight}kg</span>
+                      </div>
+                    )}
+                    {typeof job.volume === 'number' && job.volume > 0 && (
+                      <div className='flex items-center gap-1'>
+                        <Package className='w-3 h-3' />
+                        <span>{job.volume}m³</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Price - Prominent */}
+                  <div className='mb-2.5 pb-2.5 border-b border-gray-200'>
+                    <div className='text-lg font-bold text-green-600'>
+                      ₺{job.price.toLocaleString('tr-TR')}
+                  </div>
               </div>
-            ))}
+
+                  {/* Status Badge */}
+                  <div className='mb-2.5'>
+                    <span className='inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800 border border-green-200'>
+                      <CheckCircle className='w-3 h-3 mr-1' />
+                      {job.status === 'accepted' ? 'Kabul Edildi' : 
+                       job.status === 'in_progress' ? 'Devam Ediyor' :
+                       job.status === 'in_transit' ? 'Yolda' : 'Aktif'}
+                    </span>
+                  </div>
+
+                  {/* Action Button */}
+                  <Link
+                    to={`/tasiyici/jobs/${job.id}`}
+                    className='w-full px-2.5 py-1.5 bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 text-white rounded-lg text-xs font-medium transition-all duration-300 flex items-center justify-center gap-1.5 shadow-md hover:shadow-lg'
+                  >
+                    <ArrowRight className='w-3 h-3' />
+                    Detayları Gör
+                  </Link>
+                </div>
+              );
+            })}
           </div>
         )}
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="mt-6 sm:mt-8">
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={setCurrentPage}
-            />
+        {/* Results Count */}
+        {searchTerm && filteredJobs.length > 0 && (
+          <div className='mt-4 bg-blue-50 rounded-lg p-3 border border-blue-200 text-sm text-blue-800 text-center'>
+            {filteredJobs.length} iş bulundu (toplam {jobs.length})
           </div>
         )}
       </div>
-
-      {/* Job Detail Modal */}
-      {showDetailModal && selectedJob && (
-        <Modal
-          isOpen={showDetailModal}
-          onClose={() => setShowDetailModal(false)}
-          title={`İş Detayları: ${selectedJob.jobNumber}`}
-        >
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-slate-500">İş Numarası</p>
-                <p className="font-medium">{selectedJob.jobNumber}</p>
-              </div>
-              <div>
-                <p className="text-sm text-slate-500">Durum</p>
-                <p className="font-medium">{getStatusText(selectedJob.status)}</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-slate-500">Güzergah</p>
-                <p className="font-medium">{selectedJob.from} → {selectedJob.to}</p>
-              </div>
-              <div>
-                <p className="text-sm text-slate-500">Müşteri</p>
-                <p className="font-medium">{selectedJob.client}</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-slate-500">Değer</p>
-                <p className="font-medium">₺{selectedJob.value.toLocaleString()}</p>
-              </div>
-              <div>
-                <p className="text-sm text-slate-500">Mesafe</p>
-                <p className="font-medium">{selectedJob.distance} km</p>
-              </div>
-            </div>
-            <div>
-              <p className="text-sm text-slate-500">Açıklama</p>
-              <p className="font-medium">{selectedJob.description}</p>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-slate-500">Başlangıç Tarihi</p>
-                <p className="font-medium">{new Date(selectedJob.startDate).toLocaleDateString('tr-TR')}</p>
-              </div>
-              <div>
-                <p className="text-sm text-slate-500">Bitiş Tarihi</p>
-                <p className="font-medium">{new Date(selectedJob.endDate).toLocaleDateString('tr-TR')}</p>
-              </div>
-            </div>
-          </div>
-          <div className="mt-6 flex justify-end gap-3">
-            <button
-              onClick={() => setShowDetailModal(false)}
-              className="px-4 py-2 bg-slate-200 text-slate-800 rounded-lg hover:bg-slate-300 transition-colors"
-            >
-              Kapat
-            </button>
-            <button
-              onClick={() => handleCompleteJob(selectedJob.id)}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-            >
-              İşi Tamamla
-            </button>
-          </div>
-        </Modal>
-      )}
-
-      {/* Success Message */}
-      {showSuccessMessage && (
-        <SuccessMessage
-          message={successMessage}
-          onClose={() => setShowSuccessMessage(false)}
-          isVisible={showSuccessMessage}
-        />
-      )}
     </div>
   );
-}
+};
+
+export default ActiveJobs;

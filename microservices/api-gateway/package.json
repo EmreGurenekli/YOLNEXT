@@ -1,7 +1,7 @@
 {
-  "name": "yolnet-api-gateway",
+  "name": "YolNext-api-gateway",
   "version": "1.0.0",
-  "description": "YolNet API Gateway - Mikroservis mimarisi",
+  "description": "YolNext API Gateway - Mikroservis mimarisi",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -20,8 +20,8 @@
   "devDependencies": {
     "nodemon": "^3.0.2"
   },
-  "keywords": ["api-gateway", "microservices", "yolnet"],
-  "author": "YolNet Team",
+  "keywords": ["api-gateway", "microservices", "YolNext"],
+  "author": "YolNext Team",
   "license": "MIT"
 }
 

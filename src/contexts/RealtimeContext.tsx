@@ -1,4 +1,10 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  ReactNode,
+} from 'react';
 
 interface RealtimeContextType {
   socket: any | null;
@@ -30,68 +36,39 @@ interface Message {
   isRead: boolean;
 }
 
-const RealtimeContext = createContext<RealtimeContextType | undefined>(undefined);
+const RealtimeContext = createContext<RealtimeContextType | undefined>(
+  undefined
+);
 
 interface RealtimeProviderProps {
   children: ReactNode;
 }
 
-export const RealtimeProvider: React.FC<RealtimeProviderProps> = ({ children }) => {
-  const [socket, setSocket] = useState<any | null>(null);
-  const [isConnected, setIsConnected] = useState(false);
+export const RealtimeProvider: React.FC<RealtimeProviderProps> = ({
+  children,
+}) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
-    // WebSocket bağlantısı devre dışı - Backend çalışmıyor
-    console.log('WebSocket bağlantısı devre dışı bırakıldı');
-    setIsConnected(false);
-    
-    // Mock data for development
-    const mockNotifications: Notification[] = [
-      {
-        id: '1',
-        type: 'info',
-        title: 'Yeni Teklif',
-        message: 'Gönderiniz için yeni teklif alındı',
-        timestamp: new Date(),
-        isRead: false
-      },
-      {
-        id: '2',
-        type: 'success',
-        title: 'Gönderi Teslim Edildi',
-        message: 'Gönderiniz başarıyla teslim edildi',
-        timestamp: new Date(Date.now() - 3600000),
-        isRead: false
-      }
-    ];
-    setNotifications(mockNotifications);
-
-    const mockMessages: Message[] = [
-      {
-        id: '1',
-        senderId: 'carrier1',
-        receiverId: 'user1',
-        shipmentId: 'shipment1',
-        content: 'Gönderiniz yolda, yakında teslim edilecek',
-        timestamp: new Date(),
-        isRead: false
-      }
-    ];
-    setMessages(mockMessages);
+    // Check if user is authenticated
+    const token = localStorage.getItem('authToken');
+    if (token) {
+      setIsConnected(true);
+    } else {
+      setIsConnected(false);
+    }
   }, []);
 
   const sendMessage = (message: Message) => {
-    // Mock function - gerçek WebSocket bağlantısı yok
-    console.log('Mock message sent:', message);
     setMessages(prev => [message, ...prev]);
   };
 
   const markNotificationAsRead = (id: string) => {
-    setNotifications(prev => 
-      prev.map(notification => 
-        notification.id === id 
+    setNotifications(prev =>
+      prev.map(notification =>
+        notification.id === id
           ? { ...notification, isRead: true }
           : notification
       )
@@ -103,13 +80,13 @@ export const RealtimeProvider: React.FC<RealtimeProviderProps> = ({ children }) 
   };
 
   const value: RealtimeContextType = {
-    socket,
+    socket: null,
     isConnected,
     notifications,
     messages,
     sendMessage,
     markNotificationAsRead,
-    clearNotifications
+    clearNotifications,
   };
 
   return (

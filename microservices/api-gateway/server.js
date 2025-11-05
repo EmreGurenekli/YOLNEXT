@@ -203,7 +203,7 @@ app.use('*', (req, res) => {
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`🚀 YolNet API Gateway running on port ${PORT}`);
+  console.log(`🚀 YolNext API Gateway running on port ${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
   console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🔗 Services: ${Object.keys(services).join(', ')}`);

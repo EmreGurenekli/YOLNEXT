@@ -1,331 +1,265 @@
 const express = require('express');
-const { User, CorporateUser, Carrier, Driver, Shipment, Offer } = require('../models');
-const { protect } = require('../middleware/auth');
-const logger = require('../utils/logger');
-
+const User = require('../models/User');
+const Shipment = require('../models/Shipment');
+const Offer = require('../models/Offer');
+const Message = require('../models/Message');
+const Notification = require('../models/Notification');
 const router = express.Router();
 
-// @route   GET /api/dashboard/stats
-// @desc    Get dashboard statistics
-// @access  Private
-router.get('/stats', protect, async (req, res) => {
+// Get dashboard stats
+router.get('/stats/:userType', async (req, res) => {
   try {
-    const userId = req.user.id;
-    const userType = req.user.userType;
+    const userId = req.user?.id;
+    const { userType } = req.params;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required',
+      });
+    }
 
     let stats = {};
 
-    if (userType === 'individual' || userType === 'corporate') {
-      // Sender statistics
-      const totalShipments = await Shipment.count({ where: { senderId: userId } });
-      const deliveredShipments = await Shipment.count({ 
-        where: { senderId: userId, status: 'delivered' } 
-      });
-      const pendingShipments = await Shipment.count({ 
-        where: { senderId: userId, status: 'pending' } 
-      });
-      const inTransitShipments = await Shipment.count({ 
-        where: { senderId: userId, status: 'in_transit' } 
-      });
-
-      // Calculate total spent
-      const shipments = await Shipment.findAll({
-        where: { senderId: userId, status: 'delivered' },
-        attributes: ['price']
-      });
-      const totalSpent = shipments.reduce((sum, shipment) => sum + (shipment.price || 0), 0);
-
-      // This month's spending
-      const thisMonth = new Date();
-      thisMonth.setDate(1);
-      const thisMonthShipments = await Shipment.findAll({
-        where: { 
-          senderId: userId, 
-          status: 'delivered',
-          updatedAt: { [require('sequelize').Op.gte]: thisMonth }
-        },
-        attributes: ['price']
-      });
-      const thisMonthSpent = thisMonthShipments.reduce((sum, shipment) => sum + (shipment.price || 0), 0);
-
-      stats = {
-        totalShipments,
-        deliveredShipments,
-        pendingShipments,
-        inTransitShipments,
-        successRate: totalShipments > 0 ? Math.round((deliveredShipments / totalShipments) * 100) : 0,
-        totalSpent,
-        thisMonthSpent
-      };
-
-    } else if (userType === 'carrier') {
-      // Carrier statistics
-      const carrier = await Carrier.findOne({ where: { userId } });
-      if (!carrier) {
-        return res.status(404).json({ success: false, message: 'Nakliyeci profili bulunamadı' });
-      }
-
-      const totalShipments = await Shipment.count({ where: { carrierId: carrier.id } });
-      const deliveredShipments = await Shipment.count({ 
-        where: { carrierId: carrier.id, status: 'delivered' } 
-      });
-      const pendingShipments = await Shipment.count({ 
-        where: { carrierId: carrier.id, status: 'pending' } 
-      });
-      const inTransitShipments = await Shipment.count({ 
-        where: { carrierId: carrier.id, status: 'in_transit' } 
-      });
-
-      // Calculate total earnings
-      const shipments = await Shipment.findAll({
-        where: { carrierId: carrier.id, status: 'delivered' },
-        attributes: ['price']
-      });
-      const totalEarnings = shipments.reduce((sum, shipment) => sum + (shipment.price || 0), 0);
-
-      // This month's earnings
-      const thisMonth = new Date();
-      thisMonth.setDate(1);
-      const thisMonthShipments = await Shipment.findAll({
-        where: { 
-          carrierId: carrier.id, 
-          status: 'delivered',
-          updatedAt: { [require('sequelize').Op.gte]: thisMonth }
-        },
-        attributes: ['price']
-      });
-      const thisMonthEarnings = thisMonthShipments.reduce((sum, shipment) => sum + (shipment.price || 0), 0);
-
-      // Active drivers
-      const activeDrivers = await Driver.count({ 
-        where: { carrierId: carrier.id, isActive: true } 
-      });
-
-      // Total offers
-      const totalOffers = await Offer.count({ where: { carrierId: carrier.id } });
-      const acceptedOffers = await Offer.count({ 
-        where: { carrierId: carrier.id, status: 'accepted' } 
-      });
-
-      stats = {
-        totalShipments,
-        deliveredShipments,
-        pendingShipments,
-        inTransitShipments,
-        successRate: totalShipments > 0 ? Math.round((deliveredShipments / totalShipments) * 100) : 0,
-        totalEarnings,
-        thisMonthEarnings,
-        activeDrivers,
-        totalOffers,
-        acceptedOffers
-      };
-
-    } else if (userType === 'logistics') {
-      // Driver statistics
-      const driver = await Driver.findOne({ where: { userId } });
-      if (!driver) {
-        return res.status(404).json({ success: false, message: 'Şoför profili bulunamadı' });
-      }
-
-      const totalJobs = await Shipment.count({ where: { driverId: driver.id } });
-      const completedJobs = await Shipment.count({ 
-        where: { driverId: driver.id, status: 'delivered' } 
-      });
-      const activeJobs = await Shipment.count({ 
-        where: { driverId: driver.id, status: 'in_transit' } 
-      });
-      const pendingJobs = await Shipment.count({ 
-        where: { driverId: driver.id, status: 'pending' } 
-      });
-
-      // Calculate total earnings
-      const jobs = await Shipment.findAll({
-        where: { driverId: driver.id, status: 'delivered' },
-        attributes: ['price']
-      });
-      const totalEarnings = jobs.reduce((sum, job) => sum + (job.price || 0), 0);
-
-      // This month's earnings
-      const thisMonth = new Date();
-      thisMonth.setDate(1);
-      const thisMonthJobs = await Shipment.findAll({
-        where: { 
-          driverId: driver.id, 
-          status: 'delivered',
-          updatedAt: { [require('sequelize').Op.gte]: thisMonth }
-        },
-        attributes: ['price']
-      });
-      const thisMonthEarnings = thisMonthJobs.reduce((sum, job) => sum + (job.price || 0), 0);
-
-      // Available jobs (jobs without assigned driver)
-      const availableJobs = await Shipment.count({ 
-        where: { 
-          status: 'pending',
-          driverId: null
-        } 
-      });
-
-      stats = {
-        totalJobs,
-        completedJobs,
-        activeJobs,
-        pendingJobs,
-        successRate: totalJobs > 0 ? Math.round((completedJobs / totalJobs) * 100) : 0,
-        totalEarnings,
-        thisMonthEarnings,
-        rating: driver.rating || 0,
-        totalTrips: completedJobs,
-        availableJobs
-      };
+    switch (userType) {
+      case 'individual':
+        stats = await getIndividualStats(userId);
+        break;
+      case 'corporate':
+        stats = await getCorporateStats(userId);
+        break;
+      case 'nakliyeci':
+        stats = await getNakliyeciStats(userId);
+        break;
+      case 'tasiyici':
+        stats = await getTasiyiciStats(userId);
+        break;
+      default:
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid user type',
+        });
     }
 
-    res.status(200).json({
+    res.json({
       success: true,
-      data: stats
+      data: stats,
     });
-
   } catch (error) {
-    logger.error(`Dashboard stats error: ${error.message}`, { 
-      service: 'dashboard-stats', 
-      userId: req.user.id,
-      stack: error.stack 
-    });
-    res.status(500).json({ 
-      success: false, 
-      message: 'Dashboard istatistikleri alınamadı' 
+    console.error('Get dashboard stats error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
     });
   }
 });
 
-// @route   GET /api/dashboard/recent-shipments
-// @desc    Get recent shipments
-// @access  Private
-router.get('/recent-shipments', protect, async (req, res) => {
+// Get recent activity
+router.get('/recent-activity', async (req, res) => {
   try {
-    const userId = req.user.id;
-    const userType = req.user.userType;
-    const limit = parseInt(req.query.limit) || 10;
+    const userId = req.user?.id;
 
-    let shipments = [];
-
-    if (userType === 'individual' || userType === 'corporate') {
-      shipments = await Shipment.findAll({
-        where: { senderId: userId },
-        include: [
-          { model: Carrier, as: 'carrier', attributes: ['companyName'] },
-          { model: Driver, as: 'driver', attributes: ['firstName', 'lastName'] }
-        ],
-        order: [['createdAt', 'DESC']],
-        limit
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required',
       });
-    } else if (userType === 'carrier') {
-      const carrier = await Carrier.findOne({ where: { userId } });
-      if (carrier) {
-        shipments = await Shipment.findAll({
-          where: { carrierId: carrier.id },
-          include: [
-            { model: User, as: 'sender', attributes: ['firstName', 'lastName'] },
-            { model: Driver, as: 'driver', attributes: ['firstName', 'lastName'] }
-          ],
-          order: [['createdAt', 'DESC']],
-          limit
-        });
-      }
-    } else if (userType === 'logistics') {
-      const driver = await Driver.findOne({ where: { userId } });
-      if (driver) {
-        shipments = await Shipment.findAll({
-          where: { driverId: driver.id },
-          include: [
-            { model: User, as: 'sender', attributes: ['firstName', 'lastName'] },
-            { model: Carrier, as: 'carrier', attributes: ['companyName'] }
-          ],
-          order: [['createdAt', 'DESC']],
-          limit
-        });
-      }
     }
 
-    res.status(200).json({
-      success: true,
-      data: shipments
+    const activities = [];
+
+    // Get recent shipments
+    const recentShipments = await Shipment.findAll({
+      where: { userId },
+      limit: 5,
+      order: [['createdAt', 'DESC']],
     });
 
-  } catch (error) {
-    logger.error(`Recent shipments error: ${error.message}`, { 
-      service: 'dashboard-recent-shipments', 
-      userId: req.user.id,
-      stack: error.stack 
+    // Get recent offers
+    const recentOffers = await Offer.findAll({
+      where: { carrierId: userId },
+      limit: 5,
+      order: [['createdAt', 'DESC']],
     });
-    res.status(500).json({ 
-      success: false, 
-      message: 'Son gönderiler alınamadı' 
+
+    // Get recent messages
+    const recentMessages = await Message.findAll({
+      where: {
+        [Op.or]: [{ senderId: userId }, { receiverId: userId }],
+      },
+      limit: 5,
+      order: [['createdAt', 'DESC']],
+    });
+
+    // Get recent notifications
+    const recentNotifications = await Notification.findAll({
+      where: { userId },
+      limit: 5,
+      order: [['createdAt', 'DESC']],
+    });
+
+    activities.push(
+      ...recentShipments.map(s => ({ type: 'shipment', data: s })),
+      ...recentOffers.map(o => ({ type: 'offer', data: o })),
+      ...recentMessages.map(m => ({ type: 'message', data: m })),
+      ...recentNotifications.map(n => ({ type: 'notification', data: n }))
+    );
+
+    // Sort by date
+    activities.sort(
+      (a, b) => new Date(b.data.createdAt) - new Date(a.data.createdAt)
+    );
+
+    res.json({
+      success: true,
+      data: activities.slice(0, 10),
+    });
+  } catch (error) {
+    console.error('Get recent activity error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
     });
   }
 });
 
-// @route   GET /api/dashboard/recent-offers
-// @desc    Get recent offers
-// @access  Private
-router.get('/recent-offers', protect, async (req, res) => {
+// Get analytics
+router.get('/analytics', async (req, res) => {
   try {
-    const userId = req.user.id;
-    const userType = req.user.userType;
-    const limit = parseInt(req.query.limit) || 10;
+    const userId = req.user?.id;
+    const { period = '30d' } = req.query;
 
-    let offers = [];
-
-    if (userType === 'individual' || userType === 'corporate') {
-      // Get offers for user's shipments
-      const userShipments = await Shipment.findAll({
-        where: { senderId: userId },
-        attributes: ['id']
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required',
       });
-      const shipmentIds = userShipments.map(s => s.id);
-
-      offers = await Offer.findAll({
-        where: { shipmentId: shipmentIds },
-        include: [
-          { model: Carrier, as: 'carrier', attributes: ['companyName'] },
-          { model: Driver, as: 'driver', attributes: ['firstName', 'lastName'] },
-          { model: Shipment, as: 'shipment', attributes: ['trackingNumber'] }
-        ],
-        order: [['createdAt', 'DESC']],
-        limit
-      });
-    } else if (userType === 'carrier') {
-      const carrier = await Carrier.findOne({ where: { userId } });
-      if (carrier) {
-        offers = await Offer.findAll({
-          where: { carrierId: carrier.id },
-          include: [
-            { model: Shipment, as: 'shipment', attributes: ['trackingNumber'] },
-            { model: Driver, as: 'driver', attributes: ['firstName', 'lastName'] }
-          ],
-          order: [['createdAt', 'DESC']],
-          limit
-        });
-      }
     }
 
-    res.status(200).json({
-      success: true,
-      data: offers
-    });
+    // In a real app, you would have more complex analytics
+    const analytics = {
+      shipments: {
+        total: 0,
+        completed: 0,
+        pending: 0,
+        cancelled: 0,
+      },
+      revenue: {
+        total: 0,
+        thisMonth: 0,
+        lastMonth: 0,
+      },
+      trends: {
+        shipments: [],
+        revenue: [],
+      },
+    };
 
-  } catch (error) {
-    logger.error(`Recent offers error: ${error.message}`, { 
-      service: 'dashboard-recent-offers', 
-      userId: req.user.id,
-      stack: error.stack 
+    res.json({
+      success: true,
+      data: analytics,
     });
-    res.status(500).json({ 
-      success: false, 
-      message: 'Son teklifler alınamadı' 
+  } catch (error) {
+    console.error('Get analytics error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
     });
   }
 });
+
+// Helper functions
+async function getIndividualStats(userId) {
+  const totalShipments = await Shipment.count({ where: { userId } });
+  const deliveredShipments = await Shipment.count({
+    where: { userId, status: 'delivered' },
+  });
+  const pendingShipments = await Shipment.count({
+    where: { userId, status: 'pending' },
+  });
+  const successRate =
+    totalShipments > 0 ? (deliveredShipments / totalShipments) * 100 : 0;
+
+  return {
+    totalShipments,
+    deliveredShipments,
+    pendingShipments,
+    successRate: Math.round(successRate * 100) / 100,
+    totalSpent: 0,
+    thisMonthSpent: 0,
+  };
+}
+
+async function getCorporateStats(userId) {
+  const totalShipments = await Shipment.count({ where: { userId } });
+  const deliveredShipments = await Shipment.count({
+    where: { userId, status: 'delivered' },
+  });
+  const pendingShipments = await Shipment.count({
+    where: { userId, status: 'pending' },
+  });
+  const successRate =
+    totalShipments > 0 ? (deliveredShipments / totalShipments) * 100 : 0;
+
+  return {
+    totalShipments,
+    deliveredShipments,
+    pendingShipments,
+    successRate: Math.round(successRate * 100) / 100,
+    totalSpent: 0,
+    thisMonthSpent: 0,
+    monthlyGrowth: 0,
+    activeCarriers: 0,
+  };
+}
+
+async function getNakliyeciStats(userId) {
+  const totalShipments = await Shipment.count({ where: { carrierId: userId } });
+  const deliveredShipments = await Shipment.count({
+    where: { carrierId: userId, status: 'delivered' },
+  });
+  const pendingShipments = await Shipment.count({
+    where: { carrierId: userId, status: 'pending' },
+  });
+  const successRate =
+    totalShipments > 0 ? (deliveredShipments / totalShipments) * 100 : 0;
+
+  return {
+    totalShipments,
+    deliveredShipments,
+    pendingShipments,
+    successRate: Math.round(successRate * 100) / 100,
+    totalEarnings: 0,
+    thisMonthEarnings: 0,
+    monthlyGrowth: 0,
+    activeDrivers: 0,
+    totalOffers: 0,
+    acceptedOffers: 0,
+  };
+}
+
+async function getTasiyiciStats(userId) {
+  const totalJobs = await Shipment.count({ where: { driverId: userId } });
+  const completedJobs = await Shipment.count({
+    where: { driverId: userId, status: 'delivered' },
+  });
+  const activeJobs = await Shipment.count({
+    where: { driverId: userId, status: 'in_transit' },
+  });
+  const successRate = totalJobs > 0 ? (completedJobs / totalJobs) * 100 : 0;
+
+  return {
+    totalJobs,
+    completedJobs,
+    activeJobs,
+    successRate: Math.round(successRate * 100) / 100,
+    totalEarnings: 0,
+    thisMonthEarnings: 0,
+    monthlyGrowth: 0,
+    rating: 0,
+    totalTrips: 0,
+    availableJobs: 0,
+  };
+}
 
 module.exports = router;
-

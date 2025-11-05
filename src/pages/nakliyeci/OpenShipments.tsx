@@ -1,523 +1,575 @@
 import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { 
-  Package, 
-  Search, 
-  Filter, 
-  Eye,
-  MessageSquare,
+import {
+  Package,
   MapPin,
   Calendar,
   Clock,
-  Weight,
-  DollarSign,
-  Star,
   Truck,
+  Eye,
+  MessageSquare,
+  Star,
+  Filter,
+  Search,
   ArrowRight,
-  RefreshCw,
+  CheckCircle,
   AlertCircle,
-  CheckCircle2,
-  XCircle,
-  Plus
+  Loader,
 } from 'lucide-react';
-import Breadcrumb from '../../components/common/Breadcrumb';
-import EmptyState from '../../components/common/EmptyState';
-import LoadingState from '../../components/common/LoadingState';
-import Modal from '../../components/common/Modal';
-import SuccessMessage from '../../components/common/SuccessMessage';
+import { shipmentAPI } from '../../services/api';
+import { createApiUrl } from '../../config/api';
 
-export default function OpenShipments() {
+interface Shipment {
+  id: string;
+  title: string;
+  description: string;
+  pickupAddress: string;
+  deliveryAddress: string;
+  pickupDate: string;
+  deliveryDate: string;
+  weight: number;
+  price: number;
+  status: 'open' | 'in_progress' | 'completed';
+  category: string;
+  specialRequirements: string;
+  userId: string;
+  createdAt: string;
+}
+
+const OpenShipments: React.FC = () => {
+  const [shipments, setShipments] = useState<Shipment[]>([]);
+  const [filteredShipments, setFilteredShipments] = useState<Shipment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterCategory, setFilterCategory] = useState('all');
-  const [filterWeight, setFilterWeight] = useState('all');
-  const [selectedShipment, setSelectedShipment] = useState(null);
-  const [showShipmentModal, setShowShipmentModal] = useState(false);
-  const [showOfferModal, setShowOfferModal] = useState(false);
-  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
-  const [offerPrice, setOfferPrice] = useState('');
-  const [offerNotes, setOfferNotes] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState('open');
 
-  const breadcrumbItems = [
-    { label: 'Ana Sayfa', icon: <Package className="w-4 h-4" /> },
-    { label: 'Açık İlanlar', icon: <Package className="w-4 h-4" /> }
-  ];
-
-  // Mock data - Gerçek API'den gelecek
-  const [openShipments] = useState([
+  // Demo veriler
+  const demoShipments: Shipment[] = [
     {
       id: '1',
-      trackingNumber: 'YN001234567',
-      sender: 'TechCorp A.Ş.',
-      from: 'İstanbul, Şişli',
-      to: 'Ankara, Çankaya',
-      weight: '3.5 kg',
-      volume: '0.5 m³',
-      category: 'Elektronik',
-      description: 'Laptop ve aksesuarları',
-      pickupDate: '2024-01-20',
-      deliveryDate: '2024-01-22',
-      specialRequirements: 'Kırılgan, Sigorta',
-      contactPerson: 'Ahmet Yılmaz',
-      phone: '+90 555 123 4567',
-      email: 'ahmet@techcorp.com',
-      estimatedPrice: '₺450-600',
-      publishedAt: '2024-01-15T10:30:00Z',
-      offerCount: 3,
-      isUrgent: false
+      title: 'Ev Taşınması',
+      description:
+        '3+1 ev taşınması - Yatak odası takımı, mutfak eşyaları, kırılabilir eşyalar var',
+      pickupAddress:
+        'Kadıköy, İstanbul - Moda Mahallesi, Bağdat Caddesi No:123',
+      deliveryAddress:
+        'Çankaya, Ankara - Kızılay Mahallesi, Atatürk Bulvarı No:456',
+      pickupDate: '2024-11-01',
+      deliveryDate: '2024-11-02',
+      weight: 150,
+      price: 0,
+      status: 'open',
+      category: 'house_move',
+      specialRequirements: 'Kırılabilir eşyalar var, dikkatli taşıma gerekli',
+      userId: 'user1',
+      createdAt: '2024-10-25T10:00:00Z',
     },
     {
       id: '2',
-      trackingNumber: 'YN001234568',
-      sender: 'E-Ticaret Ltd.',
-      from: 'İstanbul, Beşiktaş',
-      to: 'İzmir, Bornova',
-      weight: '150 kg',
-      volume: '2.5 m³',
-      category: 'E-ticaret',
-      description: 'Elektronik ürünler - 50 adet',
-      pickupDate: '2024-01-18',
-      deliveryDate: '2024-01-20',
-      specialRequirements: 'Acil, Sigorta',
-      contactPerson: 'Fatma Demir',
-      phone: '+90 555 987 6543',
-      email: 'fatma@eticaret.com',
-      estimatedPrice: '₺1,200-1,500',
-      publishedAt: '2024-01-15T14:20:00Z',
-      offerCount: 7,
-      isUrgent: true
+      title: 'Mobilya Taşıma',
+      description:
+        'Büyük dolap, koltuk takımı, masa - Sökme ve takma hizmeti gerekli',
+      pickupAddress:
+        'Beşiktaş, İstanbul - Etiler Mahallesi, Nispetiye Caddesi No:789',
+      deliveryAddress:
+        'Konak, İzmir - Alsancak Mahallesi, Kıbrıs Şehitleri Caddesi No:321',
+      pickupDate: '2024-11-03',
+      deliveryDate: '2024-11-04',
+      weight: 200,
+      price: 0,
+      status: 'open',
+      category: 'furniture_goods',
+      specialRequirements: 'Sökme-takma hizmeti, koruyucu sarma',
+      userId: 'user2',
+      createdAt: '2024-10-26T14:30:00Z',
     },
     {
       id: '3',
-      trackingNumber: 'YN001234569',
-      sender: 'Gıda A.Ş.',
-      from: 'Bursa, Nilüfer',
-      to: 'Antalya, Muratpaşa',
-      weight: '500 kg',
-      volume: '8 m³',
-      category: 'Gıda',
-      description: 'Taze meyve ve sebzeler',
-      pickupDate: '2024-01-19',
-      deliveryDate: '2024-01-21',
-      specialRequirements: 'Soğuk Zincir, Acil',
-      contactPerson: 'Mehmet Öz',
-      phone: '+90 555 456 7890',
-      email: 'mehmet@gida.com',
-      estimatedPrice: '₺800-1,000',
-      publishedAt: '2024-01-15T16:45:00Z',
-      offerCount: 2,
-      isUrgent: false
-    }
-  ]);
+      title: 'Araç Taşıma',
+      description:
+        '2018 BMW 3 Serisi - Çalışır durumda, sigortalı taşıma gerekli',
+      pickupAddress:
+        'Şişli, İstanbul - Mecidiyeköy Mahallesi, Büyükdere Caddesi No:555',
+      deliveryAddress:
+        'Nilüfer, Bursa - Özlüce Mahallesi, Ertuğrul Caddesi No:777',
+      pickupDate: '2024-11-05',
+      deliveryDate: '2024-11-06',
+      weight: 1500,
+      price: 0,
+      status: 'open',
+      category: 'vehicle_transport',
+      specialRequirements: 'Kapalı kamyon, sigorta şart',
+      userId: 'user3',
+      createdAt: '2024-10-27T09:15:00Z',
+    },
+    {
+      id: '4',
+      title: 'Ofis Taşınması',
+      description:
+        'Bilgisayarlar, yazıcılar, dosyalar - Elektronik eşyalar var',
+      pickupAddress: 'Levent, İstanbul - Büyükdere Caddesi No:100',
+      deliveryAddress: 'Çankaya, Ankara - Tunalı Hilmi Caddesi No:200',
+      pickupDate: '2024-11-07',
+      deliveryDate: '2024-11-08',
+      weight: 100,
+      price: 0,
+      status: 'open',
+      category: 'special_cargo',
+      specialRequirements: 'Elektronik eşyalar, dikkatli taşıma',
+      userId: 'user4',
+      createdAt: '2024-10-28T16:45:00Z',
+    },
+    {
+      id: '5',
+      title: 'Antika Eşya Taşıma',
+      description: 'Eski saat, tablo, vazo - Değerli antika eşyalar',
+      pickupAddress:
+        'Beyoğlu, İstanbul - Galata Mahallesi, Bankalar Caddesi No:50',
+      deliveryAddress:
+        'Konak, İzmir - Kemeraltı Mahallesi, Anafartalar Caddesi No:75',
+      pickupDate: '2024-11-09',
+      deliveryDate: '2024-11-10',
+      weight: 50,
+      price: 0,
+      status: 'open',
+      category: 'special_cargo',
+      specialRequirements: 'Sigorta şart, özel paketleme',
+      userId: 'user5',
+      createdAt: '2024-10-29T11:20:00Z',
+    },
+  ];
 
   useEffect(() => {
-    // Simulate loading
-    setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-    }, 1000);
+    loadShipments();
   }, []);
 
-  const filteredShipments = openShipments.filter(shipment => {
-    const matchesSearch = 
-      shipment.trackingNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      shipment.sender.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      shipment.from.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      shipment.to.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesCategory = filterCategory === 'all' || shipment.category === filterCategory;
-    
-    return matchesSearch && matchesCategory;
-  });
+  useEffect(() => {
+    loadShipments();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm, selectedCategory]);
 
-  const handleViewDetails = (shipment: any) => {
-    setSelectedShipment(shipment);
-    setShowShipmentModal(true);
+  useEffect(() => {
+    filterShipments();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shipments, selectedStatus]);
+
+  const loadShipments = async () => {
+    try {
+      setIsLoading(true);
+
+      // Gerçek API çağrısı - search parametresi ile
+      try {
+        const token = localStorage.getItem('authToken');
+        const params = new URLSearchParams();
+        if (searchTerm && searchTerm.trim()) {
+          params.append('search', searchTerm.trim());
+        }
+        if (selectedCategory) {
+          params.append('category', selectedCategory);
+        }
+        
+        const response = await fetch(
+          `${createApiUrl('/api/shipments/open')}${params.toString() ? '?' + params.toString() : ''}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+        
+        if (response.ok) {
+          const data = await response.json();
+          const shipmentsData = data.data || data.shipments || [];
+          if (data.success) {
+            setShipments(Array.isArray(shipmentsData) ? shipmentsData : []);
+          } else {
+            setShipments([]);
+          }
+        } else {
+          setShipments([]);
+        }
+      } catch (error) {
+        console.log('API hatası:', error);
+        setShipments([]);
+      }
+    } catch (error) {
+      console.error('Gönderiler yüklenirken hata:', error);
+      setShipments([]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleMakeOffer = (shipment: any) => {
-    setSelectedShipment(shipment);
-    setOfferPrice('');
-    setOfferNotes('');
-    setShowOfferModal(true);
-  };
+  // Arama ve kategori backend'de yapıldığı için sadece status filtresi uygulanıyor
+  const filterShipments = () => {
+    let filtered = shipments;
 
-  const handleSubmitOffer = () => {
-    if (!offerPrice) {
-      setSuccessMessage('Lütfen teklif fiyatı girin');
-      setShowSuccessMessage(true);
-      return;
+    // Durum filtresi (client-side, çünkü backend sadece 'open' döndürüyor)
+    if (selectedStatus && selectedStatus !== 'open') {
+      filtered = filtered.filter(
+        shipment => shipment.status === selectedStatus
+      );
     }
 
-    // Simulate API call
-    setTimeout(() => {
-      setShowOfferModal(false);
-      setSuccessMessage('Teklifiniz başarıyla gönderildi!');
-      setShowSuccessMessage(true);
-      setTimeout(() => setShowSuccessMessage(false), 3000);
-    }, 1000);
+    setFilteredShipments(filtered);
   };
 
-  const getCategoryColor = (category: string) => {
+  const getCategoryName = (category: string) => {
+    const categories: { [key: string]: string } = {
+      house_move: 'Ev Taşınması',
+      furniture_goods: 'Mobilya Taşıma',
+      vehicle_transport: 'Araç Taşıma',
+      special_cargo: 'Özel Yük',
+      other: 'Diğer',
+    };
+    return categories[category] || 'Bilinmeyen';
+  };
+
+  const getCategoryIcon = (category: string) => {
     switch (category) {
-      case 'Elektronik':
-        return 'bg-blue-100 text-blue-800';
-      case 'E-ticaret':
+      case 'house_move':
+        return '🏠';
+      case 'furniture_goods':
+        return '🪑';
+      case 'vehicle_transport':
+        return '🚗';
+      case 'special_cargo':
+        return '📦';
+      default:
+        return '📦';
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'open':
         return 'bg-green-100 text-green-800';
-      case 'Gıda':
-        return 'bg-orange-100 text-orange-800';
-      case 'Doküman':
-        return 'bg-purple-100 text-purple-800';
+      case 'in_progress':
+        return 'bg-blue-100 text-blue-800';
+      case 'completed':
+        return 'bg-gray-100 text-gray-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
   };
 
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'open':
+        return 'Açık';
+      case 'in_progress':
+        return 'Devam Ediyor';
+      case 'completed':
+        return 'Tamamlandı';
+      default:
+        return 'Bilinmeyen';
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('tr-TR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+  };
+
+  const handleOfferClick = (shipmentId: string) => {
+    // Teklif verme sayfasına yönlendir
+    window.location.href = `/nakliyeci/offer/${shipmentId}`;
+  };
+
+  const handleViewDetails = (shipmentId: string) => {
+    // Gönderi detay sayfasına yönlendir
+    window.location.href = `/nakliyeci/shipment/${shipmentId}`;
+  };
+
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <LoadingState text="Açık ilanlar yükleniyor..." />
+      <div className='min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center'>
+        <div className='text-center'>
+          <Loader className='w-8 h-8 animate-spin text-blue-600 mx-auto mb-4' />
+          <p className='text-slate-600'>Gönderiler yükleniyor...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className='min-h-screen bg-gradient-to-br from-slate-50 to-blue-50'>
       <Helmet>
-        <title>Açık İlanlar - Nakliyeci Panel - YolNet</title>
-        <meta name="description" content="Açık gönderi ilanları" />
+        <title>Açık Gönderiler - YolNext Nakliyeci</title>
+        <meta
+          name='description'
+          content='Açık gönderileri görüntüleyin ve teklif verin'
+        />
       </Helmet>
 
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        {/* Breadcrumb */}
-        <div className="mb-6">
-          <Breadcrumb items={breadcrumbItems} />
-        </div>
-
+      <div className='container mx-auto px-4 py-8'>
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
-          <div className="flex items-center gap-3 mb-4 sm:mb-0">
-            <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-800 rounded-xl flex items-center justify-center shadow-lg">
-              <Package className="w-6 h-6 text-white" />
+        <div className='mb-8'>
+          <div className='flex items-center gap-3 mb-4'>
+            <div className='w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center'>
+              <Package className='w-6 h-6 text-white' />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Açık İlanlar</h1>
-              <p className="text-gray-600">Gönderi taleplerine teklif verin</p>
-            </div>
-          </div>
-          
-          <div className="flex gap-3">
-            <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
-              <RefreshCw className="w-4 h-4" />
-              <span>Yenile</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Toplam İlan</p>
-                <p className="text-2xl font-bold text-gray-900">{openShipments.length}</p>
-              </div>
-              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                <Package className="w-5 h-5 text-blue-600" />
-              </div>
+              <h1 className='text-3xl font-bold text-slate-900'>
+                Açık Gönderiler
+              </h1>
+              <p className='text-slate-600'>Mevcut gönderilere teklif verin</p>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Acil İlanlar</p>
-                <p className="text-2xl font-bold text-red-600">
-                  {openShipments.filter(s => s.isUrgent).length}
-                </p>
-              </div>
-              <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
-                <AlertCircle className="w-5 h-5 text-red-600" />
+          {/* Stats */}
+          <div className='grid grid-cols-1 md:grid-cols-3 gap-4 mb-6'>
+            <div className='bg-white rounded-xl p-6 shadow-sm border border-slate-200'>
+              <div className='flex items-center gap-3'>
+                <div className='w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center'>
+                  <CheckCircle className='w-5 h-5 text-green-600' />
+                </div>
+                <div>
+                  <p className='text-2xl font-bold text-slate-900'>
+                    {filteredShipments.length}
+                  </p>
+                  <p className='text-sm text-slate-600'>Toplam Gönderi</p>
+                </div>
               </div>
             </div>
-          </div>
-
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Ortalama Teklif</p>
-                <p className="text-2xl font-bold text-green-600">₺850</p>
+            <div className='bg-white rounded-xl p-6 shadow-sm border border-slate-200'>
+              <div className='flex items-center gap-3'>
+                <div className='w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center'>
+                  <Clock className='w-5 h-5 text-blue-600' />
+                </div>
+                <div>
+                  <p className='text-2xl font-bold text-slate-900'>
+                    {filteredShipments.filter(s => s.status === 'open').length}
+                  </p>
+                  <p className='text-sm text-slate-600'>Açık Gönderi</p>
+                </div>
               </div>
-              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                <DollarSign className="w-5 h-5 text-green-600" />
+            </div>
+            <div className='bg-white rounded-xl p-6 shadow-sm border border-slate-200'>
+              <div className='flex items-center gap-3'>
+                <div className='w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center'>
+                  <Truck className='w-5 h-5 text-purple-600' />
+                </div>
+                <div>
+                  <p className='text-2xl font-bold text-slate-900'>
+                    {
+                      filteredShipments.filter(s => s.status === 'in_progress')
+                        .length
+                    }
+                  </p>
+                  <p className='text-sm text-slate-600'>Devam Eden</p>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
         {/* Filters */}
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 mb-6">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <input
-                  type="text"
-                  placeholder="İlan ara..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
+        <div className='bg-white rounded-xl p-6 shadow-sm border border-slate-200 mb-6'>
+          <div className='grid grid-cols-1 md:grid-cols-4 gap-4'>
+            {/* Search */}
+            <div className='relative'>
+              <Search className='absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400' />
+              <input
+                type='text'
+                placeholder='Gönderi ara...'
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className='w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+              />
             </div>
-            
-            <div className="flex gap-3">
-              <select
-                value={filterCategory}
-                onChange={(e) => setFilterCategory(e.target.value)}
-                className="px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="all">Tüm Kategoriler</option>
-                <option value="Elektronik">Elektronik</option>
-                <option value="E-ticaret">E-ticaret</option>
-                <option value="Gıda">Gıda</option>
-                <option value="Doküman">Doküman</option>
-              </select>
-            </div>
+
+            {/* Category Filter */}
+            <select
+              value={selectedCategory}
+              onChange={e => setSelectedCategory(e.target.value)}
+              className='w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+            >
+              <option value=''>Tüm Kategoriler</option>
+              <option value='house_move'>Ev Taşınması</option>
+              <option value='furniture_goods'>Mobilya Taşıma</option>
+              <option value='vehicle_transport'>Araç Taşıma</option>
+              <option value='special_cargo'>Özel Yük</option>
+            </select>
+
+            {/* Status Filter */}
+            <select
+              value={selectedStatus}
+              onChange={e => setSelectedStatus(e.target.value)}
+              className='w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+            >
+              <option value='open'>Açık Gönderiler</option>
+              <option value='in_progress'>Devam Eden</option>
+              <option value='completed'>Tamamlanan</option>
+            </select>
+
+            {/* Filter Button */}
+            <button className='min-h-[44px] flex items-center justify-center gap-2 px-4 py-3 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors'>
+              <Filter className='w-5 h-5' />
+              Filtrele
+            </button>
           </div>
         </div>
 
         {/* Shipments List */}
-        {filteredShipments.length === 0 ? (
-          <EmptyState
-            icon={Package}
-            title="İlan bulunamadı"
-            description="Arama kriterlerinize uygun ilan bulunamadı."
-          />
-        ) : (
-          <div className="space-y-4">
-            {filteredShipments.map((shipment) => (
-              <div key={shipment.id} className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
-                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-3">
-                      <span className="text-sm font-medium text-blue-600">#{shipment.trackingNumber}</span>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getCategoryColor(shipment.category)}`}>
-                        {shipment.category}
-                      </span>
-                      {shipment.isUrgent && (
-                        <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                          Acil
-                        </span>
-                      )}
-                      <div className="flex items-center gap-1 text-xs text-gray-500">
-                        <MessageSquare className="w-3 h-3" />
-                        <span>{shipment.offerCount} teklif</span>
+        <div className='space-y-4'>
+          {filteredShipments.length === 0 ? (
+            <div className='bg-white rounded-xl p-12 text-center shadow-sm border border-slate-200'>
+              <Package className='w-16 h-16 text-slate-300 mx-auto mb-4' />
+              <h3 className='text-xl font-semibold text-slate-900 mb-2'>
+                Gönderi Bulunamadı
+              </h3>
+              <p className='text-slate-600'>
+                Arama kriterlerinize uygun gönderi bulunmuyor.
+              </p>
+            </div>
+          ) : (
+            filteredShipments.map(shipment => (
+              <div
+                key={shipment.id}
+                data-testid={`shipment-card-${shipment.id}`}
+                className='bg-white rounded-xl p-6 shadow-sm border border-slate-200 hover:shadow-md transition-shadow'
+              >
+                <div className='flex flex-col lg:flex-row lg:items-start gap-6'>
+                  {/* Left Content */}
+                  <div className='flex-1'>
+                    <div className='flex items-start gap-4 mb-4'>
+                      <div className='w-12 h-12 bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl flex items-center justify-center text-2xl'>
+                        {getCategoryIcon(shipment.category)}
+                      </div>
+                      <div className='flex-1'>
+                        <div className='flex items-center gap-3 mb-2'>
+                          <h3 className='text-xl font-bold text-slate-900'>
+                            {shipment.title}
+                          </h3>
+                          <span
+                            className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(shipment.status)}`}
+                          >
+                            {getStatusText(shipment.status)}
+                          </span>
+                        </div>
+                        <p className='text-slate-600 mb-3'>
+                          {shipment.description}
+                        </p>
+
+                        {/* Special Requirements */}
+                        {shipment.specialRequirements && (
+                          <div className='bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4'>
+                            <div className='flex items-center gap-2 mb-1'>
+                              <AlertCircle className='w-4 h-4 text-amber-600' />
+                              <span className='text-sm font-medium text-amber-800'>
+                                Özel Gereksinimler
+                              </span>
+                            </div>
+                            <p className='text-sm text-amber-700'>
+                              {shipment.specialRequirements}
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                      <div>
-                        <p className="text-xs text-gray-500 mb-1">Gönderen</p>
-                        <p className="text-sm font-medium text-gray-900">{shipment.sender}</p>
+
+                    {/* Address Info */}
+                    <div className='grid grid-cols-1 md:grid-cols-2 gap-4 mb-4'>
+                      <div className='flex items-start gap-3'>
+                        <div className='w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0'>
+                          <MapPin className='w-4 h-4 text-green-600' />
+                        </div>
+                        <div>
+                          <p className='text-sm font-medium text-slate-700 mb-1'>
+                            Toplama Adresi
+                          </p>
+                          <p className='text-sm text-slate-600'>
+                            {shipment.pickupAddress}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-xs text-gray-500 mb-1">Güzergah</p>
-                        <p className="text-sm font-medium text-gray-900">{shipment.from} → {shipment.to}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500 mb-1">Ağırlık / Hacim</p>
-                        <p className="text-sm font-medium text-gray-900">{shipment.weight} / {shipment.volume}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500 mb-1">Tahmini Fiyat</p>
-                        <p className="text-sm font-medium text-gray-900">{shipment.estimatedPrice}</p>
+                      <div className='flex items-start gap-3'>
+                        <div className='w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center flex-shrink-0'>
+                          <MapPin className='w-4 h-4 text-red-600' />
+                        </div>
+                        <div>
+                          <p className='text-sm font-medium text-slate-700 mb-1'>
+                            Teslimat Adresi
+                          </p>
+                          <p className='text-sm text-slate-600'>
+                            {shipment.deliveryAddress}
+                          </p>
+                        </div>
                       </div>
                     </div>
-                    
-                    <div className="mb-4">
-                      <p className="text-xs text-gray-500 mb-1">Açıklama</p>
-                      <p className="text-sm text-gray-900">{shipment.description}</p>
+
+                    {/* Date Info */}
+                    <div className='grid grid-cols-1 md:grid-cols-2 gap-4 mb-4'>
+                      <div className='flex items-center gap-3'>
+                        <Calendar className='w-5 h-5 text-blue-600' />
+                        <div>
+                          <p className='text-sm font-medium text-slate-700'>
+                            Toplama Tarihi
+                          </p>
+                          <p className='text-sm text-slate-600'>
+                            {formatDate(shipment.pickupDate)}
+                          </p>
+                        </div>
+                      </div>
+                      <div className='flex items-center gap-3'>
+                        <Calendar className='w-5 h-5 text-purple-600' />
+                        <div>
+                          <p className='text-sm font-medium text-slate-700'>
+                            Teslimat Tarihi
+                          </p>
+                          <p className='text-sm text-slate-600'>
+                            {formatDate(shipment.deliveryDate)}
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                    
-                    <div className="flex items-center gap-4 text-xs text-gray-500">
-                      <div className="flex items-center gap-1">
-                        <Calendar className="w-3 h-3" />
-                        <span>Toplama: {new Date(shipment.pickupDate).toLocaleDateString('tr-TR')}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        <span>Teslimat: {new Date(shipment.deliveryDate).toLocaleDateString('tr-TR')}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Weight className="w-3 h-3" />
-                        <span>{shipment.specialRequirements}</span>
+
+                    {/* Weight */}
+                    <div className='flex items-center gap-3 mb-4'>
+                      <Truck className='w-5 h-5 text-slate-600' />
+                      <div>
+                        <p className='text-sm font-medium text-slate-700'>
+                          Tahmini Ağırlık
+                        </p>
+                        <p className='text-sm text-slate-600'>
+                          {shipment.weight} kg
+                        </p>
                       </div>
                     </div>
                   </div>
-                  
-                  <div className="flex items-center gap-2">
+
+                  {/* Right Actions */}
+                  <div className='flex flex-col gap-3 lg:w-48'>
                     <button
-                      onClick={() => handleViewDetails(shipment)}
-                      className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                      onClick={() => handleOfferClick(shipment.id)}
+                      className='flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-sm hover:shadow-md'
                     >
-                      <Eye className="w-4 h-4" />
+                      <MessageSquare className='w-4 h-4' />
+                      Teklif Ver
                     </button>
                     <button
-                      onClick={() => handleMakeOffer(shipment)}
-                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                      onClick={() => handleViewDetails(shipment.id)}
+                      className='flex items-center justify-center gap-2 px-4 py-3 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors'
                     >
-                      <MessageSquare className="w-4 h-4" />
-                      <span>Teklif Ver</span>
+                      <Eye className='w-4 h-4' />
+                      Detayları Gör
                     </button>
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
+            ))
+          )}
+        </div>
       </div>
-
-      {/* Shipment Detail Modal */}
-      {showShipmentModal && selectedShipment && (
-        <Modal
-          isOpen={showShipmentModal}
-          onClose={() => setShowShipmentModal(false)}
-          title="İlan Detayları"
-        >
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-gray-500">Takip Numarası</p>
-                <p className="font-medium">{selectedShipment.trackingNumber}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Kategori</p>
-                <p className="font-medium">{selectedShipment.category}</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-gray-500">Gönderen</p>
-                <p className="font-medium">{selectedShipment.sender}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Güzergah</p>
-                <p className="font-medium">{selectedShipment.from} → {selectedShipment.to}</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-gray-500">Ağırlık / Hacim</p>
-                <p className="font-medium">{selectedShipment.weight} / {selectedShipment.volume}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Tahmini Fiyat</p>
-                <p className="font-medium">{selectedShipment.estimatedPrice}</p>
-              </div>
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Açıklama</p>
-              <p className="font-medium">{selectedShipment.description}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-500">Özel Gereksinimler</p>
-              <p className="font-medium">{selectedShipment.specialRequirements}</p>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-gray-500">Toplama Tarihi</p>
-                <p className="font-medium">{new Date(selectedShipment.pickupDate).toLocaleDateString('tr-TR')}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Teslimat Tarihi</p>
-                <p className="font-medium">{new Date(selectedShipment.deliveryDate).toLocaleDateString('tr-TR')}</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-gray-500">İletişim Kişisi</p>
-                <p className="font-medium">{selectedShipment.contactPerson}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Telefon</p>
-                <p className="font-medium">{selectedShipment.phone}</p>
-              </div>
-            </div>
-          </div>
-        </Modal>
-      )}
-
-      {/* Offer Modal */}
-      {showOfferModal && selectedShipment && (
-        <Modal
-          isOpen={showOfferModal}
-          onClose={() => setShowOfferModal(false)}
-          title="Teklif Ver"
-        >
-          <div className="space-y-4">
-            <div className="bg-gray-50 rounded-lg p-4">
-              <h3 className="font-medium text-gray-900 mb-2">İlan Bilgileri</h3>
-              <p className="text-sm text-gray-600">#{selectedShipment.trackingNumber} - {selectedShipment.from} → {selectedShipment.to}</p>
-              <p className="text-sm text-gray-600">{selectedShipment.weight} / {selectedShipment.volume}</p>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Teklif Fiyatı (₺) *
-              </label>
-              <input
-                type="number"
-                value={offerPrice}
-                onChange={(e) => setOfferPrice(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Örn: 450"
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Notlar
-              </label>
-              <textarea
-                value={offerNotes}
-                onChange={(e) => setOfferNotes(e.target.value)}
-                rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Teklifiniz hakkında notlar..."
-              />
-            </div>
-            
-            <div className="flex gap-3 pt-4">
-              <button
-                onClick={() => setShowOfferModal(false)}
-                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                İptal
-              </button>
-              <button
-                onClick={handleSubmitOffer}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                Teklif Gönder
-              </button>
-            </div>
-          </div>
-        </Modal>
-      )}
-
-      {/* Success Message */}
-      {showSuccessMessage && (
-        <SuccessMessage
-          message={successMessage}
-          isVisible={showSuccessMessage}
-          onClose={() => setShowSuccessMessage(false)}
-        />
-      )}
     </div>
   );
-}
+};
 
+export default OpenShipments;

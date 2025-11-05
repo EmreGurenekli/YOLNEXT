@@ -3,138 +3,67 @@ const { sequelize } = require('../config/database');
 
 const Carrier = sequelize.define('Carrier', {
   id: {
-    type: DataTypes.INTEGER,
-    autoIncrement: true,
+    type: DataTypes.UUID,
+    defaultValue: DataTypes.UUIDV4,
     primaryKey: true
   },
   userId: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.UUID,
     allowNull: false,
     references: {
-      model: 'users',
+      model: 'Users',
       key: 'id'
     }
   },
   companyName: {
     type: DataTypes.STRING,
-    allowNull: false,
-    validate: {
-      len: [2, 100]
-    }
+    allowNull: false
   },
   taxNumber: {
     type: DataTypes.STRING,
-    allowNull: false,
-    unique: true,
-    validate: {
-      len: [10, 11]
-    }
+    allowNull: true
   },
   address: {
     type: DataTypes.TEXT,
-    allowNull: false
-  },
-  city: {
-    type: DataTypes.STRING,
-    allowNull: false
-  },
-  district: {
-    type: DataTypes.STRING,
-    allowNull: false
-  },
-  postalCode: {
-    type: DataTypes.STRING,
     allowNull: true
   },
-  phone: {
-    type: DataTypes.STRING,
-    allowNull: false
-  },
-  email: {
-    type: DataTypes.STRING,
-    allowNull: false,
-    validate: {
-      isEmail: true
-    }
-  },
-  website: {
-    type: DataTypes.STRING,
-    allowNull: true,
-    validate: {
-      isUrl: true
-    }
-  },
-  licenseNumber: {
-    type: DataTypes.STRING,
-    allowNull: false,
-    unique: true
-  },
-  licenseExpiry: {
-    type: DataTypes.DATE,
-    allowNull: false
-  },
-  insuranceNumber: {
-    type: DataTypes.STRING,
-    allowNull: true
-  },
-  insuranceExpiry: {
-    type: DataTypes.DATE,
-    allowNull: true
-  },
-  rating: {
-    type: DataTypes.DECIMAL(2, 1),
-    defaultValue: 0.0,
-    validate: {
-      min: 0,
-      max: 5
-    }
-  },
-  totalShipments: {
+  vehicleCount: {
     type: DataTypes.INTEGER,
+    allowNull: false,
     defaultValue: 0
   },
-  successfulShipments: {
-    type: DataTypes.INTEGER,
+  rating: {
+    type: DataTypes.FLOAT,
+    allowNull: false,
     defaultValue: 0
   },
   isVerified: {
     type: DataTypes.BOOLEAN,
+    allowNull: false,
     defaultValue: false
   },
-  isActive: {
-    type: DataTypes.BOOLEAN,
-    defaultValue: true
-  },
-  verificationDocuments: {
-    type: DataTypes.JSONB,
-    defaultValue: []
-  },
-  serviceAreas: {
-    type: DataTypes.JSONB,
-    defaultValue: []
-  },
-  vehicleTypes: {
-    type: DataTypes.JSONB,
-    defaultValue: []
-  },
-  workingHours: {
-    type: DataTypes.JSONB,
-    defaultValue: {
-      monday: { start: '09:00', end: '18:00', isWorking: true },
-      tuesday: { start: '09:00', end: '18:00', isWorking: true },
-      wednesday: { start: '09:00', end: '18:00', isWorking: true },
-      thursday: { start: '09:00', end: '18:00', isWorking: true },
-      friday: { start: '09:00', end: '18:00', isWorking: true },
-      saturday: { start: '09:00', end: '18:00', isWorking: false },
-      sunday: { start: '09:00', end: '18:00', isWorking: false }
-    }
-  },
   preferences: {
-    type: DataTypes.JSONB,
+    type: DataTypes.JSON,
+    allowNull: true,
     defaultValue: {}
+  },
+  notificationSettings: {
+    type: DataTypes.JSON,
+    allowNull: true,
+    defaultValue: {
+      email: true,
+      sms: true,
+      push: true
+    }
   }
 }, {
-  tableName: 'carriers'
+  tableName: 'carriers',
+  timestamps: true,
+  indexes: [
+    {
+      fields: ['userId']
+    }
+  ]
 });
 
 module.exports = Carrier;

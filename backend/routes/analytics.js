@@ -14,8 +14,15 @@ router.post('/track', authenticateToken, (req, res) => {
   db.run(
     `INSERT INTO analytics (user_id, event_type, event_data, page_url, user_agent, ip_address)
      VALUES (?, ?, ?, ?, ?, ?)`,
-    [userId, event_type, JSON.stringify(event_data), page_url, user_agent, ip_address],
-    function(err) {
+    [
+      userId,
+      event_type,
+      JSON.stringify(event_data),
+      page_url,
+      user_agent,
+      ip_address,
+    ],
+    function (err) {
       if (err) {
         console.error('Analytics tracking error:', err);
         return res.status(500).json({ error: 'Failed to track event' });
@@ -60,7 +67,7 @@ router.get('/user', authenticateToken, (req, res) => {
     // Process analytics data
     const processedAnalytics = analytics.map(item => ({
       ...item,
-      event_data: item.event_data ? JSON.parse(item.event_data) : null
+      event_data: item.event_data ? JSON.parse(item.event_data) : null,
     }));
 
     res.json(processedAnalytics);
@@ -86,32 +93,38 @@ router.get('/dashboard', authenticateToken, (req, res) => {
     // Events by type
     `SELECT event_type, COUNT(*) as count FROM analytics WHERE user_id = ? AND created_at >= ? GROUP BY event_type`,
     // Daily activity
-    `SELECT DATE(created_at) as date, COUNT(*) as events FROM analytics WHERE user_id = ? AND created_at >= ? GROUP BY DATE(created_at) ORDER BY date DESC`
+    `SELECT DATE(created_at) as date, COUNT(*) as events FROM analytics WHERE user_id = ? AND created_at >= ? GROUP BY DATE(created_at) ORDER BY date DESC`,
   ];
 
   const params = [userId, startDate.toISOString()];
 
-  Promise.all(queries.map(query => 
-    new Promise((resolve, reject) => {
-      db.all(query, params, (err, result) => {
-        if (err) reject(err);
-        else resolve(result);
+  Promise.all(
+    queries.map(
+      query =>
+        new Promise((resolve, reject) => {
+          db.all(query, params, (err, result) => {
+            if (err) reject(err);
+            else resolve(result);
+          });
+        })
+    )
+  )
+    .then(results => {
+      const [totalEvents, uniquePages, topPages, eventsByType, dailyActivity] =
+        results;
+
+      res.json({
+        total_events: totalEvents[0].total_events,
+        unique_pages: uniquePages[0].unique_pages,
+        top_pages: topPages,
+        events_by_type: eventsByType,
+        daily_activity: dailyActivity,
       });
     })
-  )).then(results => {
-    const [totalEvents, uniquePages, topPages, eventsByType, dailyActivity] = results;
-
-    res.json({
-      total_events: totalEvents[0].total_events,
-      unique_pages: uniquePages[0].unique_pages,
-      top_pages: topPages,
-      events_by_type: eventsByType,
-      daily_activity: dailyActivity
+    .catch(err => {
+      console.error('Dashboard analytics error:', err);
+      res.status(500).json({ error: 'Failed to fetch dashboard analytics' });
     });
-  }).catch(err => {
-    console.error('Dashboard analytics error:', err);
-    res.status(500).json({ error: 'Failed to fetch dashboard analytics' });
-  });
 });
 
 // Get shipment analytics
@@ -130,31 +143,37 @@ router.get('/shipments', authenticateToken, (req, res) => {
     // Average price
     `SELECT AVG(price) as avg_price FROM shipments WHERE user_id = ? AND price IS NOT NULL AND created_at >= ?`,
     // Monthly trend
-    `SELECT strftime('%Y-%m', created_at) as month, COUNT(*) as shipments FROM shipments WHERE user_id = ? AND created_at >= ? GROUP BY strftime('%Y-%m', created_at) ORDER BY month DESC`
+    `SELECT strftime('%Y-%m', created_at) as month, COUNT(*) as shipments FROM shipments WHERE user_id = ? AND created_at >= ? GROUP BY strftime('%Y-%m', created_at) ORDER BY month DESC`,
   ];
 
   const params = [userId, startDate.toISOString()];
 
-  Promise.all(queries.map(query => 
-    new Promise((resolve, reject) => {
-      db.all(query, params, (err, result) => {
-        if (err) reject(err);
-        else resolve(result);
+  Promise.all(
+    queries.map(
+      query =>
+        new Promise((resolve, reject) => {
+          db.all(query, params, (err, result) => {
+            if (err) reject(err);
+            else resolve(result);
+          });
+        })
+    )
+  )
+    .then(results => {
+      const [totalShipments, shipmentsByStatus, avgPrice, monthlyTrend] =
+        results;
+
+      res.json({
+        total_shipments: totalShipments[0].total_shipments,
+        shipments_by_status: shipmentsByStatus,
+        average_price: avgPrice[0].avg_price || 0,
+        monthly_trend: monthlyTrend,
       });
     })
-  )).then(results => {
-    const [totalShipments, shipmentsByStatus, avgPrice, monthlyTrend] = results;
-
-    res.json({
-      total_shipments: totalShipments[0].total_shipments,
-      shipments_by_status: shipmentsByStatus,
-      average_price: avgPrice[0].avg_price || 0,
-      monthly_trend: monthlyTrend
+    .catch(err => {
+      console.error('Shipment analytics error:', err);
+      res.status(500).json({ error: 'Failed to fetch shipment analytics' });
     });
-  }).catch(err => {
-    console.error('Shipment analytics error:', err);
-    res.status(500).json({ error: 'Failed to fetch shipment analytics' });
-  });
 });
 
 // Get financial analytics
@@ -173,31 +192,41 @@ router.get('/financial', authenticateToken, (req, res) => {
     // Transaction summary
     `SELECT type, SUM(amount) as total_amount, COUNT(*) as count FROM transactions t JOIN wallets w ON t.wallet_id = w.id WHERE t.user_id = ? AND t.created_at >= ? GROUP BY type`,
     // Monthly financial trend
-    `SELECT strftime('%Y-%m', t.created_at) as month, SUM(t.amount) as total_amount FROM transactions t JOIN wallets w ON t.wallet_id = w.id WHERE t.user_id = ? AND t.created_at >= ? GROUP BY strftime('%Y-%m', t.created_at) ORDER BY month DESC`
+    `SELECT strftime('%Y-%m', t.created_at) as month, SUM(t.amount) as total_amount FROM transactions t JOIN wallets w ON t.wallet_id = w.id WHERE t.user_id = ? AND t.created_at >= ? GROUP BY strftime('%Y-%m', t.created_at) ORDER BY month DESC`,
   ];
 
   const params = [userId, startDate.toISOString()];
 
-  Promise.all(queries.map(query => 
-    new Promise((resolve, reject) => {
-      db.all(query, params, (err, result) => {
-        if (err) reject(err);
-        else resolve(result);
+  Promise.all(
+    queries.map(
+      query =>
+        new Promise((resolve, reject) => {
+          db.all(query, params, (err, result) => {
+            if (err) reject(err);
+            else resolve(result);
+          });
+        })
+    )
+  )
+    .then(results => {
+      const [
+        walletBalance,
+        totalTransactions,
+        transactionSummary,
+        monthlyTrend,
+      ] = results;
+
+      res.json({
+        wallet_balance: walletBalance[0]?.balance || 0,
+        total_transactions: totalTransactions[0].total_transactions,
+        transaction_summary: transactionSummary,
+        monthly_trend: monthlyTrend,
       });
     })
-  )).then(results => {
-    const [walletBalance, totalTransactions, transactionSummary, monthlyTrend] = results;
-
-    res.json({
-      wallet_balance: walletBalance[0]?.balance || 0,
-      total_transactions: totalTransactions[0].total_transactions,
-      transaction_summary: transactionSummary,
-      monthly_trend: monthlyTrend
+    .catch(err => {
+      console.error('Financial analytics error:', err);
+      res.status(500).json({ error: 'Failed to fetch financial analytics' });
     });
-  }).catch(err => {
-    console.error('Financial analytics error:', err);
-    res.status(500).json({ error: 'Failed to fetch financial analytics' });
-  });
 });
 
 // Get performance analytics (for carriers)
@@ -226,42 +255,50 @@ router.get('/performance', authenticateToken, (req, res) => {
        COUNT(*) as offers,
        SUM(CASE WHEN status = 'accepted' THEN 1 ELSE 0 END) as accepted
      FROM offers WHERE carrier_id = ? AND created_at >= ? 
-     GROUP BY strftime('%Y-%m', created_at) ORDER BY month DESC`
+     GROUP BY strftime('%Y-%m', created_at) ORDER BY month DESC`,
   ];
 
   const params = [userId, startDate.toISOString()];
 
-  Promise.all(queries.map(query => 
-    new Promise((resolve, reject) => {
-      db.all(query, params, (err, result) => {
-        if (err) reject(err);
-        else resolve(result);
+  Promise.all(
+    queries.map(
+      query =>
+        new Promise((resolve, reject) => {
+          db.all(query, params, (err, result) => {
+            if (err) reject(err);
+            else resolve(result);
+          });
+        })
+    )
+  )
+    .then(results => {
+      const [
+        totalOffers,
+        acceptedOffers,
+        avgOffer,
+        successRate,
+        monthlyPerformance,
+      ] = results;
+
+      const successRateData = successRate[0];
+      const calculatedSuccessRate =
+        successRateData.total_offers > 0
+          ? (successRateData.accepted_offers / successRateData.total_offers) *
+            100
+          : 0;
+
+      res.json({
+        total_offers: totalOffers[0].total_offers,
+        accepted_offers: acceptedOffers[0].accepted_offers,
+        average_offer: avgOffer[0].avg_offer || 0,
+        success_rate: calculatedSuccessRate,
+        monthly_performance: monthlyPerformance,
       });
     })
-  )).then(results => {
-    const [totalOffers, acceptedOffers, avgOffer, successRate, monthlyPerformance] = results;
-
-    const successRateData = successRate[0];
-    const calculatedSuccessRate = successRateData.total_offers > 0 
-      ? (successRateData.accepted_offers / successRateData.total_offers) * 100 
-      : 0;
-
-    res.json({
-      total_offers: totalOffers[0].total_offers,
-      accepted_offers: acceptedOffers[0].accepted_offers,
-      average_offer: avgOffer[0].avg_offer || 0,
-      success_rate: calculatedSuccessRate,
-      monthly_performance: monthlyPerformance
+    .catch(err => {
+      console.error('Performance analytics error:', err);
+      res.status(500).json({ error: 'Failed to fetch performance analytics' });
     });
-  }).catch(err => {
-    console.error('Performance analytics error:', err);
-    res.status(500).json({ error: 'Failed to fetch performance analytics' });
-  });
 });
 
 module.exports = router;
-
-
-
-
-

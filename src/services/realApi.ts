@@ -1,6 +1,8 @@
 // Gerçek API servisleri - SQLite veritabanı ile çalışır
 
-const API_BASE_URL = 'http://localhost:3001/api';
+const API_BASE_URL = (import.meta.env.VITE_API_URL || (import.meta.env.MODE === 'production'
+  ? 'https://api.yolnext.com'
+  : 'http://localhost:5000')) + '/api';
 
 interface ApiResponse<T> {
   success: boolean;
@@ -103,11 +105,17 @@ class RealApiService {
   }
 
   // AUTH ENDPOINTS
-  async login(email: string, password: string): Promise<ApiResponse<{ user: User; token: string }>> {
-    const response = await this.request<{ user: User; token: string }>('/real-auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ email, password }),
-    });
+  async login(
+    email: string,
+    password: string
+  ): Promise<ApiResponse<{ user: User; token: string }>> {
+    const response = await this.request<{ user: User; token: string }>(
+      '/real-auth/login',
+      {
+        method: 'POST',
+        body: JSON.stringify({ email, password }),
+      }
+    );
 
     if (response.success && response.data) {
       this.token = response.data.token;
@@ -125,10 +133,13 @@ class RealApiService {
     company_name?: string;
     location?: string;
   }): Promise<ApiResponse<{ user: User; token: string }>> {
-    const response = await this.request<{ user: User; token: string }>('/real-auth/register', {
-      method: 'POST',
-      body: JSON.stringify(userData),
-    });
+    const response = await this.request<{ user: User; token: string }>(
+      '/real-auth/register',
+      {
+        method: 'POST',
+        body: JSON.stringify(userData),
+      }
+    );
 
     if (response.success && response.data) {
       this.token = response.data.token;
@@ -149,7 +160,9 @@ class RealApiService {
   }
 
   // SHIPMENT ENDPOINTS
-  async createShipment(shipmentData: any): Promise<ApiResponse<{ shipment: any }>> {
+  async createShipment(
+    shipmentData: any
+  ): Promise<ApiResponse<{ shipment: any }>> {
     return this.request<{ shipment: any }>('/real-shipments/create', {
       method: 'POST',
       body: JSON.stringify(shipmentData),
@@ -180,41 +193,63 @@ class RealApiService {
     return this.request<{ shipments: Shipment[]; pagination: any }>(endpoint);
   }
 
-  async createOffer(shipmentId: number, offerData: {
-    price: number;
-    estimatedDays: number;
-    notes: string;
-    vehicleType: string;
-  }): Promise<ApiResponse<{ offerId: number }>> {
-    return this.request<{ offerId: number }>(`/real-shipments/${shipmentId}/offer`, {
-      method: 'POST',
-      body: JSON.stringify(offerData),
-    });
+  async createOffer(
+    shipmentId: number,
+    offerData: {
+      price: number;
+      estimatedDays: number;
+      notes: string;
+      vehicleType: string;
+    }
+  ): Promise<ApiResponse<{ offerId: number }>> {
+    return this.request<{ offerId: number }>(
+      `/real-shipments/${shipmentId}/offer`,
+      {
+        method: 'POST',
+        body: JSON.stringify(offerData),
+      }
+    );
   }
 
-  async getOffers(shipmentId: number): Promise<ApiResponse<{ offers: Offer[] }>> {
-    return this.request<{ offers: Offer[] }>(`/real-shipments/${shipmentId}/offers`);
+  async getOffers(
+    shipmentId: number
+  ): Promise<ApiResponse<{ offers: Offer[] }>> {
+    return this.request<{ offers: Offer[] }>(
+      `/real-shipments/${shipmentId}/offers`
+    );
   }
 
-  async acceptOffer(shipmentId: number, offerId: number): Promise<ApiResponse<void>> {
-    return this.request<void>(`/real-shipments/${shipmentId}/accept-offer/${offerId}`, {
-      method: 'POST',
-    });
+  async acceptOffer(
+    shipmentId: number,
+    offerId: number
+  ): Promise<ApiResponse<void>> {
+    return this.request<void>(
+      `/real-shipments/${shipmentId}/accept-offer/${offerId}`,
+      {
+        method: 'POST',
+      }
+    );
   }
 
-  async trackShipment(shipmentId: number): Promise<ApiResponse<{ shipment: any }>> {
-    return this.request<{ shipment: any }>(`/real-shipments/${shipmentId}/track`);
+  async trackShipment(
+    shipmentId: number
+  ): Promise<ApiResponse<{ shipment: any }>> {
+    return this.request<{ shipment: any }>(
+      `/real-shipments/${shipmentId}/track`
+    );
   }
 
   // DASHBOARD ENDPOINTS
-  async getDashboardStats(): Promise<ApiResponse<{
-    totalShipments: number;
-    activeShipments: number;
-    completedShipments: number;
-    totalEarnings: number;
-    thisMonthEarnings: number;
-    successRate: number;
-  }>> {
+  async getDashboardStats(): Promise<
+    ApiResponse<{
+      totalShipments: number;
+      activeShipments: number;
+      completedShipments: number;
+      totalEarnings: number;
+      thisMonthEarnings: number;
+      successRate: number;
+    }>
+  > {
     return this.request<any>('/dashboard/stats');
   }
 
@@ -231,7 +266,9 @@ class RealApiService {
     return this.request<{ notifications: any[] }>('/notifications');
   }
 
-  async markNotificationAsRead(notificationId: number): Promise<ApiResponse<void>> {
+  async markNotificationAsRead(
+    notificationId: number
+  ): Promise<ApiResponse<void>> {
     return this.request<void>(`/notifications/${notificationId}/read`, {
       method: 'POST',
     });
@@ -255,7 +292,9 @@ class RealApiService {
     });
   }
 
-  async getPaymentStatus(paymentId: number): Promise<ApiResponse<{ status: string }>> {
+  async getPaymentStatus(
+    paymentId: number
+  ): Promise<ApiResponse<{ status: string }>> {
     return this.request<{ status: string }>(`/payments/${paymentId}/status`);
   }
 
@@ -280,13 +319,21 @@ class RealApiService {
     });
   }
 
-  async getMessages(shipmentId?: number): Promise<ApiResponse<{ messages: any[] }>> {
-    const endpoint = shipmentId ? `/messages?shipmentId=${shipmentId}` : '/messages';
+  async getMessages(
+    shipmentId?: number
+  ): Promise<ApiResponse<{ messages: any[] }>> {
+    const endpoint = shipmentId
+      ? `/messages?shipmentId=${shipmentId}`
+      : '/messages';
     return this.request<{ messages: any[] }>(endpoint);
   }
 
   // STATUS UPDATE ENDPOINTS
-  async updateShipmentStatus(shipmentId: number, status: string, data?: any): Promise<ApiResponse<void>> {
+  async updateShipmentStatus(
+    shipmentId: number,
+    status: string,
+    data?: any
+  ): Promise<ApiResponse<void>> {
     return this.request<void>(`/shipments/${shipmentId}/update-status`, {
       method: 'POST',
       body: JSON.stringify({ status, ...data }),
@@ -294,7 +341,10 @@ class RealApiService {
   }
 
   // FILE UPLOAD ENDPOINTS
-  async uploadFile(file: File, type: 'photo' | 'document'): Promise<ApiResponse<{ url: string }>> {
+  async uploadFile(
+    file: File,
+    type: 'photo' | 'document'
+  ): Promise<ApiResponse<{ url: string }>> {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('type', type);

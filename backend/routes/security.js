@@ -19,20 +19,30 @@ const securityLimiter = rateLimit({
 const logSecurityEvent = (userId, action, req, details = null) => {
   const ip_address = req.ip || req.connection.remoteAddress;
   const user_agent = req.get('User-Agent');
-  
+
   // Determine risk level
   let risk_level = 'low';
   if (action.includes('login_failed') || action.includes('suspicious')) {
     risk_level = 'high';
-  } else if (action.includes('password_change') || action.includes('email_change')) {
+  } else if (
+    action.includes('password_change') ||
+    action.includes('email_change')
+  ) {
     risk_level = 'medium';
   }
 
   db.run(
     `INSERT INTO security_logs (user_id, action, ip_address, user_agent, details, risk_level)
      VALUES (?, ?, ?, ?, ?, ?)`,
-    [userId, action, ip_address, user_agent, JSON.stringify(details), risk_level],
-    (err) => {
+    [
+      userId,
+      action,
+      ip_address,
+      user_agent,
+      JSON.stringify(details),
+      risk_level,
+    ],
+    err => {
       if (err) {
         console.error('Security log error:', err);
       }
@@ -74,7 +84,9 @@ router.get('/logs', authenticateToken, (req, res) => {
     db.get(countQuery, countParams, (err, countResult) => {
       if (err) {
         console.error('Get security logs count error:', err);
-        return res.status(500).json({ error: 'Failed to fetch security logs count' });
+        return res
+          .status(500)
+          .json({ error: 'Failed to fetch security logs count' });
       }
 
       res.json({
@@ -83,240 +95,310 @@ router.get('/logs', authenticateToken, (req, res) => {
           page: parseInt(page),
           limit: parseInt(limit),
           total: countResult.total,
-          pages: Math.ceil(countResult.total / parseInt(limit))
-        }
+          pages: Math.ceil(countResult.total / parseInt(limit)),
+        },
       });
     });
   });
 });
 
 // Change password
-router.post('/change-password', securityLimiter, authenticateToken, [
-  body('current_password').isString().withMessage('Current password is required'),
-  body('new_password').isLength({ min: 8 }).withMessage('New password must be at least 8 characters'),
-  body('confirm_password').custom((value, { req }) => {
-    if (value !== req.body.new_password) {
-      throw new Error('Password confirmation does not match');
-    }
-    return true;
-  })
-], (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      logSecurityEvent(req.user.userId, 'password_change_validation_failed', req, { errors: errors.array() });
-      return res.status(400).json({ errors: errors.array() });
-    }
+router.post(
+  '/change-password',
+  securityLimiter,
+  authenticateToken,
+  [
+    body('current_password')
+      .isString()
+      .withMessage('Current password is required'),
+    body('new_password')
+      .isLength({ min: 8 })
+      .withMessage('New password must be at least 8 characters'),
+    body('confirm_password').custom((value, { req }) => {
+      if (value !== req.body.new_password) {
+        throw new Error('Password confirmation does not match');
+      }
+      return true;
+    }),
+  ],
+  (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        logSecurityEvent(
+          req.user.userId,
+          'password_change_validation_failed',
+          req,
+          { errors: errors.array() }
+        );
+        return res.status(400).json({ errors: errors.array() });
+      }
 
-    const { current_password, new_password } = req.body;
-    const userId = req.user.userId;
+      const { current_password, new_password } = req.body;
+      const userId = req.user.userId;
 
-    // Get current user
-    db.get(
-      `SELECT password FROM users WHERE id = ?`,
-      [userId],
-      (err, user) => {
-        if (err) {
-          console.error('Get user for password change error:', err);
-          return res.status(500).json({ error: 'Failed to verify current password' });
-        }
-
-        if (!user) {
-          logSecurityEvent(userId, 'password_change_user_not_found', req);
-          return res.status(404).json({ error: 'User not found' });
-        }
-
-        // Verify current password
-        const bcrypt = require('bcryptjs');
-        bcrypt.compare(current_password, user.password, (err, isMatch) => {
+      // Get current user
+      db.get(
+        `SELECT password FROM users WHERE id = ?`,
+        [userId],
+        (err, user) => {
           if (err) {
-            console.error('Password comparison error:', err);
-            return res.status(500).json({ error: 'Failed to verify current password' });
+            console.error('Get user for password change error:', err);
+            return res
+              .status(500)
+              .json({ error: 'Failed to verify current password' });
           }
 
-          if (!isMatch) {
-            logSecurityEvent(userId, 'password_change_wrong_current', req);
-            return res.status(400).json({ error: 'Current password is incorrect' });
+          if (!user) {
+            logSecurityEvent(userId, 'password_change_user_not_found', req);
+            return res.status(404).json({ error: 'User not found' });
           }
 
-          // Hash new password
-          bcrypt.hash(new_password, 10, (err, hashedPassword) => {
+          // Verify current password
+          const bcrypt = require('bcryptjs');
+          bcrypt.compare(current_password, user.password, (err, isMatch) => {
             if (err) {
-              console.error('Password hashing error:', err);
-              return res.status(500).json({ error: 'Failed to hash new password' });
+              console.error('Password comparison error:', err);
+              return res
+                .status(500)
+                .json({ error: 'Failed to verify current password' });
             }
 
-            // Update password
-            db.run(
-              `UPDATE users SET password = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-              [hashedPassword, userId],
-              function(err) {
+            if (!isMatch) {
+              logSecurityEvent(userId, 'password_change_wrong_current', req);
+              return res
+                .status(400)
+                .json({ error: 'Current password is incorrect' });
+            }
+
+            // Hash new password
+            bcrypt.hash(new_password, 10, (err, hashedPassword) => {
+              if (err) {
+                console.error('Password hashing error:', err);
+                return res
+                  .status(500)
+                  .json({ error: 'Failed to hash new password' });
+              }
+
+              // Update password
+              db.run(
+                `UPDATE users SET password = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+                [hashedPassword, userId],
+                function (err) {
+                  if (err) {
+                    console.error('Update password error:', err);
+                    return res
+                      .status(500)
+                      .json({ error: 'Failed to update password' });
+                  }
+
+                  logSecurityEvent(userId, 'password_change_success', req);
+                  res.json({ message: 'Password changed successfully' });
+                }
+              );
+            });
+          });
+        }
+      );
+    } catch (error) {
+      console.error('Change password error:', error);
+      logSecurityEvent(req.user.userId, 'password_change_error', req, {
+        error: error.message,
+      });
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+);
+
+// Update email
+router.post(
+  '/change-email',
+  securityLimiter,
+  authenticateToken,
+  [
+    body('new_email').isEmail().withMessage('Valid email is required'),
+    body('password')
+      .isString()
+      .withMessage('Password is required for email change'),
+  ],
+  (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        logSecurityEvent(
+          req.user.userId,
+          'email_change_validation_failed',
+          req,
+          { errors: errors.array() }
+        );
+        return res.status(400).json({ errors: errors.array() });
+      }
+
+      const { new_email, password } = req.body;
+      const userId = req.user.userId;
+
+      // Get current user
+      db.get(
+        `SELECT password, email FROM users WHERE id = ?`,
+        [userId],
+        (err, user) => {
+          if (err) {
+            console.error('Get user for email change error:', err);
+            return res.status(500).json({ error: 'Failed to verify user' });
+          }
+
+          if (!user) {
+            logSecurityEvent(userId, 'email_change_user_not_found', req);
+            return res.status(404).json({ error: 'User not found' });
+          }
+
+          // Verify password
+          const bcrypt = require('bcryptjs');
+          bcrypt.compare(password, user.password, (err, isMatch) => {
+            if (err) {
+              console.error('Password verification error:', err);
+              return res
+                .status(500)
+                .json({ error: 'Failed to verify password' });
+            }
+
+            if (!isMatch) {
+              logSecurityEvent(userId, 'email_change_wrong_password', req);
+              return res.status(400).json({ error: 'Password is incorrect' });
+            }
+
+            // Check if new email already exists
+            db.get(
+              `SELECT id FROM users WHERE email = ? AND id != ?`,
+              [new_email, userId],
+              (err, existingUser) => {
                 if (err) {
-                  console.error('Update password error:', err);
-                  return res.status(500).json({ error: 'Failed to update password' });
+                  console.error('Check email existence error:', err);
+                  return res
+                    .status(500)
+                    .json({ error: 'Failed to check email availability' });
                 }
 
-                logSecurityEvent(userId, 'password_change_success', req);
-                res.json({ message: 'Password changed successfully' });
+                if (existingUser) {
+                  logSecurityEvent(userId, 'email_change_email_exists', req, {
+                    new_email,
+                  });
+                  return res
+                    .status(400)
+                    .json({ error: 'Email already exists' });
+                }
+
+                // Update email
+                db.run(
+                  `UPDATE users SET email = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+                  [new_email, userId],
+                  function (err) {
+                    if (err) {
+                      console.error('Update email error:', err);
+                      return res
+                        .status(500)
+                        .json({ error: 'Failed to update email' });
+                    }
+
+                    logSecurityEvent(userId, 'email_change_success', req, {
+                      old_email: user.email,
+                      new_email,
+                    });
+                    res.json({ message: 'Email changed successfully' });
+                  }
+                );
               }
             );
           });
-        });
-      }
-    );
-  } catch (error) {
-    console.error('Change password error:', error);
-    logSecurityEvent(req.user.userId, 'password_change_error', req, { error: error.message });
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// Update email
-router.post('/change-email', securityLimiter, authenticateToken, [
-  body('new_email').isEmail().withMessage('Valid email is required'),
-  body('password').isString().withMessage('Password is required for email change')
-], (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      logSecurityEvent(req.user.userId, 'email_change_validation_failed', req, { errors: errors.array() });
-      return res.status(400).json({ errors: errors.array() });
+        }
+      );
+    } catch (error) {
+      console.error('Change email error:', error);
+      logSecurityEvent(req.user.userId, 'email_change_error', req, {
+        error: error.message,
+      });
+      res.status(500).json({ error: 'Internal server error' });
     }
-
-    const { new_email, password } = req.body;
-    const userId = req.user.userId;
-
-    // Get current user
-    db.get(
-      `SELECT password, email FROM users WHERE id = ?`,
-      [userId],
-      (err, user) => {
-        if (err) {
-          console.error('Get user for email change error:', err);
-          return res.status(500).json({ error: 'Failed to verify user' });
-        }
-
-        if (!user) {
-          logSecurityEvent(userId, 'email_change_user_not_found', req);
-          return res.status(404).json({ error: 'User not found' });
-        }
-
-        // Verify password
-        const bcrypt = require('bcryptjs');
-        bcrypt.compare(password, user.password, (err, isMatch) => {
-          if (err) {
-            console.error('Password verification error:', err);
-            return res.status(500).json({ error: 'Failed to verify password' });
-          }
-
-          if (!isMatch) {
-            logSecurityEvent(userId, 'email_change_wrong_password', req);
-            return res.status(400).json({ error: 'Password is incorrect' });
-          }
-
-          // Check if new email already exists
-          db.get(
-            `SELECT id FROM users WHERE email = ? AND id != ?`,
-            [new_email, userId],
-            (err, existingUser) => {
-              if (err) {
-                console.error('Check email existence error:', err);
-                return res.status(500).json({ error: 'Failed to check email availability' });
-              }
-
-              if (existingUser) {
-                logSecurityEvent(userId, 'email_change_email_exists', req, { new_email });
-                return res.status(400).json({ error: 'Email already exists' });
-              }
-
-              // Update email
-              db.run(
-                `UPDATE users SET email = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-                [new_email, userId],
-                function(err) {
-                  if (err) {
-                    console.error('Update email error:', err);
-                    return res.status(500).json({ error: 'Failed to update email' });
-                  }
-
-                  logSecurityEvent(userId, 'email_change_success', req, { 
-                    old_email: user.email, 
-                    new_email 
-                  });
-                  res.json({ message: 'Email changed successfully' });
-                }
-              );
-            }
-          );
-        });
-      }
-    );
-  } catch (error) {
-    console.error('Change email error:', error);
-    logSecurityEvent(req.user.userId, 'email_change_error', req, { error: error.message });
-    res.status(500).json({ error: 'Internal server error' });
   }
-});
+);
 
 // Enable/disable 2FA
-router.post('/2fa/toggle', securityLimiter, authenticateToken, [
-  body('enabled').isBoolean().withMessage('Enabled must be a boolean'),
-  body('password').isString().withMessage('Password is required for 2FA changes')
-], (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      logSecurityEvent(req.user.userId, '2fa_toggle_validation_failed', req, { errors: errors.array() });
-      return res.status(400).json({ errors: errors.array() });
-    }
-
-    const { enabled, password } = req.body;
-    const userId = req.user.userId;
-
-    // Get current user
-    db.get(
-      `SELECT password FROM users WHERE id = ?`,
-      [userId],
-      (err, user) => {
-        if (err) {
-          console.error('Get user for 2FA toggle error:', err);
-          return res.status(500).json({ error: 'Failed to verify user' });
-        }
-
-        if (!user) {
-          logSecurityEvent(userId, '2fa_toggle_user_not_found', req);
-          return res.status(404).json({ error: 'User not found' });
-        }
-
-        // Verify password
-        const bcrypt = require('bcryptjs');
-        bcrypt.compare(password, user.password, (err, isMatch) => {
-          if (err) {
-            console.error('Password verification error:', err);
-            return res.status(500).json({ error: 'Failed to verify password' });
-          }
-
-          if (!isMatch) {
-            logSecurityEvent(userId, '2fa_toggle_wrong_password', req);
-            return res.status(400).json({ error: 'Password is incorrect' });
-          }
-
-          // For now, just log the action (2FA implementation would go here)
-          logSecurityEvent(userId, enabled ? '2fa_enabled' : '2fa_disabled', req);
-          
-          res.json({ 
-            message: `2FA ${enabled ? 'enabled' : 'disabled'} successfully`,
-            enabled 
-          });
+router.post(
+  '/2fa/toggle',
+  securityLimiter,
+  authenticateToken,
+  [
+    body('enabled').isBoolean().withMessage('Enabled must be a boolean'),
+    body('password')
+      .isString()
+      .withMessage('Password is required for 2FA changes'),
+  ],
+  (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        logSecurityEvent(req.user.userId, '2fa_toggle_validation_failed', req, {
+          errors: errors.array(),
         });
+        return res.status(400).json({ errors: errors.array() });
       }
-    );
-  } catch (error) {
-    console.error('Toggle 2FA error:', error);
-    logSecurityEvent(req.user.userId, '2fa_toggle_error', req, { error: error.message });
-    res.status(500).json({ error: 'Internal server error' });
+
+      const { enabled, password } = req.body;
+      const userId = req.user.userId;
+
+      // Get current user
+      db.get(
+        `SELECT password FROM users WHERE id = ?`,
+        [userId],
+        (err, user) => {
+          if (err) {
+            console.error('Get user for 2FA toggle error:', err);
+            return res.status(500).json({ error: 'Failed to verify user' });
+          }
+
+          if (!user) {
+            logSecurityEvent(userId, '2fa_toggle_user_not_found', req);
+            return res.status(404).json({ error: 'User not found' });
+          }
+
+          // Verify password
+          const bcrypt = require('bcryptjs');
+          bcrypt.compare(password, user.password, (err, isMatch) => {
+            if (err) {
+              console.error('Password verification error:', err);
+              return res
+                .status(500)
+                .json({ error: 'Failed to verify password' });
+            }
+
+            if (!isMatch) {
+              logSecurityEvent(userId, '2fa_toggle_wrong_password', req);
+              return res.status(400).json({ error: 'Password is incorrect' });
+            }
+
+            // For now, just log the action (2FA implementation would go here)
+            logSecurityEvent(
+              userId,
+              enabled ? '2fa_enabled' : '2fa_disabled',
+              req
+            );
+
+            res.json({
+              message: `2FA ${enabled ? 'enabled' : 'disabled'} successfully`,
+              enabled,
+            });
+          });
+        }
+      );
+    } catch (error) {
+      console.error('Toggle 2FA error:', error);
+      logSecurityEvent(req.user.userId, '2fa_toggle_error', req, {
+        error: error.message,
+      });
+      res.status(500).json({ error: 'Internal server error' });
+    }
   }
-});
+);
 
 // Get security settings
 router.get('/settings', authenticateToken, (req, res) => {
@@ -331,7 +413,9 @@ router.get('/settings', authenticateToken, (req, res) => {
     (err, recentLogs) => {
       if (err) {
         console.error('Get security settings error:', err);
-        return res.status(500).json({ error: 'Failed to fetch security settings' });
+        return res
+          .status(500)
+          .json({ error: 'Failed to fetch security settings' });
       }
 
       // Count risk levels
@@ -339,7 +423,7 @@ router.get('/settings', authenticateToken, (req, res) => {
         low: 0,
         medium: 0,
         high: 0,
-        critical: 0
+        critical: 0,
       };
 
       recentLogs.forEach(log => {
@@ -350,7 +434,7 @@ router.get('/settings', authenticateToken, (req, res) => {
         recent_activity: recentLogs,
         risk_counts: riskCounts,
         security_score: calculateSecurityScore(riskCounts),
-        recommendations: generateSecurityRecommendations(riskCounts)
+        recommendations: generateSecurityRecommendations(riskCounts),
       });
     }
   );
@@ -358,10 +442,13 @@ router.get('/settings', authenticateToken, (req, res) => {
 
 // Calculate security score
 function calculateSecurityScore(riskCounts) {
-  const total = riskCounts.low + riskCounts.medium + riskCounts.high + riskCounts.critical;
+  const total =
+    riskCounts.low + riskCounts.medium + riskCounts.high + riskCounts.critical;
   if (total === 0) return 100;
 
-  const score = 100 - (riskCounts.medium * 5 + riskCounts.high * 15 + riskCounts.critical * 30);
+  const score =
+    100 -
+    (riskCounts.medium * 5 + riskCounts.high * 15 + riskCounts.critical * 30);
   return Math.max(0, Math.min(100, score));
 }
 
@@ -372,24 +459,27 @@ function generateSecurityRecommendations(riskCounts) {
   if (riskCounts.critical > 0) {
     recommendations.push({
       type: 'critical',
-      message: 'Critical security events detected. Please review your account immediately.',
-      action: 'Contact support'
+      message:
+        'Critical security events detected. Please review your account immediately.',
+      action: 'Contact support',
     });
   }
 
   if (riskCounts.high > 3) {
     recommendations.push({
       type: 'high',
-      message: 'Multiple high-risk events detected. Consider changing your password.',
-      action: 'Change password'
+      message:
+        'Multiple high-risk events detected. Consider changing your password.',
+      action: 'Change password',
     });
   }
 
   if (riskCounts.medium > 5) {
     recommendations.push({
       type: 'medium',
-      message: 'Several medium-risk events detected. Enable 2FA for better security.',
-      action: 'Enable 2FA'
+      message:
+        'Several medium-risk events detected. Enable 2FA for better security.',
+      action: 'Enable 2FA',
     });
   }
 
@@ -397,7 +487,7 @@ function generateSecurityRecommendations(riskCounts) {
     recommendations.push({
       type: 'low',
       message: 'High activity detected. Monitor your account regularly.',
-      action: 'Review activity'
+      action: 'Review activity',
     });
   }
 
@@ -456,7 +546,9 @@ router.get('/admin/logs', authenticateToken, (req, res) => {
     db.get(countQuery, countParams, (err, countResult) => {
       if (err) {
         console.error('Get security logs count error:', err);
-        return res.status(500).json({ error: 'Failed to fetch security logs count' });
+        return res
+          .status(500)
+          .json({ error: 'Failed to fetch security logs count' });
       }
 
       res.json({
@@ -465,8 +557,8 @@ router.get('/admin/logs', authenticateToken, (req, res) => {
           page: parseInt(page),
           limit: parseInt(limit),
           total: countResult.total,
-          pages: Math.ceil(countResult.total / parseInt(limit))
-        }
+          pages: Math.ceil(countResult.total / parseInt(limit)),
+        },
       });
     });
   });

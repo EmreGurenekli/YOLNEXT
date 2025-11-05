@@ -1,1 +1,34 @@
-node_modules
+# Build outputs
+node_modules/
+dist/
+build/
+*.log
+
+# Environment files
+.env
+.env.local
+.env.production
+.env.development
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+temp/
+tmp/
+
+# Database files (keep schemas, ignore data)
+*.db
+*.sqlite
+*.sqlite3
+!database/*.sql
+!backend/database/*.sql

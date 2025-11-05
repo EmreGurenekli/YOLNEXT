@@ -8,7 +8,7 @@ router.post('/create', protect, async (req, res) => {
   try {
     res.json({
       message: 'Escrow created successfully',
-      escrowId: 'escrow_' + Date.now()
+      escrowId: 'escrow_' + Date.now(),
     });
   } catch (error) {
     console.error('Create escrow error:', error);
@@ -17,5 +17,3 @@ router.post('/create', protect, async (req, res) => {
 });
 
 module.exports = router;
-
-

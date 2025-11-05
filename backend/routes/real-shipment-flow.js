@@ -7,7 +7,7 @@ const jwt = require('jsonwebtoken');
 // Gönderi durumları
 const SHIPMENT_STATUS = {
   DRAFT: 'draft',
-  ACTIVE: 'active', 
+  ACTIVE: 'active',
   BIDDING: 'bidding',
   ACCEPTED: 'accepted',
   IN_PROGRESS: 'in_progress',
@@ -15,7 +15,7 @@ const SHIPMENT_STATUS = {
   IN_TRANSIT: 'in_transit',
   DELIVERED: 'delivered',
   COMPLETED: 'completed',
-  CANCELLED: 'cancelled'
+  CANCELLED: 'cancelled',
 };
 
 // Middleware: Token doğrulama
@@ -27,13 +27,19 @@ const authenticateToken = (req, res, next) => {
     return res.status(401).json({ success: false, message: 'Token gerekli' });
   }
 
-  jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key', (err, user) => {
-    if (err) {
-      return res.status(403).json({ success: false, message: 'Geçersiz token' });
+  jwt.verify(
+    token,
+    process.env.JWT_SECRET || 'your-secret-key',
+    (err, user) => {
+      if (err) {
+        return res
+          .status(403)
+          .json({ success: false, message: 'Geçersiz token' });
+      }
+      req.user = user;
+      next();
     }
-    req.user = user;
-    next();
-  });
+  );
 };
 
 // 1. Gönderi oluşturma (Bireysel)
@@ -51,7 +57,7 @@ router.post('/create', authenticateToken, async (req, res) => {
       communication,
       security,
       notes,
-      privacy
+      privacy,
     } = req.body;
 
     const trackingCode = generateTrackingCode();
@@ -90,7 +96,7 @@ router.post('/create', authenticateToken, async (req, res) => {
       status: SHIPMENT_STATUS.DRAFT,
       priority: 'normal',
       created_at: now,
-      updated_at: now
+      updated_at: now,
     };
 
     const sql = `INSERT INTO shipments (
@@ -103,30 +109,62 @@ router.post('/create', authenticateToken, async (req, res) => {
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
     const params = [
-      shipmentData.user_id, shipmentData.tracking_code, shipmentData.cargo_type, shipmentData.description, shipmentData.estimated_value,
-      shipmentData.sender_name, shipmentData.sender_phone, shipmentData.sender_email, shipmentData.sender_address, shipmentData.sender_city, shipmentData.sender_district, shipmentData.sender_postal_code, shipmentData.sender_location_type,
-      shipmentData.receiver_name, shipmentData.receiver_phone, shipmentData.receiver_email, shipmentData.receiver_address, shipmentData.receiver_city, shipmentData.receiver_district, shipmentData.receiver_postal_code, shipmentData.receiver_location_type,
-      shipmentData.loading_date, shipmentData.delivery_date, shipmentData.loading_time, shipmentData.delivery_time,
-      shipmentData.vehicle_type, shipmentData.weight, shipmentData.volume, shipmentData.special_instructions,
-      shipmentData.status, shipmentData.priority, shipmentData.created_at, shipmentData.updated_at
+      shipmentData.user_id,
+      shipmentData.tracking_code,
+      shipmentData.cargo_type,
+      shipmentData.description,
+      shipmentData.estimated_value,
+      shipmentData.sender_name,
+      shipmentData.sender_phone,
+      shipmentData.sender_email,
+      shipmentData.sender_address,
+      shipmentData.sender_city,
+      shipmentData.sender_district,
+      shipmentData.sender_postal_code,
+      shipmentData.sender_location_type,
+      shipmentData.receiver_name,
+      shipmentData.receiver_phone,
+      shipmentData.receiver_email,
+      shipmentData.receiver_address,
+      shipmentData.receiver_city,
+      shipmentData.receiver_district,
+      shipmentData.receiver_postal_code,
+      shipmentData.receiver_location_type,
+      shipmentData.loading_date,
+      shipmentData.delivery_date,
+      shipmentData.loading_time,
+      shipmentData.delivery_time,
+      shipmentData.vehicle_type,
+      shipmentData.weight,
+      shipmentData.volume,
+      shipmentData.special_instructions,
+      shipmentData.status,
+      shipmentData.priority,
+      shipmentData.created_at,
+      shipmentData.updated_at,
     ];
 
-    db.run(sql, params, function(err) {
+    db.run(sql, params, function (err) {
       if (err) {
         console.error('Gönderi oluşturma hatası:', err);
         return res.status(500).json({ success: false, error: err.message });
       }
 
       // Göndericiye bildirim oluştur
-      createNotification(req.user.id, 'Gönderi Oluşturuldu', 'Gönderiniz başarıyla oluşturuldu ve taslak olarak kaydedildi.', 'success');
+      createNotification(
+        req.user.id,
+        'Gönderi Oluşturuldu',
+        'Gönderiniz başarıyla oluşturuldu ve taslak olarak kaydedildi.',
+        'success'
+      );
 
-      res.json({ 
-        success: true, 
+      res.json({
+        success: true,
         shipment: {
           id: this.lastID,
           trackingCode: trackingCode,
-          status: SHIPMENT_STATUS.DRAFT
-        }
+          status: SHIPMENT_STATUS.DRAFT,
+        },
       });
     });
   } catch (error) {
@@ -150,23 +188,32 @@ router.post('/:id/publish', authenticateToken, async (req, res) => {
           return res.status(500).json({ success: false, error: err.message });
         }
         if (!shipment) {
-          return res.status(404).json({ success: false, message: 'Gönderi bulunamadı' });
+          return res
+            .status(404)
+            .json({ success: false, message: 'Gönderi bulunamadı' });
         }
 
         // Durumu güncelle
         db.run(
           'UPDATE shipments SET status = ?, published_at = ?, updated_at = ? WHERE id = ?',
           [SHIPMENT_STATUS.ACTIVE, now, now, shipmentId],
-          function(err) {
+          function (err) {
             if (err) {
-              return res.status(500).json({ success: false, error: err.message });
+              return res
+                .status(500)
+                .json({ success: false, error: err.message });
             }
 
             // Nakliyecilere bildirim gönder
             notifyCarriers(shipmentId, shipment.tracking_code);
 
             // Göndericiye bildirim
-            createNotification(req.user.id, 'Gönderi Yayınlandı', 'Gönderiniz yayınlandı ve nakliyeciler teklif verebilir.', 'success');
+            createNotification(
+              req.user.id,
+              'Gönderi Yayınlandı',
+              'Gönderiniz yayınlandı ve nakliyeciler teklif verebilir.',
+              'success'
+            );
 
             res.json({ success: true, message: 'Gönderi yayınlandı' });
           }
@@ -245,25 +292,25 @@ router.get('/active', authenticateToken, async (req, res) => {
             description: shipment.description,
             sender: {
               name: shipment.sender_name,
-              city: shipment.sender_city
+              city: shipment.sender_city,
             },
             receiver: {
               name: shipment.receiver_name,
-              city: shipment.receiver_city
+              city: shipment.receiver_city,
             },
             schedule: {
               loadingDate: shipment.loading_date,
-              deliveryDate: shipment.delivery_date
+              deliveryDate: shipment.delivery_date,
             },
             estimatedValue: shipment.estimated_value,
             status: shipment.status,
-            createdAt: shipment.created_at
+            createdAt: shipment.created_at,
           })),
           pagination: {
             current: parseInt(page),
             pages: Math.ceil(countResult.total / limit),
-            total: countResult.total
-          }
+            total: countResult.total,
+          },
         });
       });
     });
@@ -289,35 +336,46 @@ router.post('/:id/offer', authenticateToken, async (req, res) => {
     const estimatedDelivery = new Date();
     estimatedDelivery.setDate(estimatedDelivery.getDate() + estimatedDays);
 
-    db.run(sql, [
-      shipmentId, carrierId, price, estimatedDelivery.toISOString(), notes, vehicleType, now, now
-    ], function(err) {
-      if (err) {
-        console.error('Teklif oluşturma hatası:', err);
-        return res.status(500).json({ success: false, error: err.message });
-      }
-
-      // Gönderi durumunu güncelle
-      db.run(
-        'UPDATE shipments SET status = ?, updated_at = ? WHERE id = ?',
-        [SHIPMENT_STATUS.BIDDING, now, shipmentId],
-        (err) => {
-          if (err) {
-            console.error('Gönderi durumu güncelleme hatası:', err);
-          }
-
-          // Göndericiye bildirim
-          createNotification(
-            shipmentId, 
-            'Yeni Teklif Geldi', 
-            'Gönderiniz için yeni teklif alındı.', 
-            'info'
-          );
-
-          res.json({ success: true, offerId: this.lastID });
+    db.run(
+      sql,
+      [
+        shipmentId,
+        carrierId,
+        price,
+        estimatedDelivery.toISOString(),
+        notes,
+        vehicleType,
+        now,
+        now,
+      ],
+      function (err) {
+        if (err) {
+          console.error('Teklif oluşturma hatası:', err);
+          return res.status(500).json({ success: false, error: err.message });
         }
-      );
-    });
+
+        // Gönderi durumunu güncelle
+        db.run(
+          'UPDATE shipments SET status = ?, updated_at = ? WHERE id = ?',
+          [SHIPMENT_STATUS.BIDDING, now, shipmentId],
+          err => {
+            if (err) {
+              console.error('Gönderi durumu güncelleme hatası:', err);
+            }
+
+            // Göndericiye bildirim
+            createNotification(
+              shipmentId,
+              'Yeni Teklif Geldi',
+              'Gönderiniz için yeni teklif alındı.',
+              'info'
+            );
+
+            res.json({ success: true, offerId: this.lastID });
+          }
+        );
+      }
+    );
   } catch (error) {
     console.error('Teklif verme hatası:', error);
     res.status(500).json({ success: false, error: error.message });
@@ -347,7 +405,10 @@ router.get('/:id/offers', authenticateToken, async (req, res) => {
         offers: offers.map(offer => ({
           id: offer.id,
           price: offer.price,
-          estimatedDays: Math.ceil((new Date(offer.estimated_delivery) - new Date()) / (1000 * 60 * 60 * 24)),
+          estimatedDays: Math.ceil(
+            (new Date(offer.estimated_delivery) - new Date()) /
+              (1000 * 60 * 60 * 24)
+          ),
           notes: offer.message,
           vehicleType: offer.vehicle_type,
           status: offer.status,
@@ -356,10 +417,10 @@ router.get('/:id/offers', authenticateToken, async (req, res) => {
             companyName: offer.company_name,
             rating: offer.rating,
             totalJobs: offer.total_jobs,
-            completedJobs: offer.completed_jobs
+            completedJobs: offer.completed_jobs,
           },
-          createdAt: offer.created_at
-        }))
+          createdAt: offer.created_at,
+        })),
       });
     });
   } catch (error) {
@@ -369,67 +430,73 @@ router.get('/:id/offers', authenticateToken, async (req, res) => {
 });
 
 // 6. Teklif kabul etme (Gönderici)
-router.post('/:id/accept-offer/:offerId', authenticateToken, async (req, res) => {
-  try {
-    const { offerId } = req.params;
-    const shipmentId = req.params.id;
-    const now = new Date().toISOString();
+router.post(
+  '/:id/accept-offer/:offerId',
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const { offerId } = req.params;
+      const shipmentId = req.params.id;
+      const now = new Date().toISOString();
 
-    // Teklifi kabul et
-    db.run(
-      'UPDATE offers SET status = ?, accepted_at = ? WHERE id = ?',
-      ['accepted', now, offerId],
-      (err) => {
-        if (err) {
-          return res.status(500).json({ success: false, error: err.message });
-        }
-
-        // Diğer teklifleri reddet
-        db.run(
-          'UPDATE offers SET status = ?, rejected_at = ? WHERE shipment_id = ? AND id != ?',
-          ['rejected', now, shipmentId, offerId],
-          (err) => {
-            if (err) {
-              console.error('Diğer teklifleri reddetme hatası:', err);
-            }
-
-            // Gönderi durumunu güncelle
-            db.run(
-              'UPDATE shipments SET status = ?, accepted_offer_id = ?, updated_at = ? WHERE id = ?',
-              [SHIPMENT_STATUS.ACCEPTED, offerId, now, shipmentId],
-              (err) => {
-                if (err) {
-                  return res.status(500).json({ success: false, error: err.message });
-                }
-
-                // Nakliyeciye bildirim
-                db.get(
-                  'SELECT nakliyeci_id FROM offers WHERE id = ?',
-                  [offerId],
-                  (err, offer) => {
-                    if (!err && offer) {
-                      createNotification(
-                        offer.nakliyeci_id,
-                        'Teklifiniz Kabul Edildi',
-                        'Gönderi için verdiğiniz teklif kabul edildi.',
-                        'success'
-                      );
-                    }
-                  }
-                );
-
-                res.json({ success: true });
-              }
-            );
+      // Teklifi kabul et
+      db.run(
+        'UPDATE offers SET status = ?, accepted_at = ? WHERE id = ?',
+        ['accepted', now, offerId],
+        err => {
+          if (err) {
+            return res.status(500).json({ success: false, error: err.message });
           }
-        );
-      }
-    );
-  } catch (error) {
-    console.error('Teklif kabul etme hatası:', error);
-    res.status(500).json({ success: false, error: error.message });
+
+          // Diğer teklifleri reddet
+          db.run(
+            'UPDATE offers SET status = ?, rejected_at = ? WHERE shipment_id = ? AND id != ?',
+            ['rejected', now, shipmentId, offerId],
+            err => {
+              if (err) {
+                console.error('Diğer teklifleri reddetme hatası:', err);
+              }
+
+              // Gönderi durumunu güncelle
+              db.run(
+                'UPDATE shipments SET status = ?, accepted_offer_id = ?, updated_at = ? WHERE id = ?',
+                [SHIPMENT_STATUS.ACCEPTED, offerId, now, shipmentId],
+                err => {
+                  if (err) {
+                    return res
+                      .status(500)
+                      .json({ success: false, error: err.message });
+                  }
+
+                  // Nakliyeciye bildirim
+                  db.get(
+                    'SELECT nakliyeci_id FROM offers WHERE id = ?',
+                    [offerId],
+                    (err, offer) => {
+                      if (!err && offer) {
+                        createNotification(
+                          offer.nakliyeci_id,
+                          'Teklifiniz Kabul Edildi',
+                          'Gönderi için verdiğiniz teklif kabul edildi.',
+                          'success'
+                        );
+                      }
+                    }
+                  );
+
+                  res.json({ success: true });
+                }
+              );
+            }
+          );
+        }
+      );
+    } catch (error) {
+      console.error('Teklif kabul etme hatası:', error);
+      res.status(500).json({ success: false, error: error.message });
+    }
   }
-});
+);
 
 // 7. Gönderi takibi (Herkes)
 router.get('/:id/track', authenticateToken, async (req, res) => {
@@ -448,7 +515,9 @@ router.get('/:id/track', authenticateToken, async (req, res) => {
         return res.status(500).json({ success: false, error: err.message });
       }
       if (!shipment) {
-        return res.status(404).json({ success: false, message: 'Gönderi bulunamadı' });
+        return res
+          .status(404)
+          .json({ success: false, message: 'Gönderi bulunamadı' });
       }
 
       res.json({
@@ -463,22 +532,22 @@ router.get('/:id/track', authenticateToken, async (req, res) => {
             name: shipment.sender_name,
             phone: shipment.sender_phone,
             address: shipment.sender_address,
-            city: shipment.sender_city
+            city: shipment.sender_city,
           },
           receiver: {
             name: shipment.receiver_name,
             phone: shipment.receiver_phone,
             address: shipment.receiver_address,
-            city: shipment.receiver_city
+            city: shipment.receiver_city,
           },
           schedule: {
             loadingDate: shipment.loading_date,
-            deliveryDate: shipment.delivery_date
+            deliveryDate: shipment.delivery_date,
           },
           specialInstructions: shipment.special_instructions,
           createdAt: shipment.created_at,
-          updatedAt: shipment.updated_at
-        }
+          updatedAt: shipment.updated_at,
+        },
       });
     });
   } catch (error) {
@@ -495,8 +564,8 @@ function generateTrackingCode() {
 function createNotification(userId, title, message, type) {
   const sql = `INSERT INTO notifications (user_id, title, message, type, created_at) VALUES (?, ?, ?, ?, ?)`;
   const now = new Date().toISOString();
-  
-  db.run(sql, [userId, title, message, type, now], (err) => {
+
+  db.run(sql, [userId, title, message, type, now], err => {
     if (err) {
       console.error('Bildirim oluşturma hatası:', err);
     }
@@ -506,7 +575,7 @@ function createNotification(userId, title, message, type) {
 function notifyCarriers(shipmentId, trackingCode) {
   // Nakliyecilere bildirim gönder
   const sql = `SELECT id FROM users WHERE panel_type = 'nakliyeci'`;
-  
+
   db.all(sql, [], (err, carriers) => {
     if (err) {
       console.error('Nakliyeci listesi alma hatası:', err);
@@ -525,8 +594,3 @@ function notifyCarriers(shipmentId, trackingCode) {
 }
 
 module.exports = router;
-
-
-
-
-

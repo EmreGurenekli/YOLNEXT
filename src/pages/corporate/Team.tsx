@@ -1,23 +1,23 @@
 import React, { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { 
-  Users, 
-  Plus, 
-  Search, 
-  Filter, 
-  MoreVertical, 
-  Mail, 
-  Phone, 
-  Edit, 
-  Trash2, 
-  UserPlus, 
-  Shield, 
+import {
+  Users,
+  Plus,
+  Search,
+  Filter,
+  MoreVertical,
+  Mail,
+  Phone,
+  Edit,
+  Trash2,
+  UserPlus,
+  Shield,
   Clock,
   CheckCircle,
   AlertCircle,
   Star,
   MapPin,
-  Calendar
+  Calendar,
 } from 'lucide-react';
 
 export default function CorporateTeam() {
@@ -28,7 +28,7 @@ export default function CorporateTeam() {
   const teamMembers = [
     {
       id: 1,
-      name: 'Ahmet Yılmaz',
+      name: 'Kullanıcı',
       email: 'ahmet.yilmaz@migros.com.tr',
       phone: '+90 212 555 0123',
       role: 'Lojistik Müdürü',
@@ -38,7 +38,7 @@ export default function CorporateTeam() {
       avatar: 'AY',
       permissions: ['admin', 'shipment', 'reports'],
       joinDate: '2020-03-15',
-      location: 'İstanbul'
+      location: 'İstanbul',
     },
     {
       id: 2,
@@ -52,11 +52,11 @@ export default function CorporateTeam() {
       avatar: 'AD',
       permissions: ['shipment', 'tracking'],
       joinDate: '2021-07-20',
-      location: 'İstanbul'
+      location: 'İstanbul',
     },
     {
       id: 3,
-      name: 'Mehmet Kaya',
+      name: 'Kullanıcı',
       email: 'mehmet.kaya@migros.com.tr',
       phone: '+90 212 555 0125',
       role: 'Mali İşler Uzmanı',
@@ -66,7 +66,7 @@ export default function CorporateTeam() {
       avatar: 'MK',
       permissions: ['reports', 'payments'],
       joinDate: '2019-11-10',
-      location: 'Ankara'
+      location: 'Ankara',
     },
     {
       id: 4,
@@ -80,11 +80,11 @@ export default function CorporateTeam() {
       avatar: 'FÖ',
       permissions: ['messages', 'support'],
       joinDate: '2022-01-15',
-      location: 'İzmir'
+      location: 'İzmir',
     },
     {
       id: 5,
-      name: 'Ali Veli',
+      name: 'Kullanıcı',
       email: 'ali.veli@migros.com.tr',
       phone: '+90 212 555 0127',
       role: 'IT Uzmanı',
@@ -94,17 +94,20 @@ export default function CorporateTeam() {
       avatar: 'AV',
       permissions: ['admin', 'settings'],
       joinDate: '2018-05-03',
-      location: 'İstanbul'
-    }
+      location: 'İstanbul',
+    },
   ];
 
   const filteredMembers = teamMembers.filter(member => {
-    const matchesSearch = member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         member.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         member.role.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesRole = filterRole === 'all' || member.role.toLowerCase().includes(filterRole.toLowerCase());
-    
+    const matchesSearch =
+      member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      member.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      member.role.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesRole =
+      filterRole === 'all' ||
+      member.role.toLowerCase().includes(filterRole.toLowerCase());
+
     return matchesSearch && matchesRole;
   });
 
@@ -145,99 +148,120 @@ export default function CorporateTeam() {
   return (
     <>
       <Helmet>
-        <title>Ekip Yönetimi - YolNet Kargo</title>
-        <meta name="description" content="Kurumsal ekip yönetimi" />
+        <title>Ekip Yönetimi - YolNext Kargo</title>
+        <meta name='description' content='Kurumsal ekip yönetimi' />
       </Helmet>
 
-      <div className="max-w-[1400px] mx-auto">
+      <div className='max-w-[1400px] mx-auto'>
         {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-6">
+        <div className='mb-8'>
+          <div className='flex items-center justify-between mb-6'>
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Ekip Yönetimi</h1>
-              <p className="text-gray-600">Takım üyelerinizi yönetin ve izinlerini düzenleyin</p>
+              <h1 className='text-3xl font-bold text-gray-900'>
+                Ekip Yönetimi
+              </h1>
+              <p className='text-gray-600'>
+                Takım üyelerinizi yönetin ve izinlerini düzenleyin
+              </p>
             </div>
-            <div className="flex items-center gap-4">
-              <button className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2">
-                <UserPlus className="w-4 h-4" />
+            <div className='flex items-center gap-4'>
+              <button className='px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2'>
+                <UserPlus className='w-4 h-4' />
                 Toplu Ekleme
               </button>
-              <button 
+              <button
                 onClick={() => setShowAddModal(true)}
-                className="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center gap-2"
+                className='px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center gap-2'
               >
-                <Plus className="w-4 h-4" />
+                <Plus className='w-4 h-4' />
                 Üye Ekle
               </button>
             </div>
           </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
-              <div className="flex items-center gap-3 mb-2">
-                <Users className="w-5 h-5 text-blue-600" />
-                <span className="text-sm font-medium text-gray-600">Toplam Üye</span>
+          <div className='grid grid-cols-1 md:grid-cols-4 gap-6 mb-8'>
+            <div className='bg-white rounded-xl p-6 shadow-sm border border-gray-200'>
+              <div className='flex items-center gap-3 mb-2'>
+                <Users className='w-5 h-5 text-blue-600' />
+                <span className='text-sm font-medium text-gray-600'>
+                  Toplam Üye
+                </span>
               </div>
-              <div className="text-2xl font-bold text-gray-900">{teamMembers.length}</div>
+              <div className='text-2xl font-bold text-gray-900'>
+                {teamMembers.length}
+              </div>
             </div>
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
-              <div className="flex items-center gap-3 mb-2">
-                <CheckCircle className="w-5 h-5 text-green-600" />
-                <span className="text-sm font-medium text-gray-600">Aktif Üye</span>
+            <div className='bg-white rounded-xl p-6 shadow-sm border border-gray-200'>
+              <div className='flex items-center gap-3 mb-2'>
+                <CheckCircle className='w-5 h-5 text-green-600' />
+                <span className='text-sm font-medium text-gray-600'>
+                  Aktif Üye
+                </span>
               </div>
-              <div className="text-2xl font-bold text-gray-900">
+              <div className='text-2xl font-bold text-gray-900'>
                 {teamMembers.filter(m => m.status === 'active').length}
               </div>
             </div>
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
-              <div className="flex items-center gap-3 mb-2">
-                <Shield className="w-5 h-5 text-purple-600" />
-                <span className="text-sm font-medium text-gray-600">Admin</span>
+            <div className='bg-white rounded-xl p-6 shadow-sm border border-gray-200'>
+              <div className='flex items-center gap-3 mb-2'>
+                <Shield className='w-5 h-5 text-purple-600' />
+                <span className='text-sm font-medium text-gray-600'>Admin</span>
               </div>
-              <div className="text-2xl font-bold text-gray-900">
-                {teamMembers.filter(m => m.permissions.includes('admin')).length}
+              <div className='text-2xl font-bold text-gray-900'>
+                {
+                  teamMembers.filter(m => m.permissions.includes('admin'))
+                    .length
+                }
               </div>
             </div>
-            <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
-              <div className="flex items-center gap-3 mb-2">
-                <Clock className="w-5 h-5 text-orange-600" />
-                <span className="text-sm font-medium text-gray-600">Son 24 Saat</span>
+            <div className='bg-white rounded-xl p-6 shadow-sm border border-gray-200'>
+              <div className='flex items-center gap-3 mb-2'>
+                <Clock className='w-5 h-5 text-orange-600' />
+                <span className='text-sm font-medium text-gray-600'>
+                  Son 24 Saat
+                </span>
               </div>
-              <div className="text-2xl font-bold text-gray-900">
-                {teamMembers.filter(m => m.lastActive.includes('saat') || m.lastActive.includes('dakika')).length}
+              <div className='text-2xl font-bold text-gray-900'>
+                {
+                  teamMembers.filter(
+                    m =>
+                      m.lastActive.includes('saat') ||
+                      m.lastActive.includes('dakika')
+                  ).length
+                }
               </div>
             </div>
           </div>
 
           {/* Filters */}
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+          <div className='bg-white rounded-xl p-6 shadow-sm border border-gray-200'>
+            <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+              <div className='relative'>
+                <Search className='absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4' />
                 <input
-                  type="text"
-                  placeholder="Üye ara..."
+                  type='text'
+                  placeholder='Üye ara...'
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  onChange={e => setSearchTerm(e.target.value)}
+                  className='w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
                 />
               </div>
-              
+
               <select
                 value={filterRole}
-                onChange={(e) => setFilterRole(e.target.value)}
-                className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                onChange={e => setFilterRole(e.target.value)}
+                className='px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
               >
-                <option value="all">Tüm Roller</option>
-                <option value="müdür">Müdür</option>
-                <option value="uzman">Uzman</option>
-                <option value="hizmetleri">Müşteri Hizmetleri</option>
-                <option value="it">IT</option>
+                <option value='all'>Tüm Roller</option>
+                <option value='müdür'>Müdür</option>
+                <option value='uzman'>Uzman</option>
+                <option value='hizmetleri'>Müşteri Hizmetleri</option>
+                <option value='it'>IT</option>
               </select>
 
-              <button className="px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-center gap-2">
-                <Filter className="w-4 h-4" />
+              <button className='px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-center gap-2'>
+                <Filter className='w-4 h-4' />
                 Filtrele
               </button>
             </div>
@@ -245,63 +269,72 @@ export default function CorporateTeam() {
         </div>
 
         {/* Team Members Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredMembers.map((member) => (
-            <div key={member.id} className="bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
-              <div className="p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-semibold">
+        <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
+          {filteredMembers.map(member => (
+            <div
+              key={member.id}
+              className='bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow'
+            >
+              <div className='p-6'>
+                <div className='flex items-start justify-between mb-4'>
+                  <div className='flex items-center gap-3'>
+                    <div className='w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-semibold'>
                       {member.avatar}
                     </div>
                     <div>
-                      <h3 className="font-semibold text-gray-900">{member.name}</h3>
-                      <p className="text-sm text-gray-600">{member.role}</p>
+                      <h3 className='font-semibold text-gray-900'>
+                        {member.name}
+                      </h3>
+                      <p className='text-sm text-gray-600'>{member.role}</p>
                     </div>
                   </div>
-                  <button className="p-2 text-gray-400 hover:text-gray-600">
-                    <MoreVertical className="w-4 h-4" />
+                  <button className='p-2 text-gray-400 hover:text-gray-600'>
+                    <MoreVertical className='w-4 h-4' />
                   </button>
                 </div>
 
-                <div className="space-y-3 mb-4">
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    <Mail className="w-4 h-4" />
-                    <span className="truncate">{member.email}</span>
+                <div className='space-y-3 mb-4'>
+                  <div className='flex items-center gap-2 text-sm text-gray-600'>
+                    <Mail className='w-4 h-4' />
+                    <span className='truncate'>{member.email}</span>
                   </div>
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    <Phone className="w-4 h-4" />
+                  <div className='flex items-center gap-2 text-sm text-gray-600'>
+                    <Phone className='w-4 h-4' />
                     <span>{member.phone}</span>
                   </div>
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    <MapPin className="w-4 h-4" />
+                  <div className='flex items-center gap-2 text-sm text-gray-600'>
+                    <MapPin className='w-4 h-4' />
                     <span>{member.location}</span>
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between mb-4">
-                  <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(member.status)}`}>
+                <div className='flex items-center justify-between mb-4'>
+                  <span
+                    className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(member.status)}`}
+                  >
                     {getStatusText(member.status)}
                   </span>
-                  <span className={`px-2 py-1 text-xs font-medium rounded-full ${getRoleColor(member.role)}`}>
+                  <span
+                    className={`px-2 py-1 text-xs font-medium rounded-full ${getRoleColor(member.role)}`}
+                  >
                     {member.department}
                   </span>
                 </div>
 
-                <div className="text-xs text-gray-500 mb-4">
+                <div className='text-xs text-gray-500 mb-4'>
                   Son aktif: {member.lastActive}
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <button className="flex-1 px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2">
-                    <Edit className="w-4 h-4" />
+                <div className='flex items-center gap-2'>
+                  <button className='flex-1 px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2'>
+                    <Edit className='w-4 h-4' />
                     Düzenle
                   </button>
-                  <button className="px-3 py-2 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50 transition-colors">
-                    <Mail className="w-4 h-4" />
+                  <button className='px-3 py-2 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50 transition-colors'>
+                    <Mail className='w-4 h-4' />
                   </button>
-                  <button className="px-3 py-2 border border-red-300 text-red-700 text-sm rounded-lg hover:bg-red-50 transition-colors">
-                    <Trash2 className="w-4 h-4" />
+                  <button className='px-3 py-2 border border-red-300 text-red-700 text-sm rounded-lg hover:bg-red-50 transition-colors'>
+                    <Trash2 className='w-4 h-4' />
                   </button>
                 </div>
               </div>
@@ -311,13 +344,20 @@ export default function CorporateTeam() {
 
         {/* Empty State */}
         {filteredMembers.length === 0 && (
-          <div className="text-center py-12">
-            <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Üye bulunamadı</h3>
-            <p className="text-gray-500 mb-6">Arama kriterlerinize uygun üye bulunamadı</p>
-            <button 
-              onClick={() => { setSearchTerm(''); setFilterRole('all'); }}
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+          <div className='text-center py-12'>
+            <Users className='w-16 h-16 text-gray-300 mx-auto mb-4' />
+            <h3 className='text-lg font-medium text-gray-900 mb-2'>
+              Üye bulunamadı
+            </h3>
+            <p className='text-gray-500 mb-6'>
+              Arama kriterlerinize uygun üye bulunamadı
+            </p>
+            <button
+              onClick={() => {
+                setSearchTerm('');
+                setFilterRole('all');
+              }}
+              className='px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors'
             >
               Tümünü Göster
             </button>

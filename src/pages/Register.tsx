@@ -1,489 +1,1210 @@
 import React, { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { Link, useNavigate } from 'react-router-dom';
-import { 
-  Truck, 
-  Eye, 
-  EyeOff, 
-  Mail, 
-  Lock, 
-  User, 
-  Phone, 
-  Building2, 
-  AlertCircle, 
-  CheckCircle,
-  ArrowRight,
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import {
   Users,
-  Package,
+  Building2,
+  Truck,
+  UserCheck,
+  ArrowRight,
+  Mail,
+  Lock,
+  User,
+  Phone,
+  CheckCircle,
   Shield,
-  Zap,
-  MapPin,
-  Calendar
+  Clock,
+  Globe,
+  Star,
+  AlertTriangle,
+  Loader2,
+  XCircle,
 } from 'lucide-react';
+import YolNextLogo from '../components/common/yolnextLogo';
 
-export default function Register() {
+const Register = () => {
+  const navigate = useNavigate();
+  const { register } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [verificationStatus, setVerificationStatus] = useState<
+    'pending' | 'verifying' | 'verified' | 'rejected'
+  >('pending');
+  const [verificationMessage, setVerificationMessage] = useState('');
+  const [verificationCode, setVerificationCode] = useState('');
+  const [showCodeInput, setShowCodeInput] = useState(false);
+  const [codeType, setCodeType] = useState<'email' | 'phone' | null>(null);
   const [formData, setFormData] = useState({
-    userType: 'individual',
+    // Temel bilgiler (tüm kullanıcılar için)
     firstName: '',
     lastName: '',
     email: '',
     phone: '',
     password: '',
     confirmPassword: '',
+    userType: 'individual',
+
+    // Kurumsal bilgiler (Kurumsal Gönderici + Nakliyeci)
     companyName: '',
     taxNumber: '',
-    address: '',
-    acceptTerms: false
-  });
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
-  const navigate = useNavigate();
+    companyAddress: '',
+    companyPhone: '',
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value, type } = e.target;
+    // Nakliyeci özel bilgiler
+    licenseNumber: '',
+    vehicleCount: '',
+    serviceAreas: '',
+
+    // Taşıyıcı özel bilgiler
+    driverLicenseNumber: '',
+    vehicleType: '',
+    vehiclePlate: '',
+    experienceYears: '',
+
+    // Bireysel özel bilgiler
+    address: '',
+    city: '',
+    district: '',
+  });
+
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+  ) => {
+    const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
+      [name]: value,
     }));
+
+    // Gerçek zamanlı doğrulama
+    if (name === 'email' && value) {
+      verifyEmail(value).then(isValid => {
+        if (!isValid) {
+          setError('Geçersiz e-posta formatı');
+        } else {
+          setError('');
+        }
+      });
+    }
+
+    if (name === 'phone' && value) {
+      verifyPhoneNumber(value).then(isValid => {
+        if (!isValid) {
+          setError('Geçersiz telefon numarası formatı');
+        } else {
+          setError('');
+        }
+      });
+    }
+
+    if (name === 'taxNumber' && value) {
+      verifyTaxNumber(value).then(isValid => {
+        if (!isValid) {
+          setError('Geçersiz vergi numarası');
+        } else {
+          setError('');
+        }
+      });
+    }
+
+    if (name === 'driverLicenseNumber' && value) {
+      verifyDriverLicense(value).then(isValid => {
+        if (!isValid) {
+          setError('Geçersiz ehliyet numarası (11 haneli olmalı)');
+        } else {
+          setError('');
+        }
+      });
+    }
+  };
+
+  // Her kullanıcı tipi için gerekli alanları belirle
+  const getRequiredFields = (userType: string) => {
+    const baseFields = [
+      'firstName',
+      'lastName',
+      'email',
+      'phone',
+      'password',
+      'confirmPassword',
+    ];
+
+    switch (userType) {
+      case 'individual':
+        return [...baseFields, 'address', 'city', 'district'];
+      case 'corporate':
+        return [
+          ...baseFields,
+          'companyName',
+          'taxNumber',
+          'companyAddress',
+          'companyPhone',
+        ];
+      case 'nakliyeci':
+        return [
+          ...baseFields,
+          'companyName',
+          'taxNumber',
+          'companyAddress',
+          'companyPhone',
+          'licenseNumber',
+          'vehicleCount',
+          'serviceAreas',
+        ];
+      case 'tasiyici':
+        return [
+          ...baseFields,
+          'driverLicenseNumber',
+          'vehicleType',
+          'vehiclePlate',
+          'experienceYears',
+          'address',
+          'city',
+        ];
+      default:
+        return baseFields;
+    }
+  };
+
+  // Evrak doğrulama fonksiyonları
+  const verifyTaxNumber = async (taxNumber: string) => {
+    // 1. Format kontrolü
+    if (taxNumber.length !== 10) return false;
+
+    // 2. Algoritma kontrolü
+    const digits = taxNumber.split('').map(Number);
+    const checkDigit = digits[9];
+    const sum = digits.slice(0, 9).reduce((acc, digit, index) => {
+      const temp = (digit + (9 - index)) % 10;
+      return acc + (temp === 0 ? 0 : (temp * Math.pow(2, 9 - index)) % 9);
+    }, 0);
+
+    const isValidFormat = (10 - (sum % 10)) % 10 === checkDigit;
+    if (!isValidFormat) return false;
+
+    // 3. GERÇEK DOĞRULAMA - API çağrısı (şirket adı ile)
+    try {
+      const response = await fetch('/api/verify/tax-number', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          taxNumber,
+          companyName: formData.companyName,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.isValid && result.companyInfo) {
+        // Gerçek şirket bilgilerini göster
+        setVerificationMessage(
+          `✅ Doğrulandı: ${result.companyInfo.unvan} - ${result.companyInfo.adres}`
+        );
+      } else if (result.verificationDetails) {
+        // Doğrulama detaylarını göster
+        const { maliye, ticaret } = result.verificationDetails;
+        if (maliye && ticaret) {
+          setVerificationMessage(
+            `❌ Doğrulama başarısız: Maliye: ${maliye.found ? '✅' : '❌'}, Ticaret: ${ticaret.active ? '✅' : '❌'}`
+          );
+        }
+      }
+
+      return result.isValid; // API'den gelen gerçek sonuç
+    } catch (error) {
+      console.error('Vergi numarası doğrulama hatası:', error);
+      return false; // API hatası durumunda güvenli tarafta kal
+    }
+  };
+
+  const verifyDriverLicense = async (licenseNumber: string) => {
+    // 1. Format kontrolü
+    if (!/^\d{11}$/.test(licenseNumber)) return false;
+
+    // 2. GERÇEK DOĞRULAMA - API çağrısı (ad-soyad ile)
+    try {
+      const response = await fetch('/api/verify/driver-license', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          licenseNumber,
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.isValid && result.driverInfo) {
+        // Gerçek sürücü bilgilerini göster
+        setVerificationMessage(
+          `✅ Doğrulandı: ${result.driverInfo.ad} ${result.driverInfo.soyad} - ${result.driverInfo.ehliyetSinifi}`
+        );
+      } else if (result.verificationDetails) {
+        // Doğrulama detaylarını göster
+        const { icisleri, nvi } = result.verificationDetails;
+        if (icisleri && nvi) {
+          setVerificationMessage(
+            `❌ Doğrulama başarısız: İçişleri: ${icisleri.found ? '✅' : '❌'}, NVI: ${nvi.found ? '✅' : '❌'}`
+          );
+        }
+      }
+
+      return result.isValid; // API'den gelen gerçek sonuç
+    } catch (error) {
+      console.error('Ehliyet doğrulama hatası:', error);
+      return false;
+    }
+  };
+
+  const verifyPhoneNumber = async (phone: string) => {
+    // 1. Format kontrolü
+    const cleanPhone = phone.replace(/\D/g, '');
+    if (!/^(\+90|0)?[5][0-9]{9}$/.test(cleanPhone)) return false;
+
+    // 2. GERÇEK DOĞRULAMA - SMS doğrulama
+    try {
+      const response = await fetch('/api/verify/phone', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: cleanPhone }),
+      });
+
+      const result = await response.json();
+
+      if (result.requiresCode) {
+        setShowCodeInput(true);
+        setCodeType('phone');
+        setVerificationMessage(
+          'Telefon numaranıza SMS doğrulama kodu gönderildi'
+        );
+        return false; // Kod gerekli, henüz doğrulanmadı
+      }
+
+      return result.isValid; // SMS doğrulama sonucu
+    } catch (error) {
+      console.error('Telefon doğrulama hatası:', error);
+      return false;
+    }
+  };
+
+  const verifyEmail = async (email: string) => {
+    // 1. Format kontrolü
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) return false;
+
+    // 2. GERÇEK DOĞRULAMA - E-posta doğrulama
+    try {
+      const response = await fetch('/api/verify/email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+
+      const result = await response.json();
+
+      if (result.requiresCode) {
+        setShowCodeInput(true);
+        setCodeType('email');
+        setVerificationMessage('E-posta adresinize doğrulama kodu gönderildi');
+        return false; // Kod gerekli, henüz doğrulanmadı
+      }
+
+      return result.isValid; // E-posta doğrulama sonucu
+    } catch (error) {
+      console.error('E-posta doğrulama hatası:', error);
+      return false;
+    }
+  };
+
+  // Doğrulama kodu kontrolü
+  const verifyCode = async () => {
+    if (!verificationCode || !codeType) return false;
+
+    try {
+      const endpoint =
+        codeType === 'email'
+          ? '/api/verify/email/verify-code'
+          : '/api/verify/phone/verify-code';
+      const data =
+        codeType === 'email'
+          ? { email: formData.email, code: verificationCode }
+          : { phone: formData.phone, code: verificationCode };
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+
+      const result = await response.json();
+
+      if (result.isValid) {
+        setShowCodeInput(false);
+        setCodeType(null);
+        setVerificationCode('');
+        setVerificationStatus('verified');
+        setVerificationMessage(
+          `${codeType === 'email' ? 'E-posta' : 'Telefon'} doğrulandı!`
+        );
+        return true;
+      } else {
+        setError(result.error || 'Geçersiz doğrulama kodu');
+        return false;
+      }
+    } catch (error) {
+      console.error('Kod doğrulama hatası:', error);
+      setError('Kod doğrulama sırasında hata oluştu');
+      return false;
+    }
+  };
+
+  // Evrak doğrulama sistemi
+  const verifyDocuments = async () => {
+    setVerificationStatus('verifying');
+    setVerificationMessage('Evraklar doğrulanıyor...');
+
+    try {
+      const errors = [];
+
+      // E-posta doğrulama
+      if (!(await verifyEmail(formData.email))) {
+        errors.push('Geçersiz e-posta formatı');
+      }
+
+      // Telefon doğrulama
+      if (!(await verifyPhoneNumber(formData.phone))) {
+        errors.push('Geçersiz telefon numarası formatı');
+      }
+
+      // Kullanıcı tipine göre özel doğrulamalar
+      if (
+        formData.userType === 'corporate' ||
+        formData.userType === 'nakliyeci'
+      ) {
+        if (!(await verifyTaxNumber(formData.taxNumber))) {
+          errors.push('Geçersiz vergi numarası');
+        }
+      }
+
+      if (formData.userType === 'tasiyici') {
+        if (!(await verifyDriverLicense(formData.driverLicenseNumber))) {
+          errors.push('Geçersiz ehliyet numarası (11 haneli olmalı)');
+        }
+      }
+
+      if (errors.length > 0) {
+        setVerificationStatus('rejected');
+        setVerificationMessage(`Doğrulama hatası: ${errors.join(', ')}`);
+        return false;
+      }
+
+      setVerificationStatus('verified');
+      setVerificationMessage('Tüm evraklar doğrulandı!');
+      return true;
+    } catch (error) {
+      setVerificationStatus('rejected');
+      setVerificationMessage('Doğrulama sırasında hata oluştu');
+      return false;
+    }
+  };
+
+  // Form validasyonu
+  const validateForm = () => {
+    const requiredFields = getRequiredFields(formData.userType);
+    const missingFields = requiredFields.filter(
+      field => !formData[field as keyof typeof formData]
+    );
+
+    if (missingFields.length > 0) {
+      setError(
+        `Lütfen tüm gerekli alanları doldurun: ${missingFields.join(', ')}`
+      );
+      return false;
+    }
+
+    if (formData.password !== formData.confirmPassword) {
+      setError('Şifreler eşleşmiyor');
+      return false;
+    }
+
+    if (formData.password.length < 6) {
+      setError('Şifre en az 6 karakter olmalıdır');
+      return false;
+    }
+
+    return true;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
+    setVerificationStatus('pending');
 
-    // Validation
-    if (formData.password !== formData.confirmPassword) {
-      setError('Şifreler eşleşmiyor');
+    // Form validasyonu
+    if (!validateForm()) {
       setIsLoading(false);
       return;
     }
 
-    if (!formData.acceptTerms) {
-      setError('Kullanım şartlarını kabul etmelisiniz');
+    // Evrak doğrulama
+    const isVerified = await verifyDocuments();
+    if (!isVerified) {
       setIsLoading(false);
       return;
     }
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Redirect based on user type
-      switch (formData.userType) {
-        case 'individual':
-          navigate('/individual/dashboard');
-          break;
-        case 'corporate':
-          navigate('/corporate/dashboard');
-          break;
-        case 'nakliyeci':
-          navigate('/nakliyeci/dashboard');
-          break;
-        case 'tasiyici':
-          navigate('/tasiyici/dashboard');
-          break;
-        default:
-          navigate('/individual/dashboard');
+      const result = await register(formData);
+
+      if (result.success && result.user) {
+        // Redirect based on user type
+        switch (formData.userType) {
+          case 'individual':
+            navigate('/individual/dashboard');
+            break;
+          case 'corporate':
+            navigate('/corporate/dashboard');
+            break;
+          case 'nakliyeci':
+            navigate('/nakliyeci/dashboard');
+            break;
+          case 'tasiyici':
+            navigate('/tasiyici/dashboard');
+            break;
+          default:
+            navigate('/individual/dashboard');
+        }
+      } else {
+        setError(result.error || 'Kayıt başarısız');
       }
-    } catch (err) {
-      setError('Kayıt olurken bir hata oluştu. Lütfen tekrar deneyin.');
+    } catch (error: any) {
+      setError('Kayıt başarısız. Lütfen tekrar deneyin.');
+      console.error('Registration error:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const userTypes = [
-    {
-      value: 'individual',
-      label: 'Bireysel',
-      description: 'Ev taşıma, kişisel gönderiler',
-      icon: <Users className="w-6 h-6" />,
-      color: 'blue',
-      features: ['Ev taşıma', 'Kişisel gönderiler', 'Basit takip']
-    },
-    {
-      value: 'corporate',
-      label: 'Kurumsal',
-      description: 'Büyük firmalar, fabrikalar',
-      icon: <Building2 className="w-6 h-6" />,
-      color: 'green',
-      features: ['Toplu gönderiler', 'Raporlama', 'Ekip yönetimi']
-    },
-    {
-      value: 'nakliyeci',
-      label: 'Nakliyeci',
-      description: 'Kargo firmaları',
-      icon: <Truck className="w-6 h-6" />,
-      color: 'orange',
-      features: ['Gönderi yönetimi', 'Müşteri takibi', 'Finansal raporlar']
-    },
-    {
-      value: 'tasiyici',
-      label: 'Taşıyıcı',
-      description: 'Kamyoncu, şoförler',
-      icon: <Package className="w-6 h-6" />,
-      color: 'purple',
-      features: ['İş fırsatları', 'Kazanç takibi', 'Profil yönetimi']
-    }
-  ];
-
-  const getColorClasses = (color: string, isSelected: boolean) => {
-    const colors = {
-      blue: isSelected ? 'bg-blue-100 border-blue-300 text-blue-700' : 'border-gray-200 text-gray-600 hover:border-blue-300',
-      green: isSelected ? 'bg-green-100 border-green-300 text-green-700' : 'border-gray-200 text-gray-600 hover:border-green-300',
-      orange: isSelected ? 'bg-orange-100 border-orange-300 text-orange-700' : 'border-gray-200 text-gray-600 hover:border-orange-300',
-      purple: isSelected ? 'bg-purple-100 border-purple-300 text-purple-700' : 'border-gray-200 text-gray-600 hover:border-purple-300'
-    };
-    return colors[color as keyof typeof colors] || colors.blue;
-  };
-
-  const selectedUserType = userTypes.find(type => type.value === formData.userType);
-
   return (
-    <>
+    <div className='min-h-screen bg-white'>
       <Helmet>
-        <title>Kayıt Ol - YolNet Kargo</title>
-        <meta name="description" content="YolNet platformuna kayıt olun" />
+        <title>Kayıt Ol - YolNext | Tamamen Ücretsiz Lojistik Platformu</title>
+        <meta
+          name='description'
+          content='YolNext platformuna ücretsiz kayıt olun. %0 üyelik ücreti, sadece nakliyeci %1 komisyon öder. 4 kullanıcı tipi, 81 il kapsamı.'
+        />
+        <meta
+          name='keywords'
+          content='kayıt ol, register, lojistik, kargo, ücretsiz, YolNext'
+        />
       </Helmet>
 
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-6xl mx-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Left Side - Branding */}
-            <div className="hidden lg:flex flex-col justify-center">
-              <div className="text-center">
-                <div className="flex items-center justify-center mb-8">
-                  <Truck className="w-16 h-16 text-blue-600" />
-                  <span className="ml-4 text-4xl font-bold text-gray-900">YolNet</span>
+      <div className='min-h-screen flex'>
+        {/* Left Side - Branding */}
+        <div className='hidden lg:flex lg:w-1/2 bg-gradient-to-br from-slate-800 via-slate-900 to-blue-900 relative overflow-hidden'>
+          <div className='absolute inset-0 bg-gradient-to-br from-white/5 to-transparent'></div>
+          <div className='absolute top-0 right-0 w-80 h-80 bg-gradient-to-br from-blue-400/10 to-indigo-400/10 rounded-full -translate-y-40 translate-x-40'></div>
+          <div className='absolute bottom-0 left-0 w-64 h-64 bg-gradient-to-tr from-slate-400/10 to-blue-400/10 rounded-full translate-y-32 -translate-x-32'></div>
+
+          <div className='relative z-10 flex flex-col justify-center px-12 text-white'>
+            <div className='flex items-center mb-8'>
+              <YolNextLogo variant='banner' className='text-white h-12' />
+            </div>
+
+            <h1 className='text-4xl font-bold mb-6 bg-gradient-to-r from-white to-blue-200 bg-clip-text text-transparent'>
+              YolNext Ailesine Katılın
+            </h1>
+
+            <p className='text-xl text-slate-200 mb-8 leading-relaxed'>
+              4 farklı kullanıcı tipi için özel tasarlanmış, 81 ilde hizmet
+              veren
+              <br />
+              <span className='text-blue-300 font-semibold'>
+                tamamen ücretsiz
+              </span>{' '}
+              lojistik platformu.
+            </p>
+
+            {/* Ücretsiz Kullanım Vurgusu */}
+            <div className='bg-white/10 backdrop-blur-sm rounded-2xl p-6 mb-8'>
+              <div className='text-center'>
+                <div className='text-2xl font-bold text-white mb-2'>
+                  🎉 TAMAMEN ÜCRETSİZ
                 </div>
-                <h1 className="text-3xl font-bold text-gray-900 mb-4">
-                  Lojistik Dünyasına Hoş Geldiniz
-                </h1>
-                <p className="text-lg text-gray-600 mb-8">
-                  Türkiye'nin en gelişmiş lojistik platformuna katılın
-                </p>
-                
-                <div className="grid grid-cols-1 gap-4 text-left">
-                  <div className="flex items-center gap-3">
-                    <CheckCircle className="w-5 h-5 text-green-600" />
-                    <span className="text-gray-700">Ücretsiz kayıt</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <CheckCircle className="w-5 h-5 text-green-600" />
-                    <span className="text-gray-700">Hızlı kurulum</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <CheckCircle className="w-5 h-5 text-green-600" />
-                    <span className="text-gray-700">7/24 destek</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <CheckCircle className="w-5 h-5 text-green-600" />
-                    <span className="text-gray-700">Güvenli platform</span>
-                  </div>
+                <div className='text-white/90 text-lg'>
+                  <span className='font-bold'>%0 üyelik ücreti</span> •
+                  <span className='font-bold'>%0 gönderi ücreti</span> •
+                  <span className='font-bold'>%0 gizli ücret</span>
+                </div>
+                <div className='text-white/80 text-sm mt-2'>
+                  Sadece nakliyeci %1 komisyon öder, diğer her şey ücretsiz!
                 </div>
               </div>
             </div>
 
-            {/* Right Side - Registration Form */}
-            <div className="bg-white rounded-2xl shadow-xl p-8">
-              <div className="text-center mb-8">
-                <div className="flex items-center justify-center mb-4 lg:hidden">
-                  <Truck className="w-12 h-12 text-blue-600" />
-                  <span className="ml-3 text-2xl font-bold text-gray-900">YolNet</span>
-                </div>
-                <h2 className="text-2xl font-bold text-gray-900">Kayıt Ol</h2>
-                <p className="text-gray-600 mt-2">Hesabınızı oluşturun</p>
+            <div className='grid grid-cols-2 gap-6'>
+              <div className='flex items-center gap-3'>
+                <CheckCircle className='w-6 h-6 text-green-400' />
+                <span className='text-slate-200'>30,550+ Kullanıcı</span>
               </div>
-
-              {/* User Type Selection */}
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-3">
-                  Kullanıcı Tipi
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  {userTypes.map((type) => (
-                    <button
-                      key={type.value}
-                      type="button"
-                      onClick={() => setFormData(prev => ({ ...prev, userType: type.value }))}
-                      className={`p-3 rounded-lg border-2 transition-all ${getColorClasses(type.color, formData.userType === type.value)}`}
-                    >
-                      <div className="flex items-center gap-2">
-                        {type.icon}
-                        <div className="text-left">
-                          <div className="font-medium">{type.label}</div>
-                          <div className="text-xs opacity-75">{type.description}</div>
-                        </div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-                
-                {/* Selected User Type Features */}
-                {selectedUserType && (
-                  <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-                    <div className="text-sm font-medium text-gray-700 mb-2">
-                      {selectedUserType.label} hesabı ile:
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {selectedUserType.features.map((feature, index) => (
-                        <span key={index} className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full">
-                          {feature}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
+              <div className='flex items-center gap-3'>
+                <Shield className='w-6 h-6 text-blue-400' />
+                <span className='text-slate-200'>%99.9 Memnuniyet</span>
               </div>
-
-              {/* Registration Form */}
-              <form onSubmit={handleSubmit} className="space-y-6">
-                {error && (
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-3">
-                    <AlertCircle className="w-5 h-5 text-red-600" />
-                    <span className="text-red-700 text-sm">{error}</span>
-                  </div>
-                )}
-
-                {/* Personal Information */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-2">
-                      Ad *
-                    </label>
-                    <div className="relative">
-                      <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                      <input
-                        id="firstName"
-                        name="firstName"
-                        type="text"
-                        required
-                        value={formData.firstName}
-                        onChange={handleInputChange}
-                        placeholder="Adınız"
-                        className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-2">
-                      Soyad *
-                    </label>
-                    <div className="relative">
-                      <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                      <input
-                        id="lastName"
-                        name="lastName"
-                        type="text"
-                        required
-                        value={formData.lastName}
-                        onChange={handleInputChange}
-                        placeholder="Soyadınız"
-                        className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                    E-posta Adresi *
-                  </label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                    <input
-                      id="email"
-                      name="email"
-                      type="email"
-                      required
-                      value={formData.email}
-                      onChange={handleInputChange}
-                      placeholder="ornek@email.com"
-                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-2">
-                    Telefon Numarası *
-                  </label>
-                  <div className="relative">
-                    <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                    <input
-                      id="phone"
-                      name="phone"
-                      type="tel"
-                      required
-                      value={formData.phone}
-                      onChange={handleInputChange}
-                      placeholder="+90 555 123 45 67"
-                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
-                </div>
-
-                {/* Corporate Information */}
-                {(formData.userType === 'corporate' || formData.userType === 'nakliyeci') && (
-                  <>
-                    <div>
-                      <label htmlFor="companyName" className="block text-sm font-medium text-gray-700 mb-2">
-                        Şirket Adı *
-                      </label>
-                      <div className="relative">
-                        <Building2 className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                        <input
-                          id="companyName"
-                          name="companyName"
-                          type="text"
-                          required
-                          value={formData.companyName}
-                          onChange={handleInputChange}
-                          placeholder="Şirket adınız"
-                          className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label htmlFor="taxNumber" className="block text-sm font-medium text-gray-700 mb-2">
-                        Vergi Numarası *
-                      </label>
-                      <input
-                        id="taxNumber"
-                        name="taxNumber"
-                        type="text"
-                        required
-                        value={formData.taxNumber}
-                        onChange={handleInputChange}
-                        placeholder="1234567890"
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      />
-                    </div>
-                  </>
-                )}
-
-                <div>
-                  <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-2">
-                    Adres *
-                  </label>
-                  <div className="relative">
-                    <MapPin className="absolute left-3 top-3 text-gray-400 w-5 h-5" />
-                    <textarea
-                      id="address"
-                      name="address"
-                      required
-                      value={formData.address}
-                      onChange={handleInputChange}
-                      placeholder="Tam adresiniz"
-                      rows={3}
-                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
-                </div>
-
-                {/* Password */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                      Şifre *
-                    </label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                      <input
-                        id="password"
-                        name="password"
-                        type={showPassword ? 'text' : 'password'}
-                        required
-                        value={formData.password}
-                        onChange={handleInputChange}
-                        placeholder="••••••••"
-                        className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                      >
-                        {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                      </button>
-                    </div>
-                  </div>
-                  <div>
-                    <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
-                      Şifre Tekrar *
-                    </label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                      <input
-                        id="confirmPassword"
-                        name="confirmPassword"
-                        type={showConfirmPassword ? 'text' : 'password'}
-                        required
-                        value={formData.confirmPassword}
-                        onChange={handleInputChange}
-                        placeholder="••••••••"
-                        className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                      >
-                        {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-start">
-                  <input
-                    id="acceptTerms"
-                    name="acceptTerms"
-                    type="checkbox"
-                    checked={formData.acceptTerms}
-                    onChange={handleInputChange}
-                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mt-1"
-                  />
-                  <label htmlFor="acceptTerms" className="ml-2 text-sm text-gray-600">
-                    <a href="#" className="text-blue-600 hover:text-blue-700">Kullanım Şartları</a> ve{' '}
-                    <a href="#" className="text-blue-600 hover:text-blue-700">Gizlilik Politikası</a>'nı okudum ve kabul ediyorum *
-                  </label>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-                >
-                  {isLoading ? (
-                    <>
-                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      Kayıt oluşturuluyor...
-                    </>
-                  ) : (
-                    <>
-                      Hesap Oluştur
-                      <ArrowRight className="w-4 h-4" />
-                    </>
-                  )}
-                </button>
-              </form>
-
-              <div className="mt-6 text-center">
-                <p className="text-gray-600">
-                  Zaten hesabınız var mı?{' '}
-                  <Link to="/login" className="text-blue-600 hover:text-blue-700 font-medium">
-                    Giriş yapın
-                  </Link>
-                </p>
+              <div className='flex items-center gap-3'>
+                <Clock className='w-6 h-6 text-yellow-400' />
+                <span className='text-slate-200'>2 Gün Teslimat</span>
+              </div>
+              <div className='flex items-center gap-3'>
+                <Globe className='w-6 h-6 text-green-400' />
+                <span className='text-slate-200'>81 İl Kapsamı</span>
               </div>
             </div>
           </div>
         </div>
+
+        {/* Right Side - Register Form */}
+        <div className='w-full lg:w-1/2 flex items-center justify-center px-8 py-12 bg-white'>
+          <div className='w-full max-w-md'>
+            {/* Mobile Logo */}
+            <div className='lg:hidden flex items-center justify-center mb-8'>
+              <YolNextLogo variant='banner' className='text-gray-900 h-10' />
+            </div>
+
+            <div className='text-center mb-8'>
+              <h1 className='text-3xl font-bold text-gray-900 mb-2'>
+                Hesap Oluştur
+              </h1>
+              <p className='text-gray-600'>
+                YolNext platformuna ücretsiz katılın
+              </p>
+            </div>
+
+            <form onSubmit={handleSubmit} className='space-y-6'>
+              {/* Error Message */}
+              {error && (
+                <div className='bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm'>
+                  {error}
+                </div>
+              )}
+
+              {/* Evrak Doğrulama Durumu */}
+              {verificationStatus !== 'pending' && (
+                <div
+                  className={`px-4 py-3 rounded-lg text-sm flex items-center gap-2 ${
+                    verificationStatus === 'verified'
+                      ? 'bg-green-50 border border-green-200 text-green-700'
+                      : verificationStatus === 'verifying'
+                        ? 'bg-blue-50 border border-blue-200 text-blue-700'
+                        : 'bg-red-50 border border-red-200 text-red-700'
+                  }`}
+                >
+                  {verificationStatus === 'verified' && (
+                    <CheckCircle className='w-5 h-5' />
+                  )}
+                  {verificationStatus === 'verifying' && (
+                    <Loader2 className='w-5 h-5 animate-spin' />
+                  )}
+                  {verificationStatus === 'rejected' && (
+                    <XCircle className='w-5 h-5' />
+                  )}
+                  {verificationMessage}
+                </div>
+              )}
+
+              {/* Doğrulama Kodu Girişi */}
+              {showCodeInput && (
+                <div className='bg-blue-50 border border-blue-200 rounded-lg p-4'>
+                  <h4 className='text-sm font-semibold text-blue-900 mb-2'>
+                    {codeType === 'email' ? 'E-posta' : 'SMS'} Doğrulama Kodu
+                  </h4>
+                  <p className='text-sm text-blue-700 mb-3'>
+                    {codeType === 'email'
+                      ? `${formData.email} adresine gönderilen 6 haneli kodu girin`
+                      : `${formData.phone} numarasına gönderilen 6 haneli kodu girin`}
+                  </p>
+                  <div className='flex gap-2'>
+                    <label htmlFor='verificationCode' className='sr-only'>
+                      Doğrulama Kodu
+                    </label>
+                    <input
+                      id='verificationCode'
+                      type='text'
+                      value={verificationCode}
+                      onChange={e => setVerificationCode(e.target.value)}
+                      placeholder='123456'
+                      aria-label='Doğrulama Kodu'
+                      className='flex-1 px-3 py-2 border border-blue-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500'
+                      maxLength={6}
+                    />
+                    <button
+                      type='button'
+                      onClick={verifyCode}
+                      disabled={verificationCode.length !== 6}
+                      className='px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-700'
+                    >
+                      Doğrula
+                    </button>
+                  </div>
+                  <button
+                    type='button'
+                    onClick={() => {
+                      setShowCodeInput(false);
+                      setCodeType(null);
+                      setVerificationCode('');
+                    }}
+                    className='mt-2 text-xs text-blue-600 hover:text-blue-800'
+                  >
+                    İptal
+                  </button>
+                </div>
+              )}
+
+              {/* User Type Selection */}
+              <div className='space-y-3'>
+                <label className='text-gray-700 text-sm font-medium'>
+                  Kullanıcı Tipi
+                </label>
+                <div className='grid grid-cols-2 gap-3'>
+                  <button
+                    type='button'
+                    onClick={() =>
+                      setFormData(prev => ({ ...prev, userType: 'individual' }))
+                    }
+                    className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg transition-colors text-sm font-medium ${
+                      formData.userType === 'individual'
+                        ? 'bg-gradient-to-r from-slate-800 to-blue-900 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    <Users className='w-4 h-4' />
+                    Bireysel
+                  </button>
+                  <button
+                    type='button'
+                    onClick={() =>
+                      setFormData(prev => ({ ...prev, userType: 'corporate' }))
+                    }
+                    className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg transition-colors text-sm font-medium ${
+                      formData.userType === 'corporate'
+                        ? 'bg-gradient-to-r from-slate-800 to-blue-900 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    <Building2 className='w-4 h-4' />
+                    Kurumsal
+                  </button>
+                  <button
+                    type='button'
+                    onClick={() =>
+                      setFormData(prev => ({ ...prev, userType: 'nakliyeci' }))
+                    }
+                    className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg transition-colors text-sm font-medium ${
+                      formData.userType === 'nakliyeci'
+                        ? 'bg-gradient-to-r from-slate-800 to-blue-900 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    <Truck className='w-4 h-4' />
+                    Nakliyeci
+                  </button>
+                  <button
+                    type='button'
+                    onClick={() =>
+                      setFormData(prev => ({ ...prev, userType: 'tasiyici' }))
+                    }
+                    className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg transition-colors text-sm font-medium ${
+                      formData.userType === 'tasiyici'
+                        ? 'bg-gradient-to-r from-slate-800 to-blue-900 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    <UserCheck className='w-4 h-4' />
+                    Taşıyıcı
+                  </button>
+                </div>
+              </div>
+
+              {/* Form Fields */}
+              <div className='grid grid-cols-2 gap-4'>
+                <div>
+                  <label className='text-gray-700 text-sm font-medium'>
+                    Ad
+                  </label>
+                  <input
+                    type='text'
+                    name='firstName'
+                    value={formData.firstName}
+                    onChange={handleInputChange}
+                    className='w-full mt-1 px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                    placeholder='Adınız'
+                    required
+                  />
+                </div>
+                <div>
+                  <label htmlFor='lastName' className='text-gray-700 text-sm font-medium'>
+                    Soyad
+                  </label>
+                  <input
+                    id='lastName'
+                    type='text'
+                    name='lastName'
+                    value={formData.lastName}
+                    onChange={handleInputChange}
+                    className='w-full mt-1 px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                    placeholder='Soyadınız'
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor='email' className='text-gray-700 text-sm font-medium'>
+                  E-posta
+                </label>
+                <input
+                  id='email'
+                  type='email'
+                  name='email'
+                  value={formData.email}
+                  onChange={handleInputChange}
+                  className='w-full mt-1 px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                  placeholder='ornek@email.com'
+                  required
+                  aria-label='E-posta adresi'
+                />
+              </div>
+
+              <div>
+                <label htmlFor='phone' className='text-gray-700 text-sm font-medium'>
+                  Telefon
+                </label>
+                <input
+                  id='phone'
+                  type='tel'
+                  name='phone'
+                  value={formData.phone}
+                  onChange={handleInputChange}
+                  className='w-full mt-1 px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                  placeholder='+90 555 123 4567'
+                  required
+                  aria-label='Telefon numarası'
+                />
+              </div>
+
+              <div className='grid grid-cols-2 gap-4'>
+                <div>
+                  <label htmlFor='password' className='text-gray-700 text-sm font-medium'>
+                    Şifre
+                  </label>
+                  <input
+                    id='password'
+                    type='password'
+                    name='password'
+                    value={formData.password}
+                    onChange={handleInputChange}
+                    className='w-full mt-1 px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                    placeholder='••••••••'
+                    required
+                    aria-label='Şifre'
+                  />
+                </div>
+                <div>
+                  <label htmlFor='confirmPassword' className='text-gray-700 text-sm font-medium'>
+                    Şifre Tekrar
+                  </label>
+                  <input
+                    id='confirmPassword'
+                    type='password'
+                    name='confirmPassword'
+                    value={formData.confirmPassword}
+                    onChange={handleInputChange}
+                    className='w-full mt-1 px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                    placeholder='••••••••'
+                    required
+                    aria-label='Şifre tekrar'
+                  />
+                </div>
+              </div>
+
+              {/* Bireysel Gönderici Alanları */}
+              {formData.userType === 'individual' && (
+                <>
+                  <div>
+                    <label className='text-gray-700 text-sm font-medium'>
+                      Adres
+                    </label>
+                    <textarea
+                      name='address'
+                      value={formData.address}
+                      onChange={handleInputChange}
+                      className='w-full mt-1 px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                      placeholder='Tam adresinizi girin'
+                      rows={3}
+                      required
+                    />
+                  </div>
+                  <div className='grid grid-cols-2 gap-4'>
+                    <div>
+                      <label className='text-gray-700 text-sm font-medium'>
+                        Şehir
+                      </label>
+                      <input
+                        type='text'
+                        name='city'
+                        value={formData.city}
+                        onChange={handleInputChange}
+                        className='w-full mt-1 px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                        placeholder='İstanbul'
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className='text-gray-700 text-sm font-medium'>
+                        İlçe
+                      </label>
+                      <input
+                        type='text'
+                        name='district'
+                        value={formData.district}
+                        onChange={handleInputChange}
+                        className='w-full mt-1 px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                        placeholder='Kadıköy'
+                        required
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Kurumsal Gönderici Alanları */}
+              {formData.userType === 'corporate' && (
+                <>
+                  <div>
+                    <label className='text-gray-700 text-sm font-medium'>
+                      Şirket Adı
+                    </label>
+                    <input
+                      type='text'
+                      name='companyName'
+                      value={formData.companyName}
+                      onChange={handleInputChange}
+                      className='w-full mt-1 px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                      placeholder='Şirket Adı'
+                      required
+                    />
+                  </div>
+                  <div className='grid grid-cols-2 gap-4'>
+                    <div>
+                      <label className='text-gray-700 text-sm font-medium'>
+                        Vergi Numarası
+                      </label>
+                      <input
+                        type='text'
+                        name='taxNumber'
+                        value={formData.taxNumber}
+                        onChange={handleInputChange}
+                        className='w-full mt-1 px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                        placeholder='1234567890'
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className='text-gray-700 text-sm font-medium'>
+                        Şirket Telefonu
+                      </label>
+                      <input
+                        type='tel'
+                        name='companyPhone'
+                        value={formData.companyPhone}
+                        onChange={handleInputChange}
+                        className='w-full mt-1 px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                        placeholder='+90 212 123 4567'
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className='text-gray-700 text-sm font-medium'>
+                      Şirket Adresi
+                    </label>
+                    <textarea
+                      name='companyAddress'
+                      value={formData.companyAddress}
+                      onChange={handleInputChange}
+                      className='w-full mt-1 px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                      placeholder='Şirket adresini girin'
+                      rows={3}
+                      required
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* Nakliyeci Alanları */}
+              {formData.userType === 'nakliyeci' && (
+                <>
+                  <div>
+                    <label className='text-gray-700 text-sm font-medium'>
+                      Şirket Adı
+                    </label>
+                    <input
+                      type='text'
+                      name='companyName'
+                      value={formData.companyName}
+                      onChange={handleInputChange}
+                      className='w-full mt-1 px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                      placeholder='Nakliye Şirketi Adı'
+                      required
+                    />
+                  </div>
+                  <div className='grid grid-cols-2 gap-4'>
+                    <div>
+                      <label className='text-gray-700 text-sm font-medium'>
+                        Vergi Numarası
+                      </label>
+                      <input
+                        type='text'
+                        name='taxNumber'
+                        value={formData.taxNumber}
+                        onChange={handleInputChange}
+                        className='w-full mt-1 px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                        placeholder='1234567890'
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className='text-gray-700 text-sm font-medium'>
+                        Şirket Telefonu
+                      </label>
+                      <input
+                        type='tel'
+                        name='companyPhone'
+                        value={formData.companyPhone}
+                        onChange={handleInputChange}
+                        className='w-full mt-1 px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                        placeholder='+90 212 123 4567'
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className='text-gray-700 text-sm font-medium'>
+                      Şirket Adresi
+                    </label>
+                    <textarea
+                      name='companyAddress'
+                      value={formData.companyAddress}
+                      onChange={handleInputChange}
+                      className='w-full mt-1 px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                      placeholder='Şirket adresini girin'
+                      rows={3}
+                      required
+                    />
+                  </div>
+                  <div className='grid grid-cols-2 gap-4'>
+                    <div>
+                      <label className='text-gray-700 text-sm font-medium'>
+                        Nakliye Lisans No
+                      </label>
+                      <input
+                        type='text'
+                        name='licenseNumber'
+                        value={formData.licenseNumber}
+                        onChange={handleInputChange}
+                        className='w-full mt-1 px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                        placeholder='NL123456789'
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className='text-gray-700 text-sm font-medium'>
+                        Araç Sayısı
+                      </label>
+                      <input
+                        type='number'
+                        name='vehicleCount'
+                        value={formData.vehicleCount}
+                        onChange={handleInputChange}
+                        className='w-full mt-1 px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                        placeholder='5'
+                        min='1'
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className='text-gray-700 text-sm font-medium'>
+                      Hizmet Verilen Bölgeler
+                    </label>
+                    <input
+                      type='text'
+                      name='serviceAreas'
+                      value={formData.serviceAreas}
+                      onChange={handleInputChange}
+                      className='w-full mt-1 px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                      placeholder='İstanbul, Ankara, İzmir (virgülle ayırın)'
+                      required
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* Taşıyıcı Alanları */}
+              {formData.userType === 'tasiyici' && (
+                <>
+                  <div className='grid grid-cols-2 gap-4'>
+                    <div>
+                      <label className='text-gray-700 text-sm font-medium'>
+                        Ehliyet Numarası
+                      </label>
+                      <input
+                        type='text'
+                        name='driverLicenseNumber'
+                        value={formData.driverLicenseNumber}
+                        onChange={handleInputChange}
+                        className='w-full mt-1 px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                        placeholder='12345678901'
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className='text-gray-700 text-sm font-medium'>
+                        Deneyim (Yıl)
+                      </label>
+                      <input
+                        type='number'
+                        name='experienceYears'
+                        value={formData.experienceYears}
+                        onChange={handleInputChange}
+                        className='w-full mt-1 px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                        placeholder='5'
+                        min='0'
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className='grid grid-cols-2 gap-4'>
+                    <div>
+                      <label className='text-gray-700 text-sm font-medium'>
+                        Araç Tipi
+                      </label>
+                      <select
+                        name='vehicleType'
+                        value={formData.vehicleType}
+                        onChange={handleInputChange}
+                        className='w-full mt-1 px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                        required
+                      >
+                        <option value=''>Araç tipi seçin</option>
+                        <option value='kamyon'>Kamyon</option>
+                        <option value='tir'>TIR</option>
+                        <option value='van'>Van</option>
+                        <option value='pickup'>Pickup</option>
+                        <option value='minibus'>Minibüs</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className='text-gray-700 text-sm font-medium'>
+                        Araç Plakası
+                      </label>
+                      <input
+                        type='text'
+                        name='vehiclePlate'
+                        value={formData.vehiclePlate}
+                        onChange={handleInputChange}
+                        className='w-full mt-1 px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                        placeholder='34 ABC 123'
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className='text-gray-700 text-sm font-medium'>
+                      Adres
+                    </label>
+                    <textarea
+                      name='address'
+                      value={formData.address}
+                      onChange={handleInputChange}
+                      className='w-full mt-1 px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                      placeholder='Tam adresinizi girin'
+                      rows={3}
+                      required
+                    />
+                  </div>
+                  <div className='grid grid-cols-2 gap-4'>
+                    <div>
+                      <label className='text-gray-700 text-sm font-medium'>
+                        Şehir
+                      </label>
+                      <input
+                        type='text'
+                        name='city'
+                        value={formData.city}
+                        onChange={handleInputChange}
+                        className='w-full mt-1 px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                        placeholder='İstanbul'
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className='text-gray-700 text-sm font-medium'>
+                        İlçe
+                      </label>
+                      <input
+                        type='text'
+                        name='district'
+                        value={formData.district}
+                        onChange={handleInputChange}
+                        className='w-full mt-1 px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                        placeholder='Kadıköy'
+                        required
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Submit Button */}
+              <button
+                type='submit'
+                disabled={isLoading}
+                className='w-full bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-3 px-4 rounded-lg transition-all duration-300 transform hover:scale-105 disabled:transform-none flex items-center justify-center gap-2'
+              >
+                {isLoading ? (
+                  <div className='flex items-center'>
+                    <div className='w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2'></div>
+                    Oluşturuluyor...
+                  </div>
+                ) : (
+                  <>
+                    Hesap Oluştur
+                    <ArrowRight className='w-5 h-5' />
+                  </>
+                )}
+              </button>
+            </form>
+
+            <div className='mt-6 text-center'>
+              <p className='text-gray-600'>
+                Zaten hesabınız var mı?{' '}
+                <button
+                  onClick={() => navigate('/login')}
+                  className='text-blue-600 hover:text-blue-700 font-semibold'
+                >
+                  Giriş Yap
+                </button>
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
-    </>
+    </div>
   );
-}
+};
+
+export default Register;

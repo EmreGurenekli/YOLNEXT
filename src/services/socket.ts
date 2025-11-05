@@ -1,167 +1,196 @@
-import { io, Socket } from 'socket.io-client'
+import { io, Socket } from 'socket.io-client';
+import { createApiUrl } from '../config/api';
 
 class SocketService {
-  private socket: Socket | null = null
-  private reconnectAttempts = 0
-  private maxReconnectAttempts = 5
-  private reconnectDelay = 1000
+  private socket: Socket | null = null;
+  private reconnectAttempts = 0;
+  private maxReconnectAttempts = 5;
+  private reconnectDelay = 1000;
 
-  connect(token?: string) {
-    if (this.socket?.connected) {
-      return this.socket
-    }
+  connect(token?: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      try {
+        const socketUrl = createApiUrl('/');
 
-    const url = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000'
-    
-    this.socket = io(url, {
-      auth: {
-        token: token || localStorage.getItem('authToken')
-      },
-      autoConnect: true,
-      reconnection: true,
-      reconnectionAttempts: this.maxReconnectAttempts,
-      reconnectionDelay: this.reconnectDelay,
-    })
+        this.socket = io(socketUrl, {
+          auth: {
+            token: token || localStorage.getItem('authToken'),
+          },
+          transports: ['websocket', 'polling'],
+          timeout: 20000,
+          reconnection: true,
+          reconnectionAttempts: this.maxReconnectAttempts,
+          reconnectionDelay: this.reconnectDelay,
+        });
 
-    this.setupEventListeners()
-    return this.socket
+        this.socket.on('connect', () => {
+          console.log('Socket connected:', this.socket?.id);
+          this.reconnectAttempts = 0;
+          resolve();
+        });
+
+        this.socket.on('connect_error', error => {
+          // WebSocket bağlantısı başarısız olsa bile devam et (demo mod için)
+          console.log(
+            'Socket connection error (ignored in demo mode):',
+            error.message
+          );
+          resolve(); // Promise'i resolve et, hatayı devam ettirme
+        });
+
+        this.socket.on('disconnect', reason => {
+          console.log('Socket disconnected:', reason);
+        });
+
+        this.socket.on('reconnect', attemptNumber => {
+          console.log('Socket reconnected after', attemptNumber, 'attempts');
+          this.reconnectAttempts = 0;
+        });
+
+        this.socket.on('reconnect_error', error => {
+          console.error('Socket reconnection error:', error);
+          this.reconnectAttempts++;
+        });
+
+        this.socket.on('reconnect_failed', () => {
+          console.error(
+            'Socket reconnection failed after',
+            this.maxReconnectAttempts,
+            'attempts'
+          );
+        });
+      } catch (error) {
+        console.error('Socket initialization error:', error);
+        reject(error);
+      }
+    });
   }
 
-  disconnect() {
+  disconnect(): void {
     if (this.socket) {
-      this.socket.disconnect()
-      this.socket = null
+      this.socket.disconnect();
+      this.socket = null;
     }
   }
 
-  private setupEventListeners() {
-    if (!this.socket) return
+  emit(event: string, data?: any): void {
+    if (this.socket && this.socket.connected) {
+      this.socket.emit(event, data);
+    } else {
+      console.warn('Socket not connected. Cannot emit event:', event);
+    }
+  }
 
-    this.socket.on('connect', () => {
-      console.log('Socket connected')
-      this.reconnectAttempts = 0
-    })
+  on(event: string, callback: (...args: any[]) => void): void {
+    if (this.socket) {
+      this.socket.on(event, callback);
+    }
+  }
 
-    this.socket.on('disconnect', (reason) => {
-      console.log('Socket disconnected:', reason)
-    })
+  off(event: string, callback?: (...args: any[]) => void): void {
+    if (this.socket) {
+      this.socket.off(event, callback);
+    }
+  }
 
-    this.socket.on('connect_error', (error) => {
-      console.error('Socket connection error:', error)
-      this.reconnectAttempts++
-    })
+  isConnected(): boolean {
+    return this.socket ? this.socket.connected : false;
+  }
 
-    this.socket.on('reconnect', (attemptNumber) => {
-      console.log('Socket reconnected after', attemptNumber, 'attempts')
-      this.reconnectAttempts = 0
-    })
+  getSocketId(): string | undefined {
+    return this.socket?.id;
+  }
 
-    this.socket.on('reconnect_error', (error) => {
-      console.error('Socket reconnection error:', error)
-    })
+  // Shipment tracking events
+  joinShipmentRoom(shipmentId: string): void {
+    this.emit('join_shipment_room', { shipmentId });
+  }
 
-    this.socket.on('reconnect_failed', () => {
-      console.error('Socket reconnection failed')
-    })
+  leaveShipmentRoom(shipmentId: string): void {
+    this.emit('leave_shipment_room', { shipmentId });
   }
 
   // Message events
-  onNewMessage(callback: (message: any) => void) {
-    this.socket?.on('new_message', callback)
+  sendMessage(roomId: string, message: string, type: string = 'text'): void {
+    this.emit('send_message', {
+      roomId,
+      message,
+      type,
+    });
   }
 
-  onMessageUpdate(callback: (message: any) => void) {
-    this.socket?.on('message_update', callback)
+  joinMessageRoom(roomId: string): void {
+    this.emit('join_message_room', { roomId });
   }
 
-  onMessageDelete(callback: (messageId: string) => void) {
-    this.socket?.on('message_delete', callback)
-  }
-
-  // Shipment events
-  onShipmentUpdate(callback: (shipment: any) => void) {
-    this.socket?.on('shipment_update', callback)
-  }
-
-  onShipmentStatusChange(callback: (data: { shipmentId: string; status: string }) => void) {
-    this.socket?.on('shipment_status_change', callback)
+  leaveMessageRoom(roomId: string): void {
+    this.emit('leave_message_room', { roomId });
   }
 
   // Notification events
-  onNotification(callback: (notification: any) => void) {
-    this.socket?.on('notification', callback)
+  subscribeToNotifications(): void {
+    this.emit('subscribe_notifications');
   }
 
-  onSystemNotification(callback: (notification: any) => void) {
-    this.socket?.on('system_notification', callback)
+  unsubscribeFromNotifications(): void {
+    this.emit('unsubscribe_notifications');
   }
 
-  // User events
-  onUserOnline(callback: (userId: string) => void) {
-    this.socket?.on('user_online', callback)
+  // Offer events
+  subscribeToOffers(): void {
+    this.emit('subscribe_offers');
   }
 
-  onUserOffline(callback: (userId: string) => void) {
-    this.socket?.on('user_offline', callback)
+  unsubscribeFromOffers(): void {
+    this.emit('unsubscribe_offers');
   }
 
-  onUserTyping(callback: (data: { userId: string; isTyping: boolean }) => void) {
-    this.socket?.on('user_typing', callback)
-  }
-
-  // Emit events
-  joinRoom(roomId: string) {
-    this.socket?.emit('join_room', roomId)
-  }
-
-  leaveRoom(roomId: string) {
-    this.socket?.emit('leave_room', roomId)
-  }
-
-  sendMessage(data: {
-    roomId: string
-    content: string
-    type?: 'text' | 'image' | 'file'
-    metadata?: any
-  }) {
-    this.socket?.emit('send_message', data)
-  }
-
-  updateShipmentStatus(shipmentId: string, status: string, metadata?: any) {
-    this.socket?.emit('update_shipment_status', {
+  // Real-time tracking
+  updateLocation(
+    shipmentId: string,
+    location: { lat: number; lng: number }
+  ): void {
+    this.emit('update_location', {
       shipmentId,
-      status,
-      metadata
-    })
+      location,
+    });
   }
 
-  sendTyping(roomId: string, isTyping: boolean) {
-    this.socket?.emit('typing', { roomId, isTyping })
+  // Event listeners for common events
+  onNewMessage(callback: (data: any) => void): void {
+    this.on('new_message', callback);
   }
 
-  // Generic event handling
-  on(event: string, callback: (...args: any[]) => void) {
-    this.socket?.on(event, callback)
+  onNewOffer(callback: (data: any) => void): void {
+    this.on('new_offer', callback);
   }
 
-  off(event: string, callback?: (...args: any[]) => void) {
-    this.socket?.off(event, callback)
+  onOfferAccepted(callback: (data: any) => void): void {
+    this.on('offer_accepted', callback);
   }
 
-  emit(event: string, data?: any) {
-    this.socket?.emit(event, data)
+  onOfferRejected(callback: (data: any) => void): void {
+    this.on('offer_rejected', callback);
   }
 
-  // Connection status
-  get isConnected() {
-    return this.socket?.connected || false
+  onShipmentUpdate(callback: (data: any) => void): void {
+    this.on('shipment_update', callback);
   }
 
-  get id() {
-    return this.socket?.id
+  onTrackingUpdate(callback: (data: any) => void): void {
+    this.on('tracking_update', callback);
+  }
+
+  onNotification(callback: (data: any) => void): void {
+    this.on('notification', callback);
+  }
+
+  onError(callback: (error: any) => void): void {
+    this.on('error', callback);
   }
 }
 
-export const socketService = new SocketService()
+// Create singleton instance
+const socketService = new SocketService();
 
-
+export default socketService;

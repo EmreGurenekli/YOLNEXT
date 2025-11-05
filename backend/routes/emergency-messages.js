@@ -7,7 +7,7 @@ const router = express.Router();
 router.post('/send', protect, async (req, res) => {
   try {
     res.json({
-      message: 'Emergency message sent successfully'
+      message: 'Emergency message sent successfully',
     });
   } catch (error) {
     console.error('Send emergency message error:', error);
@@ -16,5 +16,3 @@ router.post('/send', protect, async (req, res) => {
 });
 
 module.exports = router;
-
-

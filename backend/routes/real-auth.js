@@ -10,13 +10,14 @@ const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 // 1. Kullanıcı kaydı
 router.post('/register', async (req, res) => {
   try {
-    const { name, email, password, panel_type, company_name, location } = req.body;
+    const { name, email, password, panel_type, company_name, location } =
+      req.body;
 
     // Validasyon
     if (!name || !email || !password || !panel_type) {
       return res.status(400).json({
         success: false,
-        message: 'Ad, e-posta, şifre ve panel tipi gerekli'
+        message: 'Ad, e-posta, şifre ve panel tipi gerekli',
       });
     }
 
@@ -25,7 +26,7 @@ router.post('/register', async (req, res) => {
     if (!emailRegex.test(email)) {
       return res.status(400).json({
         success: false,
-        message: 'Geçerli bir e-posta adresi girin'
+        message: 'Geçerli bir e-posta adresi girin',
       });
     }
 
@@ -33,103 +34,120 @@ router.post('/register', async (req, res) => {
     if (password.length < 6) {
       return res.status(400).json({
         success: false,
-        message: 'Şifre en az 6 karakter olmalı'
+        message: 'Şifre en az 6 karakter olmalı',
       });
     }
 
     // E-posta benzersizlik kontrolü
-    db.get('SELECT id FROM users WHERE email = ?', [email], (err, existingUser) => {
-      if (err) {
-        console.error('E-posta kontrolü hatası:', err);
-        return res.status(500).json({
-          success: false,
-          message: 'Sunucu hatası'
-        });
-      }
-
-      if (existingUser) {
-        return res.status(400).json({
-          success: false,
-          message: 'Bu e-posta adresi zaten kullanılıyor'
-        });
-      }
-
-      // Şifreyi hashle
-      const hashedPassword = bcrypt.hashSync(password, 10);
-
-      // Kullanıcıyı oluştur
-      const sql = `INSERT INTO users (name, email, password, panel_type, company_name, location, created_at, updated_at) 
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
-      const now = new Date().toISOString();
-
-      db.run(sql, [name, email, hashedPassword, panel_type, company_name || null, location || null, now, now], function(err) {
+    db.get(
+      'SELECT id FROM users WHERE email = ?',
+      [email],
+      (err, existingUser) => {
         if (err) {
-          console.error('Kullanıcı oluşturma hatası:', err);
+          console.error('E-posta kontrolü hatası:', err);
           return res.status(500).json({
             success: false,
-            message: 'Kullanıcı oluşturulamadı'
+            message: 'Sunucu hatası',
           });
         }
 
-        const userId = this.lastID;
-
-        // Cüzdan oluştur
-        db.run(
-          'INSERT INTO wallets (user_id, balance, currency, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
-          [userId, 0, 'TRY', now, now],
-          (err) => {
-            if (err) {
-              console.error('Cüzdan oluşturma hatası:', err);
-            }
-          }
-        );
-
-        // Nakliyeci veya taşıyıcı ise carrier tablosuna ekle
-        if (panel_type === 'nakliyeci' || panel_type === 'tasiyici') {
-          db.run(
-            'INSERT INTO carriers (user_id, company_name, is_available, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
-            [userId, company_name || null, true, now, now],
-            (err) => {
-              if (err) {
-                console.error('Carrier oluşturma hatası:', err);
-              }
-            }
-          );
+        if (existingUser) {
+          return res.status(400).json({
+            success: false,
+            message: 'Bu e-posta adresi zaten kullanılıyor',
+          });
         }
 
-        // JWT token oluştur
-        const token = jwt.sign(
-          { 
-            id: userId, 
-            email, 
-            panel_type,
-            name 
-          },
-          JWT_SECRET,
-          { expiresIn: JWT_EXPIRES_IN }
-        );
+        // Şifreyi hashle
+        const hashedPassword = bcrypt.hashSync(password, 10);
 
-        res.json({
-          success: true,
-          data: {
-            user: {
-              id: userId,
-              name,
-              email,
-              panel_type,
-              company_name: company_name || null,
-              location: location || null
-            },
-            token
+        // Kullanıcıyı oluştur
+        const sql = `INSERT INTO users (name, email, password, panel_type, company_name, location, created_at, updated_at) 
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
+        const now = new Date().toISOString();
+
+        db.run(
+          sql,
+          [
+            name,
+            email,
+            hashedPassword,
+            panel_type,
+            company_name || null,
+            location || null,
+            now,
+            now,
+          ],
+          function (err) {
+            if (err) {
+              console.error('Kullanıcı oluşturma hatası:', err);
+              return res.status(500).json({
+                success: false,
+                message: 'Kullanıcı oluşturulamadı',
+              });
+            }
+
+            const userId = this.lastID;
+
+            // Cüzdan oluştur
+            db.run(
+              'INSERT INTO wallets (user_id, balance, currency, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
+              [userId, 0, 'TRY', now, now],
+              err => {
+                if (err) {
+                  console.error('Cüzdan oluşturma hatası:', err);
+                }
+              }
+            );
+
+            // Nakliyeci veya taşıyıcı ise carrier tablosuna ekle
+            if (panel_type === 'nakliyeci' || panel_type === 'tasiyici') {
+              db.run(
+                'INSERT INTO carriers (user_id, company_name, is_available, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
+                [userId, company_name || null, true, now, now],
+                err => {
+                  if (err) {
+                    console.error('Carrier oluşturma hatası:', err);
+                  }
+                }
+              );
+            }
+
+            // JWT token oluştur
+            const token = jwt.sign(
+              {
+                id: userId,
+                email,
+                panel_type,
+                name,
+              },
+              JWT_SECRET,
+              { expiresIn: JWT_EXPIRES_IN }
+            );
+
+            res.json({
+              success: true,
+              data: {
+                user: {
+                  id: userId,
+                  name,
+                  email,
+                  panel_type,
+                  company_name: company_name || null,
+                  location: location || null,
+                },
+                token,
+              },
+            });
           }
-        });
-      });
-    });
+        );
+      }
+    );
   } catch (error) {
     console.error('Kayıt hatası:', error);
     res.status(500).json({
       success: false,
-      message: 'Sunucu hatası'
+      message: 'Sunucu hatası',
     });
   }
 });
@@ -142,7 +160,7 @@ router.post('/login', async (req, res) => {
     if (!email || !password) {
       return res.status(400).json({
         success: false,
-        message: 'E-posta ve şifre gerekli'
+        message: 'E-posta ve şifre gerekli',
       });
     }
 
@@ -152,14 +170,14 @@ router.post('/login', async (req, res) => {
         console.error('Giriş hatası:', err);
         return res.status(500).json({
           success: false,
-          message: 'Sunucu hatası'
+          message: 'Sunucu hatası',
         });
       }
 
       if (!user) {
         return res.status(401).json({
           success: false,
-          message: 'Geçersiz e-posta veya şifre'
+          message: 'Geçersiz e-posta veya şifre',
         });
       }
 
@@ -167,17 +185,17 @@ router.post('/login', async (req, res) => {
       if (!bcrypt.compareSync(password, user.password)) {
         return res.status(401).json({
           success: false,
-          message: 'Geçersiz e-posta veya şifre'
+          message: 'Geçersiz e-posta veya şifre',
         });
       }
 
       // JWT token oluştur
       const token = jwt.sign(
-        { 
-          id: user.id, 
-          email: user.email, 
+        {
+          id: user.id,
+          email: user.email,
           panel_type: user.panel_type,
-          name: user.name 
+          name: user.name,
         },
         JWT_SECRET,
         { expiresIn: JWT_EXPIRES_IN }
@@ -186,8 +204,14 @@ router.post('/login', async (req, res) => {
       // Güvenlik logu
       db.run(
         'INSERT INTO security_logs (user_id, action, ip_address, user_agent, created_at) VALUES (?, ?, ?, ?, ?)',
-        [user.id, 'login', req.ip, req.get('User-Agent'), new Date().toISOString()],
-        (err) => {
+        [
+          user.id,
+          'login',
+          req.ip,
+          req.get('User-Agent'),
+          new Date().toISOString(),
+        ],
+        err => {
           if (err) {
             console.error('Güvenlik logu hatası:', err);
           }
@@ -204,17 +228,17 @@ router.post('/login', async (req, res) => {
             panel_type: user.panel_type,
             company_name: user.company_name,
             location: user.location,
-            is_verified: user.is_verified
+            is_verified: user.is_verified,
           },
-          token
-        }
+          token,
+        },
       });
     });
   } catch (error) {
     console.error('Giriş hatası:', error);
     res.status(500).json({
       success: false,
-      message: 'Sunucu hatası'
+      message: 'Sunucu hatası',
     });
   }
 });
@@ -228,7 +252,7 @@ router.get('/me', async (req, res) => {
     if (!token) {
       return res.status(401).json({
         success: false,
-        message: 'Token gerekli'
+        message: 'Token gerekli',
       });
     }
 
@@ -236,7 +260,7 @@ router.get('/me', async (req, res) => {
       if (err) {
         return res.status(403).json({
           success: false,
-          message: 'Geçersiz token'
+          message: 'Geçersiz token',
         });
       }
 
@@ -245,14 +269,14 @@ router.get('/me', async (req, res) => {
         if (err) {
           return res.status(500).json({
             success: false,
-            message: 'Sunucu hatası'
+            message: 'Sunucu hatası',
           });
         }
 
         if (!user) {
           return res.status(404).json({
             success: false,
-            message: 'Kullanıcı bulunamadı'
+            message: 'Kullanıcı bulunamadı',
           });
         }
 
@@ -266,9 +290,9 @@ router.get('/me', async (req, res) => {
               panel_type: user.panel_type,
               company_name: user.company_name,
               location: user.location,
-              is_verified: user.is_verified
-            }
-          }
+              is_verified: user.is_verified,
+            },
+          },
         });
       });
     });
@@ -276,7 +300,7 @@ router.get('/me', async (req, res) => {
     console.error('Token doğrulama hatası:', error);
     res.status(500).json({
       success: false,
-      message: 'Sunucu hatası'
+      message: 'Sunucu hatası',
     });
   }
 });
@@ -291,21 +315,21 @@ router.post('/change-password', async (req, res) => {
     if (!token) {
       return res.status(401).json({
         success: false,
-        message: 'Token gerekli'
+        message: 'Token gerekli',
       });
     }
 
     if (!currentPassword || !newPassword) {
       return res.status(400).json({
         success: false,
-        message: 'Mevcut şifre ve yeni şifre gerekli'
+        message: 'Mevcut şifre ve yeni şifre gerekli',
       });
     }
 
     if (newPassword.length < 6) {
       return res.status(400).json({
         success: false,
-        message: 'Yeni şifre en az 6 karakter olmalı'
+        message: 'Yeni şifre en az 6 karakter olmalı',
       });
     }
 
@@ -313,65 +337,75 @@ router.post('/change-password', async (req, res) => {
       if (err) {
         return res.status(403).json({
           success: false,
-          message: 'Geçersiz token'
+          message: 'Geçersiz token',
         });
       }
 
       // Mevcut şifreyi kontrol et
-      db.get('SELECT password FROM users WHERE id = ?', [decoded.id], (err, user) => {
-        if (err) {
-          return res.status(500).json({
-            success: false,
-            message: 'Sunucu hatası'
-          });
-        }
-
-        if (!bcrypt.compareSync(currentPassword, user.password)) {
-          return res.status(400).json({
-            success: false,
-            message: 'Mevcut şifre yanlış'
-          });
-        }
-
-        // Yeni şifreyi hashle ve güncelle
-        const hashedNewPassword = bcrypt.hashSync(newPassword, 10);
-        const now = new Date().toISOString();
-
-        db.run(
-          'UPDATE users SET password = ?, updated_at = ? WHERE id = ?',
-          [hashedNewPassword, now, decoded.id],
-          (err) => {
-            if (err) {
-              return res.status(500).json({
-                success: false,
-                message: 'Şifre güncellenemedi'
-              });
-            }
-
-            // Güvenlik logu
-            db.run(
-              'INSERT INTO security_logs (user_id, action, ip_address, user_agent, created_at) VALUES (?, ?, ?, ?, ?)',
-              [decoded.id, 'password_change', req.ip, req.get('User-Agent'), now],
-              (err) => {
-                if (err) {
-                  console.error('Güvenlik logu hatası:', err);
-                }
-              }
-            );
-
-            res.json({
-              success: true,
-              message: 'Şifre başarıyla güncellendi'
+      db.get(
+        'SELECT password FROM users WHERE id = ?',
+        [decoded.id],
+        (err, user) => {
+          if (err) {
+            return res.status(500).json({
+              success: false,
+              message: 'Sunucu hatası',
             });
           }
-        );
-      });
+
+          if (!bcrypt.compareSync(currentPassword, user.password)) {
+            return res.status(400).json({
+              success: false,
+              message: 'Mevcut şifre yanlış',
+            });
+          }
+
+          // Yeni şifreyi hashle ve güncelle
+          const hashedNewPassword = bcrypt.hashSync(newPassword, 10);
+          const now = new Date().toISOString();
+
+          db.run(
+            'UPDATE users SET password = ?, updated_at = ? WHERE id = ?',
+            [hashedNewPassword, now, decoded.id],
+            err => {
+              if (err) {
+                return res.status(500).json({
+                  success: false,
+                  message: 'Şifre güncellenemedi',
+                });
+              }
+
+              // Güvenlik logu
+              db.run(
+                'INSERT INTO security_logs (user_id, action, ip_address, user_agent, created_at) VALUES (?, ?, ?, ?, ?)',
+                [
+                  decoded.id,
+                  'password_change',
+                  req.ip,
+                  req.get('User-Agent'),
+                  now,
+                ],
+                err => {
+                  if (err) {
+                    console.error('Güvenlik logu hatası:', err);
+                  }
+                }
+              );
+
+              res.json({
+                success: true,
+                message: 'Şifre başarıyla güncellendi',
+              });
+            }
+          );
+        }
+      );
     });
   } catch (error) {
     console.error('Şifre değiştirme hatası:', error);
     res.status(500).json({
       success: false,
-      message: 'Sunucu hatası'
+      message: 'Sunucu hatası',
     });
   }
 });
@@ -388,8 +422,14 @@ router.post('/logout', async (req, res) => {
           // Güvenlik logu
           db.run(
             'INSERT INTO security_logs (user_id, action, ip_address, user_agent, created_at) VALUES (?, ?, ?, ?, ?)',
-            [decoded.id, 'logout', req.ip, req.get('User-Agent'), new Date().toISOString()],
-            (err) => {
+            [
+              decoded.id,
+              'logout',
+              req.ip,
+              req.get('User-Agent'),
+              new Date().toISOString(),
+            ],
+            err => {
               if (err) {
                 console.error('Güvenlik logu hatası:', err);
               }
@@ -401,20 +441,15 @@ router.post('/logout', async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Başarıyla çıkış yapıldı'
+      message: 'Başarıyla çıkış yapıldı',
     });
   } catch (error) {
     console.error('Çıkış hatası:', error);
     res.status(500).json({
       success: false,
-      message: 'Sunucu hatası'
+      message: 'Sunucu hatası',
     });
   }
 });
 
 module.exports = router;
-
-
-
-
-

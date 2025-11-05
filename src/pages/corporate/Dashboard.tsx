@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useAuth } from '../../contexts/AuthContext';
+import { dashboardAPI, notificationAPI, shipmentAPI } from '../../services/api';
 import { 
   Package, 
   CheckCircle2, 
@@ -38,6 +39,29 @@ import EmptyState from '../../components/common/EmptyState';
 import LoadingState from '../../components/common/LoadingState';
 import Modal from '../../components/common/Modal';
 import SuccessMessage from '../../components/common/SuccessMessage';
+import CommissionManager from '../../components/CommissionManager';
+import StatusManager from '../../components/StatusManager';
+
+interface Shipment {
+  id: number;
+  trackingNumber: string;
+  date: string;
+  description: string;
+  status: string;
+  from: string;
+  to: string;
+  weight: string;
+  value: string;
+  priority: string;
+}
+
+interface Offer {
+  id: number;
+  date: string;
+  amount: string;
+  carrier: string;
+  status: string;
+}
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -51,126 +75,84 @@ const Dashboard = () => {
     monthlyGrowth: 0,
     activeCarriers: 0
   });
-  const [recentShipments, setRecentShipments] = useState([]);
-  const [recentOffers, setRecentOffers] = useState([]);
+  const [recentShipments, setRecentShipments] = useState<Shipment[]>([]);
+  const [recentOffers, setRecentOffers] = useState<Offer[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
 
-  // Mock data - Gerçek API'den gelecek
-  const mockData = {
+  // Yeni kullanıcılar için boş veriler
+  const emptyData = {
     stats: {
-      totalShipments: 45,
-      deliveredShipments: 38,
-      pendingShipments: 5,
-      successRate: 92,
-      totalSpent: 12500.75,
-      thisMonthSpent: 3200.50,
-      monthlyGrowth: 15.2,
-      activeCarriers: 8
+      totalShipments: 0,
+      deliveredShipments: 0,
+      pendingShipments: 0,
+      successRate: 0,
+      totalSpent: 0,
+      thisMonthSpent: 0,
+      monthlyGrowth: 0,
+      activeCarriers: 0
     },
-    recentShipments: [
-      {
-        id: '1',
-        trackingNumber: 'YN001234567',
-        status: 'pending',
-        from: 'İstanbul, Beşiktaş',
-        to: 'Ankara, Çankaya',
-        weight: '150 kg',
-        value: '₺1,200',
-        date: '2024-01-15',
-        description: 'Endüstriyel parça - Motor',
-        priority: 'high'
-      },
-      {
-        id: '2',
-        trackingNumber: 'YN001234568',
-        status: 'in_transit',
-        from: 'İstanbul, Beşiktaş',
-        to: 'İzmir, Bornova',
-        weight: '75 kg',
-        value: '₺850',
-        date: '2024-01-14',
-        description: 'Elektronik ekipman',
-        priority: 'normal'
-      },
-      {
-        id: '3',
-        trackingNumber: 'YN001234569',
-        status: 'delivered',
-        from: 'İstanbul, Beşiktaş',
-        to: 'Bursa, Nilüfer',
-        weight: '200 kg',
-        value: '₺1,500',
-        date: '2024-01-12',
-        description: 'Makine parçaları',
-        priority: 'normal'
-      },
-      {
-        id: '4',
-        trackingNumber: 'YN001234570',
-        status: 'delivered',
-        from: 'İstanbul, Beşiktaş',
-        to: 'Antalya, Muratpaşa',
-        weight: '50 kg',
-        value: '₺650',
-        date: '2024-01-10',
-        description: 'Doküman ve belgeler',
-        priority: 'low'
-      }
-    ],
-    recentOffers: [
-      {
-        id: '1',
-        carrierName: 'Hızlı Kargo Ltd.',
-        price: '₺1,200',
-        deliveryTime: '1-2 gün',
-        rating: 4.5,
-        status: 'pending',
-        shipmentId: '1'
-      },
-      {
-        id: '2',
-        carrierName: 'Güvenilir Nakliye A.Ş.',
-        price: '₺1,100',
-        deliveryTime: '2-3 gün',
-        rating: 4.2,
-        status: 'accepted',
-        shipmentId: '2'
-      },
-      {
-        id: '3',
-        carrierName: 'Express Lojistik',
-        price: '₺1,350',
-        deliveryTime: '1 gün',
-        rating: 4.8,
-        status: 'pending',
-        shipmentId: '3'
-      }
-    ]
+    recentShipments: [],
+    recentOffers: []
   };
 
   useEffect(() => {
-    // Simulate API call
     const loadData = async () => {
-    setIsLoading(true);
-      
-      // Simulate loading delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setStats(mockData.stats);
-      setRecentShipments(mockData.recentShipments);
-      setRecentOffers(mockData.recentOffers);
-      setUnreadCount(5);
-      
-      setIsLoading(false);
+      try {
+        setIsLoading(true);
+        
+        // Load stats from real API
+        const statsResponse = await dashboardAPI.getStats('corporate');
+        if (statsResponse?.success && statsResponse?.data?.stats) {
+          setStats({
+            ...statsResponse.data.stats,
+            deliveredShipments: statsResponse.data.stats.completedShipments || 0,
+            successRate: statsResponse.data.stats.completedShipments > 0 ? 
+              (statsResponse.data.stats.completedShipments / statsResponse.data.stats.totalShipments * 100).toFixed(1) : 0,
+            totalSpent: 0,
+            thisMonthSpent: 0,
+            monthlyGrowth: 0,
+            activeCarriers: 0
+          });
+        } else {
+          setStats(emptyData.stats);
+        }
+        
+        // Load recent shipments from real API
+        const shipmentsResponse = await shipmentAPI.getAll();
+        if (shipmentsResponse?.success) {
+          const shipments = (shipmentsResponse as any).shipments || shipmentsResponse.data?.shipments || [];
+          setRecentShipments(shipments);
+        } else {
+          setRecentShipments(emptyData.recentShipments);
+        }
+        
+        // Load unread notifications count from real API
+        const notificationsResponse = await notificationAPI.getUnreadCount();
+        if (notificationsResponse?.success && notificationsResponse?.data) {
+          setUnreadCount(notificationsResponse.data.count || 0);
+        } else {
+          setUnreadCount(0);
+        }
+        
+      } catch (error) {
+        console.error('Error loading dashboard data:', error);
+        // Fallback to empty data
+        setStats(emptyData.stats);
+        setRecentShipments(emptyData.recentShipments);
+        setRecentOffers(emptyData.recentOffers);
+        setUnreadCount(0);
+      } finally {
+        setIsLoading(false);
+      }
     };
 
     loadData();
   }, []);
   
-  const getStatusColor = (status) => {
+  const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending':
         return 'text-yellow-600 bg-yellow-100';
@@ -185,7 +167,7 @@ const Dashboard = () => {
     }
   };
 
-  const getStatusText = (status) => {
+  const getStatusText = (status: string) => {
     switch (status) {
       case 'pending':
         return 'Bekliyor';
@@ -200,7 +182,7 @@ const Dashboard = () => {
     }
   };
 
-  const getStatusIcon = (status) => {
+  const getStatusIcon = (status: string) => {
     switch (status) {
       case 'pending':
         return <Clock className="w-4 h-4" />;
@@ -215,7 +197,7 @@ const Dashboard = () => {
     }
   };
 
-  const getPriorityColor = (priority) => {
+  const getPriorityColor = (priority: string) => {
     switch (priority) {
       case 'high':
         return 'text-red-600 bg-red-100';
@@ -228,7 +210,7 @@ const Dashboard = () => {
     }
   };
 
-  const getPriorityText = (priority) => {
+  const getPriorityText = (priority: string) => {
     switch (priority) {
       case 'high':
         return 'Yüksek';
@@ -245,16 +227,16 @@ const Dashboard = () => {
     return (
       <div className="min-h-screen bg-gray-50">
         <Helmet>
-          <title>Dashboard - YolNet</title>
+          <title>Dashboard - YolNext</title>
         </Helmet>
         <div className="p-6">
           <Breadcrumb
             items={[
-              { label: 'Ana Sayfa', icon: <Package className="w-4 h-4" /> },
-              { label: 'Dashboard', icon: <BarChart3 className="w-4 h-4" /> }
+              { label: 'Ana Sayfa' },
+              { label: 'Dashboard' }
             ]}
           />
-          <LoadingState text="Dashboard yükleniyor..." />
+          <LoadingState message="Dashboard yükleniyor..." />
         </div>
       </div>
     );
@@ -263,7 +245,7 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
       <Helmet>
-        <title>Dashboard - YolNet Kurumsal</title>
+        <title>Dashboard - YolNext Kurumsal</title>
       </Helmet>
 
       <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
@@ -282,7 +264,7 @@ const Dashboard = () => {
                   </div>
                   <div>
                     <h1 className="text-3xl font-bold mb-2 bg-gradient-to-r from-white to-blue-200 bg-clip-text text-transparent">
-                      Merhaba {user?.firstName}! 👋
+                      Merhaba {user?.firstName || user?.fullName?.split(' ')[0] || 'Kullanıcı'}! 👋
                     </h1>
                     <p className="text-slate-200 text-lg leading-relaxed">
                       Kurumsal nakliye hizmetlerinize hoş geldiniz. 
@@ -305,7 +287,7 @@ const Dashboard = () => {
               
               <div className="flex items-center gap-3">
                 <Link to="/corporate/notifications" className="relative group">
-                  <button className="w-12 h-12 bg-white/10 backdrop-blur-sm rounded-2xl flex items-center justify-center hover:bg-white/20 transition-all duration-300 border border-white/20 group-hover:scale-110">
+                  <button className="min-w-[44px] min-h-[44px] w-12 h-12 bg-white/10 backdrop-blur-sm rounded-2xl flex items-center justify-center hover:bg-white/20 transition-all duration-300 border border-white/20 group-hover:scale-110">
                     <Bell size={20} className="text-white" />
                     {unreadCount > 0 && (
                       <span className="absolute -top-1 -right-1 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center font-bold shadow-lg">
@@ -338,7 +320,6 @@ const Dashboard = () => {
                   <svg className="w-3 h-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 17l9.2-9.2M17 17V7H7" />
                   </svg>
-                  <span className="text-xs text-blue-600 font-semibold">+{stats.monthlyGrowth}% bu ay</span>
                 </div>
               </div>
             </div>
@@ -357,7 +338,6 @@ const Dashboard = () => {
                   <svg className="w-3 h-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 17l9.2-9.2M17 17V7H7" />
                   </svg>
-                  <span className="text-xs text-blue-600 font-semibold">+{Math.round(stats.deliveredShipments * 0.15)} bu ay</span>
                 </div>
               </div>
             </div>
@@ -387,20 +367,19 @@ const Dashboard = () => {
           <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:border-blue-300 transition-all duration-300">
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center">
-                <DollarSign className="w-6 h-6 text-white" />
+                <Clock className="w-6 h-6 text-white" />
               </div>
               <div className="text-right">
-                <div className="text-2xl font-bold text-slate-900 mb-1">₺{stats.totalSpent.toLocaleString()}</div>
+                <div className="text-2xl font-bold text-slate-900 mb-1">{stats.pendingShipments}</div>
                 <div className="flex items-center gap-1">
                   <svg className="w-3 h-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 17l9.2-9.2M17 17V7H7" />
                   </svg>
-                  <span className="text-xs text-blue-600 font-semibold">₺{stats.thisMonthSpent.toLocaleString()} bu ay</span>
                 </div>
               </div>
             </div>
-            <div className="text-slate-700 font-semibold text-sm">Toplam Harcama</div>
-            <div className="mt-1 text-xs text-slate-500">Nakliye harcamaları</div>
+            <div className="text-slate-700 font-semibold text-sm">Bekleyen Gönderiler</div>
+            <div className="mt-1 text-xs text-slate-500">İşlem bekleyen gönderiler</div>
           </div>
         </div>
 

@@ -18,93 +18,128 @@ const storage = multer.diskStorage({
     cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, `${req.user.userId}-${file.fieldname}-${uniqueSuffix}${path.extname(file.originalname)}`);
-  }
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    cb(
+      null,
+      `${req.user.userId}-${file.fieldname}-${uniqueSuffix}${path.extname(file.originalname)}`
+    );
+  },
 });
 
 const upload = multer({
   storage: storage,
   limits: {
-    fileSize: 5 * 1024 * 1024 // 5MB limit
+    fileSize: 5 * 1024 * 1024, // 5MB limit
   },
   fileFilter: (req, file, cb) => {
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
+    const allowedTypes = [
+      'image/jpeg',
+      'image/png',
+      'image/jpg',
+      'application/pdf',
+    ];
     if (allowedTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error('Invalid file type. Only JPEG, PNG, and PDF files are allowed.'));
+      cb(
+        new Error(
+          'Invalid file type. Only JPEG, PNG, and PDF files are allowed.'
+        )
+      );
     }
-  }
+  },
 });
 
 // Upload KYC document
-router.post('/upload', authenticateToken, upload.single('document'), [
-  body('document_type').isIn(['id_card', 'passport', 'driver_license', 'company_registration', 'tax_certificate']).withMessage('Invalid document type'),
-  body('document_number').optional().isString().withMessage('Document number must be a string')
-], (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
-    }
-
-    if (!req.file) {
-      return res.status(400).json({ error: 'No file uploaded' });
-    }
-
-    const { document_type, document_number } = req.body;
-    const userId = req.user.userId;
-    const filePath = req.file.path;
-
-    // Check if document type already exists for user
-    db.get(
-      `SELECT id FROM kyc_documents WHERE user_id = ? AND document_type = ? AND status != 'rejected'`,
-      [userId, document_type],
-      (err, existingDoc) => {
-        if (err) {
-          console.error('Check existing document error:', err);
-          return res.status(500).json({ error: 'Failed to check existing document' });
-        }
-
-        if (existingDoc) {
-          // Delete uploaded file
-          fs.unlinkSync(filePath);
-          return res.status(400).json({ error: 'Document of this type already exists' });
-        }
-
-        // Create KYC document record
-        db.run(
-          `INSERT INTO kyc_documents (user_id, document_type, document_number, file_path, status)
-           VALUES (?, ?, ?, ?, 'pending')`,
-          [userId, document_type, document_number, filePath],
-          function(err) {
-            if (err) {
-              console.error('Create KYC document error:', err);
-              // Delete uploaded file
-              fs.unlinkSync(filePath);
-              return res.status(500).json({ error: 'Failed to create document record' });
-            }
-
-            res.status(201).json({
-              message: 'Document uploaded successfully',
-              document: {
-                id: this.lastID,
-                document_type,
-                document_number,
-                status: 'pending',
-                uploaded_at: new Date().toISOString()
-              }
-            });
-          }
-        );
+router.post(
+  '/upload',
+  authenticateToken,
+  upload.single('document'),
+  [
+    body('document_type')
+      .isIn([
+        'id_card',
+        'passport',
+        'driver_license',
+        'company_registration',
+        'tax_certificate',
+      ])
+      .withMessage('Invalid document type'),
+    body('document_number')
+      .optional()
+      .isString()
+      .withMessage('Document number must be a string'),
+  ],
+  (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
       }
-    );
-  } catch (error) {
-    console.error('KYC upload error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+
+      if (!req.file) {
+        return res.status(400).json({ error: 'No file uploaded' });
+      }
+
+      const { document_type, document_number } = req.body;
+      const userId = req.user.userId;
+      const filePath = req.file.path;
+
+      // Check if document type already exists for user
+      db.get(
+        `SELECT id FROM kyc_documents WHERE user_id = ? AND document_type = ? AND status != 'rejected'`,
+        [userId, document_type],
+        (err, existingDoc) => {
+          if (err) {
+            console.error('Check existing document error:', err);
+            return res
+              .status(500)
+              .json({ error: 'Failed to check existing document' });
+          }
+
+          if (existingDoc) {
+            // Delete uploaded file
+            fs.unlinkSync(filePath);
+            return res
+              .status(400)
+              .json({ error: 'Document of this type already exists' });
+          }
+
+          // Create KYC document record
+          db.run(
+            `INSERT INTO kyc_documents (user_id, document_type, document_number, file_path, status)
+           VALUES (?, ?, ?, ?, 'pending')`,
+            [userId, document_type, document_number, filePath],
+            function (err) {
+              if (err) {
+                console.error('Create KYC document error:', err);
+                // Delete uploaded file
+                fs.unlinkSync(filePath);
+                return res
+                  .status(500)
+                  .json({ error: 'Failed to create document record' });
+              }
+
+              res.status(201).json({
+                message: 'Document uploaded successfully',
+                document: {
+                  id: this.lastID,
+                  document_type,
+                  document_number,
+                  status: 'pending',
+                  uploaded_at: new Date().toISOString(),
+                },
+              });
+            }
+          );
+        }
+      );
+    } catch (error) {
+      console.error('KYC upload error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
   }
-});
+);
 
 // Get user KYC documents
 router.get('/', authenticateToken, (req, res) => {
@@ -203,7 +238,7 @@ router.delete('/:id', authenticateToken, (req, res) => {
       db.run(
         `DELETE FROM kyc_documents WHERE id = ? AND user_id = ?`,
         [id, userId],
-        function(err) {
+        function (err) {
           if (err) {
             console.error('Delete KYC document error:', err);
             return res.status(500).json({ error: 'Failed to delete document' });
@@ -237,7 +272,7 @@ router.get('/status/overview', authenticateToken, (req, res) => {
       const statusCounts = {
         pending: 0,
         approved: 0,
-        rejected: 0
+        rejected: 0,
       };
 
       const documentTypes = {
@@ -245,7 +280,7 @@ router.get('/status/overview', authenticateToken, (req, res) => {
         passport: false,
         driver_license: false,
         company_registration: false,
-        tax_certificate: false
+        tax_certificate: false,
       };
 
       documents.forEach(doc => {
@@ -255,16 +290,22 @@ router.get('/status/overview', authenticateToken, (req, res) => {
         }
       });
 
-      const overallStatus = documents.length === 0 ? 'not_started' :
-                           statusCounts.rejected > 0 ? 'rejected' :
-                           statusCounts.pending > 0 ? 'pending' :
-                           statusCounts.approved > 0 ? 'approved' : 'not_started';
+      const overallStatus =
+        documents.length === 0
+          ? 'not_started'
+          : statusCounts.rejected > 0
+            ? 'rejected'
+            : statusCounts.pending > 0
+              ? 'pending'
+              : statusCounts.approved > 0
+                ? 'approved'
+                : 'not_started';
 
       res.json({
         overall_status: overallStatus,
         status_counts: statusCounts,
         document_types: documentTypes,
-        documents: documents
+        documents: documents,
       });
     }
   );
@@ -322,7 +363,9 @@ router.get('/admin/all', authenticateToken, (req, res) => {
     db.get(countQuery, countParams, (err, countResult) => {
       if (err) {
         console.error('Get KYC documents count error:', err);
-        return res.status(500).json({ error: 'Failed to fetch documents count' });
+        return res
+          .status(500)
+          .json({ error: 'Failed to fetch documents count' });
       }
 
       res.json({
@@ -331,60 +374,76 @@ router.get('/admin/all', authenticateToken, (req, res) => {
           page: parseInt(page),
           limit: parseInt(limit),
           total: countResult.total,
-          pages: Math.ceil(countResult.total / parseInt(limit))
-        }
+          pages: Math.ceil(countResult.total / parseInt(limit)),
+        },
       });
     });
   });
 });
 
 // Admin: Verify KYC document
-router.patch('/admin/:id/verify', authenticateToken, [
-  body('status').isIn(['approved', 'rejected']).withMessage('Status must be approved or rejected'),
-  body('rejection_reason').optional().isString().withMessage('Rejection reason must be a string')
-], (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
-    }
+router.patch(
+  '/admin/:id/verify',
+  authenticateToken,
+  [
+    body('status')
+      .isIn(['approved', 'rejected'])
+      .withMessage('Status must be approved or rejected'),
+    body('rejection_reason')
+      .optional()
+      .isString()
+      .withMessage('Rejection reason must be a string'),
+  ],
+  (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
 
-    const { id } = req.params;
-    const { status, rejection_reason } = req.body;
-    const verifiedBy = req.user.userId;
+      const { id } = req.params;
+      const { status, rejection_reason } = req.body;
+      const verifiedBy = req.user.userId;
 
-    const updateData = {
-      status,
-      verified_at: new Date().toISOString(),
-      verified_by: verifiedBy
-    };
+      const updateData = {
+        status,
+        verified_at: new Date().toISOString(),
+        verified_by: verifiedBy,
+      };
 
-    if (status === 'rejected' && rejection_reason) {
-      updateData.rejection_reason = rejection_reason;
-    }
+      if (status === 'rejected' && rejection_reason) {
+        updateData.rejection_reason = rejection_reason;
+      }
 
-    db.run(
-      `UPDATE kyc_documents 
+      db.run(
+        `UPDATE kyc_documents 
        SET status = ?, verified_at = ?, verified_by = ?, rejection_reason = ?, updated_at = CURRENT_TIMESTAMP
        WHERE id = ?`,
-      [updateData.status, updateData.verified_at, updateData.verified_by, updateData.rejection_reason || null, id],
-      function(err) {
-        if (err) {
-          console.error('Verify KYC document error:', err);
-          return res.status(500).json({ error: 'Failed to verify document' });
-        }
+        [
+          updateData.status,
+          updateData.verified_at,
+          updateData.verified_by,
+          updateData.rejection_reason || null,
+          id,
+        ],
+        function (err) {
+          if (err) {
+            console.error('Verify KYC document error:', err);
+            return res.status(500).json({ error: 'Failed to verify document' });
+          }
 
-        if (this.changes === 0) {
-          return res.status(404).json({ error: 'Document not found' });
-        }
+          if (this.changes === 0) {
+            return res.status(404).json({ error: 'Document not found' });
+          }
 
-        res.json({ message: 'Document verification updated successfully' });
-      }
-    );
-  } catch (error) {
-    console.error('Verify KYC document error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+          res.json({ message: 'Document verification updated successfully' });
+        }
+      );
+    } catch (error) {
+      console.error('Verify KYC document error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
   }
-});
+);
 
 module.exports = router;

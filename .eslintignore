@@ -1,0 +1,14 @@
+# Backend files (CommonJS)
+backend/**/*
+**/*.js
+!src/**/*.js
+
+# Dependencies
+node_modules/**
+dist/**
+coverage/**
+
+# Build outputs
+*.min.js
+*.bundle.js
+

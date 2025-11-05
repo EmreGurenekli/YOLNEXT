@@ -1,90 +1,85 @@
-const { sequelize, testConnection } = require('../config/database');
+const { Sequelize } = require('sequelize');
+const path = require('path');
 
-// Import all models
-const User = require('./User');
+// SQLite database connection
+const sequelize = new Sequelize({
+  dialect: 'sqlite',
+  storage: path.join(__dirname, '../database/YolNext.db'),
+  logging: false,
+  define: {
+    timestamps: true,
+    underscored: true,
+    freezeTableName: true
+  }
+});
+
+// Import models
+const User = require('./SimpleUser');
 const CorporateUser = require('./CorporateUser');
 const Carrier = require('./Carrier');
 const Driver = require('./Driver');
+const IndividualUser = require('./IndividualUser');
 const Shipment = require('./Shipment');
+const ShipmentRequest = require('./ShipmentRequest');
 const Offer = require('./Offer');
-// const Message = require('./Message');
-// const Notification = require('./Notification');
-// const Payment = require('./Payment');
+const Message = require('./Message');
+const Job = require('./Job');
+const Payment = require('./Payment');
 
 // Define associations
-// User associations
-User.hasOne(CorporateUser, { foreignKey: 'userId', as: 'corporateProfile' });
-User.hasOne(Carrier, { foreignKey: 'userId', as: 'carrierProfile' });
-User.hasOne(Driver, { foreignKey: 'userId', as: 'driverProfile' });
-User.hasMany(Shipment, { foreignKey: 'senderId', as: 'sentShipments' });
-// User.hasMany(Message, { foreignKey: 'senderId', as: 'sentMessages' });
-// User.hasMany(Message, { foreignKey: 'receiverId', as: 'receivedMessages' });
-// User.hasMany(Notification, { foreignKey: 'userId', as: 'notifications' });
-// User.hasMany(Payment, { foreignKey: 'userId', as: 'payments' });
+User.hasMany(Shipment, { foreignKey: 'user_id', as: 'shipments' });
+User.hasMany(Offer, { foreignKey: 'carrier_id', as: 'offers' });
+User.hasMany(Message, { foreignKey: 'sender_id', as: 'sentMessages' });
+User.hasMany(Message, { foreignKey: 'receiver_id', as: 'receivedMessages' });
 
-// CorporateUser associations
-CorporateUser.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+Shipment.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
+Shipment.hasMany(Offer, { foreignKey: 'shipment_id', as: 'offers' });
+Shipment.hasMany(Message, { foreignKey: 'shipment_id', as: 'messages' });
 
-// Carrier associations
-Carrier.belongsTo(User, { foreignKey: 'userId', as: 'user' });
-Carrier.hasMany(Driver, { foreignKey: 'carrierId', as: 'drivers' });
-Carrier.hasMany(Shipment, { foreignKey: 'carrierId', as: 'carriedShipments' });
-Carrier.hasMany(Offer, { foreignKey: 'carrierId', as: 'offers' });
+Offer.belongsTo(Shipment, { foreignKey: 'shipment_id', as: 'shipment' });
+Offer.belongsTo(User, { foreignKey: 'carrier_id', as: 'carrier' });
 
-// Driver associations
-Driver.belongsTo(User, { foreignKey: 'userId', as: 'user' });
-Driver.belongsTo(Carrier, { foreignKey: 'carrierId', as: 'carrier' });
-Driver.hasMany(Shipment, { foreignKey: 'driverId', as: 'drivenShipments' });
-Driver.hasMany(Offer, { foreignKey: 'driverId', as: 'offers' });
+Message.belongsTo(User, { foreignKey: 'sender_id', as: 'sender' });
+Message.belongsTo(User, { foreignKey: 'receiver_id', as: 'receiver' });
+Message.belongsTo(Shipment, { foreignKey: 'shipment_id', as: 'shipment' });
 
-// Shipment associations
-Shipment.belongsTo(User, { foreignKey: 'senderId', as: 'sender' });
-Shipment.belongsTo(Carrier, { foreignKey: 'carrierId', as: 'carrier' });
-Shipment.belongsTo(Driver, { foreignKey: 'driverId', as: 'driver' });
-Shipment.hasMany(Offer, { foreignKey: 'shipmentId', as: 'offers' });
-// Shipment.hasMany(Message, { foreignKey: 'shipmentId', as: 'messages' });
-// Shipment.hasMany(Payment, { foreignKey: 'shipmentId', as: 'payments' });
-
-// Offer associations
-Offer.belongsTo(Shipment, { foreignKey: 'shipmentId', as: 'shipment' });
-Offer.belongsTo(Carrier, { foreignKey: 'carrierId', as: 'carrier' });
-Offer.belongsTo(Driver, { foreignKey: 'driverId', as: 'driver' });
-// Offer.hasMany(Payment, { foreignKey: 'offerId', as: 'payments' });
-
-// Message associations (temporarily disabled)
-// Message.belongsTo(User, { foreignKey: 'senderId', as: 'sender' });
-// Message.belongsTo(User, { foreignKey: 'receiverId', as: 'receiver' });
-// Message.belongsTo(Shipment, { foreignKey: 'shipmentId', as: 'shipment' });
-
-// Notification associations (temporarily disabled)
-// Notification.belongsTo(User, { foreignKey: 'userId', as: 'user' });
-
-// Payment associations (temporarily disabled)
-// Payment.belongsTo(User, { foreignKey: 'userId', as: 'user' });
-// Payment.belongsTo(Shipment, { foreignKey: 'shipmentId', as: 'shipment' });
-// Payment.belongsTo(Offer, { foreignKey: 'offerId', as: 'offer' });
+// Test database connection
+const testConnection = async () => {
+  try {
+    await sequelize.authenticate();
+    console.log('✅ Database connection established successfully');
+    return true;
+  } catch (error) {
+    console.error('❌ Unable to connect to database:', error);
+    return false;
+  }
+};
 
 // Sync database
-const syncDatabase = async (force = false) => {
+const syncDatabase = async () => {
   try {
-    await sequelize.sync({ force });
-    console.log('✅ Veritabanı modelleri senkronize edildi!');
+    await sequelize.sync({ alter: true });
+    console.log('✅ Database synchronized successfully');
+    return true;
   } catch (error) {
-    console.error('❌ Veritabanı senkronizasyon hatası:', error.message);
+    console.error('❌ Database synchronization error:', error);
+    return false;
   }
 };
 
 module.exports = {
   sequelize,
-  testConnection,
   User,
   CorporateUser,
   Carrier,
   Driver,
+  IndividualUser,
   Shipment,
+  ShipmentRequest,
   Offer,
-  // Message,
-  // Notification,
-  // Payment,
+  Message,
+  Job,
+  Payment,
+  testConnection,
   syncDatabase
 };

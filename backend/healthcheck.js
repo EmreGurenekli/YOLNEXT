@@ -5,10 +5,10 @@ const options = {
   port: 5000,
   path: '/api/health',
   method: 'GET',
-  timeout: 2000
+  timeout: 2000,
 };
 
-const req = http.request(options, (res) => {
+const req = http.request(options, res => {
   if (res.statusCode === 200) {
     console.log('Health check passed');
     process.exit(0);
@@ -18,7 +18,7 @@ const req = http.request(options, (res) => {
   }
 });
 
-req.on('error', (err) => {
+req.on('error', err => {
   console.log(`Health check failed: ${err.message}`);
   process.exit(1);
 });
@@ -30,6 +30,3 @@ req.on('timeout', () => {
 });
 
 req.end();
-
-
-

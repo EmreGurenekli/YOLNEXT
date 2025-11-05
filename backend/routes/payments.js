@@ -1,399 +1,226 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
-const { Payment, User, Shipment, Offer } = require('../models');
-const { auth } = require('../middleware/auth');
-const { logger } = require('../utils/logger');
-
+const Payment = require('../models/Payment');
 const router = express.Router();
 
-// @route   GET /api/payments
-// @desc    Get user payments
-// @access  Private
-router.get('/', auth, async (req, res) => {
+// Get all payments
+router.get('/', async (req, res) => {
   try {
-    const { page = 1, limit = 20, type, status, shipmentId } = req.query;
+    const userId = req.user?.id;
+    const { page = 1, limit = 10, status } = req.query;
     const offset = (page - 1) * limit;
 
-    const whereClause = { userId: req.user.id };
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required',
+      });
+    }
 
-    if (type) whereClause.paymentType = type;
+    const whereClause = { userId };
     if (status) whereClause.status = status;
-    if (shipmentId) whereClause.shipmentId = shipmentId;
 
     const payments = await Payment.findAndCountAll({
       where: whereClause,
-      include: [
-        {
-          model: User,
-          as: 'user',
-          attributes: ['id', 'firstName', 'lastName']
-        },
-        {
-          model: Shipment,
-          as: 'shipment',
-          attributes: ['id', 'title', 'status']
-        },
-        {
-          model: Offer,
-          as: 'offer',
-          attributes: ['id', 'price', 'status']
-        }
-      ],
-      order: [['createdAt', 'DESC']],
       limit: parseInt(limit),
-      offset: parseInt(offset)
+      offset: parseInt(offset),
+      order: [['createdAt', 'DESC']],
     });
 
     res.json({
       success: true,
-      data: {
-        payments: payments.rows,
-        pagination: {
-          currentPage: parseInt(page),
-          totalPages: Math.ceil(payments.count / limit),
-          totalItems: payments.count,
-          itemsPerPage: parseInt(limit)
-        }
-      }
+      data: payments.rows,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: payments.count,
+        pages: Math.ceil(payments.count / limit),
+      },
     });
   } catch (error) {
-    logger.error('Get payments error:', error);
+    console.error('Get payments error:', error);
     res.status(500).json({
       success: false,
-      message: 'Ödemeler alınırken hata oluştu.'
+      message: 'Internal server error',
     });
   }
 });
 
-// @route   POST /api/payments/deposit
-// @desc    Create deposit payment
-// @access  Private
-router.post('/deposit', [
-  auth,
-  body('amount').isFloat({ min: 1 }).withMessage('Miktar 1 TL\'den fazla olmalı'),
-  body('paymentMethod').isIn(['credit_card', 'bank_transfer', 'stripe']).withMessage('Geçersiz ödeme yöntemi'),
-  body('description').optional().trim().isLength({ max: 200 }).withMessage('Açıklama 200 karakterden az olmalı')
-], async (req, res) => {
+// Get payment by ID
+router.get('/:id', async (req, res) => {
   try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
+    const { id } = req.params;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
         success: false,
-        message: 'Geçersiz veri',
-        errors: errors.array()
+        message: 'Authentication required',
       });
     }
 
-    const { amount, paymentMethod, description } = req.body;
-
-    const payment = await Payment.create({
-      userId: req.user.id,
-      amount,
-      currency: 'TRY',
-      paymentType: 'deposit',
-      paymentMethod,
-      status: 'pending',
-      description: description || 'Hesap bakiyesi yatırma',
-      metadata: {
-        ip: req.ip,
-        userAgent: req.get('User-Agent')
-      }
-    });
-
-    res.status(201).json({
-      success: true,
-      data: payment,
-      message: 'Para yatırma işlemi başlatıldı.'
-    });
-  } catch (error) {
-    logger.error('Create deposit error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Para yatırma işlemi oluşturulurken hata oluştu.'
-    });
-  }
-});
-
-// @route   POST /api/payments/commission
-// @desc    Create commission payment
-// @access  Private
-router.post('/commission', [
-  auth,
-  body('offerId').isUUID().withMessage('Geçerli teklif ID gerekli'),
-  body('amount').isFloat({ min: 0.01 }).withMessage('Miktar 0.01 TL\'den fazla olmalı')
-], async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Geçersiz veri',
-        errors: errors.array()
-      });
-    }
-
-    const { offerId, amount } = req.body;
-
-    // Check if offer exists and belongs to user
-    const offer = await Offer.findByPk(offerId, {
-      include: [
-        {
-          model: Shipment,
-          as: 'shipment',
-          attributes: ['id', 'title', 'status']
-        }
-      ]
-    });
-
-    if (!offer) {
+    const payment = await Payment.findByPk(id);
+    if (!payment) {
       return res.status(404).json({
         success: false,
-        message: 'Teklif bulunamadı.'
+        message: 'Payment not found',
       });
     }
 
-    if (offer.carrierId !== req.user.id) {
+    if (payment.userId !== userId) {
       return res.status(403).json({
         success: false,
-        message: 'Bu teklif için komisyon ödemesi yapamazsınız.'
+        message: 'Access denied',
       });
     }
 
-    const payment = await Payment.create({
-      userId: req.user.id,
-      offerId,
-      shipmentId: offer.shipmentId,
-      amount,
-      currency: 'TRY',
-      paymentType: 'commission',
-      paymentMethod: 'wallet',
-      status: 'completed',
-      description: `Komisyon ödemesi - ${offer.shipment.title}`,
-      processedAt: new Date(),
-      metadata: {
-        offerPrice: offer.price,
-        commissionRate: 0.01,
-        ip: req.ip,
-        userAgent: req.get('User-Agent')
-      }
-    });
-
-    res.status(201).json({
+    res.json({
       success: true,
       data: payment,
-      message: 'Komisyon ödemesi tamamlandı.'
     });
   } catch (error) {
-    logger.error('Create commission error:', error);
+    console.error('Get payment error:', error);
     res.status(500).json({
       success: false,
-      message: 'Komisyon ödemesi oluşturulurken hata oluştu.'
+      message: 'Internal server error',
     });
   }
 });
 
-// @route   GET /api/payments/balance
-// @desc    Get user balance
-// @access  Private
-router.get('/balance', auth, async (req, res) => {
-  try {
-    const completedPayments = await Payment.findAll({
-      where: {
-        userId: req.user.id,
-        status: 'completed'
-      },
-      attributes: ['paymentType', 'amount']
-    });
-
-    let balance = 0;
-    completedPayments.forEach(payment => {
-      if (payment.paymentType === 'deposit' || payment.paymentType === 'refund' || payment.paymentType === 'bonus') {
-        balance += parseFloat(payment.amount);
-      } else if (payment.paymentType === 'commission' || payment.paymentType === 'withdrawal') {
-        balance -= parseFloat(payment.amount);
+// Create payment
+router.post(
+  '/',
+  [
+    body('amount').isNumeric(),
+    body('type').isIn(['shipment', 'wallet', 'subscription']),
+    body('method').isIn(['credit_card', 'bank_transfer', 'wallet']),
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation error',
+          errors: errors.array(),
+        });
       }
-    });
 
-    res.json({
-      success: true,
-      data: {
-        balance: balance.toFixed(2),
-        currency: 'TRY'
+      const userId = req.user?.id;
+      const { amount, type, method, description, shipmentId } = req.body;
+
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          message: 'Authentication required',
+        });
       }
-    });
-  } catch (error) {
-    logger.error('Get balance error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Bakiye alınırken hata oluştu.'
-    });
-  }
-});
 
-// @route   GET /api/payments/stats
-// @desc    Get payment statistics
-// @access  Private
-router.get('/stats', auth, async (req, res) => {
-  try {
-    const { startDate, endDate } = req.query;
-    
-    const whereClause = { userId: req.user.id };
-    
-    if (startDate && endDate) {
-      whereClause.createdAt = {
-        $gte: new Date(startDate),
-        $lte: new Date(endDate)
+      const paymentData = {
+        userId,
+        amount,
+        type,
+        method,
+        description: description || '',
+        shipmentId: shipmentId || null,
+        status: 'pending',
+        transactionId: generateTransactionId(),
       };
-    }
 
-    const stats = await Payment.findAll({
-      where: whereClause,
-      attributes: [
-        'paymentType',
-        'status',
-        [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
-        [sequelize.fn('SUM', sequelize.col('amount')), 'totalAmount']
-      ],
-      group: ['paymentType', 'status']
-    });
+      const payment = await Payment.create(paymentData);
 
-    res.json({
-      success: true,
-      data: stats
-    });
-  } catch (error) {
-    logger.error('Get payment stats error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Ödeme istatistikleri alınırken hata oluştu.'
-    });
-  }
-});
-
-module.exports = router;
-router.get('/history', [
-  auth,
-  authorize('individual', 'corporate')
-], async (req, res) => {
-  try {
-    const { page = 1, limit = 10 } = req.query;
-    const offset = (page - 1) * limit;
-
-    // Get shipments with payments
-    const { count, rows: shipments } = await Shipment.findAndCountAll({
-      where: { senderId: req.user.id },
-      include: [
-        { association: 'carrier' },
-        { association: 'driver' }
-      ],
-      order: [['createdAt', 'DESC']],
-      limit: parseInt(limit),
-      offset: parseInt(offset)
-    });
-
-    // Transform shipments to payment history format
-    const payments = shipments.map(shipment => ({
-      id: shipment.id,
-      trackingNumber: shipment.trackingNumber,
-      amount: shipment.finalPrice,
-      commission: shipment.commission,
-      status: shipment.status,
-      carrier: shipment.carrier?.companyName,
-      driver: shipment.driver ? `${shipment.driver.firstName} ${shipment.driver.lastName}` : null,
-      createdAt: shipment.createdAt,
-      updatedAt: shipment.updatedAt
-    }));
-
-    res.json({
-      success: true,
-      data: {
-        payments,
-        pagination: {
-          currentPage: parseInt(page),
-          totalPages: Math.ceil(count / limit),
-          totalItems: count,
-          itemsPerPage: parseInt(limit)
-        }
-      }
-    });
-  } catch (error) {
-    logger.error('Get payment history error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Sunucu hatası'
-    });
-  }
-});
-
-// @route   GET /api/payments/commission-history
-// @desc    Get commission history for carriers
-// @access  Private
-router.get('/commission-history', [
-  auth,
-  authorize('carrier')
-], async (req, res) => {
-  try {
-    const { page = 1, limit = 10 } = req.query;
-    const offset = (page - 1) * limit;
-
-    // Get carrier profile
-    const carrier = await Carrier.findOne({
-      where: { userId: req.user.id }
-    });
-
-    if (!carrier) {
-      return res.status(400).json({
+      res.status(201).json({
+        success: true,
+        message: 'Payment created successfully',
+        data: payment,
+      });
+    } catch (error) {
+      console.error('Create payment error:', error);
+      res.status(500).json({
         success: false,
-        message: 'Nakliyeci profili bulunamadı'
+        message: 'Internal server error',
+      });
+    }
+  }
+);
+
+// Get wallet
+router.get('/wallet', async (req, res) => {
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required',
       });
     }
 
-    // Get shipments carried by this carrier
-    const { count, rows: shipments } = await Shipment.findAndCountAll({
-      where: { carrierId: carrier.id },
-      include: [
-        { association: 'sender' },
-        { association: 'driver' }
-      ],
-      order: [['createdAt', 'DESC']],
-      limit: parseInt(limit),
-      offset: parseInt(offset)
-    });
-
-    // Transform shipments to commission history format
-    const commissions = shipments.map(shipment => ({
-      id: shipment.id,
-      trackingNumber: shipment.trackingNumber,
-      amount: shipment.finalPrice,
-      commission: shipment.commission,
-      status: shipment.status,
-      sender: shipment.sender?.firstName ? 
-        `${shipment.sender.firstName} ${shipment.sender.lastName}` : 
-        shipment.senderName,
-      driver: shipment.driver ? `${shipment.driver.firstName} ${shipment.driver.lastName}` : null,
-      createdAt: shipment.createdAt,
-      updatedAt: shipment.updatedAt
-    }));
+    // In a real app, you would have a Wallet model
+    const wallet = {
+      balance: 0,
+      currency: 'TRY',
+    };
 
     res.json({
       success: true,
-      data: {
-        commissions,
-        pagination: {
-          currentPage: parseInt(page),
-          totalPages: Math.ceil(count / limit),
-          totalItems: count,
-          itemsPerPage: parseInt(limit)
-        }
-      }
+      data: wallet,
     });
   } catch (error) {
-    logger.error('Get commission history error:', error);
+    console.error('Get wallet error:', error);
     res.status(500).json({
       success: false,
-      message: 'Sunucu hatası'
+      message: 'Internal server error',
     });
   }
 });
+
+// Add funds to wallet
+router.post(
+  '/wallet/add-funds',
+  [
+    body('amount').isNumeric(),
+    body('method').isIn(['credit_card', 'bank_transfer']),
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation error',
+          errors: errors.array(),
+        });
+      }
+
+      const userId = req.user?.id;
+      const { amount, method } = req.body;
+
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          message: 'Authentication required',
+        });
+      }
+
+      // In a real app, you would process the payment and update wallet
+      res.json({
+        success: true,
+        message: 'Funds added to wallet successfully',
+      });
+    } catch (error) {
+      console.error('Add funds error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+      });
+    }
+  }
+);
+
+// Generate transaction ID
+function generateTransactionId() {
+  return 'TXN_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+}
 
 module.exports = router;

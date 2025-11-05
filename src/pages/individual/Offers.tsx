@@ -1,655 +1,939 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { 
-  Search, 
-  Filter, 
-  Clock, 
-  CheckCircle, 
-  XCircle, 
-  Star, 
-  Truck, 
-  MapPin, 
+import React, { useState, useEffect } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
+import { useAuth } from '../../contexts/AuthContext';
+import {
+  Search,
+  Filter,
+  Clock,
+  CheckCircle,
+  XCircle,
+  Star,
+  Truck,
+  MapPin,
   Calendar,
   DollarSign,
   Eye,
   MessageSquare,
   Phone,
   Mail,
-  FileText,
   Package,
   User,
   Building2,
   Users,
-  Download,
   TrendingUp,
   BarChart3,
   CheckSquare,
   X,
-  Plus
+  Plus,
+  ArrowRight,
+  Bell,
+  AlertCircle,
+  FileText,
+  Zap,
+  Shield,
+  Award,
+  Timer,
+  Target,
+  Sparkles,
+  ThumbsUp,
+  MessageCircle,
+  Heart,
+  Flag,
+  CheckCircle2,
 } from 'lucide-react';
 import Breadcrumb from '../../components/common/Breadcrumb';
 import EmptyState from '../../components/common/EmptyState';
 import LoadingState from '../../components/common/LoadingState';
 import Modal from '../../components/common/Modal';
 import SuccessMessage from '../../components/common/SuccessMessage';
-import Pagination from '../../components/common/Pagination';
+
+interface Offer {
+  id: string;
+  shipmentTitle: string;
+  carrierName: string;
+  carrierRating: number;
+  carrierVerified: boolean;
+  carrierReviews: number;
+  carrierExperience: string;
+  price: number;
+  estimatedDelivery: string;
+  message: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  createdAt: string;
+  pickupAddress: string;
+  deliveryAddress: string;
+  weight: string;
+  dimensions: string;
+  specialFeatures: string[];
+  tracking: boolean;
+  priority: 'low' | 'medium' | 'high';
+  trackingCode: string;
+  carrierPhone: string;
+  carrierEmail: string;
+  carrierLogo: string;
+  recentComments: string[];
+  responseTime: string;
+  successRate: number;
+}
 
 export default function Offers() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [filterStatus, setFilterStatus] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
-  const [showComparison, setShowComparison] = useState(false);
-  const [showPriceAnalysis, setShowPriceAnalysis] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [selectedOffer, setSelectedOffer] = useState<Offer | null>(null);
   const [offerToReject, setOfferToReject] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 6;
+  const [offers, setOffers] = useState<Offer[]>([]);
+  const [stats, setStats] = useState({
+    totalOffers: 0,
+    pendingOffers: 0,
+    acceptedOffers: 0,
+    rejectedOffers: 0,
+    averagePrice: 0,
+    topCarrier: '',
+    responseTime: 0,
+  });
 
-  // Mock data - gerçek uygulamada API'den gelecek
-  const offers = [
-    {
-      id: 'OFF-001',
-      shipmentId: 'IND-2024-001',
-      carrier: {
-        name: 'Hızlı Lojistik A.Ş.',
-        rating: 4.8,
-        logo: '/logo.svg',
-        phone: '0555 123 45 67',
-        email: 'info@hizlilojistik.com',
-        isContracted: true // Anlaşmalı nakliyeci
-      },
-      route: 'İstanbul → Ankara',
-      cargo: 'Gıda Ürünleri - Soğuk Zincir',
-      weight: '2.5 ton',
-      volume: '15 m³',
-      price: 45000,
-      currency: '₺',
-      deliveryTime: '2 gün',
-      pickupDate: '2024-01-16',
-      deliveryDate: '2024-01-18',
-      status: 'pending', // pending, accepted, rejected
-      submittedAt: '2024-01-15 14:30',
-      specialNotes: 'Soğuk zincir garantili taşıma',
-      insurance: 'Tam sigorta dahil',
-      vehicleType: 'Soğutmalı Tır',
-      driver: {
-        name: 'Ahmet Yılmaz',
-        experience: '8 yıl',
-        rating: 4.9
+  useEffect(() => {
+    loadOffers();
+  }, [filterStatus, searchTerm]);
+
+  const loadOffers = async () => {
+    setIsLoading(true);
+    try {
+      const user = localStorage.getItem('user')
+        ? JSON.parse(localStorage.getItem('user') || '{}')
+        : null;
+      const userId = user?.id;
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(
+        `/api/offers?${userId ? `userId=${userId}` : ''}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token || ''}`,
+            'X-User-Id': userId || '',
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to load offers');
       }
-    },
-    {
-      id: 'OFF-002',
-      shipmentId: 'IND-2024-001',
-      carrier: {
-        name: 'Güvenli Taşımacılık Ltd.',
-        rating: 4.6,
-        logo: '/logo.svg',
-        phone: '0555 987 65 43',
-        email: 'info@guvenlitasimacilik.com',
-        isContracted: false // Genel nakliyeci
-      },
-      route: 'İstanbul → Ankara',
-      cargo: 'Gıda Ürünleri - Soğuk Zincir',
-      weight: '2.5 ton',
-      volume: '15 m³',
-      price: 42000,
-      currency: '₺',
-      deliveryTime: '3 gün',
-      pickupDate: '2024-01-16',
-      deliveryDate: '2024-01-19',
-      status: 'pending',
-      submittedAt: '2024-01-15 16:45',
-      specialNotes: '24 saat takip sistemi',
-      insurance: 'Temel sigorta',
-      vehicleType: 'Soğutmalı Tır',
-      driver: {
-        name: 'Mehmet Kaya',
-        experience: '12 yıl',
-        rating: 4.7
-      }
-    },
-    {
-      id: 'OFF-003',
-      shipmentId: 'IND-2024-002',
-      carrier: {
-        name: 'Express Kargo A.Ş.',
-        rating: 4.9,
-        logo: '/logo.svg',
-        phone: '0555 555 55 55',
-        email: 'info@expresskargo.com',
-        isContracted: true // Anlaşmalı nakliyeci
-      },
-      route: 'İzmir → Bursa',
-      cargo: 'Tekstil Ürünleri',
-      weight: '1.8 ton',
-      volume: '12 m³',
-      price: 28500,
-      currency: '₺',
-      deliveryTime: '1 gün',
-      pickupDate: '2024-01-15',
-      deliveryDate: '2024-01-16',
-      status: 'accepted',
-      submittedAt: '2024-01-15 10:20',
-      specialNotes: 'Hızlı teslimat garantisi',
-      insurance: 'Premium sigorta',
-      vehicleType: 'Kamyon',
-      driver: {
-        name: 'Ali Demir',
-        experience: '6 yıl',
-        rating: 4.8
-      }
-    },
-    {
-      id: 'OFF-004',
-      shipmentId: 'IND-2024-002',
-      carrier: {
-        name: 'Mega Lojistik Ltd.',
-        rating: 4.4,
-        logo: '/logo.svg',
-        phone: '0555 444 44 44',
-        email: 'info@megalojistik.com',
-        isContracted: false // Genel nakliyeci
-      },
-      route: 'İzmir → Bursa',
-      cargo: 'Tekstil Ürünleri',
-      weight: '1.8 ton',
-      volume: '12 m³',
-      price: 32000,
-      currency: '₺',
-      deliveryTime: '2 gün',
-      pickupDate: '2024-01-15',
-      deliveryDate: '2024-01-17',
-      status: 'pending',
-      submittedAt: '2024-01-15 14:30',
-      specialNotes: 'Ekonomik fiyat',
-      insurance: 'Temel sigorta',
-      vehicleType: 'Kamyon',
-      driver: {
-        name: 'Veli Özkan',
-        experience: '5 yıl',
-        rating: 4.3
-      }
-    },
-    {
-      id: 'OFF-005',
-      shipmentId: 'IND-2024-004',
-      carrier: {
-        name: 'Kimyasal Lojistik A.Ş.',
-        rating: 4.9,
-        logo: '/logo.svg',
-        phone: '0555 555 55 55',
-        email: 'info@kimyasallojistik.com',
-        isContracted: true
-      },
-      route: 'İstanbul → Antalya',
-      cargo: 'Kimyasal Ürünler',
-      weight: '1.2 ton',
-      volume: '10 m³',
-      price: 2200,
-      currency: '₺',
-      deliveryTime: '3 gün',
-      pickupDate: '2024-01-15',
-      deliveryDate: '2024-01-18',
-      status: 'pending',
-      submittedAt: '2024-01-15 16:45',
-      specialNotes: 'Özel kimyasal taşıma',
-      insurance: 'Tam sigorta',
-      vehicleType: 'Özel Kimyasal Kamyon',
-      driver: {
-        name: 'Mehmet Yılmaz',
-        experience: '8 yıl',
-        rating: 4.9
-      }
+
+      const data = await response.json();
+      setOffers(data.data || data.offers || (Array.isArray(data) ? data : []));
+      setStats(
+        data.stats || {
+          totalOffers: 0,
+          pendingOffers: 0,
+          acceptedOffers: 0,
+          rejectedOffers: 0,
+          averagePrice: 0,
+          topCarrier: '',
+          responseTime: 0,
+        }
+      );
+    } catch (error) {
+      console.error('Error loading offers:', error);
+      setOffers([]);
+      setStats({
+        totalOffers: 0,
+        pendingOffers: 0,
+        acceptedOffers: 0,
+        rejectedOffers: 0,
+        averagePrice: 0,
+        topCarrier: '',
+        responseTime: 0,
+      });
+    } finally {
+      setIsLoading(false);
     }
-  ];
+  };
 
   const filteredOffers = offers.filter(offer => {
-    if (filterStatus === 'all') {
-      return true;
-    } else if (filterStatus === 'contracted') {
-      return offer.carrier.isContracted;
-    } else if (filterStatus === 'general') {
-      return !offer.carrier.isContracted;
-    } else {
-      return offer.status === filterStatus;
-    }
+    const matchesStatus =
+      filterStatus === 'all' || offer.status === filterStatus;
+    const matchesSearch =
+      offer.shipmentTitle.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      offer.carrierName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      offer.trackingCode.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesStatus && matchesSearch;
   });
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'pending':
-        return <Clock className="w-4 h-4 text-yellow-500" />;
       case 'accepted':
-        return <CheckCircle className="w-4 h-4 text-green-500" />;
+        return <CheckCircle className='w-3 h-3 mr-1' />;
       case 'rejected':
-        return <XCircle className="w-4 h-4 text-red-500" />;
+        return <XCircle className='w-3 h-3 mr-1' />;
+      case 'pending':
+        return <Clock className='w-3 h-3 mr-1' />;
       default:
-        return <Clock className="w-4 h-4 text-gray-500" />;
+        return <Clock className='w-3 h-3 mr-1' />;
     }
   };
 
-  const getStatusText = (status: string) => {
+  const getStatusInfo = (status: string) => {
     switch (status) {
-      case 'pending':
-        return 'Beklemede';
       case 'accepted':
-        return 'Kabul Edildi';
+        return { text: 'Kabul Edildi', color: 'bg-green-100 text-green-800' };
       case 'rejected':
-        return 'Reddedildi';
+        return { text: 'Reddedildi', color: 'bg-red-100 text-red-800' };
+      case 'pending':
+        return { text: 'Beklemede', color: 'bg-yellow-100 text-yellow-800' };
       default:
-        return 'Bilinmiyor';
+        return { text: 'Bilinmiyor', color: 'bg-gray-100 text-gray-800' };
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'accepted':
-        return 'bg-green-100 text-green-800';
-      case 'rejected':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
+  const handleAcceptOffer = async (offerId: string) => {
+    setIsLoading(true);
+    try {
+      const response = await fetch(`/api/offers/${offerId}/accept`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to accept offer');
+      }
+
+      setSuccessMessage(
+        'Teklif başarıyla kabul edildi! Gönderilerim sayfasına yönlendiriliyorsunuz...'
+      );
+      setShowSuccessMessage(true);
+      setOffers(prev =>
+        prev.map(offer =>
+          offer.id === offerId
+            ? { ...offer, status: 'accepted' as const }
+            : offer
+        )
+      );
+      setStats(prev => ({
+        ...prev,
+        pendingOffers: prev.pendingOffers - 1,
+        acceptedOffers: prev.acceptedOffers + 1,
+      }));
+      setTimeout(() => {
+        setShowSuccessMessage(false);
+        navigate('/individual/my-shipments');
+      }, 2000);
+    } catch (error) {
+      console.error('Error accepting offer:', error);
+      setSuccessMessage('Teklif kabul edilirken bir hata oluştu.');
+      setShowSuccessMessage(true);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  // Pagination logic
-  const totalPages = Math.ceil(filteredOffers.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedOffers = filteredOffers.slice(startIndex, startIndex + itemsPerPage);
+  const handleRejectOffer = async (offerId: string) => {
+    setIsLoading(true);
+    try {
+      const response = await fetch(`/api/offers/${offerId}/reject`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
-  const breadcrumbItems = [
-    { label: 'Teklifler', icon: <FileText className="w-4 h-4" /> }
-  ];
+      if (!response.ok) {
+        throw new Error('Failed to reject offer');
+      }
+
+      setSuccessMessage('Teklif başarıyla reddedildi!');
+      setShowSuccessMessage(true);
+      setOffers(prev =>
+        prev.map(offer =>
+          offer.id === offerId
+            ? { ...offer, status: 'rejected' as const }
+            : offer
+        )
+      );
+      setStats(prev => ({
+        ...prev,
+        pendingOffers: prev.pendingOffers - 1,
+        rejectedOffers: prev.rejectedOffers + 1,
+      }));
+      setTimeout(() => setShowSuccessMessage(false), 2000);
+    } catch (error) {
+      console.error('Error rejecting offer:', error);
+      setSuccessMessage('Teklif reddedilirken bir hata oluştu.');
+      setShowSuccessMessage(true);
+    } finally {
+      setIsLoading(false);
+      setOfferToReject(null);
+      setShowRejectModal(false);
+    }
+  };
+
+  const handleViewDetails = (offerId: string) => {
+    const offer = offers.find(o => o.id === offerId);
+    if (offer) {
+      setSelectedOffer(offer);
+      setShowDetailModal(true);
+    }
+  };
+
+  const handleContactCarrier = (carrierPhone: string, carrierEmail: string) => {
+    // Open contact options
+    const contactMethod = window.confirm(
+      'Nakliyeci ile iletişim kurmak için telefon aramak ister misiniz? (Hayır derseniz e-posta gönderilir)'
+    );
+    if (contactMethod) {
+      window.open(`tel:${carrierPhone}`);
+    } else {
+      window.open(`mailto:${carrierEmail}`);
+    }
+  };
+
+  if (isLoading) {
+    return <LoadingState message='Teklifler yükleniyor...' />;
+  }
+
+  if (showSuccessMessage) {
+    return (
+      <SuccessMessage
+        isVisible={showSuccessMessage}
+        message={successMessage}
+        onClose={() => setShowSuccessMessage(false)}
+      />
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
-      <div className="max-w-5xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
-        {/* Breadcrumb */}
-        <div className="mb-4 sm:mb-6">
-          <Breadcrumb items={breadcrumbItems} />
-      </div>
+    <div className='min-h-screen bg-white'>
+      <Helmet>
+        <title>Tekliflerim - YolNext Bireysel</title>
+        <meta
+          name='description'
+          content='Gönderileriniz için gelen teklifleri yönetin'
+        />
+      </Helmet>
 
-        {/* Header - Mobile Optimized */}
-        <div className="text-center mb-8 sm:mb-12">
-          <div className="flex justify-center mb-4 sm:mb-6">
-            <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-br from-slate-800 to-blue-900 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-lg">
-              <Users className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
+      <div className='max-w-5xl mx-auto px-4 py-6'>
+        {/* Header - Match MyShipments Design */}
+        <div className='text-center mb-12'>
+          <div className='flex justify-center mb-6'>
+            <div className='w-16 h-16 bg-gradient-to-br from-slate-800 to-blue-900 rounded-2xl flex items-center justify-center shadow-lg'>
+              <FileText className='w-8 h-8 text-white' />
             </div>
           </div>
-          <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-slate-900 mb-2 sm:mb-3">
-            Teklifleri{' '}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-slate-800 to-blue-900">Yönetin</span>
+          <h1 className='text-4xl md:text-5xl font-bold text-slate-900 mb-3'>
+            Tekliflerinizi{' '}
+            <span className='text-transparent bg-clip-text bg-gradient-to-r from-slate-800 to-blue-900'>
+              Yönetin
+            </span>
           </h1>
-          <p className="text-sm sm:text-base md:text-lg text-slate-600 px-4">Nakliyecilerden gelen teklifleri görüntüleyin ve yönetin</p>
+          <p className='text-lg text-slate-600'>
+            Gönderileriniz için gelen teklifleri karşılaştırın ve en uygun
+            olanını seçin
+          </p>
         </div>
 
-        {/* Filters Card - Mobile Optimized */}
-        <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-lg border border-slate-200 mb-6 sm:mb-8">
-          <div className="flex flex-col lg:flex-row gap-3 sm:gap-4">
-            {/* Sol Taraf - Arama ve Filtreler */}
-            <div className="flex-1 flex flex-col sm:flex-row gap-3">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-                <input
-                  type="text"
-                  placeholder="Nakliyeci, rota veya yük ara..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 sm:py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-sm"
-                />
+        {/* Stats Cards */}
+        <div className='grid grid-cols-1 md:grid-cols-4 gap-6 mb-8'>
+          <div className='bg-white rounded-2xl p-6 shadow-xl border border-slate-200'>
+            <div className='flex items-center justify-between'>
+              <div>
+                <p className='text-sm font-medium text-slate-600'>
+                  Toplam Teklif
+                </p>
+                <p className='text-2xl font-bold text-slate-900'>
+                  {stats.totalOffers}
+                </p>
               </div>
-              
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className="px-3 py-2 sm:py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-sm min-w-[140px]"
-              >
-                <option value="all">Tüm Durumlar</option>
-                <option value="accepted">Kabul Edildi</option>
-                <option value="rejected">Reddedildi</option>
-                <option value="contracted">Anlaşmalı</option>
-                <option value="general">Genel</option>
-              </select>
+              <div className='w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-xl flex items-center justify-center'>
+                <FileText className='w-6 h-6 text-white' />
+              </div>
             </div>
+          </div>
 
-            {/* Sağ Taraf - Aksiyon Butonları - Mobile Optimized */}
-            <div className="flex flex-wrap gap-2">
-              <button 
-                onClick={() => setShowComparison(!showComparison)}
-                className="px-2 sm:px-3 py-2 sm:py-2.5 bg-slate-50 text-slate-700 rounded-lg hover:bg-slate-100 transition-colors flex items-center gap-1 sm:gap-2 text-xs sm:text-sm font-medium border border-slate-200"
-              >
-                <FileText className="w-4 h-4" />
-                Karşılaştır
-              </button>
+          <div className='bg-white rounded-2xl p-6 shadow-xl border border-slate-200'>
+            <div className='flex items-center justify-between'>
+              <div>
+                <p className='text-sm font-medium text-slate-600'>Bekleyen</p>
+                <p className='text-2xl font-bold text-slate-900'>
+                  {stats.pendingOffers}
+                </p>
+              </div>
+              <div className='w-12 h-12 bg-gradient-to-br from-orange-500 to-amber-600 rounded-xl flex items-center justify-center'>
+                <Clock className='w-6 h-6 text-white' />
+              </div>
+            </div>
+          </div>
 
-              <button 
-                onClick={() => setShowPriceAnalysis(!showPriceAnalysis)}
-                className="px-2 sm:px-3 py-2 sm:py-2.5 bg-slate-50 text-slate-700 rounded-lg hover:bg-slate-100 transition-colors flex items-center gap-1 sm:gap-2 text-xs sm:text-sm font-medium border border-slate-200"
-              >
-                <TrendingUp className="w-4 h-4" />
-                Fiyat Analizi
-              </button>
+          <div className='bg-white rounded-2xl p-6 shadow-xl border border-slate-200'>
+            <div className='flex items-center justify-between'>
+              <div>
+                <p className='text-sm font-medium text-slate-600'>
+                  Kabul Edilen
+                </p>
+                <p className='text-2xl font-bold text-slate-900'>
+                  {stats.acceptedOffers}
+                </p>
+              </div>
+              <div className='w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center'>
+                <CheckCircle className='w-6 h-6 text-white' />
+              </div>
+            </div>
+          </div>
 
-              <button 
-                onClick={() => navigate('/individual/create-shipment')}
-                className="px-2 sm:px-3 py-2 sm:py-2.5 bg-slate-600 text-white rounded-lg hover:bg-slate-700 transition-colors flex items-center gap-1 sm:gap-2 text-xs sm:text-sm font-medium"
-              >
-                <Plus className="w-4 h-4" />
-                Yeni Gönderi
-              </button>
-
-              <button 
-                onClick={() => navigate('/individual/carriers')}
-                className="px-2 sm:px-3 py-2 sm:py-2.5 bg-slate-50 text-slate-700 rounded-lg hover:bg-slate-100 transition-colors flex items-center gap-1 sm:gap-2 text-xs sm:text-sm font-medium border border-slate-200"
-              >
-                <Users className="w-4 h-4" />
-                Nakliyeciler
-              </button>
+          <div className='bg-white rounded-2xl p-6 shadow-xl border border-slate-200'>
+            <div className='flex items-center justify-between'>
+              <div>
+                <p className='text-sm font-medium text-slate-600'>
+                  Ortalama Fiyat
+                </p>
+                <p className='text-2xl font-bold text-slate-900'>
+                  ₺{stats.averagePrice.toFixed(0)}
+                </p>
+              </div>
+              <div className='w-12 h-12 bg-gradient-to-br from-purple-600 to-indigo-700 rounded-xl flex items-center justify-center'>
+                <DollarSign className='w-6 h-6 text-white' />
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Offers List - Mobile Optimized */}
-        <div className="space-y-3 sm:space-y-4">
-          {isLoading ? (
-            <LoadingState text="Teklifler yükleniyor..." />
-          ) : paginatedOffers.length === 0 ? (
-            <EmptyState
-              icon={Users}
-              title="Teklif bulunamadı"
-              description="Arama kriterlerinize uygun teklif bulunamadı"
-              action={{
-                label: "Yeni Gönderi Oluştur",
-                onClick: () => window.location.href = '/individual/create-shipment',
-                icon: Plus
-              }}
-            />
-          ) : (
-            paginatedOffers.map((offer) => (
-              <div key={offer.id} className="bg-white rounded-lg sm:rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6 hover:shadow-md transition-shadow">
-                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 sm:gap-4">
-                  {/* Left Side - Offer Info */}
-                  <div className="flex-1">
-                    <div className="flex items-start justify-between mb-3 sm:mb-4">
-                      <div className="flex items-center space-x-2 sm:space-x-3">
-                        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-100 rounded-lg flex items-center justify-center">
-                          <Users className="w-5 h-5 sm:w-6 sm:h-6 text-gray-600" />
-                    </div>
-                    <div>
-                          <div className="flex flex-col sm:flex-row sm:items-center space-y-1 sm:space-y-0 sm:space-x-2 mb-1">
-                            <h3 className="text-base sm:text-lg font-semibold text-gray-900">{offer.carrier.name}</h3>
-                        {offer.carrier.isContracted && (
-                              <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full w-fit">
-                            Anlaşmalı
-                          </span>
-                        )}
-                      </div>
-                          <div className="flex flex-col sm:flex-row sm:items-center space-y-1 sm:space-y-0 sm:space-x-2">
-                            <div className="flex items-center space-x-1 sm:space-x-2">
-                          <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                              <span className="text-xs sm:text-sm text-gray-600">{offer.carrier.rating}/5</span>
-                            </div>
-                            <span className="text-xs sm:text-sm text-gray-400 hidden sm:inline">•</span>
-                            <span className="text-xs sm:text-sm text-gray-600">{offer.driver.experience} deneyim</span>
-                            {!offer.carrier.isContracted && (
-                              <span className="text-xs text-gray-500">• Genel Nakliyeci</span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      <div className={`px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium flex items-center space-x-1 sm:space-x-2 ${getStatusColor(offer.status)}`}>
-                        {getStatusIcon(offer.status)}
-                        <span className="hidden sm:inline">{getStatusText(offer.status)}</span>
-                        <span className="sm:hidden">{getStatusText(offer.status).split(' ')[0]}</span>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-3 sm:mb-4">
-                      <div className="flex items-center space-x-2">
-                        <MapPin className="w-4 h-4 text-gray-400" />
-                        <div>
-                          <p className="text-xs sm:text-sm text-gray-600">Rota</p>
-                          <p className="font-medium text-gray-900 text-sm sm:text-base">{offer.route}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Package className="w-4 h-4 text-gray-400" />
-                        <div>
-                          <p className="text-xs sm:text-sm text-gray-600">Yük</p>
-                          <p className="font-medium text-gray-900 text-sm sm:text-base">{offer.cargo}</p>
-                  </div>
-                </div>
-                      <div className="flex items-center space-x-2">
-                        <Calendar className="w-4 h-4 text-gray-400" />
-                        <div>
-                          <p className="text-xs sm:text-sm text-gray-600">Teslimat</p>
-                          <p className="font-medium text-gray-900 text-sm sm:text-base">{offer.deliveryTime}</p>
-                  </div>
-                  </div>
-                      <div className="flex items-center space-x-2">
-                        <DollarSign className="w-4 h-4 text-gray-400" />
-                        <div>
-                          <p className="text-xs sm:text-sm text-gray-600">Fiyat</p>
-                          <p className="font-medium text-gray-900 text-sm sm:text-base">{offer.price.toLocaleString()} {offer.currency}</p>
-                  </div>
-                  </div>
-                </div>
-
-                    <div className="text-xs sm:text-sm text-gray-600 space-y-1">
-                      <p><span className="font-medium">Ağırlık:</span> {offer.weight} • <span className="font-medium">Hacim:</span> {offer.volume}</p>
-                      <p><span className="font-medium">Araç:</span> {offer.vehicleType} • <span className="font-medium">Şoför:</span> {offer.driver.name}</p>
-                      <p><span className="font-medium">Sigorta:</span> {offer.insurance}</p>
-                      {offer.specialNotes && <p><span className="font-medium">Notlar:</span> {offer.specialNotes}</p>}
-                  </div>
-                </div>
-
-                  {/* Right Side - Actions - Mobile Optimized */}
-                  <div className="flex flex-col space-y-2 lg:min-w-[200px]">
-                    <div className="text-xs text-gray-500 text-left sm:text-right">
-                  Teklif No: {offer.id}
-                </div>
-                    <div className="text-xs text-gray-500 text-left sm:text-right">
-                  Gönderi: {offer.shipmentId}
-                </div>
-                    <div className="text-xs text-gray-500 text-left sm:text-right">
-                  {new Date(offer.submittedAt).toLocaleString('tr-TR')}
-                </div>
-                
-                    <div className="flex flex-col space-y-2 pt-3 border-t border-gray-100">
-                      <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
-                    <button 
-                      type="button"
-                      onClick={() => {
-                        // Teklif kabul edildi - gönderiler sayfasına yönlendir
-                            window.location.href = `/individual/my-shipments?accepted=${offer.shipmentId}`;
-                      }}
-                          className="flex-1 px-3 py-2 bg-gradient-to-r from-slate-800 to-blue-900 text-white rounded-md hover:from-slate-900 hover:to-blue-950 transition-all duration-200 text-xs font-medium flex items-center justify-center space-x-1 shadow-sm hover:shadow-md border-0 outline-none focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-opacity-50"
-                    >
-                      <CheckCircle className="w-3 h-3" />
-                      <span>Kabul Et</span>
-                    </button>
-                    <button 
-                      type="button"
-                      onClick={() => {
-                        // Teklif reddetme modalını aç
-                        setOfferToReject(offer.id);
-                        setShowRejectModal(true);
-                      }}
-                          className="flex-1 px-3 py-2 bg-gradient-to-r from-gray-100 to-gray-200 text-gray-700 rounded-md hover:from-gray-200 hover:to-gray-300 transition-all duration-200 text-xs font-medium flex items-center justify-center space-x-1 shadow-sm hover:shadow-md border-0 outline-none focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-50"
-                    >
-                      <XCircle className="w-3 h-3" />
-                      <span>Reddet</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
+        {/* Filters Card */}
+        <div className='bg-white rounded-2xl p-8 shadow-xl border border-slate-200 mb-8'>
+          <div className='grid grid-cols-1 md:grid-cols-4 gap-4'>
+            <div className='relative'>
+              <Search className='absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4' />
+              <input
+                type='text'
+                placeholder='Teklif ara...'
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className='w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+              />
             </div>
+
+            <select
+              value={filterStatus}
+              onChange={e => setFilterStatus(e.target.value)}
+              className='px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+            >
+              <option value='all'>Tüm Durumlar</option>
+              <option value='pending'>Bekleyen</option>
+              <option value='accepted'>Kabul Edilen</option>
+              <option value='rejected'>Reddedilen</option>
+            </select>
+
+            <select className='px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'>
+              <option value='price'>Fiyata Göre</option>
+              <option value='rating'>Puana Göre</option>
+              <option value='date'>Tarihe Göre</option>
+              <option value='delivery'>Teslimat Süresine Göre</option>
+            </select>
+
+            <button className='px-4 py-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors flex items-center justify-center gap-2'>
+              <Filter className='w-4 h-4' />
+              Filtrele
+            </button>
+          </div>
+        </div>
+
+        {/* Offers Cards */}
+        <div className='space-y-4'>
+          {filteredOffers.length > 0 ? (
+            filteredOffers.map(offer => (
+              <div
+                key={offer.id}
+                className='bg-white rounded-xl shadow-lg border border-slate-200 hover:shadow-xl transition-all duration-300 group'
+              >
+                <div className='p-6'>
+                  {/* Compact Header */}
+                  <div className='flex items-center justify-between mb-4'>
+                    <div className='flex items-center gap-3'>
+                      <div className='w-10 h-10 bg-gradient-to-br from-slate-800 to-blue-900 rounded-xl flex items-center justify-center'>
+                        <FileText className='w-5 h-5 text-white' />
+                      </div>
+                      <div>
+                        <h3 className='text-lg font-bold text-slate-900 group-hover:text-blue-600 transition-colors'>
+                          {offer.shipmentTitle}
+                        </h3>
+                        <div className='flex items-center gap-3 text-sm text-slate-500'>
+                          <span className='font-mono bg-slate-100 text-slate-800 px-2 py-1 rounded'>
+                            {offer.trackingCode}
+                          </span>
+                          <span>
+                            {new Date(offer.createdAt).toLocaleDateString(
+                              'tr-TR'
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className='text-right'>
+                      <div className='text-2xl font-bold text-blue-600'>
+                        ₺{offer.price.toLocaleString()}
+                      </div>
+                      <div className='text-sm text-slate-500'>
+                        Teslimat: {offer.estimatedDelivery}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Compact Info */}
+                  <div className='flex items-center justify-between mb-4'>
+                    <div className='flex items-center gap-4 text-sm text-slate-600'>
+                      <div className='flex items-center gap-1'>
+                        <MapPin className='w-4 h-4' />
+                        <span>
+                          {offer.pickupAddress} → {offer.deliveryAddress}
+                        </span>
+                      </div>
+                      <div className='flex items-center gap-1'>
+                        <Package className='w-4 h-4' />
+                        <span>
+                          {offer.weight} • {offer.dimensions}
+                        </span>
+                      </div>
+                    </div>
+                    <div className='flex items-center gap-2'>
+                      <span
+                        className={`inline-flex items-center px-3 py-1 rounded-lg text-xs font-semibold ${getStatusInfo(offer.status).color}`}
+                      >
+                        {getStatusIcon(offer.status)}
+                        {getStatusInfo(offer.status).text}
+                      </span>
+                      <span
+                        className={`px-3 py-1 rounded-lg text-xs font-semibold ${
+                          offer.priority === 'high'
+                            ? 'bg-red-100 text-red-800'
+                            : offer.priority === 'medium'
+                              ? 'bg-yellow-100 text-yellow-800'
+                              : 'bg-green-100 text-green-800'
+                        }`}
+                      >
+                        {offer.priority === 'high'
+                          ? 'Yüksek'
+                          : offer.priority === 'medium'
+                            ? 'Orta'
+                            : 'Düşük'}{' '}
+                        Öncelik
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Carrier Preview */}
+                  <div className='flex items-center justify-between mb-4'>
+                    <div className='flex items-center gap-3'>
+                      <div className='w-8 h-8 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center text-white font-bold text-sm'>
+                        {offer.carrierLogo}
+                      </div>
+                      <div>
+                        <div className='flex items-center gap-2'>
+                          <span className='font-semibold text-slate-900'>
+                            {offer.carrierName}
+                          </span>
+                          {offer.carrierVerified && (
+                            <Shield className='w-4 h-4 text-green-600' />
+                          )}
+                        </div>
+                        <div className='flex items-center gap-2 text-sm text-slate-500'>
+                          <div className='flex items-center gap-1'>
+                            <Star className='w-3 h-3 text-yellow-500 fill-current' />
+                            <span>{offer.carrierRating}</span>
+                          </div>
+                          <span>•</span>
+                          <span>{offer.carrierReviews} yorum</span>
+                          <span>•</span>
+                          <span>{offer.carrierExperience} deneyim</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className='flex items-center gap-2'>
+                      {offer.tracking && (
+                        <span className='px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-lg'>
+                          Takip ✓
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className='flex items-center justify-between'>
+                    <div className='text-sm text-slate-500'>
+                      {offer.message.length > 60
+                        ? offer.message.substring(0, 60) + '...'
+                        : offer.message}
+                    </div>
+                    <div className='flex items-center gap-2'>
+                      {offer.status === 'pending' && (
+                        <>
+                          <button
+                            onClick={() => handleAcceptOffer(offer.id)}
+                            className='px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-1'
+                          >
+                            <CheckCircle className='w-4 h-4' />
+                            Kabul Et
+                          </button>
+                          <button
+                            onClick={() => {
+                              setOfferToReject(offer.id);
+                              setShowRejectModal(true);
+                            }}
+                            className='px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-1'
+                          >
+                            <XCircle className='w-4 h-4' />
+                            Reddet
+                          </button>
+                        </>
+                      )}
+                      <button
+                        onClick={() => handleViewDetails(offer.id)}
+                        className='px-4 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 text-sm font-medium rounded-lg transition-colors flex items-center gap-1'
+                      >
+                        <Eye className='w-4 h-4' />
+                        Detay
+                      </button>
+                      <button
+                        onClick={() =>
+                          handleContactCarrier(
+                            offer.carrierPhone,
+                            offer.carrierEmail
+                          )
+                        }
+                        className='px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition-colors flex items-center gap-1'
+                      >
+                        <MessageCircle className='w-4 h-4' />
+                        İletişim
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
             ))
+          ) : (
+            <div className='bg-white rounded-2xl p-12 shadow-xl border border-slate-200 text-center'>
+              <FileText className='w-16 h-16 text-slate-300 mx-auto mb-6' />
+              <h3 className='text-2xl font-bold text-slate-900 mb-4'>
+                Teklif Bulunamadı
+              </h3>
+              <p className='text-slate-600 text-lg mb-8'>
+                Arama kriterlerinize uygun teklif bulunamadı.
+              </p>
+              <Link
+                to='/individual/create-shipment'
+                className='inline-flex items-center gap-3 bg-gradient-to-r from-slate-800 to-blue-900 text-white px-8 py-4 rounded-xl font-semibold hover:from-slate-700 hover:to-blue-800 transition-all duration-300 shadow-lg hover:shadow-xl'
+              >
+                <Plus className='w-6 h-6' />
+                Yeni Gönderi Oluştur
+              </Link>
+            </div>
           )}
         </div>
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="mt-8">
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={setCurrentPage}
-            />
-          </div>
-        )}
+        {/* Quick Actions */}
+        <div className='mt-8 text-center'>
+          <Link
+            to='/individual/create-shipment'
+            className='inline-flex items-center gap-2 bg-gradient-to-r from-slate-800 to-blue-900 text-white px-6 py-3 rounded-xl font-semibold hover:from-slate-700 hover:to-blue-800 transition-all duration-300 shadow-lg hover:shadow-xl'
+          >
+            <Plus className='w-5 h-5' />
+            Yeni Gönderi Oluştur
+          </Link>
+        </div>
+      </div>
 
-        {/* Teklif Karşılaştırma Modal */}
-        <Modal
-          isOpen={showComparison}
-          onClose={() => setShowComparison(false)}
-          title="Teklif Karşılaştırması"
-          size="xl"
-        >
-              <div className="text-center py-8">
-            <CheckSquare className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-slate-900 mb-2">Teklif Karşılaştırması</h3>
-            <p className="text-slate-500">Teklif karşılaştırma özelliği geliştiriliyor...</p>
-          </div>
-        </Modal>
-
-        {/* Fiyat Analizi Modal */}
-        {showPriceAnalysis && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-2xl p-8 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">Fiyat Analizi</h2>
-                <button
-                  onClick={() => setShowPriceAnalysis(false)}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                >
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <div className="bg-slate-50 rounded-lg p-6">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-lg font-semibold text-slate-900">Ortalama Fiyat</h3>
-                    <BarChart3 className="w-6 h-6 text-slate-600" />
+      {/* Detail Modal */}
+      <Modal
+        isOpen={showDetailModal}
+        onClose={() => setShowDetailModal(false)}
+        title=''
+        size='xl'
+      >
+        {selectedOffer && (
+          <div className='p-0'>
+            {/* Modern Header */}
+            <div className='relative bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 p-8 text-white rounded-t-2xl'>
+              <div className='absolute inset-0 bg-gradient-to-r from-white/5 to-transparent rounded-t-2xl'></div>
+              <div className='relative z-10'>
+                <div className='flex items-start justify-between mb-6'>
+                  <div className='flex-1'>
+                    <div className='flex items-center gap-3 mb-4'>
+                      <div className='w-12 h-12 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center'>
+                        <FileText className='w-6 h-6 text-white' />
+                      </div>
+                      <div>
+                        <h3 className='text-2xl font-bold mb-2'>
+                          {selectedOffer.shipmentTitle}
+                        </h3>
+                        <div className='flex items-center gap-4 text-blue-200'>
+                          <span className='font-mono bg-white/20 backdrop-blur-sm text-white px-3 py-1 rounded-lg text-sm'>
+                            {selectedOffer.trackingCode}
+                          </span>
+                          <span className='text-sm'>
+                            {new Date(
+                              selectedOffer.createdAt
+                            ).toLocaleDateString('tr-TR')}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className='flex items-center gap-6 text-blue-200'>
+                      <div className='flex items-center gap-2'>
+                        <MapPin className='w-5 h-5' />
+                        <span className='font-medium'>
+                          {selectedOffer.pickupAddress} →{' '}
+                          {selectedOffer.deliveryAddress}
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-3xl font-bold text-slate-900">
-                    ₺{Math.round(filteredOffers.reduce((sum, offer) => sum + offer.price, 0) / filteredOffers.length).toLocaleString()}
+                  <div className='text-right'>
+                    <div className='text-4xl font-bold mb-2'>
+                      ₺{selectedOffer.price.toLocaleString()}
+                    </div>
+                    <div className='text-blue-200'>
+                      Teslimat: {selectedOffer.estimatedDelivery}
+                    </div>
                   </div>
-                  <div className="text-sm text-slate-700">Tüm tekliflerin ortalaması</div>
-                </div>
-                
-                <div className="bg-green-50 rounded-lg p-6">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-lg font-semibold text-green-900">En Düşük Fiyat</h3>
-                    <TrendingUp className="w-6 h-6 text-green-600" />
-                  </div>
-                  <div className="text-3xl font-bold text-green-900">
-                    ₺{Math.min(...filteredOffers.map(offer => offer.price)).toLocaleString()}
-                  </div>
-                  <div className="text-sm text-green-700">En uygun teklif</div>
-                </div>
-                
-                <div className="bg-red-50 rounded-lg p-6">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-lg font-semibold text-red-900">En Yüksek Fiyat</h3>
-                    <TrendingUp className="w-6 h-6 text-red-600" />
-                  </div>
-                  <div className="text-3xl font-bold text-red-900">
-                    ₺{Math.max(...filteredOffers.map(offer => offer.price)).toLocaleString()}
-                  </div>
-                  <div className="text-sm text-red-700">En pahalı teklif</div>
                 </div>
               </div>
+            </div>
 
-              <div className="bg-gray-50 rounded-lg p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Fiyat Dağılımı</h3>
-                <div className="space-y-3">
-                  {filteredOffers
-                    .sort((a, b) => a.price - b.price)
-                    .map((offer, index) => (
-                    <div key={offer.id} className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center text-sm font-medium">
+            <div className='p-8'>
+              {/* Carrier Profile */}
+              <div className='bg-gradient-to-r from-slate-50 to-blue-50 rounded-2xl p-8 mb-8 border border-slate-200'>
+                <div className='flex items-center gap-6 mb-6'>
+                  <div className='w-20 h-20 bg-gradient-to-br from-slate-800 to-blue-900 rounded-3xl flex items-center justify-center text-white font-bold text-2xl shadow-xl'>
+                    {selectedOffer.carrierLogo}
+                  </div>
+                  <div className='flex-1'>
+                    <div className='flex items-center gap-3 mb-3'>
+                      <h4 className='text-2xl font-bold text-slate-900'>
+                        {selectedOffer.carrierName}
+                      </h4>
+                      {selectedOffer.carrierVerified && (
+                        <div className='flex items-center gap-1 bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-semibold'>
+                          <Shield className='w-4 h-4' />
+                          Doğrulanmış
+                        </div>
+                      )}
+                    </div>
+                    <div className='grid grid-cols-2 lg:grid-cols-4 gap-6'>
+                      <div className='bg-white rounded-xl p-4 shadow-sm'>
+                        <div className='flex items-center gap-2 mb-1'>
+                          <Star className='w-5 h-5 text-yellow-500 fill-current' />
+                          <span className='text-lg font-bold text-slate-900'>
+                            {selectedOffer.carrierRating}
+                          </span>
+                        </div>
+                        <div className='text-sm text-slate-500'>
+                          {selectedOffer.carrierReviews} yorum
+                        </div>
+                      </div>
+                      <div className='bg-white rounded-xl p-4 shadow-sm'>
+                        <div className='text-lg font-bold text-slate-900 mb-1'>
+                          {selectedOffer.carrierExperience}
+                        </div>
+                        <div className='text-sm text-slate-500'>Deneyim</div>
+                      </div>
+                      <div className='bg-white rounded-xl p-4 shadow-sm'>
+                        <div className='text-lg font-bold text-slate-900 mb-1'>
+                          %{selectedOffer.successRate}
+                        </div>
+                        <div className='text-sm text-slate-500'>
+                          Başarı Oranı
+                        </div>
+                      </div>
+                      <div className='bg-white rounded-xl p-4 shadow-sm'>
+                        <div className='text-lg font-bold text-slate-900 mb-1'>
+                          {selectedOffer.responseTime}
+                        </div>
+                        <div className='text-sm text-slate-500'>
+                          Yanıt Süresi
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Reviews Section */}
+              <div className='mb-8'>
+                <h5 className='text-xl font-bold text-slate-900 mb-6 flex items-center gap-2'>
+                  <Star className='w-6 h-6 text-yellow-500' />
+                  Müşteri Değerlendirmeleri
+                </h5>
+                <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'>
+                  {selectedOffer.recentComments.map((comment, index) => (
+                    <div
+                      key={index}
+                      className='bg-white border border-slate-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow'
+                    >
+                      <div className='flex items-center gap-3 mb-3'>
+                        <div className='w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold'>
                           {index + 1}
                         </div>
                         <div>
-                          <div className="font-medium text-gray-900">{offer.carrier.name}</div>
-                          <div className="text-sm text-gray-500">{offer.vehicleType}</div>
+                          <div className='font-semibold text-slate-900'>
+                            Müşteri {index + 1}
+                          </div>
+                          <div className='flex items-center gap-1'>
+                            {[...Array(5)].map((_, i) => (
+                              <Star
+                                key={i}
+                                className='w-4 h-4 text-yellow-400 fill-current'
+                              />
+                            ))}
+                          </div>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <div className="font-bold text-gray-900">₺{offer.price.toLocaleString()}</div>
-                        <div className="text-sm text-gray-500">{offer.deliveryTime}</div>
-                      </div>
+                      <p className='text-slate-600 italic'>"{comment}"</p>
                     </div>
                   ))}
                 </div>
               </div>
-            </div>
-          </div>
-        )}
 
-        {/* Teklif Reddetme Onay Modalı */}
-        {showRejectModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl">
-              <div className="flex items-center justify-center mb-4">
-                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
-                  <XCircle className="w-6 h-6 text-red-600" />
+              {/* Message */}
+              <div className='mb-8'>
+                <h5 className='text-lg font-bold text-slate-900 mb-4 flex items-center gap-2'>
+                  <MessageSquare className='w-5 h-5 text-blue-600' />
+                  Nakliyeci Mesajı
+                </h5>
+                <div className='bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6'>
+                  <div className='flex items-start gap-3'>
+                    <div className='w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0'>
+                      <MessageSquare className='w-4 h-4 text-white' />
+                    </div>
+                    <p className='text-slate-700 leading-relaxed'>
+                      {selectedOffer.message}
+                    </p>
+                  </div>
                 </div>
               </div>
-              
-              <h3 className="text-lg font-semibold text-gray-900 text-center mb-2">
-                Teklifi Reddet
-              </h3>
-              
-              <p className="text-gray-600 text-center mb-6">
-                Bu teklifi reddetmek istediğinizden emin misiniz?<br />
-                <span className="text-sm text-gray-500">Teklif No: {offerToReject}</span>
-              </p>
-              
-              <div className="flex space-x-3">
+
+              {/* Contact Info - Only show after acceptance */}
+              {selectedOffer.status === 'accepted' && (
+                <div className='mb-8'>
+                  <div className='bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-2xl p-8'>
+                    <div className='flex items-center gap-3 mb-6'>
+                      <div className='w-12 h-12 bg-green-600 rounded-2xl flex items-center justify-center'>
+                        <CheckCircle className='w-6 h-6 text-white' />
+                      </div>
+                      <div>
+                        <h5 className='text-xl font-bold text-slate-900'>
+                          Anlaşma Sağlandı!
+                        </h5>
+                        <p className='text-slate-600'>
+                          Nakliyeci ile iletişim bilgileri
+                        </p>
+                      </div>
+                    </div>
+                    <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
+                      <div className='flex items-center gap-4 p-4 bg-white rounded-xl border border-green-200'>
+                        <div className='w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center'>
+                          <Phone className='w-6 h-6 text-green-600' />
+                        </div>
+                        <div>
+                          <div className='text-sm text-slate-500 font-medium'>
+                            Telefon
+                          </div>
+                          <div className='text-lg font-bold text-slate-900'>
+                            {selectedOffer.carrierPhone}
+                          </div>
+                        </div>
+                      </div>
+                      <div className='flex items-center gap-4 p-4 bg-white rounded-xl border border-green-200'>
+                        <div className='w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center'>
+                          <Mail className='w-6 h-6 text-blue-600' />
+                        </div>
+                        <div>
+                          <div className='text-sm text-slate-500 font-medium'>
+                            E-posta
+                          </div>
+                          <div className='text-lg font-bold text-slate-900'>
+                            {selectedOffer.carrierEmail}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className='flex justify-end gap-4'>
                 <button
-                  onClick={() => {
-                    setShowRejectModal(false);
-                    setOfferToReject(null);
-                  }}
-                  className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors duration-200 font-medium"
+                  onClick={() => setShowDetailModal(false)}
+                  className='px-6 py-3 text-slate-600 hover:text-slate-800 transition-colors font-medium'
                 >
-                  İptal
+                  Kapat
                 </button>
-                <button
-                  onClick={() => {
-                    // Teklif reddedildi
-                    setShowRejectModal(false);
-                    setOfferToReject(null);
-                    // Burada teklif reddetme işlemi yapılabilir
-                    window.location.href = '/individual/offers';
-                  }}
-                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors duration-200 font-medium"
-                >
-                  Evet, Reddet
-                </button>
+                {selectedOffer.status === 'pending' && (
+                  <>
+                    <button
+                      onClick={() => {
+                        setShowDetailModal(false);
+                        handleAcceptOffer(selectedOffer.id);
+                      }}
+                      className='px-8 py-3 bg-gradient-to-r from-green-600 to-emerald-700 text-white rounded-xl font-semibold hover:from-green-700 hover:to-emerald-800 transition-all duration-300 flex items-center gap-2 shadow-lg hover:shadow-xl'
+                    >
+                      <CheckCircle className='w-5 h-5' />
+                      Kabul Et
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowDetailModal(false);
+                        setOfferToReject(selectedOffer.id);
+                        setShowRejectModal(true);
+                      }}
+                      className='px-8 py-3 bg-gradient-to-r from-red-600 to-rose-700 text-white rounded-xl font-semibold hover:from-red-700 hover:to-rose-800 transition-all duration-300 flex items-center gap-2 shadow-lg hover:shadow-xl'
+                    >
+                      <XCircle className='w-5 h-5' />
+                      Reddet
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           </div>
         )}
+      </Modal>
 
-        {/* Success Message */}
-        <SuccessMessage
-          message={successMessage}
-          isVisible={showSuccessMessage}
-          onClose={() => setShowSuccessMessage(false)}
-        />
-      </div>
+      {/* Reject Confirmation Modal */}
+      <Modal
+        isOpen={showRejectModal}
+        onClose={() => setShowRejectModal(false)}
+        title='Teklifi Reddet'
+      >
+        <div className='p-6'>
+          <p className='text-slate-600 mb-6'>
+            Bu teklifi reddetmek istediğinizden emin misiniz? Bu işlem geri
+            alınamaz.
+          </p>
+          <div className='flex justify-end gap-3'>
+            <button
+              onClick={() => setShowRejectModal(false)}
+              className='px-4 py-2 text-slate-600 hover:text-slate-800 transition-colors'
+            >
+              İptal
+            </button>
+            <button
+              onClick={() => offerToReject && handleRejectOffer(offerToReject)}
+              className='px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors'
+            >
+              Reddet
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

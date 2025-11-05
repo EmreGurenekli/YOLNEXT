@@ -1,20 +1,31 @@
 import React from 'react';
+import { RefreshCw } from 'lucide-react';
 
 interface LoadingStateProps {
   message?: string;
-  text?: string;
+  size?: 'sm' | 'md' | 'lg';
   className?: string;
 }
 
 const LoadingState: React.FC<LoadingStateProps> = ({
   message = 'Yükleniyor...',
-  text,
-  className = ''
+  size = 'md',
+  className = '',
 }) => {
+  const sizeClasses = {
+    sm: 'w-4 h-4',
+    md: 'w-6 h-6',
+    lg: 'w-8 h-8',
+  };
+
   return (
-    <div className={`flex flex-col items-center justify-center py-12 px-4 ${className}`}>
-      <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-4"></div>
-      <p className="text-slate-600">{text || message}</p>
+    <div className={`flex items-center justify-center ${className}`}>
+      <div className='text-center'>
+        <RefreshCw
+          className={`${sizeClasses[size]} text-blue-600 animate-spin mx-auto mb-2`}
+        />
+        <p className='text-gray-600'>{message}</p>
+      </div>
     </div>
   );
 };

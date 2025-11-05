@@ -1,10 +1,10 @@
--- YolNet Database Initialization Script
+-- YolNext Database Initialization Script
 
 -- Create database if not exists
-CREATE DATABASE IF NOT EXISTS yolnet_db;
+CREATE DATABASE IF NOT EXISTS YolNext_db;
 
 -- Use the database
-\c yolnet_db;
+\c YolNext_db;
 
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -56,6 +56,6 @@ END;
 $$ language 'plpgsql';
 
 -- Grant permissions
-GRANT ALL PRIVILEGES ON DATABASE yolnet_db TO postgres;
+GRANT ALL PRIVILEGES ON DATABASE YolNext_db TO postgres;
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO postgres;
 GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO postgres;

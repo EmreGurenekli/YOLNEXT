@@ -1,7 +1,7 @@
 {
-  "name": "yolnet-auth-service",
+  "name": "YolNext-auth-service",
   "version": "1.0.0",
-  "description": "YolNet Authentication Service",
+  "description": "YolNext Authentication Service",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -20,8 +20,8 @@
   "devDependencies": {
     "nodemon": "^3.0.2"
   },
-  "keywords": ["auth", "microservice", "yolnet"],
-  "author": "YolNet Team",
+  "keywords": ["auth", "microservice", "YolNext"],
+  "author": "YolNext Team",
   "license": "MIT"
 }
 

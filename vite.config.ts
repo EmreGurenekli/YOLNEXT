@@ -1,10 +1,12 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-import path from 'path'
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import path from 'path';
 
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
+  root: '.',
+  publicDir: 'public',
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
@@ -15,11 +17,19 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     open: false,
-    hmr: {
-      overlay: false,
-      port: 5174
+    hmr: { overlay: true },
+    cors: true,
+    fs: {
+      strict: false,
+      allow: ['..'],
     },
-    cors: true
+    proxy: {
+      '/api': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+        secure: false,
+      },
+    },
   },
   build: {
     outDir: 'dist',
@@ -30,9 +40,9 @@ export default defineConfig({
           'react-vendor': ['react', 'react-dom', 'react-router-dom'],
           'ui-vendor': ['lucide-react', 'sonner'],
           'data-vendor': ['axios'],
-          'util-vendor': ['clsx', 'tailwind-merge']
-        }
-      }
+          'util-vendor': ['clsx', 'tailwind-merge'],
+        },
+      },
     },
     chunkSizeWarningLimit: 1000,
     minify: 'terser',
@@ -40,11 +50,11 @@ export default defineConfig({
       compress: {
         drop_console: true,
         drop_debugger: true,
-        pure_funcs: ['console.log', 'console.info', 'console.debug']
-      }
-    }
+        pure_funcs: ['console.log', 'console.info', 'console.debug'],
+      },
+    },
   },
   optimizeDeps: {
-    include: ['react', 'react-dom', 'react-router-dom', 'lucide-react']
-  }
-})
+    include: ['react', 'react-dom', 'react-router-dom', 'lucide-react'],
+  },
+});

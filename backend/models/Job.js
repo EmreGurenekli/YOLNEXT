@@ -1,82 +1,59 @@
-const mongoose = require('mongoose');
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../config/database');
 
-const jobSchema = new mongoose.Schema({
-  shipmentId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Shipment',
-    required: true
+const Job = sequelize.define('Job', {
+  id: {
+    type: DataTypes.UUID,
+    defaultValue: DataTypes.UUIDV4,
+    primaryKey: true
   },
   driverId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Driver',
-    required: true
+    type: DataTypes.UUID,
+    allowNull: false,
+    references: {
+      model: 'Users',
+      key: 'id'
+    }
   },
-  carrierId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Carrier',
-    required: true
+  shipmentId: {
+    type: DataTypes.UUID,
+    allowNull: false,
+    references: {
+      model: 'Shipments',
+      key: 'id'
+    }
   },
   status: {
-    type: String,
-    enum: ['assigned', 'picked-up', 'in-transit', 'delivered', 'cancelled'],
-    default: 'assigned'
+    type: DataTypes.ENUM('pending', 'accepted', 'in_progress', 'completed', 'cancelled'),
+    allowNull: false,
+    defaultValue: 'pending'
   },
-  progress: {
-    type: Number,
-    default: 0,
-    min: 0,
-    max: 100
+  startTime: {
+    type: DataTypes.DATE,
+    allowNull: true
+  },
+  endTime: {
+    type: DataTypes.DATE,
+    allowNull: true
   },
   earnings: {
-    type: Number,
-    required: true
-  },
-  startDate: {
-    type: Date,
-    default: null
-  },
-  endDate: {
-    type: Date,
-    default: null
-  },
-  tracking: {
-    currentLocation: {
-      address: { type: String },
-      city: { type: String },
-      coordinates: {
-        lat: { type: Number },
-        lng: { type: Number }
-      },
-      timestamp: { type: Date }
-    },
-    statusHistory: [{
-      status: { type: String },
-      timestamp: { type: Date, default: Date.now },
-      location: { type: String },
-      note: { type: String }
-    }]
-  },
-  rating: {
-    score: { type: Number, min: 1, max: 5 },
-    comment: { type: String },
-    ratedBy: { type: String }, // sender, carrier
-    ratedAt: { type: Date }
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true
   }
+}, {
+  tableName: 'jobs',
+  timestamps: true,
+  indexes: [
+    {
+      fields: ['driverId']
+    },
+    {
+      fields: ['shipmentId']
+    },
+    {
+      fields: ['status']
+    }
+  ]
 });
 
-module.exports = mongoose.model('Job', jobSchema);
-
-
-
-
-
-
-
+module.exports = Job;

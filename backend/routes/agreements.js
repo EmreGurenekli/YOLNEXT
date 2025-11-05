@@ -5,8 +5,8 @@ const path = require('path');
 const { authenticateToken } = require('../middleware/auth');
 
 // Database connection
-const dbPath = path.join(__dirname, '..', 'yolnet.db');
-const db = new sqlite3.Database(dbPath, (err) => {
+const dbPath = path.join(__dirname, '..', 'YolNext.db');
+const db = new sqlite3.Database(dbPath, err => {
   if (err) {
     console.error('Database connection error:', err.message);
   }
@@ -45,7 +45,9 @@ router.post('/', authenticateToken, (req, res) => {
             return res.status(500).json({ error: 'Veritabanı hatası' });
           }
           if (existingAgreement) {
-            return res.status(400).json({ error: 'Bu teklif için zaten anlaşma yapılmış' });
+            return res
+              .status(400)
+              .json({ error: 'Bu teklif için zaten anlaşma yapılmış' });
           }
 
           // Komisyon hesapla (%1)
@@ -57,11 +59,20 @@ router.post('/', authenticateToken, (req, res) => {
             `INSERT INTO agreements (offer_id, shipment_id, sender_id, nakliyeci_id, agreed_price, 
              commission_amount, nakliyeci_receives, status, created_at) 
              VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', CURRENT_TIMESTAMP)`,
-            [offer_id, offer.shipment_id, user_id, offer.nakliyeci_id, offer.price, 
-             commission_amount, nakliyeci_receives],
-            function(err) {
+            [
+              offer_id,
+              offer.shipment_id,
+              user_id,
+              offer.nakliyeci_id,
+              offer.price,
+              commission_amount,
+              nakliyeci_receives,
+            ],
+            function (err) {
               if (err) {
-                return res.status(500).json({ error: 'Anlaşma oluşturulamadı' });
+                return res
+                  .status(500)
+                  .json({ error: 'Anlaşma oluşturulamadı' });
               }
 
               // Komisyon kaydı oluştur
@@ -69,9 +80,15 @@ router.post('/', authenticateToken, (req, res) => {
                 `INSERT INTO commissions (agreement_id, shipment_id, nakliyeci_id, agreed_price, 
                  commission_amount, nakliyeci_receives, status, created_at) 
                  VALUES (?, ?, ?, ?, ?, ?, 'pending', CURRENT_TIMESTAMP)`,
-                [this.lastID, offer.shipment_id, offer.nakliyeci_id, offer.price, 
-                 commission_amount, nakliyeci_receives],
-                (err) => {
+                [
+                  this.lastID,
+                  offer.shipment_id,
+                  offer.nakliyeci_id,
+                  offer.price,
+                  commission_amount,
+                  nakliyeci_receives,
+                ],
+                err => {
                   if (err) {
                     console.error('Komisyon kaydı oluşturulamadı:', err);
                   }
@@ -88,7 +105,7 @@ router.post('/', authenticateToken, (req, res) => {
                 commission_amount,
                 nakliyeci_receives,
                 status: 'pending',
-                created_at: new Date().toISOString()
+                created_at: new Date().toISOString(),
               });
             }
           );
@@ -112,7 +129,9 @@ router.put('/:agreement_id/accept', authenticateToken, (req, res) => {
         return res.status(500).json({ error: 'Veritabanı hatası' });
       }
       if (!agreement) {
-        return res.status(404).json({ error: 'Anlaşma bulunamadı veya yetkiniz yok' });
+        return res
+          .status(404)
+          .json({ error: 'Anlaşma bulunamadı veya yetkiniz yok' });
       }
       if (agreement.status !== 'pending') {
         return res.status(400).json({ error: 'Bu anlaşma zaten işlenmiş' });
@@ -122,7 +141,7 @@ router.put('/:agreement_id/accept', authenticateToken, (req, res) => {
       db.run(
         'UPDATE agreements SET status = ? WHERE id = ?',
         ['accepted', agreement_id],
-        function(err) {
+        function (err) {
           if (err) {
             return res.status(500).json({ error: 'Anlaşma onaylanamadı' });
           }
@@ -131,7 +150,7 @@ router.put('/:agreement_id/accept', authenticateToken, (req, res) => {
           db.run(
             'UPDATE shipments SET status = ? WHERE id = ?',
             ['in_progress', agreement.shipment_id],
-            (err) => {
+            err => {
               if (err) {
                 console.error('Gönderi durumu güncellenemedi:', err);
               }
@@ -142,7 +161,7 @@ router.put('/:agreement_id/accept', authenticateToken, (req, res) => {
           db.run(
             'UPDATE commissions SET status = ? WHERE agreement_id = ?',
             ['accepted', agreement_id],
-            (err) => {
+            err => {
               if (err) {
                 console.error('Komisyon durumu güncellenemedi:', err);
               }
@@ -170,7 +189,9 @@ router.put('/:agreement_id/reject', authenticateToken, (req, res) => {
         return res.status(500).json({ error: 'Veritabanı hatası' });
       }
       if (!agreement) {
-        return res.status(404).json({ error: 'Anlaşma bulunamadı veya yetkiniz yok' });
+        return res
+          .status(404)
+          .json({ error: 'Anlaşma bulunamadı veya yetkiniz yok' });
       }
       if (agreement.status !== 'pending') {
         return res.status(400).json({ error: 'Bu anlaşma zaten işlenmiş' });
@@ -180,7 +201,7 @@ router.put('/:agreement_id/reject', authenticateToken, (req, res) => {
       db.run(
         'UPDATE agreements SET status = ? WHERE id = ?',
         ['rejected', agreement_id],
-        function(err) {
+        function (err) {
           if (err) {
             return res.status(500).json({ error: 'Anlaşma reddedilemedi' });
           }
@@ -189,7 +210,7 @@ router.put('/:agreement_id/reject', authenticateToken, (req, res) => {
           db.run(
             'UPDATE shipments SET status = ? WHERE id = ?',
             ['pending', agreement.shipment_id],
-            (err) => {
+            err => {
               if (err) {
                 console.error('Gönderi durumu güncellenemedi:', err);
               }
@@ -283,7 +304,9 @@ router.get('/:agreement_id', authenticateToken, (req, res) => {
         return res.status(500).json({ error: 'Veritabanı hatası' });
       }
       if (!agreement) {
-        return res.status(404).json({ error: 'Anlaşma bulunamadı veya yetkiniz yok' });
+        return res
+          .status(404)
+          .json({ error: 'Anlaşma bulunamadı veya yetkiniz yok' });
       }
       res.json(agreement);
     }

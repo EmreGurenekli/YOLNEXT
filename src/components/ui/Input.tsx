@@ -14,9 +14,9 @@ export default function Input({
   ...props
 }: InputProps) {
   return (
-    <div className="w-full">
+    <div className='w-full'>
       {label && (
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label className='block text-sm font-medium text-gray-700 mb-2'>
           {label}
         </label>
       )}
@@ -26,11 +26,9 @@ export default function Input({
         } ${className}`}
         {...props}
       />
-      {error && (
-        <p className="mt-1 text-sm text-red-600">{error}</p>
-      )}
+      {error && <p className='mt-1 text-sm text-red-600'>{error}</p>}
       {helperText && !error && (
-        <p className="mt-1 text-sm text-gray-500">{helperText}</p>
+        <p className='mt-1 text-sm text-gray-500'>{helperText}</p>
       )}
     </div>
   );

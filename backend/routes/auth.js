@@ -2,251 +2,345 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
-const { User, CorporateUser, Carrier, Driver } = require('../models');
-const { protect } = require('../middleware/auth');
-const auth = protect; // Alias for compatibility
-const logger = require('../utils/logger');
-
+const SimpleUser = require('../models/SimpleUser');
 const router = express.Router();
 
-// Generate JWT token
-const generateToken = (userId) => {
-  return jwt.sign({ userId }, process.env.JWT_SECRET || 'yolnet_super_secret_key_2024_development', {
-    expiresIn: process.env.JWT_EXPIRES_IN || '7d'
-  });
-};
+/**
+ * @swagger
+ * /api/auth/register:
+ *   post:
+ *     summary: Register a new user
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - firstName
+ *               - lastName
+ *               - email
+ *               - password
+ *               - userType
+ *             properties:
+ *               firstName:
+ *                 type: string
+ *                 example: "John"
+ *               lastName:
+ *                 type: string
+ *                 example: "Doe"
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: "john@example.com"
+ *               password:
+ *                 type: string
+ *                 minLength: 6
+ *                 example: "password123"
+ *               userType:
+ *                 type: string
+ *                 enum: [individual, corporate, nakliyeci, tasiyici]
+ *                 example: "individual"
+ *               companyName:
+ *                 type: string
+ *                 example: "Acme Corp"
+ *               phone:
+ *                 type: string
+ *                 example: "+1234567890"
+ *     responses:
+ *       201:
+ *         description: User registered successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "User created successfully"
+ *                 data:
+ *                   $ref: '#/components/schemas/User'
+ *                 token:
+ *                   type: string
+ *                   example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+ *       400:
+ *         description: Validation error or user already exists
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+router.post(
+  '/register',
+  [
+    body('email').isEmail().normalizeEmail(),
+    body('password').isLength({ min: 6 }),
+    body('firstName').trim().isLength({ min: 2 }),
+    body('lastName').trim().isLength({ min: 2 }),
+    body('userType').isIn(['individual', 'corporate', 'nakliyeci', 'tasiyici']),
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation error',
+          errors: errors.array(),
+        });
+      }
 
-// @route   POST /api/auth/register
-// @desc    Register user
-// @access  Public
-router.post('/register', [
-  body('email').isEmail().normalizeEmail(),
-  body('password').isLength({ min: 6 }),
-  body('firstName').trim().isLength({ min: 2 }),
-  body('lastName').trim().isLength({ min: 2 }),
-  body('userType').isIn(['individual', 'corporate', 'carrier', 'logistics'])
-], async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Geçersiz veri',
-        errors: errors.array()
-      });
-    }
+      const {
+        email,
+        password,
+        firstName,
+        lastName,
+        userType,
+        phone,
+        companyName,
+      } = req.body;
 
-    const { email, password, firstName, lastName, userType, phone } = req.body;
-
-    // Check if user already exists
-    const existingUser = await User.findOne({ where: { email } });
-    if (existingUser) {
-      return res.status(400).json({
-        success: false,
-        message: 'Bu email adresi zaten kullanılıyor'
-      });
+      // Check if user already exists
+      const User = new SimpleUser(req.db);
+      const existingUser = await User.findOne({ email });
+      if (existingUser) {
+        return res.status(400).json({
+          success: false,
+          message: 'User already exists with this email',
+        });
       }
 
       // Hash password
-    const hashedPassword = await bcrypt.hash(password, 12);
+      const hashedPassword = await bcrypt.hash(password, 12);
 
       // Create user
-    const user = await User.create({
-      email,
-      password: hashedPassword,
-      firstName,
-      lastName,
-      userType,
-      phone
-    });
+      const user = await User.create({
+        firstName,
+        lastName,
+        email,
+        password: hashedPassword,
+        userType,
+        phone,
+        companyName,
+      });
 
-    // Generate token
-    const token = generateToken(user.id);
+      // Generate JWT token
+      const token = jwt.sign(
+        { userId: user.id, email: user.email, userType: user.userType },
+        process.env.JWT_SECRET,
+        { expiresIn: '7d' }
+      );
 
-    logger.info(`Yeni kullanıcı kaydı: ${email} (${userType})`);
-
-          res.status(201).json({
-      success: true,
-      message: 'Kullanıcı başarıyla oluşturuldu',
-      data: {
-        user: user.toJSON(),
-        token
-      }
-    });
-  } catch (error) {
-    logger.error('Register error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Sunucu hatası'
-    });
-  }
-});
-
-// @route   POST /api/auth/login
-// @desc    Login user
-// @access  Public
-router.post('/login', [
-  body('email').isEmail().normalizeEmail(),
-  body('password').exists()
-], async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
+      res.status(201).json({
+        success: true,
+        message: 'User created successfully',
+        data: {
+          id: user.id,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+          userType: user.userType,
+          companyName: user.companyName,
+          phone: user.phone,
+          isVerified: user.isVerified,
+          createdAt: user.createdAt,
+        },
+        token,
+      });
+    } catch (error) {
+      console.error('Registration error:', error);
+      res.status(500).json({
         success: false,
-        message: 'Geçersiz veri',
-        errors: errors.array()
+        message: 'Internal server error',
       });
     }
+  }
+);
 
-    const { email, password } = req.body;
+/**
+ * @swagger
+ * /api/auth/login:
+ *   post:
+ *     summary: Login user
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: "john@example.com"
+ *               password:
+ *                 type: string
+ *                 example: "password123"
+ *     responses:
+ *       200:
+ *         description: Login successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Login successful"
+ *                 data:
+ *                   $ref: '#/components/schemas/User'
+ *                 token:
+ *                   type: string
+ *                   example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+ *       401:
+ *         description: Invalid credentials
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+router.post(
+  '/login',
+  [body('email').isEmail().normalizeEmail(), body('password').notEmpty()],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation error',
+          errors: errors.array(),
+        });
+      }
 
-    // Demo kullanıcıları için özel kontrol
-    const demoUsers = {
-      'individual@demo.com': { password: 'demo123', userType: 'individual' },
-      'corporate@demo.com': { password: 'demo123', userType: 'corporate' },
-      'nakliyeci@demo.com': { password: 'demo123', userType: 'nakliyeci' },
-      'tasiyici@demo.com': { password: 'demo123', userType: 'tasiyici' }
+      const { email, password } = req.body;
+
+      // Find user
+      const User = new SimpleUser(req.db);
+      const user = await User.findOne({ email });
+      if (!user) {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid credentials',
+        });
+      }
+
+      // Check password
+      const validPassword = await bcrypt.compare(password, user.password);
+      if (!validPassword) {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid credentials',
+        });
+      }
+
+      // Generate JWT token
+      const token = jwt.sign(
+        { userId: user.id, email: user.email, userType: user.userType },
+        process.env.JWT_SECRET,
+        { expiresIn: '7d' }
+      );
+
+      res.json({
+        success: true,
+        message: 'Login successful',
+        data: {
+          id: user.id,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+          userType: user.userType,
+          companyName: user.companyName,
+          phone: user.phone,
+          isVerified: user.isVerified,
+          createdAt: user.createdAt,
+        },
+        token,
+      });
+    } catch (error) {
+      console.error('Login error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+      });
+    }
+  }
+);
+
+// Demo login endpoint for quick access without real credentials
+router.post('/demo-login', async (req, res) => {
+  try {
+    const { panelType = 'individual' } = req.body || {};
+
+    // Map demo profiles
+    const profiles = {
+      individual: {
+        id: 101,
+        name: 'Demo Bireysel',
+        email: 'demo.individual@yolnext.com',
+        panel_type: 'individual',
+        company_name: null,
+        tax_number: null,
+      },
+      corporate: {
+        id: 102,
+        name: 'Demo Kurumsal',
+        email: 'demo.corporate@yolnext.com',
+        panel_type: 'corporate',
+        company_name: 'Demo A.Ş.',
+        tax_number: '1234567890',
+      },
+      nakliyeci: {
+        id: 103,
+        name: 'Demo Nakliyeci',
+        email: 'demo.nakliyeci@yolnext.com',
+        panel_type: 'nakliyeci',
+        company_name: 'Demo Lojistik',
+        tax_number: '9988776655',
+      },
+      tasiyici: {
+        id: 104,
+        name: 'Demo Taşıyıcı',
+        email: 'demo.tasiyici@yolnext.com',
+        panel_type: 'tasiyici',
+        company_name: null,
+        tax_number: null,
+      },
     };
 
-    if (demoUsers[email] && demoUsers[email].password === password) {
-      const token = generateToken('demo-' + Date.now());
-      const userData = {
-        id: 'demo-' + Date.now(),
-        firstName: 'Demo',
-        lastName: 'User',
-        email: email,
-        userType: demoUsers[email].userType,
-        phone: '+90 555 000 0000',
-        avatar: null,
-        isActive: true,
-        isVerified: true
-      };
+    const selected = profiles[panelType] || profiles.individual;
 
-      return res.json({
-        success: true,
-        message: 'Demo giriş başarılı',
-        data: {
-          user: userData,
-          token
-        }
-      });
-    }
+    const token = jwt.sign(
+      {
+        userId: selected.id,
+        email: selected.email,
+        userType: selected.panel_type,
+      },
+      process.env.JWT_SECRET || 'dev_demo_secret',
+      { expiresIn: '2d' }
+    );
 
-    // Find user
-    const user = await User.findOne({ where: { email } });
-        if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: 'Geçersiz email veya şifre'
-      });
-        }
-
-        // Check password
-    const isMatch = await user.comparePassword(password);
-    if (!isMatch) {
-      return res.status(401).json({
-        success: false,
-        message: 'Geçersiz email veya şifre'
-      });
-    }
-
-    // Check if user is active
-    if (!user.isActive) {
-      return res.status(401).json({
-        success: false,
-        message: 'Hesabınız deaktif edilmiş'
-      });
-    }
-
-    // Update last login
-    await user.update({ lastLogin: new Date() });
-
-    // Generate token
-    const token = generateToken(user.id);
-
-    logger.info(`Kullanıcı girişi: ${email}`);
-
-        res.json({
+    return res.json({
       success: true,
-      message: 'Giriş başarılı',
-      data: {
-        user: user.toJSON(),
-        token
-      }
+      message: 'Demo login successful',
+      user: selected,
+      token,
     });
   } catch (error) {
-    logger.error('Login error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Sunucu hatası'
-    });
-  }
-});
-
-// @route   GET /api/auth/me
-// @desc    Get current user
-// @access  Private
-router.get('/me', auth, async (req, res) => {
-  try {
-    const user = await User.findByPk(req.user.id, {
-      include: [
-        { association: 'corporateProfile' },
-        { association: 'carrierProfile' },
-        { association: 'driverProfile' }
-      ]
-    });
-
-    res.json({
-      success: true,
-      data: { user }
-    });
-  } catch (error) {
-    logger.error('Get me error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Sunucu hatası'
-    });
-  }
-});
-
-// @route   POST /api/auth/refresh
-// @desc    Refresh token
-// @access  Private
-router.post('/refresh', auth, async (req, res) => {
-  try {
-    const token = generateToken(req.user.id);
-
-    res.json({
-      success: true,
-      data: { token }
-    });
-  } catch (error) {
-    logger.error('Refresh token error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Sunucu hatası'
-    });
-  }
-});
-
-// @route   POST /api/auth/logout
-// @desc    Logout user
-// @access  Private
-router.post('/logout', auth, async (req, res) => {
-  try {
-    logger.info(`Kullanıcı çıkışı: ${req.user.email}`);
-    
-    res.json({
-      success: true,
-      message: 'Çıkış başarılı'
-    });
-  } catch (error) {
-    logger.error('Logout error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Sunucu hatası'
-    });
+    return res
+      .status(500)
+      .json({ success: false, message: 'Demo login error' });
   }
 });
 

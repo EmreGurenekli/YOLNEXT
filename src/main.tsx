@@ -1,11 +1,11 @@
-import React from 'react'
-import ReactDOM from 'react-dom/client'
-import { BrowserRouter } from 'react-router-dom'
-import { HelmetProvider } from 'react-helmet-async'
-import { QueryClient, QueryClientProvider } from 'react-query'
-import { Toaster } from 'react-hot-toast'
-import App from './App'
-import './index.css'
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
+import { HelmetProvider } from 'react-helmet-async';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+// import { Toaster } from 'react-hot-toast'
+import App from './App';
+import './index.css';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -16,15 +16,17 @@ const queryClient = new QueryClient({
       staleTime: 5 * 60 * 1000, // 5 minutes
     },
   },
-})
+});
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <HelmetProvider>
       <QueryClientProvider client={queryClient}>
-        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <BrowserRouter
+          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+        >
           <App />
-          <Toaster
+          {/* <Toaster
             position="top-right"
             toastOptions={{
               duration: 4000,
@@ -47,9 +49,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
                 },
               },
             }}
-          />
+          /> */}
         </BrowserRouter>
       </QueryClientProvider>
     </HelmetProvider>
-  </React.StrictMode>,
-)
+  </React.StrictMode>
+);

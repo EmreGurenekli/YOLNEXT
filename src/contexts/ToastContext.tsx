@@ -38,7 +38,7 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
   const showToast = (toast: Omit<Toast, 'id'>) => {
     const id = Math.random().toString(36).substr(2, 9);
     const newToast = { ...toast, id };
-    
+
     setToasts(prev => [...prev, newToast]);
   };
 
@@ -51,10 +51,11 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
   };
 
   return (
-    <ToastContext.Provider value={{ toasts, showToast, hideToast, clearAllToasts }}>
+    <ToastContext.Provider
+      value={{ toasts, showToast, hideToast, clearAllToasts }}
+    >
       {children}
       <ToastContainer toasts={toasts} onClose={hideToast} />
     </ToastContext.Provider>
   );
 };
-

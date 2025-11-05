@@ -1,20 +1,20 @@
 @echo off
 echo ========================================
-echo YolNet Kargo Platform - Development Start
+echo YolNext Kargo Platform - Development Start
 echo ========================================
 
 echo Starting development servers...
 
 REM Start Backend
 echo Starting Backend Server...
-start "YolNet Backend" cmd /k "cd backend && node fixed-server.js"
+start "YolNext Backend" cmd /k "cd backend && node app.js"
 
 REM Wait for backend to start
 timeout /t 3 /nobreak >nul
 
 REM Start Frontend
 echo Starting Frontend Server...
-start "YolNet Frontend" cmd /k "cd yolnet-kargo-ta-main && npm run dev"
+start "YolNext Frontend" cmd /k "npm run dev"
 
 echo ========================================
 echo Development servers started!

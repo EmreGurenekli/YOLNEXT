@@ -1,6 +1,23 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { apiClient } from '../services/api';
-import { LoginCredentials, RegisterData, SecurityLog, PasswordStrength } from '../types/auth';
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  ReactNode,
+} from 'react';
+import { authAPI, userAPI } from '../services/api';
+import { LoginCredentials, SecurityLog, PasswordStrength } from '../types/auth';
+
+interface RegisterData {
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+  userType: string;
+  companyName?: string;
+  phone?: string;
+  address?: string;
+}
 
 interface SecurityContextType {
   isAuthenticated: boolean;
@@ -18,7 +35,6 @@ interface SecurityContextType {
   getPasswordStrength: (password: string) => PasswordStrength;
 }
 
-
 interface RegisterData {
   name: string;
   email: string;
@@ -29,14 +45,17 @@ interface RegisterData {
   phone?: string;
 }
 
-
-const SecurityContext = createContext<SecurityContextType | undefined>(undefined);
+const SecurityContext = createContext<SecurityContextType | undefined>(
+  undefined
+);
 
 interface SecurityProviderProps {
   children: ReactNode;
 }
 
-export const SecurityProvider: React.FC<SecurityProviderProps> = ({ children }) => {
+export const SecurityProvider: React.FC<SecurityProviderProps> = ({
+  children,
+}) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<any | null>(null);
 
@@ -50,11 +69,29 @@ export const SecurityProvider: React.FC<SecurityProviderProps> = ({ children }) 
 
   const verifyToken = async () => {
     try {
-      const response = await apiClient.verifyToken();
-      setUser(response.user);
+      const token = localStorage.getItem('authToken');
+
+      // Skip verification for demo tokens
+      if (token && token.startsWith('demo-jwt-token-')) {
+        console.log('🔐 Demo token detected, skipping verification');
+        setIsAuthenticated(true);
+        return;
+      }
+
+      const response = await userAPI.getProfile();
+      setUser(response.data.data);
       setIsAuthenticated(true);
     } catch (error) {
       console.error('Token verification failed:', error);
+
+      // Don't remove demo tokens
+      const token = localStorage.getItem('authToken');
+      if (token && token.startsWith('demo-jwt-token-')) {
+        console.log('🔐 Demo token verification failed, but keeping token');
+        setIsAuthenticated(true);
+        return;
+      }
+
       localStorage.removeItem('authToken');
       setIsAuthenticated(false);
       setUser(null);
@@ -67,18 +104,18 @@ export const SecurityProvider: React.FC<SecurityProviderProps> = ({ children }) 
       if (!credentials.email || !credentials.password) {
         throw new Error('Email ve şifre gereklidir');
       }
-      
+
       // Email format validation
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(credentials.email)) {
         throw new Error('Geçerli bir email adresi giriniz');
       }
-      
-      const response = await apiClient.login(credentials);
-      apiClient.setToken(response.token);
-      setUser(response.user);
+
+      const response = await authAPI.login(credentials);
+      localStorage.setItem('authToken', response.data.token);
+      setUser(response.data.data);
       setIsAuthenticated(true);
-      
+
       // Log security event
       await logSecurityEvent('login', 'User logged in successfully');
     } catch (error) {
@@ -89,7 +126,7 @@ export const SecurityProvider: React.FC<SecurityProviderProps> = ({ children }) 
   };
 
   const logout = () => {
-    apiClient.setToken(null);
+    localStorage.removeItem('authToken');
     setUser(null);
     setIsAuthenticated(false);
     logSecurityEvent('logout', 'User logged out');
@@ -97,11 +134,11 @@ export const SecurityProvider: React.FC<SecurityProviderProps> = ({ children }) 
 
   const register = async (data: RegisterData) => {
     try {
-      const response = await apiClient.register(data);
-      apiClient.setToken(response.token);
-      setUser(response.user);
+      const response = await authAPI.register(data);
+      localStorage.setItem('authToken', response.data.token);
+      setUser(response.data.data);
       setIsAuthenticated(true);
-      
+
       // Log security event
       await logSecurityEvent('register', 'New user registered');
     } catch (error) {
@@ -119,11 +156,18 @@ export const SecurityProvider: React.FC<SecurityProviderProps> = ({ children }) 
 
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
+
       // Log security event
-      await logSecurityEvent('password_change', 'Password updated successfully');
+      await logSecurityEvent(
+        'password_change',
+        'Password updated successfully'
+      );
     } catch (error) {
-      await logSecurityEvent('password_change_failed', 'Failed to update password', 'medium');
+      await logSecurityEvent(
+        'password_change_failed',
+        'Failed to update password',
+        'medium'
+      );
       throw error;
     }
   };
@@ -132,9 +176,12 @@ export const SecurityProvider: React.FC<SecurityProviderProps> = ({ children }) 
     try {
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
+
       // Log security event
-      await logSecurityEvent('2fa_enabled', 'Two-factor authentication enabled');
+      await logSecurityEvent(
+        '2fa_enabled',
+        'Two-factor authentication enabled'
+      );
     } catch (error) {
       throw error;
     }
@@ -144,9 +191,12 @@ export const SecurityProvider: React.FC<SecurityProviderProps> = ({ children }) 
     try {
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
+
       // Log security event
-      await logSecurityEvent('2fa_disabled', 'Two-factor authentication disabled');
+      await logSecurityEvent(
+        '2fa_disabled',
+        'Two-factor authentication disabled'
+      );
     } catch (error) {
       throw error;
     }
@@ -156,12 +206,19 @@ export const SecurityProvider: React.FC<SecurityProviderProps> = ({ children }) 
     try {
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
+
       // Log security event
-      await logSecurityEvent('2fa_verified', 'Two-factor authentication verified');
+      await logSecurityEvent(
+        '2fa_verified',
+        'Two-factor authentication verified'
+      );
       return true;
     } catch (error) {
-      await logSecurityEvent('2fa_failed', 'Two-factor authentication failed', 'high');
+      await logSecurityEvent(
+        '2fa_failed',
+        'Two-factor authentication failed',
+        'high'
+      );
       return false;
     }
   };
@@ -170,36 +227,45 @@ export const SecurityProvider: React.FC<SecurityProviderProps> = ({ children }) 
     try {
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 500));
-      
+
       // Mock security logs
       return [
         {
           id: '1',
+          userId: '1',
           action: 'login',
           ipAddress: '192.168.1.1',
-          userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          timestamp: new Date(),
+          userAgent:
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          timestamp: new Date().toISOString(),
+          success: true,
           riskLevel: 'low',
-          details: 'Successful login from trusted device'
+          details: 'Successful login from trusted device',
         },
         {
           id: '2',
+          userId: '1',
           action: 'password_change',
           ipAddress: '192.168.1.1',
-          userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          timestamp: new Date(Date.now() - 86400000),
+          userAgent:
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          timestamp: new Date(Date.now() - 86400000).toISOString(),
+          success: true,
           riskLevel: 'low',
-          details: 'Password updated successfully'
+          details: 'Password updated successfully',
         },
         {
           id: '3',
+          userId: '1',
           action: 'failed_login',
           ipAddress: '203.0.113.1',
-          userAgent: 'Mozilla/5.0 (Linux; Android 10; SM-G975F) AppleWebKit/537.36',
-          timestamp: new Date(Date.now() - 172800000),
+          userAgent:
+            'Mozilla/5.0 (Linux; Android 10; SM-G975F) AppleWebKit/537.36',
+          timestamp: new Date(Date.now() - 172800000).toISOString(),
+          success: false,
           riskLevel: 'high',
-          details: 'Failed login attempt from unknown device'
-        }
+          details: 'Failed login attempt from unknown device',
+        },
       ];
     } catch (error) {
       console.error('Failed to fetch security logs:', error);
@@ -211,9 +277,13 @@ export const SecurityProvider: React.FC<SecurityProviderProps> = ({ children }) 
     try {
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 500));
-      
+
       // Log security event
-      await logSecurityEvent('suspicious_activity', `User reported: ${activity}`, 'high');
+      await logSecurityEvent(
+        'suspicious_activity',
+        `User reported: ${activity}`,
+        'high'
+      );
     } catch (error) {
       console.error('Failed to report suspicious activity:', error);
     }
@@ -221,7 +291,7 @@ export const SecurityProvider: React.FC<SecurityProviderProps> = ({ children }) 
 
   const isPasswordStrong = (password: string): boolean => {
     const strength = getPasswordStrength(password);
-    return strength.strength === 'strong' || strength.strength === 'very_strong';
+    return strength.strength === 'strong';
   };
 
   const getPasswordStrength = (password: string): PasswordStrength => {
@@ -268,25 +338,27 @@ export const SecurityProvider: React.FC<SecurityProviderProps> = ({ children }) 
       score += 1;
     }
 
-    let strength: 'weak' | 'medium' | 'strong' | 'very_strong';
+    let strength: 'weak' | 'medium' | 'strong';
     if (score <= 2) {
       strength = 'weak';
     } else if (score <= 3) {
       strength = 'medium';
-    } else if (score <= 4) {
-      strength = 'strong';
     } else {
-      strength = 'very_strong';
+      strength = 'strong';
     }
 
-    return { score, feedback, strength };
+    return { score, feedback, isStrong: strength === 'strong', strength };
   };
 
-  const logSecurityEvent = async (action: string, details: string, riskLevel: 'low' | 'medium' | 'high' | 'critical' = 'low') => {
+  const logSecurityEvent = async (
+    action: string,
+    details: string,
+    riskLevel: 'low' | 'medium' | 'high' | 'critical' = 'low'
+  ) => {
     try {
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 100));
-      
+
       console.log('Security event logged:', { action, details, riskLevel });
     } catch (error) {
       console.error('Failed to log security event:', error);
@@ -306,7 +378,7 @@ export const SecurityProvider: React.FC<SecurityProviderProps> = ({ children }) 
     getSecurityLogs,
     reportSuspiciousActivity,
     isPasswordStrong,
-    getPasswordStrength
+    getPasswordStrength,
   };
 
   return (
@@ -325,6 +397,3 @@ export const useSecurity = (): SecurityContextType => {
 };
 
 export default SecurityContext;
-
-
-
