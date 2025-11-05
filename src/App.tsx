@@ -31,7 +31,6 @@ import IndividualOffers from './pages/individual/Offers';
 import IndividualAgreements from './pages/individual/Agreements';
 import IndividualShipments from './pages/individual/Shipments';
 import MyShipments from './pages/individual/MyShipments';
-import MyShipmentsNew from './pages/individual/MyShipmentsNew';
 import IndividualHistory from './pages/individual/History';
 import IndividualLiveTracking from './pages/individual/LiveTracking';
 import IndividualShipmentDetail from './pages/individual/ShipmentDetail';
