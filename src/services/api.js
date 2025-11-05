@@ -59,16 +59,27 @@ async function apiCall(endpoint, options = {}) {
 
     return await response.json();
   } catch (error) {
-    // Only log in development and don't log authentication errors
-    if (import.meta.env.DEV && !error.message?.includes('Invalid or expired token') && !error.message?.includes('403')) {
-      console.error('API call failed:', error);
-    }
-
     // Enhanced error handling
     if (error.name === 'TypeError' && error.message.includes('fetch')) {
+      // Backend connection errors are expected when backend is not running
+      // Only log if it's not a connection refused error
+      if (!error.message.includes('Failed to fetch') && !error.message.includes('ERR_CONNECTION_REFUSED')) {
+        if (import.meta.env.DEV) {
+          console.error('API call failed:', error);
+        }
+      }
       throw new Error(
         'Sunucuya bağlanılamıyor. İnternet bağlantınızı kontrol edin.'
       );
+    }
+
+    // Only log in development and don't log authentication/connection errors
+    if (import.meta.env.DEV && 
+        !error.message?.includes('Invalid or expired token') && 
+        !error.message?.includes('403') &&
+        !error.message?.includes('Failed to fetch') &&
+        !error.message?.includes('ERR_CONNECTION_REFUSED')) {
+      console.error('API call failed:', error);
     }
 
     throw error;
