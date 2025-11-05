@@ -282,16 +282,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setToken(token);
 
         // userType parametresini kullanarak role'ü kesin olarak ayarla
+        // Backend'den gelen userData'dan name veya firstName/lastName'den fullName oluştur
+        const fullName = userData.fullName || 
+          userData.name || 
+          (userData.firstName || userData.lastName 
+            ? `${userData.firstName || ''} ${userData.lastName || ''}`.trim()
+            : userData.panel_type === 'individual' ? 'Bireysel Demo Kullanıcı'
+            : userData.panel_type === 'corporate' ? 'Kurumsal Demo Kullanıcı'
+            : userData.panel_type === 'nakliyeci' ? 'Nakliyeci Demo Kullanıcı'
+            : userData.panel_type === 'tasiyici' ? 'Taşıyıcı Demo Kullanıcı'
+            : 'Demo Kullanıcı');
+        
         const formattedUser: User = {
-          id: userData.id.toString(),
-          fullName:
-            userData.fullName ||
-            userData.name ||
-            `${userData.firstName || ''} ${userData.lastName || ''}`.trim(),
-          email: userData.email,
+          id: userData.id?.toString() || String(Math.floor(Math.random() * 1000) + 10000),
+          fullName: fullName,
+          email: userData.email || `demo@${userType}.com`,
           role: userType, // userType parametresini direkt kullan (backend'den gelen role'ü değil)
-          firstName: userData.firstName,
-          lastName: userData.lastName,
+          firstName: userData.firstName || fullName.split(' ')[0] || 'Demo',
+          lastName: userData.lastName || fullName.split(' ').slice(1).join(' ') || 'Kullanıcı',
           phone: userData.phone || '05001112233',
           address: userData.address || 'Demo Adres',
           companyName: userData.companyName || userData.company_name || '',

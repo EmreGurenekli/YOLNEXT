@@ -105,7 +105,10 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(userData),
       }),
-    demoLogin: () => apiCall('/auth/demo-login', { method: 'POST' }),
+    demoLogin: (userType) => apiCall('/auth/demo-login', {
+      method: 'POST',
+      body: JSON.stringify({ userType }),
+    }),
     logout: () => {
       localStorage.removeItem('authToken');
       localStorage.removeItem('user');
