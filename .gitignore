@@ -32,3 +32,7 @@ tmp/
 *.sqlite3
 !database/*.sql
 !backend/database/*.sql
+
+# Silinen eski dosyalar - BUNLAR ASLA GERİ GETİRİLMEMELİ
+# Bu dosyalar commit edildi ve kalıcı olarak kaldırıldı
+# Eğer geri getirilirse, bu dosya güncellenecek ve uyarı verilecek
