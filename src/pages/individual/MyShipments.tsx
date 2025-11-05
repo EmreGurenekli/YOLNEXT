@@ -63,18 +63,15 @@ const IndividualMyShipments: React.FC = () => {
   useEffect(() => {
     const loadShipments = async () => {
       try {
-        console.log('🔄 Bireysel gönderiler yükleniyor...');
         setLoading(true);
         const token = localStorage.getItem('authToken');
 
         if (!token) {
-          console.error('❌ Token bulunamadı');
           setShipments(emptyShipments);
           setLoading(false);
           return;
         }
 
-        console.log('🌐 API çağrısı yapılıyor...');
         const params = new URLSearchParams({
           page: pagination.page.toString(),
           limit: pagination.limit.toString(),
@@ -95,9 +92,7 @@ const IndividualMyShipments: React.FC = () => {
           }
         );
 
-        console.log('📥 API Response Status:', response.status);
         const data = await response.json();
-        console.log('📊 API Response Data:', data);
 
         if (response.ok && data.success) {
           // Backend'den dönen data structure'ı kontrol et

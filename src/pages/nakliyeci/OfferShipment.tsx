@@ -149,7 +149,12 @@ const OfferShipment: React.FC = () => {
       setIsSubmitting(true);
       setError('');
 
-      // Teklif verisi hazırla
+      // Kullanıcı bilgilerini al
+      const user = localStorage.getItem('user')
+        ? JSON.parse(localStorage.getItem('user') || '{}')
+        : null;
+
+      // Teklif verisi hazırla - gerçek kullanıcı verileri ile
       const offerPayload = {
         shipmentId: shipment?.id,
         price: offerData.price,
@@ -157,9 +162,9 @@ const OfferShipment: React.FC = () => {
         estimatedDeliveryDays: offerData.estimatedDeliveryDays,
         insuranceIncluded: offerData.insuranceIncluded,
         specialServices: offerData.specialServices,
-        carrierId: 'demo-carrier-1', // Demo nakliyeci ID
-        carrierName: 'Demo Nakliyeci',
-        carrierCompany: 'Demo Transport',
+        carrierId: user?.id || '',
+        carrierName: user?.fullName || user?.name || '',
+        carrierCompany: user?.companyName || '',
       };
 
       // Gerçek API çağrısı
