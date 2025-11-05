@@ -101,7 +101,7 @@ export const exportOffersToCSV = (offers: any[], filename?: string): void => {
 
 /**
  * Export to Excel using SheetJS (xlsx library)
- * Note: This requires xlsx library to be installed
+ * Note: Currently falls back to CSV due to Vite configuration requirements
  */
 export const exportToExcel = async (
   data: ExportData[],
@@ -109,9 +109,23 @@ export const exportToExcel = async (
   sheetName: string = 'Sheet1',
   headers?: string[]
 ): Promise<void> => {
+  // For now, fallback to CSV until xlsx is properly configured in Vite
+  // Excel export requires additional configuration
+  console.warn('Excel export not yet fully configured, using CSV fallback');
+  exportToCSV(data, filename.replace('.xlsx', '.csv'), headers);
+  
+  /* TODO: Enable when xlsx is properly configured in Vite
   try {
-    // Dynamic import for xlsx (only load when needed)
-    const XLSX = await import('xlsx');
+    // Check if xlsx is available
+    let XLSX: any;
+    try {
+      // Try to import xlsx
+      XLSX = await import('xlsx');
+    } catch (importError) {
+      console.warn('xlsx library not available, falling back to CSV');
+      exportToCSV(data, filename.replace('.xlsx', '.csv'), headers);
+      return;
+    }
     
     if (!data || data.length === 0) {
       console.error('No data to export');
@@ -148,6 +162,7 @@ export const exportToExcel = async (
     console.warn('Falling back to CSV export');
     exportToCSV(data, filename.replace('.xlsx', '.csv'), headers);
   }
+  */
 };
 
 /**

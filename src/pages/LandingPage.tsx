@@ -1050,8 +1050,4 @@ const LandingPage: React.FC = () => {
   );
 };
 
-import Footer from '../components/common/Footer';
-
-// ... existing code ...
-
 export default LandingPage;
