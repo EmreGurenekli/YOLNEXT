@@ -75,41 +75,7 @@ async function apiCall(endpoint, options = {}) {
   }
 }
 
-// Mock API call function
-async function mockApiCall(endpoint, options = {}) {
-  // Map endpoints to mock functions
-  const endpointMap = {
-    '/health': () => mockApi.health(),
-    '/dashboard/individual': () => mockApi.getDashboardData('individual'),
-    '/dashboard/corporate': () => mockApi.getDashboardData('corporate'),
-    '/dashboard/nakliyeci': () => mockApi.getDashboardData('nakliyeci'),
-    '/dashboard/tasiyici': () => mockApi.getDashboardData('tasiyici'),
-    '/shipments/recent/individual': () =>
-      mockApi.getRecentShipments('individual'),
-    '/shipments/recent/corporate': () =>
-      mockApi.getRecentShipments('corporate'),
-    '/shipments/recent/nakliyeci': () =>
-      mockApi.getRecentShipments('nakliyeci'),
-    '/shipments/recent/tasiyici': () => mockApi.getRecentShipments('tasiyici'),
-    '/notifications/unread-count': () => mockApi.getUnreadNotificationCount(),
-    '/wallet/nakliyeci': () => mockApi.getWalletData('nakliyeci'),
-    '/wallet/tasiyici': () => mockApi.getWalletData('tasiyici'),
-    '/shipments/nakliyeci': () => mockApi.getJobsData(),
-    '/messages': () => mockApi.getMessages(),
-  };
-
-  const mockFunction = endpointMap[endpoint];
-  if (mockFunction) {
-    return await mockFunction();
-  }
-
-  // Default mock response
-  return {
-    success: true,
-    data: [],
-    message: 'Mock API response',
-  };
-}
+// Mock API functions removed - all API calls now use real backend endpoints
 
 // API service object
 export const api = {

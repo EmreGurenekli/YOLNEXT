@@ -130,7 +130,7 @@ const Dashboard = () => {
           setStats(emptyData.stats);
         }
       } catch (error) {
-        console.log('API hatası, demo stats kullanılıyor:', error);
+        console.error('Error loading dashboard stats:', error);
         setStats(emptyData.stats);
       }
 
@@ -143,7 +143,7 @@ const Dashboard = () => {
           setRecentShipments(emptyData.recentShipments);
         }
       } catch (error) {
-        console.log('API hatası, demo shipments kullanılıyor:', error);
+        console.error('Error loading shipments:', error);
         setRecentShipments(emptyData.recentShipments);
       }
 

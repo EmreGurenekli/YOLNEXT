@@ -162,25 +162,29 @@ const OfferShipment: React.FC = () => {
         carrierCompany: 'Demo Transport',
       };
 
-      console.log('Teklif verisi:', offerPayload);
-
       // Gerçek API çağrısı
-      try {
-        const response = await shipmentAPI.create(offerPayload);
-        if (response.success) {
+      const response = await fetch('/api/offers', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('authToken')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(offerPayload),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
           setSuccess('Teklifiniz başarıyla gönderildi!');
           setTimeout(() => {
             navigate('/nakliyeci/jobs');
           }, 2000);
         } else {
-          setError('Teklif gönderilirken hata oluştu');
+          setError(data.message || 'Teklif gönderilirken hata oluştu');
         }
-      } catch (error) {
-        console.log('API hatası, demo başarı:', error);
-        setSuccess('Teklifiniz başarıyla gönderildi!');
-        setTimeout(() => {
-          navigate('/nakliyeci/jobs');
-        }, 2000);
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        setError(errorData.message || 'Teklif gönderilirken hata oluştu');
       }
     } catch (error) {
       console.error('Teklif gönderme hatası:', error);
