@@ -91,10 +91,20 @@ export default function Login() {
           navigate(panelRoute, { replace: true });
         }, 100);
       } else {
-        setError('Demo giriş başarısız');
+        const errorMsg = result.error || 'Demo giriş başarısız';
+        if (errorMsg.includes('bağlanılamıyor') || errorMsg.includes('connection') || errorMsg.includes('Sunucuya')) {
+          setError('Backend sunucusu çalışmıyor. Lütfen backend\'i başlatın (cd backend && node postgres-backend.js) ve tekrar deneyin.');
+        } else {
+          setError(errorMsg);
+        }
       }
-    } catch (err) {
-      setError('Demo giriş yapılırken bir hata oluştu. Lütfen tekrar deneyin.');
+    } catch (err: any) {
+      const errorMessage = err?.message || 'Bilinmeyen bir hata oluştu';
+      if (errorMessage.includes('bağlanılamıyor') || errorMessage.includes('connection') || errorMessage.includes('Sunucuya')) {
+        setError('Backend sunucusu çalışmıyor. Lütfen backend\'i başlatın (cd backend && node postgres-backend.js) ve tekrar deneyin.');
+      } else {
+        setError(`Demo giriş yapılırken bir hata oluştu: ${errorMessage}`);
+      }
     } finally {
       setIsLoading(false);
     }

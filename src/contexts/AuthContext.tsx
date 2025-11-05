@@ -323,9 +323,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           response.data?.message || response.message || 'Demo login failed'
         );
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Demo login error:', error);
-      return { success: false };
+      // Return error message for better debugging
+      return { 
+        success: false, 
+        error: error?.message || 'Demo login failed'
+      };
     } finally {
       setIsLoading(false);
     }
