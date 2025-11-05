@@ -7,7 +7,6 @@ import { SocketProvider } from './contexts/SocketContext';
 import { RealtimeProvider } from './contexts/RealtimeContext';
 import { WebSocketProvider } from './contexts/WebSocketContext';
 import ErrorBoundary from './components/error/ErrorBoundary';
-import ErrorToast from './components/error/ErrorToast';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import LandingPage from './pages/LandingPage';
 import Login from './pages/Login';
@@ -305,8 +304,6 @@ function App() {
                     <Route path='*' element={<NotFoundPage />} />
                   </Routes>
 
-                  {/* Global Error Toast */}
-                  <ErrorToast message='' onClose={() => {}} />
                 </div>
                 </NotificationProvider>
               </RealtimeProvider>

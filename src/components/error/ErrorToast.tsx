@@ -48,6 +48,11 @@ const ErrorToast: React.FC<ErrorToastProps> = ({
     }
   };
 
+  // Don't render if message is empty
+  if (!message || message.trim() === '') {
+    return null;
+  }
+
   return (
     <div
       className={`fixed top-4 right-4 z-50 animate-slide-in-right ${getStyles()} border-l-4 rounded-lg shadow-lg p-4 min-w-[300px] max-w-md`}
