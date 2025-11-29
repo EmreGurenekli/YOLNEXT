@@ -36,20 +36,17 @@ interface SettingsData {
     phone: string;
     address: string;
   };
-  notifications: {
-    email: boolean;
-    sms: boolean;
-    push: boolean;
-    jobAlerts: boolean;
-    messageAlerts: boolean;
-    paymentAlerts: boolean;
-  };
-  privacy: {
-    showProfile: boolean;
-    showLocation: boolean;
-    showEarnings: boolean;
-    allowMessages: boolean;
-  };
+    notifications: {
+      email: boolean;
+      sms: boolean;
+      push: boolean;
+      jobAlerts: boolean;
+      messageAlerts: boolean;
+    };
+    privacy: {
+      showProfile: boolean;
+      allowMessages: boolean;
+    };
   security: {
     twoFactor: boolean;
     biometric: boolean;
@@ -90,12 +87,9 @@ export default function TasiyiciSettings() {
       push: true,
       jobAlerts: true,
       messageAlerts: true,
-      paymentAlerts: false,
     },
     privacy: {
       showProfile: true,
-      showLocation: false,
-      showEarnings: false,
       allowMessages: true,
     },
     security: {
@@ -113,7 +107,7 @@ export default function TasiyiciSettings() {
       type: 'Kamyon',
       plate: '34 ABC 123',
       capacity: '10 ton',
-      features: ['GPS', 'Klima', 'Forklift'],
+      features: ['Klima', 'Forklift'],
     },
   });
 
@@ -447,33 +441,81 @@ export default function TasiyiciSettings() {
                           />
                         </button>
                       </div>
-                      <div className='flex items-center justify-between'>
-                        <div>
-                          <h4 className='text-sm font-medium text-slate-900'>
-                            Konum Paylaşımı
-                          </h4>
-                          <p className='text-sm text-slate-600'>
-                            Gerçek zamanlı konumunuzu paylaşın
+                      
+                      {/* KVKK Veri Erişim Hakkı - Gizli yer */}
+                      <div className='mt-8 pt-6 border-t border-slate-200'>
+                        <div className='text-xs text-slate-400 space-y-2'>
+                          <p className='text-[10px] leading-tight'>
+                            KVKK m.11 gereği veri erişim ve silme haklarınız için:
                           </p>
+                          <div className='flex gap-2'>
+                            <button
+                              onClick={async () => {
+                                try {
+                                  const token = localStorage.getItem('authToken');
+                                  const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/kvkk/data-access`, {
+                                    headers: {
+                                      'Authorization': `Bearer ${token}`,
+                                      'Content-Type': 'application/json',
+                                    },
+                                  });
+                                  if (response.ok) {
+                                    const data = await response.json();
+                                    const blob = new Blob([JSON.stringify(data.data, null, 2)], { type: 'application/json' });
+                                    const url = URL.createObjectURL(blob);
+                                    const a = document.createElement('a');
+                                    a.href = url;
+                                    a.download = `yolnext-veri-export-${new Date().toISOString().split('T')[0]}.json`;
+                                    a.click();
+                                    URL.revokeObjectURL(url);
+                                    setSuccessMessage('Verileriniz indirildi');
+                                    setShowSuccessMessage(true);
+                                  } else {
+                                    setSuccessMessage('Veri erişim hatası');
+                                    setShowSuccessMessage(true);
+                                  }
+                                } catch (error) {
+                                  setSuccessMessage('Veri erişim hatası');
+                                  setShowSuccessMessage(true);
+                                }
+                              }}
+                              className='text-[10px] text-slate-400 hover:text-slate-600 underline'
+                            >
+                              Verilerimi İndir
+                            </button>
+                            <span className='text-slate-300'>|</span>
+                            <button
+                              onClick={async () => {
+                                if (!confirm('Tüm verileriniz silinecek. Bu işlem geri alınamaz. Emin misiniz?')) return;
+                                if (!confirm('Son bir kez onaylayın: Tüm verileriniz kalıcı olarak silinecek. Devam edilsin mi?')) return;
+                                try {
+                                  const token = localStorage.getItem('authToken');
+                                  const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/kvkk/delete-data`, {
+                                    method: 'DELETE',
+                                    headers: {
+                                      'Authorization': `Bearer ${token}`,
+                                      'Content-Type': 'application/json',
+                                    },
+                                  });
+                                  const data = await response.json();
+                                  if (response.ok) {
+                                    alert('Verileriniz silindi. Çıkış yapılıyor...');
+                                    localStorage.removeItem('authToken');
+                                    localStorage.removeItem('user');
+                                    window.location.href = '/login';
+                                  } else {
+                                    alert(data.message || 'Veri silme hatası');
+                                  }
+                                } catch (error) {
+                                  alert('Veri silme hatası');
+                                }
+                              }}
+                              className='text-[10px] text-slate-400 hover:text-red-600 underline'
+                            >
+                              Verilerimi Sil
+                            </button>
+                          </div>
                         </div>
-                        <button
-                          onClick={() =>
-                            handleToggle('privacy', 'showLocation')
-                          }
-                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                            settings.privacy.showLocation
-                              ? 'bg-slate-800'
-                              : 'bg-slate-200'
-                          }`}
-                        >
-                          <span
-                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                              settings.privacy.showLocation
-                                ? 'translate-x-6'
-                                : 'translate-x-1'
-                            }`}
-                          />
-                        </button>
                       </div>
                     </div>
                   </div>
@@ -720,7 +762,7 @@ export default function TasiyiciSettings() {
                           Özellikler
                         </label>
                         <div className='space-y-2'>
-                          {['GPS', 'Klima', 'Forklift', 'Vinç', 'Soğutma'].map(
+                          {['Klima', 'Forklift', 'Vinç', 'Soğutma'].map(
                             feature => (
                               <label
                                 key={feature}

@@ -60,8 +60,12 @@ const Jobs: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterFromCity, setFilterFromCity] = useState('');
+  const [filterToCity, setFilterToCity] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [priceFilter, setPriceFilter] = useState('all');
+  const [sortBy, setSortBy] = useState<'date' | 'price' | 'distance'>('date');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [showFilters, setShowFilters] = useState(false);
   const [showOfferModal, setShowOfferModal] = useState(false);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
@@ -252,9 +256,9 @@ const Jobs: React.FC = () => {
     const src = normalize(text || '');
     const get = (keys: string[]) => {
       for (const k of keys) {
-        const re = new RegExp(`${k}:(\"[^\"]+\"|[^\s]+)`, 'i');
+        const re = new RegExp(`${k}:("[^"]+"|[^\\s]+)`, 'i');
         const m = src.match(re);
-        if (m) return m[1].replace(/\"/g, '').replace(/^\"|\"$/g, '');
+        if (m) return m[1].replace(/"/g, '').replace(/^"|"$/g, '');
       }
       return '';
     };
@@ -270,12 +274,29 @@ const Jobs: React.FC = () => {
     return { from, to, type, free: cleaned };
   };
 
+  // Extract city name from address
+  const getCityFromAddress = (address?: string): string => {
+    if (!address) return '';
+    const parts = address.split(',');
+    const cityPart = parts[parts.length - 1]?.trim() || '';
+    return cityPart.replace(/\s*(İl|İli|Şehri)$/i, '').trim();
+  };
+
   const { from, to, type, free } = parseSearchFilters(searchTerm);
-  const filteredJobs = jobs.filter(job => {
+  
+  // Combine search term filters with dedicated city filters
+  const effectiveFromCity = filterFromCity || from;
+  const effectiveToCity = filterToCity || to;
+  
+  const filteredJobs = jobs
+    .filter(job => {
     const jt = normalize(job.title);
     const jd = normalize(job.description);
     const jp = normalize(job.pickupAddress);
     const jv = normalize(job.deliveryAddress);
+      const pickupCity = normalize(getCityFromAddress(job.pickupAddress));
+      const deliveryCity = normalize(getCityFromAddress(job.deliveryAddress));
+      
     const matchesSearch =
       !free ||
       jt.includes(free) ||
@@ -291,8 +312,15 @@ const Jobs: React.FC = () => {
       (priceFilter === 'medium' && job.price >= 500 && job.price < 1000) ||
       (priceFilter === 'high' && job.price >= 1000);
 
-    const matchesFrom = !from || jp.includes(from);
-    const matchesTo = !to || jv.includes(to);
+      // City filtering - check both dedicated filters and search term filters
+      const matchesFrom = !effectiveFromCity || 
+        pickupCity.includes(normalize(effectiveFromCity)) ||
+        jp.includes(normalize(effectiveFromCity));
+      
+      const matchesTo = !effectiveToCity || 
+        deliveryCity.includes(normalize(effectiveToCity)) ||
+        jv.includes(normalize(effectiveToCity));
+      
     const inferred = inferLoadType(job);
     const matchesType = !type || inferred === type;
 
@@ -304,6 +332,26 @@ const Jobs: React.FC = () => {
       matchesTo &&
       matchesType
     );
+    })
+    .sort((a, b) => {
+      let comparison = 0;
+      
+      if (sortBy === 'date') {
+        const dateA = new Date(a.createdAt || 0).getTime();
+        const dateB = new Date(b.createdAt || 0).getTime();
+        comparison = dateA - dateB;
+      } else if (sortBy === 'price') {
+        comparison = (a.price || 0) - (b.price || 0);
+      } else if (sortBy === 'distance') {
+        const pickupCityA = getCityFromAddress(a.pickupAddress);
+        const deliveryCityA = getCityFromAddress(a.deliveryAddress);
+        const pickupCityB = getCityFromAddress(b.pickupAddress);
+        const deliveryCityB = getCityFromAddress(b.deliveryAddress);
+        // Simple approximation
+        comparison = (pickupCityA.length + deliveryCityA.length) - (pickupCityB.length + deliveryCityB.length);
+      }
+      
+      return sortOrder === 'asc' ? comparison : -comparison;
   });
 
   // Using format helpers from utils/format.ts
@@ -386,35 +434,158 @@ const Jobs: React.FC = () => {
 
         {/* Filters */}
         {showFilters && (
-          <div className='bg-white rounded-xl p-4 sm:p-5 shadow-lg border border-slate-200 mb-4 sm:mb-6'>
-            <div className='flex items-end gap-3'>
-              <div className='relative flex-1'>
-                <label className='block text-xs font-medium text-slate-600 mb-1'>
-                  Arama ve Filtre
+          <div className='bg-white rounded-xl p-4 sm:p-6 shadow-lg border border-slate-200 mb-4 sm:mb-6'>
+            <div className='space-y-4'>
+              {/* Search Row */}
+              <div>
+                <label className='block text-sm font-medium text-slate-700 mb-2'>
+                  <Search className='inline w-4 h-4 mr-1' />
+                  Genel Arama
                 </label>
-                <Search className='absolute left-3 top-9 -mt-2 text-slate-400 w-4 h-4' />
                 <input
                   type='text'
-                  placeholder='örn: from:istanbul to:ankara type:palet + anahtar kelime'
+                  placeholder='Başlık, açıklama veya adres ara...'
                   value={searchTerm}
                   onChange={e => setSearchTerm(e.target.value)}
-                  className='w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-sm'
+                  className='w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm'
                 />
-                <p className='mt-1 text-[11px] text-slate-500'>
-                  İpuçları: from:İstanbul to:Ankara type:mobilya
-                </p>
               </div>
+
+              {/* City Filters Row */}
+              <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
+                {/* Başlangıç Şehri */}
+                <div>
+                  <label className='block text-sm font-medium text-slate-700 mb-2'>
+                    <MapPin className='inline w-4 h-4 mr-1 text-blue-600' />
+                    Başlangıç Şehri
+                  </label>
+                  <input
+                    type='text'
+                    placeholder='Örn: İstanbul, Ankara, İzmir...'
+                    value={filterFromCity}
+                    onChange={e => setFilterFromCity(e.target.value)}
+                    className='w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm'
+                  />
+                  <p className='mt-1 text-xs text-slate-500'>
+                    Yükün alınacağı şehir
+                  </p>
+                </div>
+
+                {/* Bitiş Şehri */}
+                <div>
+                  <label className='block text-sm font-medium text-slate-700 mb-2'>
+                    <MapPin className='inline w-4 h-4 mr-1 text-green-600' />
+                    Bitiş Şehri
+                  </label>
+                  <input
+                    type='text'
+                    placeholder='Örn: İstanbul, Ankara, İzmir...'
+                    value={filterToCity}
+                    onChange={e => setFilterToCity(e.target.value)}
+                    className='w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm'
+                />
+                  <p className='mt-1 text-xs text-slate-500'>
+                    Yükün teslim edileceği şehir
+                  </p>
+                </div>
+              </div>
+
+              {/* Additional Filters Row */}
+              <div className='grid grid-cols-1 sm:grid-cols-3 gap-4'>
+                {/* Status Filter */}
+                <div>
+                  <label className='block text-sm font-medium text-slate-700 mb-2'>
+                    Durum
+                  </label>
+                  <select
+                    value={statusFilter}
+                    onChange={e => setStatusFilter(e.target.value)}
+                    className='w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm'
+                  >
+                    <option value='all'>Tümü</option>
+                    <option value='pending'>Beklemede</option>
+                    <option value='open'>Açık</option>
+                    <option value='accepted'>Kabul Edildi</option>
+                  </select>
+                </div>
+
+                {/* Price Filter */}
+                <div>
+                  <label className='block text-sm font-medium text-slate-700 mb-2'>
+                    Fiyat Aralığı
+                  </label>
+                  <select
+                    value={priceFilter}
+                    onChange={e => setPriceFilter(e.target.value)}
+                    className='w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm'
+                  >
+                    <option value='all'>Tümü</option>
+                    <option value='low'>Düşük (&lt; 500₺)</option>
+                    <option value='medium'>Orta (500-1000₺)</option>
+                    <option value='high'>Yüksek (&gt; 1000₺)</option>
+                  </select>
+                </div>
+
+                {/* Sort */}
+                <div>
+                  <label className='block text-sm font-medium text-slate-700 mb-2'>
+                    Sıralama
+                  </label>
+                  <div className='flex gap-2'>
+                    <select
+                      value={sortBy}
+                      onChange={e => setSortBy(e.target.value as 'date' | 'price' | 'distance')}
+                      className='flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm'
+                    >
+                      <option value='date'>Tarih</option>
+                      <option value='price'>Fiyat</option>
+                      <option value='distance'>Mesafe</option>
+                    </select>
+                    <button
+                      onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                      className='px-3 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors'
+                      title={sortOrder === 'asc' ? 'Artan' : 'Azalan'}
+                    >
+                      {sortOrder === 'asc' ? '↑' : '↓'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Active Filters Info & Clear */}
+              <div className='flex items-center justify-between pt-2 border-t border-slate-200'>
+                {(filterFromCity || filterToCity || searchTerm) && (
+                  <div className='flex flex-wrap gap-2 text-sm'>
+                    {filterFromCity && (
+                      <span className='inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 rounded-md'>
+                        <MapPin className='w-3 h-3' />
+                        Başlangıç: {filterFromCity}
+                      </span>
+                    )}
+                    {filterToCity && (
+                      <span className='inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 rounded-md'>
+                        <MapPin className='w-3 h-3' />
+                        Bitiş: {filterToCity}
+                      </span>
+                    )}
+                  </div>
+                )}
               <button
                 onClick={() => {
                   setSearchTerm('');
+                    setFilterFromCity('');
+                    setFilterToCity('');
                   setStatusFilter('all');
                   setPriceFilter('all');
+                    setSortBy('date');
+                    setSortOrder('desc');
                 }}
-                className='inline-flex items-center gap-2 px-3 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-all duration-200 text-sm'
+                  className='inline-flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-all duration-200 text-sm'
               >
                 <RefreshCw className='w-4 h-4' />
-                Temizle
+                  Tümünü Temizle
               </button>
+              </div>
             </div>
           </div>
         )}

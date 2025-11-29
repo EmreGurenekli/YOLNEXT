@@ -34,7 +34,9 @@ class InputSanitizer {
       // Remove SQL keywords (basic protection, parameterized queries are the real solution)
       const sqlKeywords = /(union|select|insert|update|delete|drop|create|alter|exec|execute|script)/gi;
       if (sqlKeywords.test(value)) {
-        throw new Error('Invalid input detected');
+        // Return a special marker object instead of throwing
+        // This allows the middleware to handle it gracefully
+        return { __INVALID_INPUT: true, originalValue: value };
       }
     }
     
@@ -98,24 +100,24 @@ class InputSanitizer {
       
       if (fieldSchema) {
         if (fieldSchema.type === 'string') {
-          sanitized[key] = this.sanitizeString(value, fieldSchema.options || {});
+          sanitized[key] = InputSanitizer.sanitizeString(value, fieldSchema.options || {});
         } else if (fieldSchema.type === 'email') {
-          sanitized[key] = this.sanitizeEmail(value);
+          sanitized[key] = InputSanitizer.sanitizeEmail(value);
         } else if (fieldSchema.type === 'phone') {
-          sanitized[key] = this.sanitizePhone(value);
+          sanitized[key] = InputSanitizer.sanitizePhone(value);
         } else if (fieldSchema.type === 'number') {
-          sanitized[key] = this.sanitizeNumber(value, fieldSchema.options || {});
+          sanitized[key] = InputSanitizer.sanitizeNumber(value, fieldSchema.options || {});
         } else if (fieldSchema.type === 'object' && typeof value === 'object') {
-          sanitized[key] = this.sanitizeObject(value, fieldSchema.schema || {});
+          sanitized[key] = InputSanitizer.sanitizeObject(value, fieldSchema.schema || {});
         } else {
           sanitized[key] = value;
         }
       } else {
         // Default: sanitize as string if string, keep others
         if (typeof value === 'string') {
-          sanitized[key] = this.sanitizeString(value);
+          sanitized[key] = InputSanitizer.sanitizeString(value);
         } else if (typeof value === 'object' && value !== null) {
-          sanitized[key] = this.sanitizeObject(value);
+          sanitized[key] = InputSanitizer.sanitizeObject(value);
         } else {
           sanitized[key] = value;
         }
@@ -131,7 +133,7 @@ class InputSanitizer {
   static sanitizeBody(schema = {}) {
     return (req, res, next) => {
       if (req.body && typeof req.body === 'object') {
-        req.body = this.sanitizeObject(req.body, schema);
+        req.body = InputSanitizer.sanitizeObject(req.body, schema);
       }
       next();
     };
@@ -147,7 +149,19 @@ class InputSanitizer {
         if (req.query.hasOwnProperty(key)) {
           const value = req.query[key];
           if (typeof value === 'string') {
-            sanitized[key] = this.sanitizeString(value, { preventSQLInjection: true });
+            const sanitizedValue = InputSanitizer.sanitizeString(value, { preventSQLInjection: true });
+            
+            // Check if input was marked as invalid
+            if (sanitizedValue && typeof sanitizedValue === 'object' && sanitizedValue.__INVALID_INPUT) {
+              // SQL injection attempt detected - return 400 Bad Request
+              return res.status(400).json({
+                success: false,
+                error: 'Invalid input detected',
+                message: 'Geçersiz arama parametresi'
+              });
+            }
+            
+            sanitized[key] = sanitizedValue;
           } else {
             sanitized[key] = value;
           }
@@ -165,7 +179,19 @@ class InputSanitizer {
     if (req.params && typeof req.params === 'object') {
       for (const key in req.params) {
         if (req.params.hasOwnProperty(key) && typeof req.params[key] === 'string') {
-          req.params[key] = this.sanitizeString(req.params[key], { preventSQLInjection: true });
+          const sanitizedValue = InputSanitizer.sanitizeString(req.params[key], { preventSQLInjection: true });
+          
+          // Check if input was marked as invalid
+          if (sanitizedValue && typeof sanitizedValue === 'object' && sanitizedValue.__INVALID_INPUT) {
+            // SQL injection attempt detected - return 400 Bad Request
+            return res.status(400).json({
+              success: false,
+              error: 'Invalid input detected',
+              message: 'Geçersiz parametre'
+            });
+          }
+          
+          req.params[key] = sanitizedValue;
         }
       }
     }

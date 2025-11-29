@@ -65,8 +65,6 @@ export interface ShipmentRequest {
   payment: {
     method: 'nakit' | 'kredi_karti' | 'havale' | 'pos';
     codAmount: string;
-    insurance: boolean;
-    insuranceValue: string;
   };
 
   // İletişim

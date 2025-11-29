@@ -14,6 +14,7 @@ import {
   ArrowLeft,
   AlertCircle,
   Building2,
+  MessageSquare,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import Breadcrumb from '../../components/common/Breadcrumb';
@@ -62,7 +63,7 @@ const TasiyiciJobs: React.FC = () => {
       const userRaw = localStorage.getItem('user');
       const userId = userRaw ? JSON.parse(userRaw || '{}').id : undefined;
 
-      const response = await fetch(`/api/shipments/${id}`, {
+      const response = await fetch(createApiUrl(`/api/shipments/${id}`), {
         headers: {
           Authorization: `Bearer ${token || ''}`,
           'X-User-Id': userId || '',
@@ -73,6 +74,13 @@ const TasiyiciJobs: React.FC = () => {
       if (response.ok) {
         const data = await response.json();
         const jobData = data.data || data;
+        // Map nakliyeci object to nakliyeciName, nakliyeciCompany, etc.
+        if (jobData.nakliyeci && typeof jobData.nakliyeci === 'object') {
+          jobData.nakliyeciName = jobData.nakliyeci.name || jobData.nakliyeciName;
+          jobData.nakliyeciCompany = jobData.nakliyeci.company || jobData.nakliyeciCompany;
+          jobData.nakliyeciPhone = jobData.nakliyeci.phone || jobData.nakliyeciPhone;
+          jobData.nakliyeciEmail = jobData.nakliyeci.email || jobData.nakliyeciEmail;
+        }
         setJob(jobData);
       } else if (response.status === 404) {
         toast.error('İş bulunamadı');
@@ -92,7 +100,6 @@ const TasiyiciJobs: React.FC = () => {
   useEffect(() => {
     loadJob();
   }, [loadJob]);
-
 
   const updateStatus = async (newStatus: string) => {
     try {
@@ -122,24 +129,21 @@ const TasiyiciJobs: React.FC = () => {
       }
 
       if (response.ok && responseData.success) {
-        if (newStatus === 'in_progress') {
-          toast.success('✅ İşe başladınız! İş durumu "Devam Ediyor" olarak güncellendi.', {
-            duration: 4000,
-          });
-          // Sayfayı yenile ama yönlendirmeyi biraz geciktir
-          await loadJob();
-          // Yönlendirmeyi daha uzun tut ki kullanıcı sonucu görebilsin
-          setTimeout(() => {
-            navigate('/tasiyici/active-jobs', { replace: true });
-          }, 2500);
-        } else if (newStatus === 'completed') {
-          toast.success('🎉 İş tamamlandı! Tebrikler!', {
-            duration: 4000,
+        if (newStatus === 'picked_up') {
+          toast.success('✅ Testimi aldım! Durum güncellendi.', {
+            duration: 3000,
           });
           await loadJob();
-          setTimeout(() => {
-            navigate('/tasiyici/completed-jobs', { replace: true });
-          }, 1500);
+        } else if (newStatus === 'in_transit') {
+          toast.success('🚚 Yoldayım! Durum güncellendi.', {
+            duration: 3000,
+          });
+          await loadJob();
+        } else if (newStatus === 'delivered') {
+          toast.success('📦 Teslim ettim! Gönderici onayı bekleniyor.', {
+            duration: 4000,
+          });
+          await loadJob();
         } else {
           toast.success('İş durumu başarıyla güncellendi');
           await loadJob();
@@ -447,7 +451,7 @@ const TasiyiciJobs: React.FC = () => {
               </div>
             )}
 
-            {/* Shipper Contact */}
+            {/* Shipper Contact - Phone number hidden for privacy */}
             {job.shipperName && (
               <div className='bg-white rounded-xl p-6 shadow-lg border border-gray-100'>
                 <h2 className='text-xl font-bold text-slate-900 mb-6 flex items-center gap-2'>
@@ -462,34 +466,19 @@ const TasiyiciJobs: React.FC = () => {
                       <div className='font-semibold text-slate-900'>{job.shipperName}</div>
                     </div>
                   </div>
-                  {job.shipperPhone && (
+                  <div className='bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4'>
                     <div className='flex items-center gap-3'>
-                      <Phone className='w-5 h-5 text-gray-400' />
-                      <div>
-                        <div className='text-xs text-slate-500'>Telefon</div>
-                        <a
-                          href={`tel:${job.shipperPhone}`}
-                          className='font-semibold text-blue-600 hover:text-blue-700'
-                        >
-                          {job.shipperPhone}
-                        </a>
+                      <MessageSquare className='w-5 h-5 text-blue-600' />
+                      <div className='flex-1'>
+                        <div className='text-sm font-medium text-slate-900 mb-1'>
+                          İletişim
+                      </div>
+                        <div className='text-xs text-slate-600'>
+                          Gönderici ile iletişim için mesaj sistemi kullanılmalıdır. Telefon numarası gizlilik nedeniyle gösterilmemektedir.
+                    </div>
                       </div>
                     </div>
-                  )}
-                  {job.shipperEmail && (
-                    <div className='flex items-center gap-3'>
-                      <Mail className='w-5 h-5 text-gray-400' />
-                      <div>
-                        <div className='text-xs text-slate-500'>E-posta</div>
-                        <a
-                          href={`mailto:${job.shipperEmail}`}
-                          className='font-semibold text-blue-600 hover:text-blue-700'
-                        >
-                          {job.shipperEmail}
-                        </a>
-                      </div>
-                    </div>
-                  )}
+                  </div>
                 </div>
               </div>
             )}
@@ -497,51 +486,56 @@ const TasiyiciJobs: React.FC = () => {
 
           {/* Sidebar */}
           <div className='space-y-6'>
-            {/* Actions */}
+            {/* Actions - Basit Durum Butonları */}
             <div className='bg-white rounded-xl p-6 shadow-lg border border-gray-100'>
-              <h3 className='text-lg font-bold text-slate-900 mb-4'>İşlemler</h3>
+              <h3 className='text-lg font-bold text-slate-900 mb-4'>İş Durumu</h3>
               <div className='space-y-3'>
-                {/* İşe Başla - accepted, pending, test gibi durumlarda göster */}
+                {/* Testimi Aldım - sadece accepted/pending durumunda */}
                 {(job.status === 'accepted' || 
                   job.status === 'pending' || 
                   job.status === 'test' ||
-                  (!job.status || (job.status !== 'in_progress' && job.status !== 'completed' && job.status !== 'delivered'))) && (
+                  (!job.status || (job.status !== 'picked_up' && job.status !== 'in_progress' && job.status !== 'in_transit' && job.status !== 'completed' && job.status !== 'delivered'))) && (
                   <button
-                    onClick={() => updateStatus('in_progress')}
+                    onClick={() => updateStatus('picked_up')}
                     disabled={updatingStatus}
-                    className='w-full px-4 py-2 bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 text-white rounded-lg font-medium transition-all duration-300 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl disabled:opacity-50'
-                    title='İşe başladığınızda durum güncellenecek'
+                    className='w-full px-4 py-4 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg font-bold text-base transition-all duration-300 flex items-center justify-center gap-3 shadow-lg hover:shadow-xl disabled:opacity-50'
                   >
-                    <Clock className='w-4 h-4' />
-                    İşe Başla
+                    <CheckCircle className='w-6 h-6' />
+                    ✅ Testimi Aldım
                   </button>
                 )}
-                {/* Tamamlandı İşaretle - in_progress durumunda göster */}
-                {(job.status === 'in_progress' || job.status === 'in_transit') && (
+                
+                {/* Yoldayım - picked_up durumunda */}
+                {job.status === 'picked_up' && (
                   <button
-                    onClick={() => updateStatus('completed')}
+                    onClick={() => updateStatus('in_transit')}
                     disabled={updatingStatus}
-                    className='w-full px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg font-medium transition-all duration-300 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl disabled:opacity-50'
-                    title='İş tamamlandığında durum güncellenecek'
+                    className='w-full px-4 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg font-bold text-base transition-all duration-300 flex items-center justify-center gap-3 shadow-lg hover:shadow-xl disabled:opacity-50'
                   >
-                    <CheckCircle className='w-4 h-4' />
-                    Tamamlandı İşaretle
+                    <Truck className='w-6 h-6' />
+                    🚚 Yoldayım
                   </button>
                 )}
-                {/* Status bilgisi (debug için) */}
-                {import.meta.env.DEV && (
-                  <div className='text-xs text-gray-500 p-2 bg-gray-50 rounded'>
-                    Status: <strong>{job.status || 'undefined'}</strong>
-                  </div>
+                
+                {/* Teslim Ettim - in_transit durumunda */}
+                {(job.status === 'in_transit' || job.status === 'in_progress') && (
+                  <button
+                    onClick={() => updateStatus('delivered')}
+                    disabled={updatingStatus}
+                    className='w-full px-4 py-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-lg font-bold text-base transition-all duration-300 flex items-center justify-center gap-3 shadow-lg hover:shadow-xl disabled:opacity-50'
+                  >
+                    <Package className='w-6 h-6' />
+                    📦 Teslim Ettim
+                  </button>
                 )}
-                {/* Nakliyeci ile telefon iletişimi (mesajlaşma yok) */}
+                
+                {/* Nakliyeci ile telefon iletişimi */}
                 {job.nakliyeciPhone && (
                   <a
                     href={`tel:${job.nakliyeciPhone}`}
-                    className='block w-full px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg font-medium transition-all duration-300 flex items-center justify-center gap-2 border border-blue-200'
-                    title='Nakliyeci ile telefon iletişimi'
+                    className='block w-full px-4 py-3 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg font-semibold transition-all duration-300 flex items-center justify-center gap-2 border-2 border-blue-200'
                   >
-                    <Phone className='w-4 h-4' />
+                    <Phone className='w-5 h-5' />
                     Nakliyeciyi Ara
                   </a>
                 )}

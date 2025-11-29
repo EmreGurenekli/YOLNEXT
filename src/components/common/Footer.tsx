@@ -10,9 +10,8 @@ const Footer = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* Logo ve Açıklama */}
           <div className="col-span-1 md:col-span-2">
-            <div className="flex items-center mb-4">
-              <YolNextLogo />
-              <span className="ml-2 text-xl font-bold text-white">YolNext</span>
+            <div className="flex items-center justify-start mb-4">
+              <YolNextLogo variant='banner' size='lg' showText={false} />
             </div>
             <p className="text-slate-300 mb-4 max-w-md">
               Türkiye'nin en güvenilir lojistik platformu. Göndericiler ve nakliyecileri 
@@ -102,6 +101,11 @@ const Footer = () => {
               <li>
                 <Link to="/cookie-policy" className="text-slate-300 hover:text-white transition-colors">
                   Çerez Politikası
+                </Link>
+              </li>
+              <li>
+                <Link to="/kvkk-aydinlatma" className="text-slate-300 hover:text-white transition-colors">
+                  KVKK Aydınlatma Metni
                 </Link>
               </li>
             </ul>

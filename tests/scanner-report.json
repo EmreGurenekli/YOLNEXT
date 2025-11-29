@@ -1,0 +1,134 @@
+{
+  "passed": [
+    {
+      "page": "Landing Page",
+      "path": "/"
+    },
+    {
+      "page": "About Page",
+      "path": "/about"
+    },
+    {
+      "page": "Contact Page",
+      "path": "/contact"
+    },
+    {
+      "page": "Terms Page",
+      "path": "/terms"
+    },
+    {
+      "page": "Privacy Page",
+      "path": "/privacy"
+    },
+    {
+      "page": "Cookie Policy Page",
+      "path": "/cookie-policy"
+    },
+    {
+      "page": "Login Page",
+      "path": "/login"
+    },
+    {
+      "page": "Register Page",
+      "path": "/register"
+    },
+    {
+      "page": "Individual Dashboard",
+      "path": "/individual/dashboard"
+    },
+    {
+      "page": "Individual Create Shipment",
+      "path": "/individual/create-shipment"
+    },
+    {
+      "page": "Individual My Shipments",
+      "path": "/individual/my-shipments"
+    },
+    {
+      "page": "Individual Offers",
+      "path": "/individual/offers"
+    },
+    {
+      "page": "Individual Live Tracking",
+      "path": "/individual/live-tracking"
+    },
+    {
+      "page": "Individual Help",
+      "path": "/individual/help"
+    },
+    {
+      "page": "Corporate Dashboard",
+      "path": "/corporate/dashboard"
+    },
+    {
+      "page": "Corporate Create Shipment",
+      "path": "/corporate/create-shipment"
+    },
+    {
+      "page": "Corporate Shipments",
+      "path": "/corporate/shipments"
+    },
+    {
+      "page": "Corporate Offers",
+      "path": "/corporate/offers"
+    },
+    {
+      "page": "Corporate Analytics",
+      "path": "/corporate/analytics"
+    },
+    {
+      "page": "Corporate Help",
+      "path": "/corporate/help"
+    },
+    {
+      "page": "Nakliyeci Dashboard",
+      "path": "/nakliyeci/dashboard"
+    },
+    {
+      "page": "Nakliyeci Jobs",
+      "path": "/nakliyeci/jobs"
+    },
+    {
+      "page": "Nakliyeci Active Shipments",
+      "path": "/nakliyeci/active-shipments"
+    },
+    {
+      "page": "Nakliyeci Drivers",
+      "path": "/nakliyeci/drivers"
+    },
+    {
+      "page": "Nakliyeci Analytics",
+      "path": "/nakliyeci/analytics"
+    },
+    {
+      "page": "Nakliyeci Help",
+      "path": "/nakliyeci/help"
+    },
+    {
+      "page": "Tasiyici Dashboard",
+      "path": "/tasiyici/dashboard"
+    },
+    {
+      "page": "Tasiyici Market",
+      "path": "/tasiyici/market"
+    },
+    {
+      "page": "Tasiyici Active Jobs",
+      "path": "/tasiyici/active-jobs"
+    },
+    {
+      "page": "Tasiyici Help",
+      "path": "/tasiyici/help"
+    }
+  ],
+  "failed": [],
+  "warnings": [],
+  "errors": [],
+  "summary": {
+    "total": 30,
+    "passed": 30,
+    "failed": 0,
+    "warnings": 0,
+    "errors": 0
+  }
+}

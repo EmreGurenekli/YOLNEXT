@@ -16,10 +16,15 @@ When using Playwright browser automation via MCP:
 
 ## MCP Server Connection
 
-If MCP Playwright server shows "Not connected":
-- Check Playwright installation: `npx playwright --version`
-- Install browsers: `npx playwright install chromium`
-- Verify frontend is running: `http://localhost:5173`
-- Use direct Playwright scripts as fallback
+**CRITICAL: MCP Playwright connection must ALWAYS stay open**
+- MCP Playwright connection is managed by Cursor and should remain independent of backend/frontend server restarts
+- NEVER close MCP connection when restarting backend or frontend servers
+- Backend server restarts should NOT affect MCP Playwright connection
+- If MCP Playwright server shows "Not connected":
+  - Check Playwright installation: `npx playwright install chromium`
+  - Install browsers: `npx playwright install chromium`
+  - Verify frontend is running: `http://localhost:5173`
+  - MCP connection should automatically reconnect - do NOT manually restart it
+  - Use direct Playwright scripts as fallback ONLY if MCP is permanently unavailable
 
 

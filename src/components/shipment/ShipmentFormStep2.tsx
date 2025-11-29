@@ -21,13 +21,13 @@ export default function ShipmentFormStep2({
   // Get districts - handle both city ID and city name
   const getPickupDistricts = () => {
     if (!formData.pickupCity) return [];
-    const city = cities.find(c => c.id === formData.pickupCity || c.name === formData.pickupCity);
+    const city = cities.find((c: any) => c.id === formData.pickupCity || c.name === formData.pickupCity);
     return city?.districts || [];
   };
   
   const getDeliveryDistricts = () => {
     if (!formData.deliveryCity) return [];
-    const city = cities.find(c => c.id === formData.deliveryCity || c.name === formData.deliveryCity);
+    const city = cities.find((c: any) => c.id === formData.deliveryCity || c.name === formData.deliveryCity);
     return city?.districts || [];
   };
   
@@ -63,7 +63,7 @@ export default function ShipmentFormStep2({
               required
             >
               <option value=''>Şehir Seçin</option>
-              {cities.map(city => (
+              {cities.map((city: any) => (
                 <option key={city.id} value={city.name}>
                   {city.name}
                 </option>
@@ -90,7 +90,7 @@ export default function ShipmentFormStep2({
               required
             >
               <option value=''>İlçe Seçin</option>
-              {pickupDistricts.map(district => (
+              {pickupDistricts.map((district: string) => (
                 <option key={district} value={district}>
                   {district}
                 </option>
@@ -173,7 +173,7 @@ export default function ShipmentFormStep2({
               required
             >
               <option value=''>Şehir Seçin</option>
-              {cities.map(city => (
+              {cities.map((city: any) => (
                 <option key={city.id} value={city.name}>
                   {city.name}
                 </option>
@@ -200,7 +200,7 @@ export default function ShipmentFormStep2({
               required
             >
               <option value=''>İlçe Seçin</option>
-              {deliveryDistricts.map(district => (
+              {deliveryDistricts.map((district: string) => (
                 <option key={district} value={district}>
                   {district}
                 </option>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createApiUrl } from '../../config/api';
 import { useNavigate, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useAuth } from '../../contexts/AuthContext';
@@ -31,6 +32,7 @@ import {
   ArrowRight,
   Bell,
   AlertCircle,
+  AlertTriangle,
   Shield,
   Target,
   Timer,
@@ -79,8 +81,12 @@ export default function Offers() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [showAcceptConfirmModal, setShowAcceptConfirmModal] = useState(false);
+  const [showContactModal, setShowContactModal] = useState(false);
+  const [contactCarrier, setContactCarrier] = useState<{ phone: string; email: string } | null>(null);
   const [selectedOffer, setSelectedOffer] = useState<Offer | null>(null);
   const [offerToReject, setOfferToReject] = useState<string | null>(null);
+  const [offerToAccept, setOfferToAccept] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
@@ -102,16 +108,21 @@ export default function Offers() {
     setIsLoading(true);
     try {
       const user = localStorage.getItem('user')
-        ? JSON.parse(localStorage.getItem('user') || '{}')
+        ? (() => {
+            try {
+              return JSON.parse(localStorage.getItem('user') || '{}');
+            } catch {
+              return {};
+            }
+          })()
         : null;
       const userId = user?.id;
       const token = localStorage.getItem('authToken');
       const response = await fetch(
-        `/api/offers?${userId ? `userId=${userId}` : ''}`,
+        createApiUrl('/api/offers/corporate'),
         {
           headers: {
             Authorization: `Bearer ${token || ''}`,
-            'X-User-Id': userId || '',
             'Content-Type': 'application/json',
           },
         }
@@ -231,14 +242,29 @@ export default function Offers() {
   };
 
   const handleAcceptOffer = async (offerId: string) => {
+    setOfferToAccept(offerId);
+    setShowAcceptConfirmModal(true);
+  };
+
+  const confirmAcceptOffer = async () => {
+    if (!offerToAccept) return;
+    
     setIsLoading(true);
+    setShowAcceptConfirmModal(false);
+    
     try {
       const user = localStorage.getItem('user')
-        ? JSON.parse(localStorage.getItem('user') || '{}')
+        ? (() => {
+            try {
+              return JSON.parse(localStorage.getItem('user') || '{}');
+            } catch {
+              return {};
+            }
+          })()
         : null;
       const userId = user?.id;
       const token = localStorage.getItem('authToken');
-      const response = await fetch(`/api/offers/${offerId}/accept`, {
+      const response = await fetch(`/api/offers/${offerToAccept}/accept`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token || ''}`,
@@ -257,7 +283,7 @@ export default function Offers() {
       setShowSuccessMessage(true);
       setOffers(prev =>
         prev.map(offer =>
-          offer.id === offerId
+          offer.id === offerToAccept
             ? { ...offer, status: 'accepted' as const }
             : offer
         )
@@ -277,6 +303,7 @@ export default function Offers() {
       setShowSuccessMessage(true);
     } finally {
       setIsLoading(false);
+      setOfferToAccept(null);
     }
   };
 
@@ -284,7 +311,13 @@ export default function Offers() {
     setIsLoading(true);
     try {
       const user = localStorage.getItem('user')
-        ? JSON.parse(localStorage.getItem('user') || '{}')
+        ? (() => {
+            try {
+              return JSON.parse(localStorage.getItem('user') || '{}');
+            } catch {
+              return {};
+            }
+          })()
         : null;
       const userId = user?.id;
       const token = localStorage.getItem('authToken');
@@ -336,13 +369,23 @@ export default function Offers() {
   };
 
   const handleContactCarrier = (carrierPhone: string, carrierEmail: string) => {
-    const contactMethod = window.confirm(
-      'Nakliyeci ile iletişim kurmak için telefon aramak ister misiniz? (Hayır derseniz e-posta gönderilir)'
-    );
-    if (contactMethod) {
-      window.location.href = `tel:${carrierPhone}`;
-    } else {
-      window.location.href = `mailto:${carrierEmail}`;
+    setContactCarrier({ phone: carrierPhone, email: carrierEmail });
+    setShowContactModal(true);
+  };
+
+  const handleContactPhone = () => {
+    if (contactCarrier) {
+      window.location.href = `tel:${contactCarrier.phone}`;
+      setShowContactModal(false);
+      setContactCarrier(null);
+    }
+  };
+
+  const handleContactEmail = () => {
+    if (contactCarrier) {
+      window.location.href = `mailto:${contactCarrier.email}`;
+      setShowContactModal(false);
+      setContactCarrier(null);
     }
   };
 
@@ -972,6 +1015,63 @@ export default function Offers() {
           )}
         </Modal>
 
+        {/* Accept Confirmation Modal with Disclaimer */}
+        <Modal
+          isOpen={showAcceptConfirmModal}
+          onClose={() => {
+            setShowAcceptConfirmModal(false);
+            setOfferToAccept(null);
+          }}
+          title='Teklifi Kabul Et'
+        >
+          <div className='p-6 space-y-6'>
+            {/* ÖNEMLİ UYARI */}
+            <div className='bg-red-50 border-2 border-red-300 rounded-xl p-4 space-y-3'>
+              <div className='flex items-start gap-3'>
+                <AlertTriangle className='w-5 h-5 text-red-600 flex-shrink-0 mt-0.5' />
+                <div className='flex-1'>
+                  <h4 className='font-bold text-red-800 mb-2'>ÖNEMLİ UYARI: Sorumluluk Reddi</h4>
+                  <p className='text-sm text-red-700 font-semibold mb-2'>
+                    YolNext sadece bir aracı platformdur. Taşımacılık hizmetlerini bizzat sağlamaz ve hiçbir şekilde sorumluluk kabul etmez.
+                  </p>
+                  <ul className='text-xs text-red-700 space-y-1 list-disc pl-4'>
+                    <li>Kaza, yaralanma, ölüm: YolNext sorumlu değildir</li>
+                    <li>Hırsızlık, kayıp, hasar: YolNext sorumlu değildir</li>
+                    <li>Gecikme, yanlış teslimat: YolNext sorumlu değildir</li>
+                    <li>Mali kayıplar: YolNext sorumlu değildir</li>
+                  </ul>
+                  <p className='text-xs text-red-700 font-semibold mt-2'>
+                    Tüm riskler gönderici ve nakliyeci arasındadır.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <p className='text-slate-600'>
+              Bu teklifi kabul ederek, yukarıdaki sorumluluk reddini okuduğunuzu ve kabul ettiğinizi onaylıyorsunuz. 
+              Teklifi kabul etmek istediğinizden emin misiniz?
+            </p>
+            
+            <div className='flex justify-end gap-3'>
+              <button
+                onClick={() => {
+                  setShowAcceptConfirmModal(false);
+                  setOfferToAccept(null);
+                }}
+                className='px-4 py-2 text-slate-600 hover:text-slate-800 transition-colors'
+              >
+                İptal
+              </button>
+              <button
+                onClick={confirmAcceptOffer}
+                className='px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors'
+              >
+                Kabul Et ve Onayla
+              </button>
+            </div>
+          </div>
+        </Modal>
+
         {/* Reject Confirmation Modal */}
         <Modal
           isOpen={showRejectModal}
@@ -997,6 +1097,62 @@ export default function Offers() {
                 className='px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors'
               >
                 Reddet
+              </button>
+            </div>
+          </div>
+        </Modal>
+
+        {/* Contact Carrier Modal */}
+        <Modal
+          isOpen={showContactModal}
+          onClose={() => {
+            setShowContactModal(false);
+            setContactCarrier(null);
+          }}
+          title='Nakliyeci ile İletişim'
+          size='md'
+        >
+          <div className='p-6 space-y-4'>
+            <p className='text-slate-600 mb-4'>
+              Nakliyeci ile iletişim kurmak için bir yöntem seçin:
+            </p>
+            <div className='space-y-3'>
+              <button
+                onClick={handleContactPhone}
+                className='w-full flex items-center gap-3 p-4 bg-gradient-to-r from-green-50 to-emerald-50 hover:from-green-100 hover:to-emerald-100 border border-green-200 rounded-xl transition-all duration-300 group'
+              >
+                <div className='w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform'>
+                  <Phone className='w-6 h-6 text-white' />
+                </div>
+                <div className='flex-1 text-left'>
+                  <div className='font-semibold text-slate-900'>Telefon ile Ara</div>
+                  <div className='text-sm text-slate-600'>{contactCarrier?.phone}</div>
+                </div>
+                <ArrowRight className='w-5 h-5 text-green-600 group-hover:translate-x-1 transition-transform' />
+              </button>
+              <button
+                onClick={handleContactEmail}
+                className='w-full flex items-center gap-3 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 border border-blue-200 rounded-xl transition-all duration-300 group'
+              >
+                <div className='w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform'>
+                  <Mail className='w-6 h-6 text-white' />
+                </div>
+                <div className='flex-1 text-left'>
+                  <div className='font-semibold text-slate-900'>E-posta Gönder</div>
+                  <div className='text-sm text-slate-600'>{contactCarrier?.email}</div>
+                </div>
+                <ArrowRight className='w-5 h-5 text-blue-600 group-hover:translate-x-1 transition-transform' />
+              </button>
+            </div>
+            <div className='pt-4 border-t border-slate-200'>
+              <button
+                onClick={() => {
+                  setShowContactModal(false);
+                  setContactCarrier(null);
+                }}
+                className='w-full px-4 py-2 text-slate-600 hover:text-slate-800 transition-colors font-medium'
+              >
+                İptal
               </button>
             </div>
           </div>

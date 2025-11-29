@@ -260,7 +260,7 @@ export const validateEmail = (email: string): boolean => {
 };
 
 export const validatePhone = (phone: string): boolean => {
-  const phoneRegex = /^[\+]?[0-9\s\-\(\)]{10,}$/;
+  const phoneRegex = /^[+]?[0-9\s\-()]{10,}$/;
   return phoneRegex.test(phone);
 };
 

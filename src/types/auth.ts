@@ -24,6 +24,7 @@ export interface User {
   };
   createdAt?: string;
   updatedAt?: string;
+  driverCode?: string; // For tasiyici users
 }
 
 export interface LoginCredentials {

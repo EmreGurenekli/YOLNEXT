@@ -43,7 +43,6 @@ interface OfferData {
   price: number;
   message: string;
   estimatedDeliveryDays: number;
-  insuranceIncluded: boolean;
   specialServices: string[];
 }
 
@@ -55,7 +54,6 @@ const OfferShipment: React.FC = () => {
     price: 0,
     message: '',
     estimatedDeliveryDays: 1,
-    insuranceIncluded: false,
     specialServices: [],
   });
   const [isLoading, setIsLoading] = useState(true);
@@ -206,7 +204,6 @@ const OfferShipment: React.FC = () => {
         price: offerData.price,
         message: offerData.message,
         estimatedDeliveryDays: offerData.estimatedDeliveryDays,
-        insuranceIncluded: offerData.insuranceIncluded,
         specialServices: offerData.specialServices,
         carrierId: user?.id || '',
         carrierName: user?.fullName || user?.name || '',
@@ -525,26 +522,6 @@ const OfferShipment: React.FC = () => {
                   </select>
                 </div>
 
-                {/* Sigorta */}
-                <div className='mb-6'>
-                  <label className='flex items-center gap-3 cursor-pointer'>
-                    <input
-                      type='checkbox'
-                      checked={offerData.insuranceIncluded}
-                      onChange={e =>
-                        handleInputChange('insuranceIncluded', e.target.checked)
-                      }
-                      className='w-5 h-5 text-blue-600 border-2 border-slate-300 rounded focus:ring-blue-500'
-                    />
-                    <Shield className='w-5 h-5 text-blue-600' />
-                    <span className='text-sm font-semibold text-slate-700'>
-                      Sigorta Dahil
-                    </span>
-                  </label>
-                  <p className='text-sm text-slate-500 mt-2 ml-8'>
-                    Gönderi sigortası dahil edilecek.
-                  </p>
-                </div>
 
                 {/* Özel Hizmetler */}
                 <div className='mb-6'>

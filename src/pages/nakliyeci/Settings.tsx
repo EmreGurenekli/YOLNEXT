@@ -529,6 +529,82 @@ export default function NakliyeciSettings() {
                           />
                         </button>
                       </div>
+                      
+                      {/* KVKK Veri Erişim Hakkı - Gizli yer */}
+                      <div className='mt-8 pt-6 border-t border-slate-200'>
+                        <div className='text-xs text-slate-400 space-y-2'>
+                          <p className='text-[10px] leading-tight'>
+                            KVKK m.11 gereği veri erişim ve silme haklarınız için:
+                          </p>
+                          <div className='flex gap-2'>
+                            <button
+                              onClick={async () => {
+                                try {
+                                  const token = localStorage.getItem('authToken');
+                                  const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/kvkk/data-access`, {
+                                    headers: {
+                                      'Authorization': `Bearer ${token}`,
+                                      'Content-Type': 'application/json',
+                                    },
+                                  });
+                                  if (response.ok) {
+                                    const data = await response.json();
+                                    const blob = new Blob([JSON.stringify(data.data, null, 2)], { type: 'application/json' });
+                                    const url = URL.createObjectURL(blob);
+                                    const a = document.createElement('a');
+                                    a.href = url;
+                                    a.download = `yolnext-veri-export-${new Date().toISOString().split('T')[0]}.json`;
+                                    a.click();
+                                    URL.revokeObjectURL(url);
+                                    setSuccessMessage('Verileriniz indirildi');
+                                    setShowSuccessMessage(true);
+                                  } else {
+                                    setSuccessMessage('Veri erişim hatası');
+                                    setShowSuccessMessage(true);
+                                  }
+                                } catch (error) {
+                                  setSuccessMessage('Veri erişim hatası');
+                                  setShowSuccessMessage(true);
+                                }
+                              }}
+                              className='text-[10px] text-slate-400 hover:text-slate-600 underline'
+                            >
+                              Verilerimi İndir
+                            </button>
+                            <span className='text-slate-300'>|</span>
+                            <button
+                              onClick={async () => {
+                                if (!confirm('Tüm verileriniz silinecek. Bu işlem geri alınamaz. Emin misiniz?')) return;
+                                if (!confirm('Son bir kez onaylayın: Tüm verileriniz kalıcı olarak silinecek. Devam edilsin mi?')) return;
+                                try {
+                                  const token = localStorage.getItem('authToken');
+                                  const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/kvkk/delete-data`, {
+                                    method: 'DELETE',
+                                    headers: {
+                                      'Authorization': `Bearer ${token}`,
+                                      'Content-Type': 'application/json',
+                                    },
+                                  });
+                                  const data = await response.json();
+                                  if (response.ok) {
+                                    alert('Verileriniz silindi. Çıkış yapılıyor...');
+                                    localStorage.removeItem('authToken');
+                                    localStorage.removeItem('user');
+                                    window.location.href = '/login';
+                                  } else {
+                                    alert(data.message || 'Veri silme hatası');
+                                  }
+                                } catch (error) {
+                                  alert('Veri silme hatası');
+                                }
+                              }}
+                              className='text-[10px] text-slate-400 hover:text-red-600 underline'
+                            >
+                              Verilerimi Sil
+                            </button>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}

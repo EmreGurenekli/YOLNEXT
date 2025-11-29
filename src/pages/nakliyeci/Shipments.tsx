@@ -26,6 +26,7 @@ import Breadcrumb from '../../components/common/Breadcrumb';
 import EmptyState from '../../components/common/EmptyState';
 import LoadingState from '../../components/common/LoadingState';
 import Modal from '../../components/common/Modal';
+import SuccessMessage from '../../components/common/SuccessMessage';
 
 const NakliyeciShipments: React.FC = () => {
   const navigate = useNavigate();
@@ -36,6 +37,10 @@ const NakliyeciShipments: React.FC = () => {
   const [selectedShipment, setSelectedShipment] = useState<any>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [openingListing, setOpeningListing] = useState<number | null>(null);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [showError, setShowError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const breadcrumbItems = [
     { label: 'Ana Sayfa', icon: <Package className='w-4 h-4' /> },
@@ -95,10 +100,16 @@ const NakliyeciShipments: React.FC = () => {
         body: JSON.stringify({ shipmentId }),
       });
       if (!res.ok) throw new Error('İlan açılamadı');
-      alert('İlan taşıyıcılara açıldı');
-      navigate('/nakliyeci/listings');
+      setSuccessMessage('İlan taşıyıcılara açıldı');
+      setShowSuccess(true);
+      setTimeout(() => {
+        setShowSuccess(false);
+        navigate('/nakliyeci/listings');
+      }, 2000);
     } catch (e) {
-      alert('İlan açılamadı');
+      setErrorMessage('İlan açılamadı. Lütfen tekrar deneyin.');
+      setShowError(true);
+      setTimeout(() => setShowError(false), 5000);
     } finally {
       setOpeningListing(null);
     }
@@ -467,6 +478,29 @@ const NakliyeciShipments: React.FC = () => {
             )}
           </div>
         </Modal>
+      )}
+
+      {/* Success Message */}
+      {showSuccess && (
+        <SuccessMessage
+          message={successMessage}
+          isVisible={showSuccess}
+          onClose={() => setShowSuccess(false)}
+        />
+      )}
+
+      {/* Error Message */}
+      {showError && (
+        <div className="fixed bottom-4 right-4 bg-red-50 border border-red-200 text-red-600 px-6 py-4 rounded-xl shadow-xl flex items-center gap-3 z-50 animate-slide-up">
+          <AlertCircle className="w-5 h-5" />
+          <span className="font-medium">{errorMessage}</span>
+          <button
+            onClick={() => setShowError(false)}
+            className="ml-4 text-red-400 hover:text-red-600"
+          >
+            <XCircle className="w-5 h-5" />
+          </button>
+        </div>
       )}
     </div>
   );

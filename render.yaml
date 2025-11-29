@@ -1,0 +1,41 @@
+services:
+  - type: web
+    name: yolnext-backend
+    env: node
+    buildCommand: cd backend && npm install
+    startCommand: node postgres-backend.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: FRONTEND_ORIGIN
+        sync: false
+
+  - type: web
+    name: yolnext-frontend
+    env: static
+    buildCommand: npm install && npm run build:frontend
+    staticPublishPath: ./dist
+    envVars:
+      - key: VITE_API_URL
+        sync: false
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

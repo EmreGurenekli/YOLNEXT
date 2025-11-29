@@ -36,7 +36,7 @@ import LoadingState from '../../components/common/LoadingState';
 import Modal from '../../components/common/Modal';
 import SuccessMessage from '../../components/common/SuccessMessage';
 import Pagination from '../../components/common/Pagination';
-import { api } from '../../services/api';
+import api from '../../services/api';
 import { API_ENDPOINTS } from '../../config/api';
 
 export default function NakliyeciOffers() {
@@ -98,6 +98,16 @@ export default function NakliyeciOffers() {
     try {
       setIsLoading(true);
       setLoadError(null);
+      
+      // Check if api is available
+      if (!api || typeof api.get !== 'function') {
+        console.error('API service not available');
+        setLoadError('API servisi kullanılamıyor');
+        setOffers([]);
+        setIsLoading(false);
+        return;
+      }
+      
       const statusParam =
         filterStatus && filterStatus !== 'all'
           ? `?status=${encodeURIComponent(filterStatus)}`

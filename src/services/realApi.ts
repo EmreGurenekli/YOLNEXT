@@ -152,6 +152,7 @@ class RealApiService {
   async logout(): Promise<ApiResponse<void>> {
     this.token = null;
     localStorage.removeItem('authToken');
+    localStorage.removeItem('user');
     return { success: true };
   }
 

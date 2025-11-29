@@ -1,6 +1,5 @@
-// @ts-ignore - zustand type definitions may not be available
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore
+// @ts-ignore - zustand type definitions may not be available
 import { create } from 'zustand';
 import { logger } from '../services/logger';
 

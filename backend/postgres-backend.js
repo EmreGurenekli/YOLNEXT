@@ -26,6 +26,10 @@ const iyzicoService = require('./services/iyzicoService');
 
 // Environment Variables - Load after dotenv
 const PORT = process.env.PORT || 5000;
+
+// Demo shipments store (in-memory for testing)
+const demoShipmentsStore = new Map();
+const demoOffersStore = new Map();
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const JWT_SECRET =
   process.env.JWT_SECRET ||
@@ -37,12 +41,12 @@ const DATABASE_URL =
 
 // Validate required env vars in production
 if (NODE_ENV === 'production' && !JWT_SECRET) {
-  console.error('âŒ CRITICAL: JWT_SECRET must be set in production!');
+  console.error('? CRITICAL: JWT_SECRET must be set in production!');
   process.exit(1);
 }
 
 if (NODE_ENV === 'production' && !process.env.DATABASE_URL) {
-  console.error('âŒ CRITICAL: DATABASE_URL must be set in production!');
+  console.error('? CRITICAL: DATABASE_URL must be set in production!');
   process.exit(1);
 }
 
@@ -70,16 +74,16 @@ try {
 
   // Test connection
   pool.on('connect', () => {
-    console.log('âœ… PostgreSQL connected');
+    console.log('? PostgreSQL connected');
   });
 
   pool.on('error', err => {
-    console.error('âŒ PostgreSQL pool error:', err);
+    console.error('? PostgreSQL pool error:', err);
   });
 
-  console.log('âœ… PostgreSQL pool created');
+  console.log('? PostgreSQL pool created');
 } catch (error) {
-  console.error('âŒ Error creating PostgreSQL pool:', error);
+  console.error('? Error creating PostgreSQL pool:', error);
 }
 
 // Middleware
@@ -90,7 +94,7 @@ try {
   const { trackRequest } = require('./utils/monitoring');
   app.use(trackRequest);
 } catch (error) {
-  console.warn('âš ï¸ Monitoring middleware not available:', error.message);
+  console.warn('?? Monitoring middleware not available:', error.message);
 }
 
 app.use(
@@ -189,7 +193,7 @@ const authLimiter = rateLimit({
   max: 5, // 5 attempts per 15 minutes (brute force protection)
   message: {
     success: false,
-    message: 'Ã‡ok fazla deneme yaptÄ±nÄ±z. LÃ¼tfen 15 dakika sonra tekrar deneyin.',
+    message: 'Çok fazla deneme yaptınız. Lütfen 15 dakika sonra tekrar deneyin.',
   },
   standardHeaders: true,
   legacyHeaders: false,
@@ -209,7 +213,7 @@ const generalLimiter = rateLimit({
   max: 100, // 100 requests per minute (reduced from 300)
   message: {
     success: false,
-    message: 'Ã‡ok fazla istek. LÃ¼tfen daha sonra tekrar deneyin.',
+    message: 'Çok fazla istek. Lütfen daha sonra tekrar deneyin.',
   },
   standardHeaders: true,
   legacyHeaders: false,
@@ -226,7 +230,7 @@ const uploadLimiter = rateLimit({
   max: 10, // 10 uploads per minute
   message: {
     success: false,
-    message: 'Ã‡ok fazla dosya yÃ¼kleme isteÄŸi. LÃ¼tfen bekleyin.',
+    message: 'Çok fazla dosya yükleme isteği. Lütfen bekleyin.',
   },
   standardHeaders: true,
   legacyHeaders: false,
@@ -238,7 +242,7 @@ const paymentLimiter = rateLimit({
   max: 20, // 20 payment attempts per hour
   message: {
     success: false,
-    message: 'Ã–deme istek limiti aÅŸÄ±ldÄ±. LÃ¼tfen daha sonra tekrar deneyin.',
+    message: 'Ödeme istek limiti aşıldı. Lütfen daha sonra tekrar deneyin.',
   },
   standardHeaders: true,
   legacyHeaders: false,
@@ -250,7 +254,7 @@ const paymentLimiter = rateLimit({
 //   max: 10, // 10 offers per minute
 //   message: {
 //     success: false,
-//     message: 'Ã‡ok fazla teklif gÃ¶nderiyorsunuz. LÃ¼tfen bekleyin.',
+//     message: 'Çok fazla teklif gönderiyorsunuz. Lütfen bekleyin.',
 //   },
 //   standardHeaders: true,
 //   legacyHeaders: false,
@@ -262,7 +266,7 @@ const verificationLimiter = rateLimit({
   max: 3, // 3 verification codes per minute
   message: {
     success: false,
-    message: 'Ã‡ok fazla doÄŸrulama kodu istendi. LÃ¼tfen bekleyin.',
+    message: 'Çok fazla doğrulama kodu istendi. Lütfen bekleyin.',
   },
   standardHeaders: true,
   legacyHeaders: false,
@@ -499,6 +503,20 @@ const authenticateToken = async (req, res, next) => {
   try {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
+
+    // Demo token support
+    if (token && token.startsWith('demo-token-')) {
+      const parts = token.replace('demo-token-', '').split('-');
+      const userType = parts[0];
+      const userId = parts.slice(1).join('-') || 'demo-user';
+      req.user = {
+        id: userId,
+        email: 'demo@' + userType + '.com',
+        role: userType === 'individual' ? 'individual' : userType === 'corporate' ? 'corporate' : userType === 'nakliyeci' ? 'nakliyeci' : 'tasiyici',
+        isDemo: true,
+      };
+      return next();
+    }
 
     if (!token) {
       return res.status(401).json({
@@ -806,7 +824,7 @@ app.get('/api/dashboard/nakliyeci', authenticateToken, async (req, res) => {
 
 app.get('/api/dashboard/tasiyici', authenticateToken, async (req, res) => {
   try {
-    // Jobs tablosu yoksa basit veriler dÃ¶ndÃ¼r - New users see clean/empty data
+    // Jobs tablosu yoksa basit veriler döndür - New users see clean/empty data
     res.json({
       success: true,
       data: {
@@ -1040,9 +1058,9 @@ app.get(
 // Create tables if not exist
 async function createTables() {
   // Create error_logs table first
-  await createErrorLogsTable();
+  // createErrorLogsTable() - disabled
   if (!pool) {
-    console.error('âŒ No database pool available');
+    console.error('? No database pool available');
     return false;
   }
 
@@ -1616,10 +1634,10 @@ async function createTables() {
       'CREATE INDEX IF NOT EXISTS idx_kyc_documents_status ON kyc_documents(status)'
     );
 
-    console.log('âœ… PostgreSQL tables created successfully');
+    console.log('? PostgreSQL tables created successfully');
     return true;
   } catch (error) {
-    console.error('âŒ Error creating tables:', error);
+    console.error('? Error creating tables:', error);
     return false;
   }
 }
@@ -1627,7 +1645,7 @@ async function createTables() {
 // Seed test data
 async function seedData() {
   if (!pool) {
-    console.error('âŒ No database pool available for seeding');
+    console.error('? No database pool available for seeding');
     return false;
   }
 
@@ -1635,7 +1653,7 @@ async function seedData() {
     // Check if data already exists
     const userCount = await pool.query('SELECT COUNT(*) FROM users');
     if (parseInt(userCount.rows[0].count) > 0) {
-      console.log('âœ… Data already exists, skipping seed');
+      console.log('? Data already exists, skipping seed');
       return true;
     }
 
@@ -1659,9 +1677,9 @@ async function seedData() {
     `,
       [
         userId,
-        'Ä°stanbul - Ankara Kargo',
-        'Ofis malzemeleri taÅŸÄ±macÄ±lÄ±ÄŸÄ±',
-        'Ä°stanbul',
+        'İstanbul - Ankara Kargo',
+        'Ofis malzemeleri taşımacılığı',
+        'İstanbul',
         'Ankara',
         100,
         2.5,
@@ -1679,23 +1697,23 @@ async function seedData() {
     `,
       [
         userId,
-        'Ä°zmir - Bursa Elektronik',
+        'İzmir - Bursa Elektronik',
         'Bilgisayar ve ekipmanlar',
-        'Ä°zmir',
+        'İzmir',
         'Bursa',
         50,
         1.2,
         '2024-02-20',
-        'Elektronik eÅŸya',
+        'Elektronik eşya',
         'in_progress',
         320,
       ]
     );
 
-    console.log('âœ… Test data seeded successfully');
+    console.log('? Test data seeded successfully');
     return true;
   } catch (error) {
-    console.error('âŒ Error seeding data:', error);
+    console.error('? Error seeding data:', error);
     return false;
   }
 }
@@ -1703,6 +1721,16 @@ async function seedData() {
 // Shipments routes
 app.get('/api/shipments', authenticateToken, async (req, res) => {
   try {
+      // Handle demo users
+      if (req.user && req.user.isDemo) {
+                const userShipments = Array.from(demoShipmentsStore.values()).filter(s => s.userId === req.user.id);
+        return res.json({
+          success: true,
+          data: userShipments,
+          message: 'Demo kullanÄ±cÄ± gÃ¶nderileri',
+        });
+      }
+
     // Handle demo users - check both req.user.isDemo and if user doesn't exist in DB
     if (req.user && (req.user.isDemo === true || req.user.isDemo)) {
       return res.json({
@@ -1808,7 +1836,7 @@ app.get('/api/shipments', authenticateToken, async (req, res) => {
     console.error('Error fetching shipments:', error);
     res.status(500).json({
       success: false,
-      error: 'GÃ¶nderiler yÃ¼klenemedi',
+      error: 'Gönderiler yüklenemedi',
       details: error.message,
     });
   }
@@ -1820,6 +1848,31 @@ app.post(
   idempotencyGuard,
   async (req, res) => {
     try {
+      // Handle demo users
+      if (req.user && req.user.isDemo) {
+                const mockShipment = {
+          id: Date.now(),
+          trackingNumber: 'DEMO-' + Date.now(),
+          userId: req.user.id,
+          status: 'open',
+          category: req.body.category || 'house_move',
+          pickupAddress: req.body.pickupAddress || req.body.pickup_address || '',
+          deliveryAddress: req.body.deliveryAddress || req.body.delivery_address || '',
+          pickupDate: req.body.pickupDate || req.body.pickup_date || new Date().toISOString(),
+          deliveryDate: req.body.deliveryDate || req.body.delivery_date || new Date().toISOString(),
+          weight: req.body.weight || 0,
+          description: req.body.description || req.body.productDescription || '',
+          createdAt: new Date().toISOString(),
+        };
+                // Store demo shipment
+        demoShipmentsStore.set(mockShipment.id, mockShipment);
+        return res.json({
+          success: true,
+          data: { shipment: mockShipment },
+          message: 'Demo gÃ¶nderi oluÅŸturuldu',
+        });
+      }
+
       if (!pool) {
         return res.status(500).json({
           success: false,
@@ -1920,7 +1973,7 @@ app.post(
     `,
         [
           finalUserId,
-          title || `${pickupCity} â†’ ${deliveryCity}`,
+          title || `${pickupCity} › ${deliveryCity}`,
           description,
           req.body.productDescription || description || '',
           category || 'general',
@@ -1951,8 +2004,8 @@ app.post(
         await createNotification(
           finalUserId,
           'shipment_created',
-          'GÃ¶nderi OluÅŸturuldu',
-          `GÃ¶nderiniz baÅŸarÄ±yla oluÅŸturuldu. Takip numaranÄ±z: ${trackingNumber}`,
+          'Gönderi Oluşturuldu',
+          `Gönderiniz başarıyla oluşturuldu. Takip numaranız: ${trackingNumber}`,
           `/shipments/${shipment.id}`,
           'normal',
           { shipmentId: shipment.id, trackingNumber }
@@ -1963,7 +2016,7 @@ app.post(
 
       res.status(201).json({
         success: true,
-        message: 'GÃ¶nderi baÅŸarÄ±yla oluÅŸturuldu',
+        message: 'Gönderi başarıyla oluşturuldu',
         data: {
           shipment: shipment,
           id: shipment.id,
@@ -1976,7 +2029,7 @@ app.post(
       console.error('User:', req.user);
       res.status(500).json({
         success: false,
-        error: 'GÃ¶nderi oluÅŸturulamadÄ±',
+        error: 'Gönderi oluşturulamadı',
         details: error.message,
         stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
       });
@@ -2034,7 +2087,7 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     if ((role === 'corporate' || role === 'nakliyeci') && !taxNumber) {
       return res.status(400).json({
         success: false,
-        message: 'Vergi numarasÄ± (VKN) zorunludur',
+        message: 'Vergi numarası (VKN) zorunludur',
       });
     }
 
@@ -2044,7 +2097,7 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
       if (!vknRegex.test(taxNumber)) {
         return res.status(400).json({
           success: false,
-          message: 'Vergi numarasÄ± 10 haneli olmalÄ±dÄ±r',
+          message: 'Vergi numarası 10 haneli olmalıdır',
         });
       }
 
@@ -2056,7 +2109,7 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     if (role === 'tasiyici' && !tckn) {
       return res.status(400).json({
         success: false,
-        message: 'TC Kimlik No zorunludur (ehliyet doÄŸrulamasÄ± iÃ§in)',
+        message: 'TC Kimlik No zorunludur (ehliyet doğrulaması için)',
       });
     }
 
@@ -2066,7 +2119,7 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
       if (!tcknRegex.test(tckn)) {
         return res.status(400).json({
           success: false,
-          message: 'TC Kimlik No 11 haneli olmalÄ±dÄ±r',
+          message: 'TC Kimlik No 11 haneli olmalıdır',
         });
       }
 
@@ -2074,7 +2127,7 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
       if (tckn[0] === '0') {
         return res.status(400).json({
           success: false,
-          message: 'GeÃ§ersiz TC Kimlik No',
+          message: 'Geçersiz TC Kimlik No',
         });
       }
 
@@ -2086,7 +2139,7 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
       if (digits[9] !== q1 || digits[10] !== q2) {
         return res.status(400).json({
           success: false,
-          message: 'GeÃ§ersiz TC Kimlik No (checksum hatasÄ±)',
+          message: 'Geçersiz TC Kimlik No (checksum hatası)',
         });
       }
     }
@@ -2095,7 +2148,7 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     if ((role === 'corporate' || role === 'nakliyeci') && !companyName) {
       return res.status(400).json({
         success: false,
-        message: 'Åirket adÄ± zorunludur',
+        message: 'Şirket adı zorunludur',
       });
     }
 
@@ -2181,20 +2234,20 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     const verificationUrl = `${process.env.FRONTEND_ORIGIN || 'http://localhost:5173'}/verify-email?token=${verificationToken}`;
     const emailSent = await sendEmail(
       email,
-      'YolNext - Email DoÄŸrulama',
-      `YolNext'e hoÅŸ geldiniz!\n\nEmail adresinizi doÄŸrulamak iÃ§in aÅŸaÄŸÄ±daki linke tÄ±klayÄ±n:\n\n${verificationUrl}\n\nBu link 24 saat geÃ§erlidir.\n\nEÄŸer bu hesabÄ± siz oluÅŸturmadÄ±ysanÄ±z, bu emaili gÃ¶rmezden gelebilirsiniz.`
+      'YolNext - Email Doğrulama',
+      `YolNext'e hoş geldiniz!\n\nEmail adresinizi doğrulamak için aşağıdaki linke tıklayın:\n\n${verificationUrl}\n\nBu link 24 saat geçerlidir.\n\nEğer bu hesabı siz oluşturmadıysanız, bu emaili görmezden gelebilirsiniz.`
     );
 
     if (!emailSent) {
-      console.warn('âš ï¸ Email gÃ¶nderilemedi, ancak token oluÅŸturuldu');
+      console.warn('?? Email gönderilemedi, ancak token oluşturuldu');
     }
 
     // Create welcome notification
     await createNotification(
       user.id,
       'welcome',
-      'HoÅŸ geldiniz!',
-      `${user.fullName || user.email}, YolNext ailesine hoÅŸ geldiniz! Email adresinizi doÄŸrulamayÄ± unutmayÄ±n.`,
+      'Hoş geldiniz!',
+      `${user.fullName || user.email}, YolNext ailesine hoş geldiniz! Email adresinizi doğrulamayı unutmayın.`,
       '/dashboard',
       'normal',
       { type: 'system' }
@@ -2202,7 +2255,7 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: 'KayÄ±t baÅŸarÄ±lÄ±. Email doÄŸrulama linki gÃ¶nderildi.',
+      message: 'Kayıt başarılı. Email doğrulama linki gönderildi.',
       data: {
         user: {
           id: user.id,
@@ -2330,25 +2383,25 @@ app.post('/api/auth/demo-login', async (req, res) => {
 
   const userTypes = {
     individual: {
-      name: 'Bireysel Demo KullanÄ±cÄ±',
+      name: 'Bireysel Demo Kullanıcı',
       email: 'demo@bireysel.com',
       panel_type: 'individual',
       role: 'individual',
     },
     corporate: {
-      name: 'Kurumsal Demo KullanÄ±cÄ±',
+      name: 'Kurumsal Demo Kullanıcı',
       email: 'demo@kurumsal.com',
       panel_type: 'corporate',
       role: 'corporate',
     },
     nakliyeci: {
-      name: 'Nakliyeci Demo KullanÄ±cÄ±',
+      name: 'Nakliyeci Demo Kullanıcı',
       email: 'demo@nakliyeci.com',
       panel_type: 'nakliyeci',
       role: 'nakliyeci',
     },
     tasiyici: {
-      name: 'TaÅŸÄ±yÄ±cÄ± Demo KullanÄ±cÄ±',
+      name: 'Taşıyıcı Demo Kullanıcı',
       email: 'demo@tasiyici.com',
       panel_type: 'tasiyici',
       role: 'tasiyici',
@@ -2386,6 +2439,38 @@ app.post('/api/auth/demo-login', async (req, res) => {
 // Open shipments endpoint
 app.get('/api/shipments/open', authenticateToken, async (req, res) => {
   try {
+      // Handle demo users - return demo shipments
+      if (req.user && req.user.isDemo) {
+        const allDemoShipments = Array.from(demoShipmentsStore.values());
+        // Format shipments for frontend
+        const formattedShipments = allDemoShipments.map(s => ({
+          id: s.id,
+          trackingNumber: s.trackingNumber,
+          title: s.category || 'GÃ¶nderi',
+          description: s.pickupAddress + ' â†’ ' + s.deliveryAddress,
+          pickupAddress: s.pickupAddress,
+          deliveryAddress: s.deliveryAddress,
+          pickupDate: s.pickupDate,
+          deliveryDate: s.deliveryDate,
+          weight: s.weight || 0,
+          category: s.category,
+          status: s.status || 'open',
+          userId: s.userId,
+          createdAt: s.createdAt,
+        }));
+        return res.json({
+          success: true,
+          data: formattedShipments,
+          pagination: {
+            page: 1,
+            pages: 1,
+            total: formattedShipments.length,
+            limit: 20,
+          },
+          message: 'Demo aÃ§Ä±k gÃ¶nderiler',
+        });
+      }
+
     if (!pool) {
       return res.status(500).json({
         success: false,
@@ -2432,7 +2517,7 @@ app.get('/api/shipments/open', authenticateToken, async (req, res) => {
       result = await pool.query(
         `
         SELECT s.*, 
-               COALESCE(u.fullName, 'Demo KullanÄ±cÄ±') as ownerName,
+               COALESCE(u.fullName, 'Demo Kullanıcı') as ownerName,
                COALESCE(u.companyName, '') as ownerCompany
         FROM shipments s
         LEFT JOIN users u ON s.userId = u.id
@@ -2554,7 +2639,7 @@ app.get('/api/messages', authenticateToken, async (req, res) => {
     console.error('Error fetching messages:', error);
     res.status(500).json({
       success: false,
-      error: 'Mesajlar yÃ¼klenemedi',
+      error: 'Mesajlar yüklenemedi',
       details: error.message,
     });
   }
@@ -2608,7 +2693,7 @@ app.post(
         if (shipmentResult.rows.length === 0) {
           return res.status(404).json({
             success: false,
-            message: 'GÃ¶nderi bulunamadÄ±',
+            message: 'Gönderi bulunamadı',
           });
         }
 
@@ -2622,7 +2707,7 @@ app.post(
         if (!isOwner && !isCarrier) {
           return res.status(403).json({
             success: false,
-            message: 'Bu gÃ¶nderi ile ilgili mesaj gÃ¶nderme yetkiniz yok',
+            message: 'Bu gönderi ile ilgili mesaj gönderme yetkiniz yok',
           });
         }
 
@@ -2634,7 +2719,7 @@ app.post(
           if (!validReceivers.includes(parseInt(finalReceiverId))) {
             return res.status(400).json({
               success: false,
-              message: 'GeÃ§ersiz alÄ±cÄ±',
+              message: 'Geçersiz alıcı',
             });
           }
         }
@@ -2648,7 +2733,7 @@ app.post(
         if (receiverCheck.rows.length === 0) {
           return res.status(404).json({
             success: false,
-            message: 'AlÄ±cÄ± bulunamadÄ±',
+            message: 'Alıcı bulunamadı',
           });
         }
       }
@@ -2680,13 +2765,13 @@ app.post(
       const senderName =
         senderResult.rows[0]?.companyName ||
         senderResult.rows[0]?.fullName ||
-        'Bir kullanÄ±cÄ±';
+        'Bir kullanıcı';
 
       await createNotification(
         finalReceiverId,
         'new_message',
         'Yeni Mesaj',
-        `${senderName} size bir mesaj gÃ¶nderdi`,
+        `${senderName} size bir mesaj gönderdi`,
         shipmentId ? `/messages?shipment=${shipmentId}` : '/messages',
         'normal',
         { shipmentId, messageId: newMessage.id, senderId }
@@ -2711,7 +2796,7 @@ app.post(
 
       res.status(201).json({
         success: true,
-        message: 'Mesaj gÃ¶nderildi',
+        message: 'Mesaj gönderildi',
         data: {
           id: newMessage.id,
           ...newMessage,
@@ -2722,7 +2807,7 @@ app.post(
       console.error('Error sending message:', error);
       res.status(500).json({
         success: false,
-        error: 'Mesaj gÃ¶nderilemedi',
+        error: 'Mesaj gönderilemedi',
         details: error.message,
       });
     }
@@ -2881,7 +2966,7 @@ app.get(
       console.error('Error fetching individual notifications:', error);
       res.status(500).json({
         success: false,
-        error: 'Bildirimler yÃ¼klenemedi',
+        error: 'Bildirimler yüklenemedi',
         details: error.message,
       });
     }
@@ -2969,6 +3054,26 @@ app.post(
   idempotencyGuard,
   async (req, res) => {
     try {
+      // Handle demo users
+      if (req.user && req.user.isDemo) {
+        const mockOffer = {
+          id: Date.now(),
+          shipmentId: req.body.shipmentId,
+          carrierId: req.user.id,
+          price: req.body.price || 0,
+          message: req.body.message || '',
+          estimatedDeliveryDays: req.body.estimatedDeliveryDays || 1,
+          specialServices: req.body.specialServices || [],
+          status: 'pending',
+          createdAt: new Date().toISOString(),
+        };
+        return res.json({
+          success: true,
+          data: { offer: mockOffer },
+          message: 'Demo teklif oluÅŸturuldu',
+        });
+      }
+
       if (!pool) {
         return res.status(500).json({
           success: false,
@@ -3092,7 +3197,7 @@ app.post(
         shipment.userId,
         'new_offer',
         'Yeni Teklif',
-        `${carrierName}, gÃ¶nderiniz iÃ§in ${price} TL teklif verdi.`,
+        `${carrierName}, gönderiniz için ${price} TL teklif verdi.`,
         `/offers/${offer.id}`,
         'high',
         { shipmentId, offerId: offer.id, carrierId, price }
@@ -3109,7 +3214,7 @@ app.post(
           await sendEmail(
             owner.email,
             'Yeni teklif',
-            `GÃ¶nderiniz iÃ§in ${price} TL teklif verildi.`
+            `Gönderiniz için ${price} TL teklif verildi.`
           );
         }
         if (owner?.phone) {
@@ -3121,7 +3226,7 @@ app.post(
 
       res.status(201).json({
         success: true,
-        message: 'Teklif baÅŸarÄ±yla verildi',
+        message: 'Teklif başarıyla verildi',
         data: offer,
       });
     } catch (error) {
@@ -3165,7 +3270,7 @@ app.post(
       if (offerResult.rows.length === 0) {
         return res.status(404).json({
           success: false,
-          message: 'Teklif bulunamadÄ±',
+          message: 'Teklif bulunamadı',
         });
       }
 
@@ -3183,7 +3288,7 @@ app.post(
       if (offer.status !== 'pending') {
         return res.status(400).json({
           success: false,
-          message: 'Teklif artÄ±k geÃ§erli deÄŸil',
+          message: 'Teklif artık geçerli değil',
         });
       }
 
@@ -3191,7 +3296,7 @@ app.post(
       if (offer.shipmentStatus !== 'open') {
         return res.status(400).json({
           success: false,
-          message: 'GÃ¶nderi artÄ±k aÃ§Ä±k deÄŸil',
+          message: 'Gönderi artık açık değil',
         });
       }
 
@@ -3268,7 +3373,7 @@ app.post(
           userId,
           'offer_accepted',
           'Teklif Kabul Edildi',
-          `Teklifiniz kabul edildi. GÃ¶nderi hazÄ±rlanÄ±yor.`,
+          `Teklifiniz kabul edildi. Gönderi hazırlanıyor.`,
           `/shipments/${offer.shipmentId}`,
           'high',
           { shipmentId: offer.shipmentId, offerId }
@@ -3278,7 +3383,7 @@ app.post(
           offer.carrierId,
           'offer_accepted_carrier',
           'Tebrikler! Teklifiniz Kabul Edildi',
-          `GÃ¶nderiniz iÃ§in verdiÄŸiniz teklif kabul edildi. GÃ¶nderi detaylarÄ±nÄ± inceleyin.`,
+          `Gönderiniz için verdiğiniz teklif kabul edildi. Gönderi detaylarını inceleyin.`,
           `/shipments/${offer.shipmentId}`,
           'high',
           { shipmentId: offer.shipmentId, offerId }
@@ -3296,7 +3401,7 @@ app.post(
             await sendEmail(
               owner.email,
               'Teklif kabul edildi',
-              'GÃ¶nderiniz iÃ§in teklif kabul edildi.'
+              'Gönderiniz için teklif kabul edildi.'
             );
           if (carrier?.email)
             await sendEmail(
@@ -3314,7 +3419,7 @@ app.post(
 
         res.json({
           success: true,
-          message: 'Teklif baÅŸarÄ±yla kabul edildi',
+          message: 'Teklif başarıyla kabul edildi',
           data: acceptedResult.rows[0],
         });
       } catch (error) {
@@ -3775,7 +3880,62 @@ app.get('/api/shipments/tasiyici/completed', async (req, res) => {
 });
 
 // Offers endpoints by user type
-app.get('/api/offers/individual', async (req, res) => {
+
+// POST /api/offers - Create offer (with demo support)
+app.post('/api/offers', authenticateToken, async (req, res) => {
+  try {
+    // Handle demo users - return mock data
+    if (req.user && req.user.isDemo) {
+      // Find the shipment to get the owner's ID
+      const shipment = Array.from(demoShipmentsStore.values()).find(s => s.id === req.body.shipmentId);
+      if (!shipment) {
+        return res.status(404).json({
+          success: false,
+          error: 'GÃ¶nderi bulunamadÄ±',
+        });
+      }
+      
+      const mockOffer = {
+        id: Date.now().toString(),
+        shipmentId: req.body.shipmentId,
+        carrierId: req.user.id,
+        price: req.body.price,
+        message: req.body.message || 'Demo teklif mesajÄ±',
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+        shipmentUserId: shipment.userId, // Store the shipment owner's ID
+      };
+      // Store demo offer
+      demoOffersStore.set(mockOffer.id, mockOffer);
+      return res.json({
+        success: true,
+        data: { offer: mockOffer },
+        message: 'Demo teklif oluÅŸturuldu',
+      });
+    }
+
+    if (!pool) {
+      return res.status(500).json({
+        success: false,
+        error: 'Database not available',
+      });
+    }
+
+    // Regular database logic here...
+    return res.status(500).json({
+      success: false,
+      error: 'Database not available for non-demo users',
+    });
+  } catch (error) {
+    console.error('Error creating offer:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to create offer',
+      details: error.message,
+    });
+  }
+});
+app.get('/api/offers/individual', authenticateToken, async (req, res) => {
   try {
     if (!pool) {
       return res.status(500).json({
@@ -4037,22 +4197,22 @@ app.post('/api/complaints', authenticateToken, async (req, res) => {
     await createNotification(
       againstId,
       'complaint',
-      'Yeni ÅŸikayet',
-      `Size karÅŸÄ± bir ÅŸikayet oluÅŸturuldu. GÃ¶nderi #${shipmentId}`,
+      'Yeni şikayet',
+      `Size karşı bir şikayet oluşturuldu. Gönderi #${shipmentId}`,
       `/disputes/${result.rows[0].id}`,
       'warning'
     );
 
     res.json({
       success: true,
-      message: 'Åikayet baÅŸarÄ±yla oluÅŸturuldu',
+      message: 'Şikayet başarıyla oluşturuldu',
       data: result.rows[0],
     });
   } catch (error) {
     errorLogger.logApiError(error, req, { action: 'create_complaint' });
     res.status(500).json({
       success: false,
-      error: NODE_ENV === 'production' ? 'Åikayet oluÅŸturulamadÄ±' : error.message,
+      error: NODE_ENV === 'production' ? 'Şikayet oluşturulamadı' : error.message,
     });
   }
 });
@@ -4099,7 +4259,7 @@ app.get('/api/complaints', authenticateToken, async (req, res) => {
     errorLogger.logApiError(error, req, { action: 'get_complaints' });
     res.status(500).json({
       success: false,
-      error: NODE_ENV === 'production' ? 'Åikayetler alÄ±namadÄ±' : error.message,
+      error: NODE_ENV === 'production' ? 'Şikayetler alınamadı' : error.message,
     });
   }
 });
@@ -4195,8 +4355,8 @@ app.post('/api/ratings', authenticateToken, async (req, res) => {
     await createNotification(
       ratedId,
       'rating_received',
-      'Yeni DeÄŸerlendirme',
-      `GÃ¶nderiniz iÃ§in ${rating} yÄ±ldÄ±z deÄŸerlendirme aldÄ±nÄ±z.`,
+      'Yeni Değerlendirme',
+      `Gönderiniz için ${rating} yıldız değerlendirme aldınız.`,
       `/ratings`,
       'normal',
       { shipmentId, rating, raterId }
@@ -4204,14 +4364,14 @@ app.post('/api/ratings', authenticateToken, async (req, res) => {
 
     res.json({
       success: true,
-      message: 'DeÄŸerlendirme baÅŸarÄ±yla kaydedildi',
+      message: 'Değerlendirme başarıyla kaydedildi',
       data: result.rows[0],
     });
   } catch (error) {
     console.error('Error submitting rating:', error);
     res.status(500).json({
       success: false,
-      error: 'DeÄŸerlendirme kaydedilemedi',
+      error: 'Değerlendirme kaydedilemedi',
       details: error.message,
     });
   }
@@ -4274,11 +4434,11 @@ app.post('/api/verify/email/send', verificationLimiter, async (req, res) => {
     );
 
     if (userResult.rows.length === 0) {
-      return res.status(404).json({ success: false, message: 'KullanÄ±cÄ± bulunamadÄ±' });
+      return res.status(404).json({ success: false, message: 'Kullanıcı bulunamadı' });
     }
 
     if (userResult.rows[0].isEmailVerified) {
-      return res.status(400).json({ success: false, message: 'Email zaten doÄŸrulanmÄ±ÅŸ' });
+      return res.status(400).json({ success: false, message: 'Email zaten doğrulanmış' });
     }
 
     // Generate verification token
@@ -4302,17 +4462,17 @@ app.post('/api/verify/email/send', verificationLimiter, async (req, res) => {
     const verificationUrl = `${process.env.FRONTEND_ORIGIN || 'http://localhost:5173'}/verify-email?token=${token}`;
     const emailSent = await sendEmail(
       email,
-      'YolNext - Email DoÄŸrulama',
-      `Email adresinizi doÄŸrulamak iÃ§in aÅŸaÄŸÄ±daki linke tÄ±klayÄ±n:\n\n${verificationUrl}\n\nBu link 24 saat geÃ§erlidir.`
+      'YolNext - Email Doğrulama',
+      `Email adresinizi doğrulamak için aşağıdaki linke tıklayın:\n\n${verificationUrl}\n\nBu link 24 saat geçerlidir.`
     );
 
     if (!emailSent) {
-      console.warn('âš ï¸ Email gÃ¶nderilemedi, ancak token oluÅŸturuldu');
+      console.warn('?? Email gönderilemedi, ancak token oluşturuldu');
     }
 
     res.json({
       success: true,
-      message: 'DoÄŸrulama emaili gÃ¶nderildi',
+      message: 'Doğrulama emaili gönderildi',
       expiresIn: '24 hours'
     });
   } catch (error) {
@@ -4340,7 +4500,7 @@ app.post('/api/verify/email', async (req, res) => {
     );
 
     if (tokenResult.rows.length === 0) {
-      return res.status(400).json({ success: false, message: 'GeÃ§ersiz veya sÃ¼resi dolmuÅŸ token' });
+      return res.status(400).json({ success: false, message: 'Geçersiz veya süresi dolmuş token' });
     }
 
     const verification = tokenResult.rows[0];
@@ -4366,8 +4526,8 @@ app.post('/api/verify/email', async (req, res) => {
       await createNotification(
         verification.userid,
         'email_verified',
-        'Email DoÄŸrulandÄ±',
-        'Email adresiniz baÅŸarÄ±yla doÄŸrulandÄ±.',
+        'Email Doğrulandı',
+        'Email adresiniz başarıyla doğrulandı.',
         '/settings',
         'normal',
         {}
@@ -4375,7 +4535,7 @@ app.post('/api/verify/email', async (req, res) => {
 
       res.json({
         success: true,
-        message: 'Email baÅŸarÄ±yla doÄŸrulandÄ±'
+        message: 'Email başarıyla doğrulandı'
       });
     } catch (error) {
       await pool.query('ROLLBACK');
@@ -4396,13 +4556,13 @@ app.post('/api/verify/phone/send', verificationLimiter, async (req, res) => {
 
     const { phone } = req.body;
     if (!phone) {
-      return res.status(400).json({ success: false, message: 'Telefon numarasÄ± gerekli' });
+      return res.status(400).json({ success: false, message: 'Telefon numarası gerekli' });
     }
 
     // Format phone number (Turkish format: 5XXXXXXXXX)
     const cleanPhone = phone.replace(/\D/g, '');
     if (cleanPhone.length !== 10) {
-      return res.status(400).json({ success: false, message: 'GeÃ§ersiz telefon numarasÄ± formatÄ±' });
+      return res.status(400).json({ success: false, message: 'Geçersiz telefon numarası formatı' });
     }
 
     const formattedPhone = `+90${cleanPhone}`;
@@ -4429,12 +4589,12 @@ app.post('/api/verify/phone/send', verificationLimiter, async (req, res) => {
 
     // If SMS fails, use mock (for development)
     if (!smsResult.success && NODE_ENV !== 'production') {
-      console.log(`ğŸ“± Mock SMS: ${formattedPhone} - Kod: ${code}`);
+      console.log(`?? Mock SMS: ${formattedPhone} - Kod: ${code}`);
     }
 
     res.json({
       success: true,
-      message: 'DoÄŸrulama kodu gÃ¶nderildi',
+      message: 'Doğrulama kodu gönderildi',
       expiresIn: '10 minutes',
       ...(NODE_ENV !== 'production' && { debugCode: code }) // Only in dev
     });
@@ -4473,14 +4633,14 @@ app.post('/api/verify/phone', async (req, res) => {
         [formattedPhone]
       );
 
-      return res.status(400).json({ success: false, message: 'GeÃ§ersiz veya sÃ¼resi dolmuÅŸ kod' });
+      return res.status(400).json({ success: false, message: 'Geçersiz veya süresi dolmuş kod' });
     }
 
     const verification = codeResult.rows[0];
 
     // Check attempts (max 5)
     if (verification.attempts >= 5) {
-      return res.status(429).json({ success: false, message: 'Ã‡ok fazla deneme yapÄ±ldÄ±' });
+      return res.status(429).json({ success: false, message: 'Çok fazla deneme yapıldı' });
     }
 
     await pool.query('BEGIN');
@@ -4502,7 +4662,7 @@ app.post('/api/verify/phone', async (req, res) => {
 
       res.json({
         success: true,
-        message: 'Telefon numarasÄ± baÅŸarÄ±yla doÄŸrulandÄ±'
+        message: 'Telefon numarası başarıyla doğrulandı'
       });
     } catch (error) {
       await pool.query('ROLLBACK');
@@ -4551,7 +4711,7 @@ app.post('/api/upload', authenticateToken, uploadLimiter, upload.single('file'),
 
     res.json({
       success: true,
-      message: 'Dosya baÅŸarÄ±yla yÃ¼klendi',
+      message: 'Dosya başarıyla yüklendi',
       data: {
         url: fullUrl,
         filename: req.file.filename,
@@ -4672,7 +4832,7 @@ app.post(
       if (!shipmentId)
         return res
           .status(400)
-          .json({ success: false, message: 'GeÃ§ersiz gÃ¶nderi' });
+          .json({ success: false, message: 'Geçersiz gönderi' });
 
       const s = await pool.query(
         'SELECT id, userid, carrierid, status FROM shipments WHERE id=$1',
@@ -4681,7 +4841,7 @@ app.post(
       if (s.rows.length === 0)
         return res
           .status(404)
-          .json({ success: false, message: 'GÃ¶nderi bulunamadÄ±' });
+          .json({ success: false, message: 'Gönderi bulunamadı' });
       const shipment = s.rows[0];
 
       // Only owner or carrier can mark delivered (relaxed for E2E testing)
@@ -4693,7 +4853,7 @@ app.post(
       //   const isOwner = requestUserId === shipmentUserId;
       //   const isCarrier = shipmentCarrierId && requestUserId === shipmentCarrierId;
       //   if (!isOwner && !isCarrier) {
-      //     return res.status(403).json({ success: false, message: 'Yetkisiz iÅŸlem' });
+      //     return res.status(403).json({ success: false, message: 'Yetkisiz işlem' });
       //   }
       // }
 
@@ -4722,8 +4882,8 @@ app.post(
         await createNotification(
           shipmentUserId,
           'shipment_delivered',
-          'GÃ¶nderi Teslim Edildi',
-          'GÃ¶nderiniz teslim edildi.',
+          'Gönderi Teslim Edildi',
+          'Gönderiniz teslim edildi.',
           `/shipments/${shipmentId}`,
           'high',
           { shipmentId }
@@ -4733,15 +4893,15 @@ app.post(
         await createNotification(
           shipmentCarrierId,
           'shipment_delivered',
-          'Teslimat TamamlandÄ±',
-          'Teslim ettiÄŸiniz gÃ¶nderi tamamlandÄ±.',
+          'Teslimat Tamamlandı',
+          'Teslim ettiğiniz gönderi tamamlandı.',
           `/shipments/${shipmentId}`,
           'high',
           { shipmentId }
         );
       }
 
-      res.json({ success: true, message: 'Teslim edildi olarak iÅŸaretlendi' });
+      res.json({ success: true, message: 'Teslim edildi olarak işaretlendi' });
     } catch (e) {
       res.status(500).json({ success: false, error: e.message });
     }
@@ -4765,7 +4925,7 @@ app.post(
       if (!shipmentId)
         return res
           .status(400)
-          .json({ success: false, message: 'GeÃ§ersiz gÃ¶nderi' });
+          .json({ success: false, message: 'Geçersiz gönderi' });
 
       const s = await pool.query(
         'SELECT id, userid, carrierid, status FROM shipments WHERE id=$1',
@@ -4774,7 +4934,7 @@ app.post(
       if (s.rows.length === 0)
         return res
           .status(404)
-          .json({ success: false, message: 'GÃ¶nderi bulunamadÄ±' });
+          .json({ success: false, message: 'Gönderi bulunamadı' });
       const shipment = s.rows[0];
       const ownerId = parseInt(shipment.userid || shipment.userId || 0);
       if (ownerId !== requestUserId)
@@ -4794,7 +4954,7 @@ app.post(
       if (!carrierId)
         return res
           .status(400)
-          .json({ success: false, message: 'Atanacak taÅŸÄ±yÄ±cÄ± bulunamadÄ±' });
+          .json({ success: false, message: 'Atanacak taşıyıcı bulunamadı' });
 
       await pool.query('BEGIN');
       try {
@@ -4826,7 +4986,7 @@ app.post(
         carrierId,
         'assignment',
         'Yeni Atama',
-        'Bir gÃ¶nderi size atandÄ±',
+        'Bir gönderi size atandı',
         `/nakliyeci/shipments/${shipmentId}`,
         'high',
         { shipmentId }
@@ -4835,7 +4995,7 @@ app.post(
         ownerId,
         'assignment_done',
         'Atama Tamam',
-        'TaÅŸÄ±yÄ±cÄ± atamasÄ± yapÄ±ldÄ±',
+        'Taşıyıcı ataması yapıldı',
         `/nakliyeci/shipments/${shipmentId}`,
         'normal',
         { shipmentId, carrierId }
@@ -4843,7 +5003,7 @@ app.post(
 
       return res.json({
         success: true,
-        message: 'TaÅŸÄ±yÄ±cÄ± atandÄ±',
+        message: 'Taşıyıcı atandı',
         data: { shipmentId, carrierId, driverId },
       });
     } catch (e) {
@@ -4851,7 +5011,7 @@ app.post(
         .status(500)
         .json({
           success: false,
-          message: 'Atama baÅŸarÄ±sÄ±z',
+          message: 'Atama başarısız',
           details: e.message,
         });
     }
@@ -4875,7 +5035,7 @@ app.post(
       if (!shipmentId)
         return res
           .status(400)
-          .json({ success: false, message: 'GeÃ§ersiz gÃ¶nderi' });
+          .json({ success: false, message: 'Geçersiz gönderi' });
 
       const s = await pool.query(
         'SELECT id, userid, status FROM shipments WHERE id=$1',
@@ -4884,7 +5044,7 @@ app.post(
       if (s.rows.length === 0)
         return res
           .status(404)
-          .json({ success: false, message: 'GÃ¶nderi bulunamadÄ±' });
+          .json({ success: false, message: 'Gönderi bulunamadı' });
       const shipment = s.rows[0];
       const ownerId = parseInt(shipment.userid || shipment.userId || 0);
       if (ownerId !== requestUserId)
@@ -4915,8 +5075,8 @@ app.post(
       await createNotification(
         ownerId,
         'broadcast_opened',
-        'Ä°lan AÃ§Ä±ldÄ±',
-        'GÃ¶nderiniz taÅŸÄ±yÄ±cÄ±lar iÃ§in aÃ§Ä±ldÄ±',
+        'İlan Açıldı',
+        'Gönderiniz taşıyıcılar için açıldı',
         `/nakliyeci/open-shipments`,
         'normal',
         { shipmentId, target }
@@ -4924,7 +5084,7 @@ app.post(
 
       return res.json({
         success: true,
-        message: 'Ä°lan aÃ§Ä±ldÄ±',
+        message: 'İlan açıldı',
         data: { shipmentId, target },
       });
     } catch (e) {
@@ -4932,7 +5092,7 @@ app.post(
         .status(500)
         .json({
           success: false,
-          message: 'Ä°lan aÃ§ma baÅŸarÄ±sÄ±z',
+          message: 'İlan açma başarısız',
           details: e.message,
         });
     }
@@ -5054,7 +5214,7 @@ app.post('/api/users/me/delete', authenticateToken, async (req, res) => {
     });
     res.json({
       success: true,
-      message: 'Hesap silme talebiniz iÅŸlendi (soft delete + anonimleÅŸtirme)',
+      message: 'Hesap silme talebiniz işlendi (soft delete + anonimleştirme)',
     });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
@@ -5101,13 +5261,13 @@ app.get('/api/payments/shipment/:shipmentId', authenticateToken, async (req, res
     );
 
     if (shipmentResult.rows.length === 0) {
-      return res.status(404).json({ success: false, message: 'GÃ¶nderi bulunamadÄ±' });
+      return res.status(404).json({ success: false, message: 'Gönderi bulunamadı' });
     }
 
     const shipment = shipmentResult.rows[0];
     if (parseInt(shipment.userid) !== parseInt(userId) && 
         (!shipment.carrierid || parseInt(shipment.carrierid) !== parseInt(userId))) {
-      return res.status(403).json({ success: false, message: 'Yetkisiz eriÅŸim' });
+      return res.status(403).json({ success: false, message: 'Yetkisiz erişim' });
     }
 
     // Get payment record
@@ -5154,24 +5314,24 @@ app.post('/api/payments/shipment/:shipmentId/pay', authenticateToken, paymentLim
     );
 
     if (shipmentResult.rows.length === 0) {
-      return res.status(404).json({ success: false, message: 'GÃ¶nderi bulunamadÄ±' });
+      return res.status(404).json({ success: false, message: 'Gönderi bulunamadı' });
     }
 
     const data = shipmentResult.rows[0];
 
     // Only shipment owner can pay
     if (parseInt(data.userid) !== parseInt(userId)) {
-      return res.status(403).json({ success: false, message: 'Yetkisiz iÅŸlem' });
+      return res.status(403).json({ success: false, message: 'Yetkisiz işlem' });
     }
 
     // Check if payment already exists and is paid
     if (data.payment_id && data.payment_status === 'paid') {
-      return res.status(400).json({ success: false, message: 'Ã–deme zaten yapÄ±lmÄ±ÅŸ' });
+      return res.status(400).json({ success: false, message: 'Ödeme zaten yapılmış' });
     }
 
     const amount = parseFloat(data.price || 0);
     if (amount <= 0) {
-      return res.status(400).json({ success: false, message: 'GeÃ§ersiz tutar' });
+      return res.status(400).json({ success: false, message: 'Geçersiz tutar' });
     }
 
     await pool.query('BEGIN');
@@ -5188,7 +5348,7 @@ app.post('/api/payments/shipment/:shipmentId/pay', authenticateToken, paymentLim
 
         if (walletResult.rows.length === 0) {
           await pool.query('ROLLBACK');
-          return res.status(400).json({ success: false, message: 'CÃ¼zdan bulunamadÄ±' });
+          return res.status(400).json({ success: false, message: 'Cüzdan bulunamadı' });
         }
 
         const walletBalance = parseFloat(walletResult.rows[0].balance || 0);
@@ -5217,7 +5377,7 @@ app.post('/api/payments/shipment/:shipmentId/pay', authenticateToken, paymentLim
 
         if (userResult.rows.length === 0) {
           await pool.query('ROLLBACK');
-          return res.status(404).json({ success: false, message: 'KullanÄ±cÄ± bulunamadÄ±' });
+          return res.status(404).json({ success: false, message: 'Kullanıcı bulunamadı' });
         }
 
         const user = userResult.rows[0];
@@ -5233,7 +5393,7 @@ app.post('/api/payments/shipment/:shipmentId/pay', authenticateToken, paymentLim
           enabledInstallments: [2, 3, 6, 9],
           buyer: {
             id: userId.toString(),
-            name: user.firstname || 'KullanÄ±cÄ±',
+            name: user.firstname || 'Kullanıcı',
             surname: user.lastname || '',
             email: user.email,
             identityNumber: '11111111111', // Should be required from user profile
@@ -5256,7 +5416,7 @@ app.post('/api/payments/shipment/:shipmentId/pay', authenticateToken, paymentLim
           },
           basketItems: [{
             id: shipmentId.toString(),
-            name: `GÃ¶nderi #${shipmentId}`,
+            name: `Gönderi #${shipmentId}`,
             category1: 'Kargo',
             itemType: 'PHYSICAL',
             price: amount.toString()
@@ -5282,12 +5442,12 @@ app.post('/api/payments/shipment/:shipmentId/pay', authenticateToken, paymentLim
           await pool.query('ROLLBACK');
           return res.status(400).json({
             success: false,
-            message: paymentResponse.errorMessage || 'Ã–deme iÅŸlemi baÅŸarÄ±sÄ±z'
+            message: paymentResponse.errorMessage || 'Ödeme işlemi başarısız'
           });
         }
       } else {
         await pool.query('ROLLBACK');
-        return res.status(400).json({ success: false, message: 'GeÃ§ersiz Ã¶deme yÃ¶ntemi' });
+        return res.status(400).json({ success: false, message: 'Geçersiz ödeme yöntemi' });
       }
 
       // Update or create payment record
@@ -5317,8 +5477,8 @@ app.post('/api/payments/shipment/:shipmentId/pay', authenticateToken, paymentLim
       await createNotification(
         userId,
         'payment_completed',
-        'Ã–deme TamamlandÄ±',
-        `GÃ¶nderi Ã¶demesi baÅŸarÄ±yla tamamlandÄ±. Tutar: ${amount.toFixed(2)} TL`,
+        'Ödeme Tamamlandı',
+        `Gönderi ödemesi başarıyla tamamlandı. Tutar: ${amount.toFixed(2)} TL`,
         `/shipments/${shipmentId}`,
         'normal',
         { shipmentId, amount, paymentMethod }
@@ -5328,8 +5488,8 @@ app.post('/api/payments/shipment/:shipmentId/pay', authenticateToken, paymentLim
         await createNotification(
           parseInt(data.carrierid),
           'payment_received',
-          'Ã–deme AlÄ±ndÄ±',
-          `GÃ¶nderi Ã¶demesi alÄ±ndÄ±. GÃ¶nderiyi tamamladÄ±ÄŸÄ±nÄ±zda Ã¶deme serbest bÄ±rakÄ±lacak.`,
+          'Ödeme Alındı',
+          `Gönderi ödemesi alındı. Gönderiyi tamamladığınızda ödeme serbest bırakılacak.`,
           `/shipments/${shipmentId}`,
           'normal',
           { shipmentId, amount }
@@ -5338,7 +5498,7 @@ app.post('/api/payments/shipment/:shipmentId/pay', authenticateToken, paymentLim
 
       res.json({
         success: true,
-        message: 'Ã–deme baÅŸarÄ±yla tamamlandÄ±',
+        message: 'Ödeme başarıyla tamamlandı',
         data: {
           paymentId,
           amount,
@@ -5378,31 +5538,31 @@ app.post('/api/payments/shipment/:shipmentId/release', authenticateToken, paymen
     );
 
     if (shipmentResult.rows.length === 0) {
-      return res.status(404).json({ success: false, message: 'GÃ¶nderi bulunamadÄ±' });
+      return res.status(404).json({ success: false, message: 'Gönderi bulunamadı' });
     }
 
     const data = shipmentResult.rows[0];
 
     // Only shipment owner can release payment
     if (parseInt(data.userid) !== parseInt(userId)) {
-      return res.status(403).json({ success: false, message: 'Yetkisiz iÅŸlem' });
+      return res.status(403).json({ success: false, message: 'Yetkisiz işlem' });
     }
 
     // Payment must be paid and not yet released
     if (data.payment_status !== 'paid') {
-      return res.status(400).json({ success: false, message: 'Ã–deme henÃ¼z yapÄ±lmamÄ±ÅŸ' });
+      return res.status(400).json({ success: false, message: 'Ödeme henüz yapılmamış' });
     }
 
     // Shipment must be delivered
     if (data.status !== 'delivered') {
       return res.status(400).json({ 
         success: false, 
-        message: 'Ã–deme serbest bÄ±rakÄ±lmadan Ã¶nce gÃ¶nderi teslim edilmiÅŸ olmalÄ±' 
+        message: 'Ödeme serbest bırakılmadan önce gönderi teslim edilmiş olmalı' 
       });
     }
 
     if (!data.carrierid) {
-      return res.status(400).json({ success: false, message: 'Nakliyeci bulunamadÄ±' });
+      return res.status(400).json({ success: false, message: 'Nakliyeci bulunamadı' });
     }
 
     await pool.query('BEGIN');
@@ -5446,7 +5606,7 @@ app.post('/api/payments/shipment/:shipmentId/release', authenticateToken, paymen
       await pool.query(
         `INSERT INTO transactions (wallet_id, user_id, type, amount, description, created_at)
          VALUES ($1, $2, 'payment_release', $3, $4, NOW())`,
-        [wallet.id, data.carrierid, carrierAmount, `GÃ¶nderi #${shipmentId} Ã¶deme serbest bÄ±rakÄ±ldÄ±`]
+        [wallet.id, data.carrierid, carrierAmount, `Gönderi #${shipmentId} ödeme serbest bırakıldı`]
       );
 
       await pool.query('COMMIT');
@@ -5455,8 +5615,8 @@ app.post('/api/payments/shipment/:shipmentId/release', authenticateToken, paymen
       await createNotification(
         parseInt(data.carrierid),
         'payment_released',
-        'Ã–deme Serbest BÄ±rakÄ±ldÄ±',
-        `GÃ¶nderi Ã¶demesi cÃ¼zdanÄ±nÄ±za yatÄ±rÄ±ldÄ±. Tutar: ${carrierAmount.toFixed(2)} TL`,
+        'Ödeme Serbest Bırakıldı',
+        `Gönderi ödemesi cüzdanınıza yatırıldı. Tutar: ${carrierAmount.toFixed(2)} TL`,
         `/shipments/${shipmentId}`,
         'high',
         { shipmentId, amount: carrierAmount }
@@ -5464,7 +5624,7 @@ app.post('/api/payments/shipment/:shipmentId/release', authenticateToken, paymen
 
       res.json({
         success: true,
-        message: 'Ã–deme nakliyeciye serbest bÄ±rakÄ±ldÄ±',
+        message: 'Ödeme nakliyeciye serbest bırakıldı',
         data: {
           amount: carrierAmount,
           commission: parseFloat(data.commission || 0),
@@ -5483,7 +5643,7 @@ app.post('/api/payments/shipment/:shipmentId/release', authenticateToken, paymen
 
 // WebSocket events
 io.on('connection', socket => {
-  console.log('ğŸ”Œ User connected:', socket.id);
+  console.log('?? User connected:', socket.id);
 
   socket.on('authenticate', async data => {
     try {
@@ -5510,13 +5670,13 @@ io.on('connection', socket => {
             socket.join(`user_${user.id}`);
             socket.join(`role_${user.role}`);
             console.log(
-              `âœ… User ${user.id} (${user.email}) authenticated via WebSocket`
+              `? User ${user.id} (${user.email}) authenticated via WebSocket`
             );
             socket.emit('authenticated', { userId: user.id, role: user.role });
           }
         }
       } catch (jwtError) {
-        // Demo token kontrolÃ¼
+        // Demo token kontrolü
         if (token.includes('demo-jwt-token')) {
           socket.userId = 1;
           socket.join('user_1');
@@ -5531,7 +5691,7 @@ io.on('connection', socket => {
   });
 
   socket.on('join', data => {
-    console.log('ğŸ‘¤ User joined:', data);
+    console.log('?? User joined:', data);
     if (socket.userId) {
       socket.join(`user_${socket.userId}`);
     }
@@ -5544,7 +5704,7 @@ io.on('connection', socket => {
   });
 
   socket.on('disconnect', () => {
-    console.log('ğŸ”Œ User disconnected:', socket.id);
+    console.log('?? User disconnected:', socket.id);
   });
 
   socket.on('send-notification', data => {
@@ -5606,14 +5766,14 @@ app.post('/api/support/tickets', authenticateToken, async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Destek talebi oluÅŸturuldu',
+      message: 'Destek talebi oluşturuldu',
       data: result.rows[0],
     });
   } catch (error) {
     errorLogger.logApiError(error, req, { action: 'create_support_ticket' });
     res.status(500).json({
       success: false,
-      error: NODE_ENV === 'production' ? 'Destek talebi oluÅŸturulamadÄ±' : error.message,
+      error: NODE_ENV === 'production' ? 'Destek talebi oluşturulamadı' : error.message,
     });
   }
 });
@@ -5660,7 +5820,7 @@ app.get('/api/support/tickets', authenticateToken, async (req, res) => {
     errorLogger.logApiError(error, req, { action: 'get_support_tickets' });
     res.status(500).json({
       success: false,
-      error: NODE_ENV === 'production' ? 'Destek talepleri alÄ±namadÄ±' : error.message,
+      error: NODE_ENV === 'production' ? 'Destek talepleri alınamadı' : error.message,
     });
   }
 });
@@ -5746,7 +5906,7 @@ app.post('/api/shipments/:id/cancel', authenticateToken, async (req, res) => {
           // Create transaction record
           await pool.query(
             `INSERT INTO transactions (wallet_id, user_id, type, amount, description, payment_method, reference_type, reference_id)
-             SELECT w.id, $1, 'refund', $2, 'GÃ¶nderi iptali geri Ã¶demesi', 'wallet', 'cancellation', $3
+             SELECT w.id, $1, 'refund', $2, 'Gönderi iptali geri ödemesi', 'wallet', 'cancellation', $3
              FROM wallets w WHERE w.userid = $1`,
             [userId, refundAmount, cancelResult.rows[0].id]
           );
@@ -5766,8 +5926,8 @@ app.post('/api/shipments/:id/cancel', authenticateToken, async (req, res) => {
         await createNotification(
           shipment.carrierid,
           'shipment_cancelled',
-          'GÃ¶nderi iptal edildi',
-          `GÃ¶nderi #${shipmentId} iptal edildi`,
+          'Gönderi iptal edildi',
+          `Gönderi #${shipmentId} iptal edildi`,
           `/shipments/${shipmentId}`,
           'warning'
         );
@@ -5775,7 +5935,7 @@ app.post('/api/shipments/:id/cancel', authenticateToken, async (req, res) => {
 
       res.json({
         success: true,
-        message: 'GÃ¶nderi iptal edildi',
+        message: 'Gönderi iptal edildi',
         data: {
           cancellation: cancelResult.rows[0],
           refundAmount,
@@ -5789,7 +5949,7 @@ app.post('/api/shipments/:id/cancel', authenticateToken, async (req, res) => {
     errorLogger.logApiError(error, req, { action: 'cancel_shipment', shipmentId });
     res.status(500).json({
       success: false,
-      error: NODE_ENV === 'production' ? 'GÃ¶nderi iptal edilemedi' : error.message,
+      error: NODE_ENV === 'production' ? 'Gönderi iptal edilemedi' : error.message,
     });
   }
 });
@@ -5802,11 +5962,11 @@ if (SENTRY_DSN) {
 // Start server
 async function startServer() {
   try {
-    console.log('ğŸš€ Starting PostgreSQL Backend...');
+    console.log('?? Starting PostgreSQL Backend...');
 
     const tablesCreated = await createTables();
     if (!tablesCreated) {
-      console.error('âŒ Failed to create tables');
+      console.error('? Failed to create tables');
       return;
     }
 
@@ -5814,17 +5974,17 @@ async function startServer() {
     if (NODE_ENV !== 'production') {
       const dataSeeded = await seedData();
       if (!dataSeeded) {
-        console.error('âŒ Failed to seed data');
+        console.error('? Failed to seed data');
         return;
       }
     }
 
     server.listen(PORT, () => {
-      console.log(`ğŸš€ PostgreSQL Backend running on http://localhost:${PORT}`);
-      console.log(`âœ… Backend is working with real PostgreSQL data!`);
-      console.log(`ğŸ“Š Health check: http://localhost:${PORT}/api/health`);
-      console.log(`ğŸ“¦ Shipments API: http://localhost:${PORT}/api/shipments`);
-      console.log(`ğŸ”Œ WebSocket: Socket.IO enabled`);
+      console.log(`?? PostgreSQL Backend running on http://localhost:${PORT}`);
+      console.log(`? Backend is working with real PostgreSQL data!`);
+      console.log(`?? Health check: http://localhost:${PORT}/api/health`);
+      console.log(`?? Shipments API: http://localhost:${PORT}/api/shipments`);
+      console.log(`?? WebSocket: Socket.IO enabled`);
 
       // Data retention cleanup job (runs daily)
       setInterval(
@@ -5871,17 +6031,17 @@ async function startServer() {
             );
 
             console.log(
-              `âœ… Retention cleanup: ${msgResult.rowCount} messages, ${notifResult.rowCount} notifications, ${auditResult.rowCount} audit logs`
+              `? Retention cleanup: ${msgResult.rowCount} messages, ${notifResult.rowCount} notifications, ${auditResult.rowCount} audit logs`
             );
           } catch (e) {
-            console.error('âŒ Retention cleanup error:', e.message);
+            console.error('? Retention cleanup error:', e.message);
           }
         },
         24 * 60 * 60 * 1000
       ); // Run every 24 hours
     });
   } catch (error) {
-    console.error('âŒ Failed to start server:', error);
+    console.error('? Failed to start server:', error);
   }
 }
 

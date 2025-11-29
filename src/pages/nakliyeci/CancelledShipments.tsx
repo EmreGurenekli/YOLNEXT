@@ -328,8 +328,6 @@ const CancelledShipments = () => {
                           <p>
                             <strong>Alış:</strong>{' '}
                             {formatDate(shipment.pickupDate, 'long')}
-                              'tr-TR'
-                            )}
                           </p>
                           <p>
                             <strong>Teslim:</strong>{' '}

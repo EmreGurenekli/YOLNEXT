@@ -70,6 +70,11 @@ export default function CorporateCarriers() {
   const [successMessage, setSuccessMessage] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 6;
+  
+  // Nakliyeci ekleme için state'ler
+  const [nakliyeciCode, setNakliyeciCode] = useState('');
+  const [addingNakliyeci, setAddingNakliyeci] = useState(false);
+  const [addNakliyeciError, setAddNakliyeciError] = useState<string | null>(null);
 
   const handleViewDetails = (carrierId: number) => {
     console.log('Nakliyeci detayları:', carrierId);
@@ -114,14 +119,19 @@ export default function CorporateCarriers() {
 
   const [carriers, setCarriers] = useState<any[]>([]);
 
-  // Load carriers from API
+  // Load carriers from API (favori nakliyeciler)
   const loadCarriers = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch('/api/carriers', {
+      const storedUser = localStorage.getItem('user');
+      const userId = storedUser ? (JSON.parse(storedUser)?.id || '') : '';
+      const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      
+      const response = await fetch(`${baseURL}/api/carriers/corporate`, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
           'Content-Type': 'application/json',
+          'X-User-Id': userId
         },
       });
 
@@ -130,12 +140,60 @@ export default function CorporateCarriers() {
       }
 
       const data = await response.json();
-      setCarriers(data.carriers || []);
+      setCarriers(data.carriers || data.data || []);
     } catch (error) {
       console.error('Error loading carriers:', error);
       setCarriers([]);
     } finally {
       setIsLoading(false);
+    }
+  };
+  
+  // Add nakliyeci to favorites
+  const handleAddNakliyeci = async () => {
+    if (!nakliyeciCode.trim()) {
+      setAddNakliyeciError('Lütfen nakliyeci kodu veya e-posta girin');
+      return;
+    }
+    
+    setAddingNakliyeci(true);
+    setAddNakliyeciError(null);
+    
+    try {
+      const storedUser = localStorage.getItem('user');
+      const userId = storedUser ? (JSON.parse(storedUser)?.id || '') : '';
+      const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      
+      const response = await fetch(`${baseURL}/api/carriers/corporate/link`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+          'Content-Type': 'application/json',
+          'X-User-Id': userId
+        },
+        body: JSON.stringify({ 
+          code: nakliyeciCode.includes('@') ? null : nakliyeciCode,
+          email: nakliyeciCode.includes('@') ? nakliyeciCode : null
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok || data.success === false) {
+        setAddNakliyeciError(data.message || 'Nakliyeci eklenemedi');
+        return;
+      }
+      
+      setSuccessMessage(data.message || 'Nakliyeci başarıyla eklendi');
+      setShowSuccessMessage(true);
+      setNakliyeciCode('');
+      loadCarriers(); // Reload carriers list
+      setShowAddModal(false);
+    } catch (error: any) {
+      setAddNakliyeciError('Beklenmeyen bir hata oluştu');
+      console.error('Error adding nakliyeci:', error);
+    } finally {
+      setAddingNakliyeci(false);
     }
   };
 
@@ -239,6 +297,15 @@ export default function CorporateCarriers() {
           <p className='text-sm sm:text-base md:text-lg text-slate-600 px-4'>
             Anlaşmalı nakliyecilerinizi yönetin ve performanslarını takip edin
           </p>
+          <div className='mt-4'>
+            <button
+              onClick={() => setShowAddModal(true)}
+              className='px-4 py-2 bg-gradient-to-r from-slate-900 to-blue-900 text-white rounded-lg hover:from-slate-800 hover:to-blue-800 transition-all flex items-center gap-2 mx-auto'
+            >
+              <Plus className='w-5 h-5' />
+              Favori Nakliyeci Ekle
+            </button>
+          </div>
         </div>
 
         {/* Filters Card - Mobile Optimized */}
@@ -817,6 +884,62 @@ export default function CorporateCarriers() {
           isVisible={showSuccessMessage}
           onClose={() => setShowSuccessMessage(false)}
         />
+
+        {/* Add Nakliyeci Modal */}
+        <Modal
+          isOpen={showAddModal}
+          onClose={() => {
+            setShowAddModal(false);
+            setNakliyeciCode('');
+            setAddNakliyeciError(null);
+          }}
+          title="Favori Nakliyeci Ekle"
+        >
+          <div className="space-y-4">
+            <p className="text-sm text-slate-600">
+              Nakliyeci kodunu veya e-posta adresini girerek favorilerinize ekleyebilirsiniz.
+            </p>
+            
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Nakliyeci Kodu veya E-posta
+              </label>
+              <input
+                type="text"
+                value={nakliyeciCode}
+                onChange={(e) => {
+                  setNakliyeciCode(e.target.value);
+                  setAddNakliyeciError(null);
+                }}
+                placeholder="Örn: nakliyeci@demo.com veya nakliyeci-1763929991737"
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+              {addNakliyeciError && (
+                <p className="mt-2 text-sm text-red-600">{addNakliyeciError}</p>
+              )}
+            </div>
+
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => {
+                  setShowAddModal(false);
+                  setNakliyeciCode('');
+                  setAddNakliyeciError(null);
+                }}
+                className="px-4 py-2 text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors"
+              >
+                İptal
+              </button>
+              <button
+                onClick={handleAddNakliyeci}
+                disabled={addingNakliyeci || !nakliyeciCode.trim()}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:bg-slate-300 disabled:cursor-not-allowed"
+              >
+                {addingNakliyeci ? 'Ekleniyor...' : 'Ekle'}
+              </button>
+            </div>
+          </div>
+        </Modal>
       </div>
     </div>
   );

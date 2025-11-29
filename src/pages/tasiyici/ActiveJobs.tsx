@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
+import { createApiUrl } from '../../config/api';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
-import { Clock, MapPin, DollarSign, Truck, CheckCircle, ArrowRight, Package, Search } from 'lucide-react';
+import { Clock, MapPin, DollarSign, Truck, CheckCircle, ArrowRight, Package, Search, CheckCircle2, Navigation, Wifi, WifiOff } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 import Breadcrumb from '../../components/common/Breadcrumb';
 import LoadingState from '../../components/common/LoadingState';
 
@@ -9,6 +11,36 @@ const ActiveJobs: React.FC = () => {
   const [jobs, setJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [updatingStatus, setUpdatingStatus] = useState<Record<number, boolean>>({});
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+  // Offline/Online durumu takibi
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Offline kaydedilmiş durum güncellemelerini gönder
+  useEffect(() => {
+    if (isOnline) {
+      const pendingUpdates = JSON.parse(localStorage.getItem('tasiyici_pending_updates') || '[]');
+      if (pendingUpdates.length > 0) {
+        pendingUpdates.forEach(async (update: any) => {
+          await sendStatusUpdate(update.jobId, update.status, true);
+        });
+        localStorage.removeItem('tasiyici_pending_updates');
+        toast.success('Kaydedilen güncellemeler gönderildi!');
+      }
+    }
+  }, [isOnline]);
 
   useEffect(() => {
     const loadActiveJobs = async () => {
@@ -17,7 +49,7 @@ const ActiveJobs: React.FC = () => {
         const userRaw = localStorage.getItem('user');
         const userId = userRaw ? JSON.parse(userRaw || '{}').id : undefined;
         const token = localStorage.getItem('authToken');
-        const response = await fetch('/api/shipments/tasiyici', {
+        const response = await fetch(createApiUrl('/api/shipments/tasiyici'), {
           headers: {
             Authorization: `Bearer ${token || ''}`,
             'X-User-Id': userId || '',
@@ -62,6 +94,95 @@ const ActiveJobs: React.FC = () => {
     if (!address) return '';
     const parts = address.split(',');
     return parts[parts.length - 1]?.trim() || address;
+  };
+
+  // Durum güncelleme fonksiyonu (offline destekli)
+  const sendStatusUpdate = async (jobId: number, newStatus: string, isRetry: boolean = false) => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const userRaw = localStorage.getItem('user');
+      const userId = userRaw ? JSON.parse(userRaw || '{}').id : undefined;
+
+      const response = await fetch(createApiUrl(`/api/shipments/${jobId}`), {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token || ''}`,
+          'X-User-Id': userId || '',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: newStatus }),
+      });
+
+      if (response.ok) {
+        const responseData = await response.json();
+        if (responseData.success) {
+          // Başarılı - iş listesini güncelle
+          setJobs(prev => prev.map(job => 
+            job.id === jobId ? { ...job, status: newStatus } : job
+          ));
+          
+          if (!isRetry) {
+            const statusMessages: Record<string, string> = {
+              'picked_up': '✅ Testimi aldım!',
+              'in_transit': '🚚 Yoldayım!',
+              'delivered': '📦 Teslim ettim!',
+            };
+            toast.success(statusMessages[newStatus] || 'Durum güncellendi!');
+          }
+          return true;
+        }
+      }
+      return false;
+    } catch (error) {
+      return false;
+    }
+  };
+
+  // Durum güncelleme (offline destekli)
+  const updateJobStatus = async (jobId: number, newStatus: string) => {
+    setUpdatingStatus(prev => ({ ...prev, [jobId]: true }));
+
+    try {
+      if (!isOnline) {
+        // Offline - localStorage'a kaydet
+        const pendingUpdates = JSON.parse(localStorage.getItem('tasiyici_pending_updates') || '[]');
+        pendingUpdates.push({ jobId, status: newStatus, timestamp: Date.now() });
+        localStorage.setItem('tasiyici_pending_updates', JSON.stringify(pendingUpdates));
+        
+        // UI'ı hemen güncelle
+        setJobs(prev => prev.map(job => 
+          job.id === jobId ? { ...job, status: newStatus } : job
+        ));
+        
+        toast.success('✅ Kaydedildi! İnternet gelince gönderilecek.', {
+          icon: <WifiOff className="w-5 h-5" />,
+        });
+        setUpdatingStatus(prev => ({ ...prev, [jobId]: false }));
+        return;
+      }
+
+      // Online - direkt gönder
+      const success = await sendStatusUpdate(jobId, newStatus);
+      
+      if (!success) {
+        // Başarısız - offline'a kaydet
+        const pendingUpdates = JSON.parse(localStorage.getItem('tasiyici_pending_updates') || '[]');
+        pendingUpdates.push({ jobId, status: newStatus, timestamp: Date.now() });
+        localStorage.setItem('tasiyici_pending_updates', JSON.stringify(pendingUpdates));
+        
+        setJobs(prev => prev.map(job => 
+          job.id === jobId ? { ...job, status: newStatus } : job
+        ));
+        
+        toast.success('✅ Kaydedildi! İnternet gelince gönderilecek.', {
+          icon: <WifiOff className="w-5 h-5" />,
+        });
+      }
+    } catch (error) {
+      toast.error('Bir hata oluştu, lütfen tekrar deneyin.');
+    } finally {
+      setUpdatingStatus(prev => ({ ...prev, [jobId]: false }));
+    }
   };
 
   const filteredJobs = jobs.filter(job => {
@@ -112,15 +233,23 @@ const ActiveJobs: React.FC = () => {
                     Devam eden işlerinizi buradan takip edin ve yönetin
                   </p>
                 </div>
-                      </div>
-              <div className='bg-white/10 backdrop-blur-sm rounded-xl px-4 py-2 border border-white/20'>
-                <span className='text-slate-200 font-medium'>
-                  {jobs.length} {jobs.length === 1 ? 'Aktif İş' : 'Aktif İş'}
-                </span>
-                      </div>
-                      </div>
-                    </div>
+              </div>
+              <div className='flex items-center gap-3'>
+                {!isOnline && (
+                  <div className='bg-yellow-500/20 backdrop-blur-sm rounded-xl px-4 py-2 border border-yellow-400/30 flex items-center gap-2'>
+                    <WifiOff className='w-4 h-4 text-yellow-300' />
+                    <span className='text-yellow-200 font-medium text-sm'>İnternet Yok</span>
                   </div>
+                )}
+                <div className='bg-white/10 backdrop-blur-sm rounded-xl px-4 py-2 border border-white/20'>
+                  <span className='text-slate-200 font-medium'>
+                    {jobs.length} {jobs.length === 1 ? 'Aktif İş' : 'Aktif İş'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
 
         {/* Search */}
         {jobs.length > 0 && (
@@ -248,14 +377,53 @@ const ActiveJobs: React.FC = () => {
                     </span>
                   </div>
 
-                  {/* Action Button */}
-                  <Link
-                    to={`/tasiyici/jobs/${job.id}`}
-                    className='w-full px-2.5 py-1.5 bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 text-white rounded-lg text-xs font-medium transition-all duration-300 flex items-center justify-center gap-1.5 shadow-md hover:shadow-lg'
-                  >
-                    <ArrowRight className='w-3 h-3' />
-                    Detayları Gör
-                  </Link>
+                  {/* Durum Butonları - Basit ve Büyük */}
+                  <div className='space-y-2'>
+                    {/* Testimi Aldım - sadece accepted/pending durumunda */}
+                    {(job.status === 'accepted' || job.status === 'pending' || !job.status || job.status === 'test') && (
+                      <button
+                        onClick={() => updateJobStatus(job.id, 'picked_up')}
+                        disabled={updatingStatus[job.id]}
+                        className='w-full px-3 py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg font-bold text-sm transition-all duration-300 flex items-center justify-center gap-2 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed'
+                      >
+                        <CheckCircle2 className='w-5 h-5' />
+                        ✅ Testimi Aldım
+                      </button>
+                    )}
+                    
+                    {/* Yoldayım - picked_up veya in_progress durumunda */}
+                    {(job.status === 'picked_up' || job.status === 'in_progress') && (
+                      <button
+                        onClick={() => updateJobStatus(job.id, 'in_transit')}
+                        disabled={updatingStatus[job.id]}
+                        className='w-full px-3 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg font-bold text-sm transition-all duration-300 flex items-center justify-center gap-2 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed'
+                      >
+                        <Navigation className='w-5 h-5' />
+                        🚚 Yoldayım
+                      </button>
+                    )}
+                    
+                    {/* Teslim Ettim - in_transit durumunda */}
+                    {(job.status === 'in_transit' || job.status === 'in_progress') && (
+                      <button
+                        onClick={() => updateJobStatus(job.id, 'delivered')}
+                        disabled={updatingStatus[job.id]}
+                        className='w-full px-3 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-lg font-bold text-sm transition-all duration-300 flex items-center justify-center gap-2 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed'
+                      >
+                        <Package className='w-5 h-5' />
+                        📦 Teslim Ettim
+                      </button>
+                    )}
+                    
+                    {/* Detayları Gör - her zaman görünür */}
+                    <Link
+                      to={`/tasiyici/jobs/${job.id}`}
+                      className='w-full px-2.5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-medium transition-all duration-300 flex items-center justify-center gap-1.5 border border-gray-300'
+                    >
+                      <ArrowRight className='w-3 h-3' />
+                      Detayları Gör
+                    </Link>
+                  </div>
                 </div>
               );
             })}

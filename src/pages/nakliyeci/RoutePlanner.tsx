@@ -32,6 +32,8 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import Breadcrumb from '../../components/common/Breadcrumb';
 import LoadingState from '../../components/common/LoadingState';
+import ErrorToast from '../../components/error/ErrorToast';
+import { createApiUrl } from '../../config/api';
 
 interface Vehicle {
   id: number;
@@ -89,6 +91,8 @@ export default function RoutePlanner() {
   const [totalEarnings, setTotalEarnings] = useState(0);
   const [totalWeight, setTotalWeight] = useState(0);
   const [isOptimized, setIsOptimized] = useState(false);
+  const [showError, setShowError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const breadcrumbItems = [
     { label: 'Güzergah Planlayıcı', icon: <Route className='w-4 h-4' /> },
@@ -104,7 +108,13 @@ export default function RoutePlanner() {
       const userId =
         user?.id ||
         (localStorage.getItem('user')
-          ? JSON.parse(localStorage.getItem('user') || '{}').id
+          ? (() => {
+              try {
+                return JSON.parse(localStorage.getItem('user') || '{}').id;
+              } catch {
+                return undefined;
+              }
+            })()
           : null);
       const token = localStorage.getItem('authToken');
 
@@ -112,7 +122,7 @@ export default function RoutePlanner() {
         throw new Error('Kullanıcı ID bulunamadı');
       }
 
-      const response = await fetch('/api/vehicles/nakliyeci', {
+      const response = await fetch(createApiUrl('/api/vehicles/nakliyeci'), {
         headers: {
           Authorization: `Bearer ${token || ''}`,
           'X-User-Id': userId,
@@ -150,10 +160,16 @@ export default function RoutePlanner() {
       const userId =
         user?.id ||
         (localStorage.getItem('user')
-          ? JSON.parse(localStorage.getItem('user') || '{}').id
+          ? (() => {
+              try {
+                return JSON.parse(localStorage.getItem('user') || '{}').id;
+              } catch {
+                return undefined;
+              }
+            })()
           : null);
       const token = localStorage.getItem('authToken');
-      const response = await fetch('/api/loads/available', {
+      const response = await fetch(createApiUrl('/api/loads/available'), {
         headers: {
           Authorization: `Bearer ${token || ''}`,
           'X-User-Id': userId || '',
@@ -240,16 +256,20 @@ export default function RoutePlanner() {
 
     // Kapasite kontrolü
     if (newWeight > selectedVehicle.maxWeight) {
-      alert(
+      setErrorMessage(
         `Ağırlık limiti aşıldı! Maksimum: ${selectedVehicle.maxWeight}kg, Mevcut: ${newWeight}kg`
       );
+      setShowError(true);
+      setTimeout(() => setShowError(false), 5000);
       return;
     }
 
     if (newVolume > selectedVehicle.maxVolume) {
-      alert(
+      setErrorMessage(
         `Hacim limiti aşıldı! Maksimum: ${selectedVehicle.maxVolume}m³, Mevcut: ${newVolume}m³`
       );
+      setShowError(true);
+      setTimeout(() => setShowError(false), 5000);
       return;
     }
 
@@ -758,6 +778,15 @@ export default function RoutePlanner() {
           </div>
         </div>
       </div>
+      
+      {/* Error Toast */}
+      {showError && errorMessage && (
+        <ErrorToast
+          message={errorMessage}
+          onClose={() => setShowError(false)}
+          type="error"
+        />
+      )}
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { toast } from 'react-hot-toast';
 import Breadcrumb from '../../components/common/Breadcrumb';
 import LoadingState from '../../components/common/LoadingState';
 import Modal from '../../components/common/Modal';
+import { createApiUrl } from '../../config/api';
 
 interface Listing {
   id: number;
@@ -27,7 +28,10 @@ const Market: React.FC = () => {
   const [bidPrice, setBidPrice] = useState<Record<number, string>>({});
   const [eta, setEta] = useState<Record<number, string>>({});
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterCity, setFilterCity] = useState('');
+  const [filterFromCity, setFilterFromCity] = useState('');
+  const [filterToCity, setFilterToCity] = useState('');
+  const [sortBy, setSortBy] = useState<'date' | 'price' | 'distance'>('date');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [showBidModal, setShowBidModal] = useState(false);
   const [selectedListing, setSelectedListing] = useState<Listing | null>(null);
   const [bidPriceInput, setBidPriceInput] = useState('');
@@ -38,7 +42,7 @@ const Market: React.FC = () => {
       try {
         setLoading(true);
         const token = localStorage.getItem('authToken');
-        const res = await fetch('/api/carrier-market/available', {
+        const res = await fetch(createApiUrl('/api/carrier-market/listings'), {
           headers: {
             Authorization: `Bearer ${token || ''}`,
             'Content-Type': 'application/json',
@@ -46,9 +50,29 @@ const Market: React.FC = () => {
         });
         if (!res.ok) throw new Error('Açık ilanlar alınamadı');
         const data = await res.json();
-        setListings(
-          (Array.isArray(data) ? data : data.data || []) as Listing[]
-        );
+        const listingsData = (Array.isArray(data) ? data : data.data || []) as Listing[];
+        console.log('🔍 [Market] Loaded listings:', JSON.stringify(listingsData, null, 2));
+        console.log('🔍 [Market] Listings count:', listingsData.length);
+        
+        // Map carrier-market listings to Market component format
+        const mappedListings = listingsData.map((listing: any) => {
+          const shipment = listing.shipment || {};
+          return {
+            id: listing.id,
+            shipmentId: listing.shipmentId,
+            minPrice: listing.minPrice,
+            title: shipment.title || listing.title || `Gönderi #${listing.shipmentId}`,
+            pickupAddress: shipment.pickupAddress || shipment.from || shipment.pickupCity || '',
+            deliveryAddress: shipment.deliveryAddress || shipment.to || shipment.deliveryCity || '',
+            weight: shipment.weight || 0,
+            volume: shipment.volume || 0,
+            price: listing.minPrice || 0,
+            pickupDate: shipment.pickupDate || '',
+            createdAt: listing.createdAt || '',
+          };
+        });
+        
+        setListings(mappedListings);
       } catch (e) {
         if (import.meta.env.DEV) console.error(e);
         setListings([]);
@@ -88,11 +112,10 @@ const Market: React.FC = () => {
         bidPrice: Number(bidPriceInput),
         etaHours: etaInput ? Number(etaInput) : undefined,
       };
-      const res = await fetch('/api/carrier-market/bids', {
+      const res = await fetch(createApiUrl('/api/carrier-market/bids'), {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token || ''}`,
-          'X-User-Id': userId || '',
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(body),
@@ -109,7 +132,7 @@ const Market: React.FC = () => {
       closeBidModal();
       
       // Reload listings
-      const reloadRes = await fetch('/api/carrier-market/available', {
+      const reloadRes = await fetch(createApiUrl('/api/carrier-market/listings'), {
         headers: {
           Authorization: `Bearer ${token || ''}`,
           'Content-Type': 'application/json',
@@ -117,24 +140,81 @@ const Market: React.FC = () => {
       });
       if (reloadRes.ok) {
         const reloadData = await reloadRes.json();
-        setListings((Array.isArray(reloadData) ? reloadData : reloadData.data || []) as Listing[]);
+        const listingsData = (Array.isArray(reloadData) ? reloadData : reloadData.data || []) as any[];
+        const mappedListings = listingsData.map((listing: any) => {
+          const shipment = listing.shipment || {};
+          return {
+            id: listing.id,
+            shipmentId: listing.shipmentId,
+            minPrice: listing.minPrice,
+            title: shipment.title || listing.title || `Gönderi #${listing.shipmentId}`,
+            pickupAddress: shipment.pickupAddress || shipment.from || shipment.pickupCity || '',
+            deliveryAddress: shipment.deliveryAddress || shipment.to || shipment.deliveryCity || '',
+            weight: shipment.weight || 0,
+            volume: shipment.volume || 0,
+            price: listing.minPrice || 0,
+            pickupDate: shipment.pickupDate || '',
+            createdAt: listing.createdAt || '',
+          };
+        });
+        setListings(mappedListings);
       }
     } catch (e: any) {
       toast.error(e.message || 'Teklif gönderilemedi');
     }
   };
 
-  const filteredListings = listings.filter(listing => {
+  // Extract city name from address
+  const getCityFromAddress = (address?: string): string => {
+    if (!address) return '';
+    const parts = address.split(',');
+    const cityPart = parts[parts.length - 1]?.trim() || '';
+    // Remove common suffixes
+    return cityPart.replace(/\s*(İl|İli|Şehri)$/i, '').trim();
+  };
+
+  const filteredListings = listings
+    .filter(listing => {
     const matchesSearch = !searchTerm || 
       (listing.title || `Gönderi #${listing.shipmentId}`).toLowerCase().includes(searchTerm.toLowerCase()) ||
       listing.pickupAddress?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       listing.deliveryAddress?.toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesCity = !filterCity ||
-      listing.pickupAddress?.toLowerCase().includes(filterCity.toLowerCase()) ||
-      listing.deliveryAddress?.toLowerCase().includes(filterCity.toLowerCase());
+      const pickupCity = getCityFromAddress(listing.pickupAddress);
+      const deliveryCity = getCityFromAddress(listing.deliveryAddress);
+      
+      const matchesFromCity = !filterFromCity ||
+        pickupCity.toLowerCase().includes(filterFromCity.toLowerCase()) ||
+        listing.pickupAddress?.toLowerCase().includes(filterFromCity.toLowerCase());
+      
+      const matchesToCity = !filterToCity ||
+        deliveryCity.toLowerCase().includes(filterToCity.toLowerCase()) ||
+        listing.deliveryAddress?.toLowerCase().includes(filterToCity.toLowerCase());
     
-    return matchesSearch && matchesCity;
+      return matchesSearch && matchesFromCity && matchesToCity;
+    })
+    .sort((a, b) => {
+      let comparison = 0;
+      
+      if (sortBy === 'date') {
+        const dateA = new Date(a.createdAt || 0).getTime();
+        const dateB = new Date(b.createdAt || 0).getTime();
+        comparison = dateA - dateB;
+      } else if (sortBy === 'price') {
+        const priceA = a.price || a.minPrice || 0;
+        const priceB = b.price || b.minPrice || 0;
+        comparison = priceA - priceB;
+      } else if (sortBy === 'distance') {
+        // Simple distance approximation - can be enhanced with actual distance calculation
+        const pickupCityA = getCityFromAddress(a.pickupAddress);
+        const deliveryCityA = getCityFromAddress(a.deliveryAddress);
+        const pickupCityB = getCityFromAddress(b.pickupAddress);
+        const deliveryCityB = getCityFromAddress(b.deliveryAddress);
+        // For now, just sort by city name length as approximation
+        comparison = (pickupCityA.length + deliveryCityA.length) - (pickupCityB.length + deliveryCityB.length);
+      }
+      
+      return sortOrder === 'asc' ? comparison : -comparison;
   });
 
 
@@ -180,51 +260,125 @@ const Market: React.FC = () => {
         </div>
 
         {/* Filters */}
-        <div className='bg-white rounded-xl p-4 shadow-lg border border-gray-100 mb-6'>
-          <div className='flex flex-col sm:flex-row gap-4 items-end'>
-            {/* Search */}
-            <div className='flex-1 w-full'>
+        <div className='bg-white rounded-xl p-4 sm:p-6 shadow-lg border border-gray-100 mb-6'>
+          <div className='space-y-4'>
+            {/* Search Row */}
+            <div className='flex flex-col sm:flex-row gap-4'>
+              <div className='flex-1'>
               <label className='block text-sm font-medium text-slate-700 mb-2'>
-                Arama
+                  <Search className='inline w-4 h-4 mr-1' />
+                  Genel Arama
               </label>
-              <div className='relative'>
-                <Search className='absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400' />
                 <input
                   type='text'
-                  placeholder='İş ara... (başlık, şehir, adres)'
+                  placeholder='Başlık, açıklama veya adres ara...'
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className='w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                  className='w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
                 />
               </div>
             </div>
 
-            {/* City Filter */}
-            <div className='w-full sm:w-64'>
+            {/* City Filters Row */}
+            <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
+              {/* Başlangıç Şehri */}
+              <div>
+                <label className='block text-sm font-medium text-slate-700 mb-2'>
+                  <MapPin className='inline w-4 h-4 mr-1 text-blue-600' />
+                  Başlangıç Şehri
+                </label>
+                <input
+                  type='text'
+                  placeholder='Örn: İstanbul, Ankara, İzmir...'
+                  value={filterFromCity}
+                  onChange={(e) => setFilterFromCity(e.target.value)}
+                  className='w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                />
+                <p className='mt-1 text-xs text-slate-500'>
+                  Yükün alınacağı şehir
+                </p>
+              </div>
+
+              {/* Bitiş Şehri */}
+              <div>
               <label className='block text-sm font-medium text-slate-700 mb-2'>
-                Şehir
+                  <MapPin className='inline w-4 h-4 mr-1 text-green-600' />
+                  Bitiş Şehri
               </label>
               <input
                 type='text'
-                placeholder='Örn: İstanbul'
-                value={filterCity}
-                onChange={(e) => setFilterCity(e.target.value)}
-                className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-              />
+                  placeholder='Örn: İstanbul, Ankara, İzmir...'
+                  value={filterToCity}
+                  onChange={(e) => setFilterToCity(e.target.value)}
+                  className='w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                />
+                <p className='mt-1 text-xs text-slate-500'>
+                  Yükün teslim edileceği şehir
+                </p>
+              </div>
+            </div>
+
+            {/* Sort and Clear Row */}
+            <div className='flex flex-col sm:flex-row gap-4 items-end'>
+              {/* Sort By */}
+              <div className='flex-1 sm:flex-initial sm:w-48'>
+                <label className='block text-sm font-medium text-slate-700 mb-2'>
+                  Sıralama
+                </label>
+                <div className='flex gap-2'>
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as 'date' | 'price' | 'distance')}
+                    className='flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm'
+                  >
+                    <option value='date'>Tarih</option>
+                    <option value='price'>Fiyat</option>
+                    <option value='distance'>Mesafe</option>
+                  </select>
+                  <button
+                    onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                    className='px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors'
+                    title={sortOrder === 'asc' ? 'Artan' : 'Azalan'}
+                  >
+                    {sortOrder === 'asc' ? '↑' : '↓'}
+                  </button>
+                </div>
             </div>
 
             {/* Clear Filters */}
-            {(filterCity || searchTerm) && (
+              {(filterFromCity || filterToCity || searchTerm) && (
               <button
                 onClick={() => {
-                  setFilterCity('');
+                    setFilterFromCity('');
+                    setFilterToCity('');
                   setSearchTerm('');
                 }}
                 className='px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-all duration-300 flex items-center justify-center gap-2 whitespace-nowrap'
               >
                 <X className='w-4 h-4' />
-                Temizle
+                  Filtreleri Temizle
               </button>
+              )}
+            </div>
+
+            {/* Active Filters Info */}
+            {(filterFromCity || filterToCity) && (
+              <div className='bg-blue-50 rounded-lg p-3 border border-blue-200'>
+                <div className='flex flex-wrap gap-2 text-sm'>
+                  {filterFromCity && (
+                    <span className='inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 rounded-md'>
+                      <MapPin className='w-3 h-3' />
+                      Başlangıç: {filterFromCity}
+                    </span>
+                  )}
+                  {filterToCity && (
+                    <span className='inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 rounded-md'>
+                      <MapPin className='w-3 h-3' />
+                      Bitiş: {filterToCity}
+                    </span>
+                  )}
+                </div>
+              </div>
             )}
           </div>
         </div>

@@ -35,6 +35,7 @@ import LoadingState from '../../components/common/LoadingState';
 import Pagination from '../../components/common/Pagination';
 import Modal from '../../components/common/Modal';
 import SuccessMessage from '../../components/common/SuccessMessage';
+import MessagingModal from '../../components/MessagingModal';
 import { createApiUrl } from '../../config/api';
 import { formatCurrency, formatDate } from '../../utils/format';
 
@@ -99,6 +100,11 @@ const ActiveShipments = () => {
   const [isAssigning, setIsAssigning] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  const [showError, setShowError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [showMessagingModal, setShowMessagingModal] = useState(false);
+  const [selectedShipper, setSelectedShipper] = useState<{id: string; name: string; email: string; type: string} | null>(null);
+  const [selectedShipmentId, setSelectedShipmentId] = useState<string | null>(null);
 
   useEffect(() => {
     loadActiveShipments();
@@ -135,7 +141,61 @@ const ActiveShipments = () => {
 
       if (response.ok) {
         const data = await response.json();
-        setShipments(data.shipments || (Array.isArray(data) ? data : []));
+        const rawShipments = data.data || data.shipments || (Array.isArray(data) ? data : []);
+        
+        console.log('🔍 [DEBUG] ActiveShipments - Raw shipments from backend:', rawShipments);
+        
+        // Map backend data to frontend format
+        const mappedShipments = rawShipments.map((shipment: any) => {
+          // Build driver object with fallback logic
+          const driver = shipment.driver ? {
+            name: shipment.driver.name || shipment.carrierName || 'Atanmadı',
+            phone: shipment.driver.phone || shipment.carrierPhone || shipment.contactPhone || shipment.phone || '',
+            vehicle: shipment.driver.vehicle || shipment.carrierVehicle || shipment.vehicle || '',
+          } : (shipment.carrierName ? {
+            name: shipment.carrierName,
+            phone: shipment.carrierPhone || shipment.contactPhone || shipment.phone || '',
+            vehicle: shipment.carrierVehicle || shipment.vehicle || '',
+          } : {
+            name: 'Atanmadı',
+            phone: '',
+            vehicle: '',
+          });
+          
+          console.log(`🔍 [DEBUG] ActiveShipments - Shipment ID: ${shipment.id}, driver.vehicle: '${driver.vehicle}'`);
+
+          // Build shipper object with fallback logic
+          // PRIVACY: Gönderici telefon numarası gizlenmeli - nakliyeci sadece mesaj yoluyla ulaşabilir
+          const shipper = shipment.shipper ? {
+            name: shipment.shipper.name || shipment.shipperName || shipment.senderName || shipment.sender || shipment.contactPerson || '',
+            company: shipment.shipper.company || shipment.shipperCompany || shipment.companyName || '',
+            // phone: HIDDEN - Gizlilik nedeniyle gönderici telefon numarası gösterilmemektedir
+          } : {
+            name: shipment.shipperName || shipment.senderName || shipment.sender || shipment.contactPerson || '',
+            company: shipment.shipperCompany || shipment.companyName || '',
+            // phone: HIDDEN - Gizlilik nedeniyle gönderici telefon numarası gösterilmemektedir
+          };
+
+          return {
+            id: shipment.id?.toString() || '',
+            trackingNumber: shipment.trackingNumber || shipment.tracking_code || shipment.id?.toString() || '',
+            from: shipment.pickupCity || shipment.fromCity || `${shipment.pickupDistrict || ''} ${shipment.pickupCity || ''}`.trim() || 'Bilinmiyor',
+            to: shipment.deliveryCity || shipment.toCity || `${shipment.deliveryDistrict || ''} ${shipment.deliveryCity || ''}`.trim() || 'Bilinmiyor',
+            status: shipment.status || 'pending',
+            priority: shipment.priority || 'normal',
+            weight: shipment.weight || 0,
+            volume: shipment.volume || 0,
+            value: shipment.value || shipment.price || 0,
+            pickupDate: shipment.pickupDate || shipment.pickup_date || '',
+            deliveryDate: shipment.deliveryDate || shipment.delivery_date || '',
+            driver,
+            shipper,
+            createdAt: shipment.createdAt || shipment.created_at || new Date().toISOString(),
+          };
+        });
+        
+        setShipments(mappedShipments);
+        
         if (data.pagination) {
           setPagination(prev => ({
             ...prev,
@@ -188,6 +248,19 @@ const ActiveShipments = () => {
     setShowAssignModal(true);
   };
 
+  const handleMessageClick = (shipment: ActiveShipment) => {
+    if (shipment.shipper && shipment.shipper.name) {
+      setSelectedShipper({
+        id: shipment.id, // Use shipment ID as shipper ID for messaging
+        name: shipment.shipper.name,
+        email: '', // We don't have email in shipper object
+        type: 'individual'
+      });
+      setSelectedShipmentId(shipment.id);
+      setShowMessagingModal(true);
+    }
+  };
+
   const handleDirectAssign = async () => {
     if (!selectedDriver || !selectedShipment) return;
 
@@ -214,11 +287,16 @@ const ActiveShipments = () => {
         setSelectedDriver('');
         await loadActiveShipments();
       } else {
-        alert('Taşıyıcı atanamadı. Lütfen tekrar deneyin.');
+        const errorData = await response.json().catch(() => ({}));
+        setErrorMessage(errorData.message || 'Taşıyıcı atanamadı. Lütfen tekrar deneyin.');
+        setShowError(true);
+        setTimeout(() => setShowError(false), 5000);
       }
     } catch (error) {
       console.error('Error assigning driver:', error);
-      alert('Taşıyıcı atanamadı. Lütfen tekrar deneyin.');
+      setErrorMessage('Taşıyıcı atanamadı. Lütfen tekrar deneyin.');
+      setShowError(true);
+      setTimeout(() => setShowError(false), 5000);
     } finally {
       setIsAssigning(false);
     }
@@ -251,11 +329,16 @@ const ActiveShipments = () => {
         setMinPrice('');
         await loadActiveShipments();
       } else {
-        alert('İlan oluşturulamadı. Lütfen tekrar deneyin.');
+        const errorData = await response.json().catch(() => ({}));
+        setErrorMessage(errorData.message || 'İlan oluşturulamadı. Lütfen tekrar deneyin.');
+        setShowError(true);
+        setTimeout(() => setShowError(false), 5000);
       }
     } catch (error) {
       console.error('Error creating listing:', error);
-      alert('İlan oluşturulamadı. Lütfen tekrar deneyin.');
+      setErrorMessage('İlan oluşturulamadı. Lütfen tekrar deneyin.');
+      setShowError(true);
+      setTimeout(() => setShowError(false), 5000);
     } finally {
       setIsAssigning(false);
     }
@@ -318,13 +401,14 @@ const ActiveShipments = () => {
   };
 
   const filteredShipments = shipments.filter(shipment => {
-    const matchesSearch =
-      shipment.trackingNumber
+    const matchesSearch = !searchTerm || searchTerm.trim() === '' || (
+      (shipment.trackingNumber || '')
         .toLowerCase()
         .includes(searchTerm.toLowerCase()) ||
-      shipment.from.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      shipment.to.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      shipment.driver.name.toLowerCase().includes(searchTerm.toLowerCase());
+      (shipment.from || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (shipment.to || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      ((shipment.driver?.name || '').toLowerCase().includes(searchTerm.toLowerCase()))
+    );
 
     const matchesStatus =
       statusFilter === 'all' || shipment.status === statusFilter;
@@ -412,9 +496,9 @@ const ActiveShipments = () => {
         {/* Shipments List */}
         {filteredShipments.length > 0 ? (
           <div className='grid gap-6'>
-            {filteredShipments.map(shipment => (
+            {filteredShipments.map((shipment, index) => (
               <div
-                key={shipment.id}
+                key={`${shipment.id}-${shipment.trackingNumber}-${index}`}
                 className='bg-white rounded-xl p-6 shadow-lg border border-gray-200 hover:shadow-xl transition-shadow'
               >
                 <div className='flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4'>
@@ -491,12 +575,14 @@ const ActiveShipments = () => {
                           <p>
                             <strong>Ad:</strong> {shipment.shipper.name}
                           </p>
+                          {shipment.shipper.company && (
                           <p>
                             <strong>Şirket:</strong> {shipment.shipper.company}
                           </p>
-                          <p>
-                            <strong>Tel:</strong> {shipment.shipper.phone}
-                          </p>
+                          )}
+                          <div className='mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700'>
+                            <strong>Not:</strong> Gönderici ile iletişim için mesaj sistemi kullanın. Telefon numarası gizlilik nedeniyle gösterilmemektedir.
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -511,7 +597,7 @@ const ActiveShipments = () => {
                     </div>
 
                     <div className='flex flex-col gap-2'>
-                      {!shipment.driver || !shipment.driver.name ? (
+                      {!shipment.driver ? (
                         <button
                           onClick={() => handleAssignClick(shipment)}
                           className='w-full bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center gap-2'
@@ -530,7 +616,10 @@ const ActiveShipments = () => {
                         <Eye className='w-4 h-4' />
                         Detay
                       </button>
-                      <button className='flex-1 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center justify-center gap-2'>
+                      <button 
+                        onClick={() => handleMessageClick(shipment)}
+                        className='flex-1 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center justify-center gap-2'
+                      >
                         <MessageSquare className='w-4 h-4' />
                         Mesaj
                       </button>
@@ -736,6 +825,38 @@ const ActiveShipments = () => {
             isVisible={showSuccess}
             onClose={() => setShowSuccess(false)}
           />
+        )}
+
+        {/* Messaging Modal */}
+        {showMessagingModal && selectedShipper && user && (
+          <MessagingModal
+            isOpen={showMessagingModal}
+            onClose={() => {
+              setShowMessagingModal(false);
+              setSelectedShipper(null);
+              setSelectedShipmentId(null);
+            }}
+            otherUser={selectedShipper}
+            currentUser={{
+              id: user.id || '',
+              name: user.fullName || 'Kullanıcı',
+            }}
+            shipmentId={selectedShipmentId || undefined}
+          />
+        )}
+
+        {/* Error Message */}
+        {showError && (
+          <div className="fixed bottom-4 right-4 bg-red-50 border border-red-200 text-red-600 px-6 py-4 rounded-xl shadow-xl flex items-center gap-3 z-50 animate-slide-up">
+            <AlertCircle className="w-5 h-5" />
+            <span className="font-medium">{errorMessage}</span>
+            <button
+              onClick={() => setShowError(false)}
+              className="ml-4 text-red-400 hover:text-red-600"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         )}
       </div>
     </div>

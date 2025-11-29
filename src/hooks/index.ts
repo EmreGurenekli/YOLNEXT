@@ -22,5 +22,5 @@ export { useSafeState } from './useSafeState';
 export { useCleanup } from './useCleanup';
 
 // Socket hooks - useSocket is a .js file, so we use default import
-// @ts-ignore - JS file doesn't have types
+// @ts-expect-error - JS file doesn't have types
 export { default as useSocket } from './useSocket';

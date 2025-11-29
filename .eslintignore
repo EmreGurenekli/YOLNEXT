@@ -1,14 +1,40 @@
-# Backend files (CommonJS)
+﻿# Backend files (CommonJS) - IGNORE ALL
 backend/**/*
 **/*.js
 !src/**/*.js
 
-# Dependencies
+# Dependencies - IGNORE ALL
 node_modules/**
 dist/**
 coverage/**
+build/**
 
-# Build outputs
+# Build outputs - IGNORE ALL
 *.min.js
 *.bundle.js
+*.map
 
+# Test files - IGNORE ALL (Performance optimization)
+**/*.cjs
+**/*.test.js
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.js
+**/*.spec.ts
+**/*.spec.tsx
+tests/**
+test-*.js
+test-*.cjs
+test-*.ts
+tools/**
+
+# Legacy and temp files
+legacy/**
+*.log
+*.cache
+*.tmp
+temp/**
+
+# Only lint src/ folder for performance
+!src/**/*.ts
+!src/**/*.tsx

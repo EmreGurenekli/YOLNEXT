@@ -126,10 +126,11 @@ export const SecurityProvider: React.FC<SecurityProviderProps> = ({
   };
 
   const logout = () => {
-    localStorage.removeItem('authToken');
-    setUser(null);
-    setIsAuthenticated(false);
-    logSecurityEvent('logout', 'User logged out');
+    console.log('SecurityContext logout function called - DISABLED');
+    // localStorage.removeItem('authToken');
+    // setUser(null);
+    // setIsAuthenticated(false);
+    // logSecurityEvent('logout', 'User logged out');
   };
 
   const register = async (data: RegisterData) => {

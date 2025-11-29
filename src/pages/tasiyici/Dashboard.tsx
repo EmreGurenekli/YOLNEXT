@@ -2,14 +2,13 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useAuth } from '../../contexts/AuthContext';
+import { createApiUrl } from '../../config/api';
 import {
   Package,
   Truck,
-  DollarSign,
   Clock,
   MapPin,
   Star,
-  TrendingUp,
   Calendar,
   CheckCircle,
   AlertCircle,
@@ -25,10 +24,11 @@ import {
   Edit,
   Trash2,
   X,
+  Briefcase,
 } from 'lucide-react';
 import Breadcrumb from '../../components/common/Breadcrumb';
 import LoadingState from '../../components/common/LoadingState';
-import { formatCurrency, formatDate } from '../../utils/format';
+import { formatDate } from '../../utils/format';
 import EmptyState from '../../components/common/EmptyState';
 
 const TasiyiciDashboard: React.FC = () => {
@@ -37,8 +37,6 @@ const TasiyiciDashboard: React.FC = () => {
     totalJobs: 0,
     completedJobs: 0,
     activeJobs: 0,
-    totalEarnings: 0,
-    thisMonthEarnings: 0,
     rating: 0,
     completedDeliveries: 0,
     workHours: 0,
@@ -74,13 +72,13 @@ const TasiyiciDashboard: React.FC = () => {
           ? JSON.parse(localStorage.getItem('user') || '{}').id
           : null);
       const [statsResponse, jobsResponse] = await Promise.all([
-        fetch('/api/dashboard/stats/tasiyici', {
+        fetch(createApiUrl('/api/dashboard/stats/tasiyici'), {
           headers: {
             Authorization: `Bearer ${token}`,
             'X-User-Id': userId || '',
           },
         }),
-        fetch('/api/shipments/tasiyici', {
+        fetch(createApiUrl('/api/shipments/tasiyici'), {
           headers: {
             Authorization: `Bearer ${token}`,
             'X-User-Id': userId || '',
@@ -92,11 +90,9 @@ const TasiyiciDashboard: React.FC = () => {
         const statsData = await statsResponse.json();
         const statsObj = statsData.data?.stats || statsData.stats || {};
         setStats({
-          totalJobs: statsObj.totalShipments || 0,
-          completedJobs: statsObj.completedShipments || 0,
-          activeJobs: statsObj.acceptedOffers || 0,
-          totalEarnings: 0, // Not available from current API
-          thisMonthEarnings: 0, // Not available from current API
+          totalJobs: statsObj.totalJobs || statsObj.totalShipments || 0,
+          completedJobs: statsObj.completedJobs || statsObj.completedShipments || 0,
+          activeJobs: statsObj.activeJobs || statsObj.acceptedOffers || 0,
           rating: 0, // Not available from current API
           completedDeliveries: statsObj.completedShipments || 0,
           workHours: 0, // Not available from current API
@@ -131,8 +127,6 @@ const TasiyiciDashboard: React.FC = () => {
         totalJobs: 0,
         completedJobs: 0,
         activeJobs: 0,
-        totalEarnings: 0,
-        thisMonthEarnings: 0,
         rating: 0,
         completedDeliveries: 0,
         workHours: 0,
@@ -144,8 +138,6 @@ const TasiyiciDashboard: React.FC = () => {
     }
   };
 
-  // Using format helpers from utils/format.ts
-  const formatPrice = formatCurrency;
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -250,20 +242,10 @@ const TasiyiciDashboard: React.FC = () => {
               </div>
 
               <div className='flex items-center gap-3'>
-                <Link to='/tasiyici/messages' className='relative group'>
-                  <button className='min-w-[44px] min-h-[44px] w-12 h-12 bg-white/10 backdrop-blur-sm rounded-2xl flex items-center justify-center hover:bg-white/20 transition-all duration-300 border border-white/20 group-hover:scale-110'>
-                    <MessageSquare size={20} className='text-white' />
-                    {unreadCount > 0 && (
-                      <span className='absolute -top-1 -right-1 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center font-bold shadow-lg'>
-                        {unreadCount}
-                      </span>
-                    )}
-                  </button>
-                </Link>
-                <Link to='/tasiyici/active-jobs'>
-                  <button className='bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 text-white px-6 py-3 rounded-lg font-medium transition-all duration-300 flex items-center gap-2 text-base shadow-lg hover:shadow-xl'>
+                <Link to='/tasiyici/market'>
+                  <button className='bg-white text-slate-800 px-6 py-3 rounded-xl font-bold transition-all duration-300 flex items-center gap-2 text-base shadow-lg hover:shadow-xl hover:bg-green-50'>
                     <Plus size={20} />
-                    İş Ara
+                    Yeni İş Ara
                   </button>
                 </Link>
               </div>
@@ -272,7 +254,7 @@ const TasiyiciDashboard: React.FC = () => {
         </div>
 
         {/* Stats Grid */}
-        <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6'>
+        <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6'>
           <div className='bg-white rounded-xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:border-blue-300 transition-all duration-300'>
             <div className='flex items-center justify-between mb-4'>
               <div className='w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center'>
@@ -327,151 +309,26 @@ const TasiyiciDashboard: React.FC = () => {
               Nakliyecilerden devam eden işler
             </div>
           </div>
-
-          <div className='bg-white rounded-xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:border-blue-300 transition-all duration-300'>
-            <div className='flex items-center justify-between mb-4'>
-              <div className='w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center'>
-                <TrendingUp className='w-6 h-6 text-white' />
-              </div>
-              <div className='text-right'>
-                <div className='text-2xl font-bold text-slate-900 mb-1'>
-                  {formatPrice(stats.totalEarnings)}
-                </div>
-              </div>
-            </div>
-            <div className='text-slate-700 font-semibold text-sm'>
-              Toplam Kazanç
-            </div>
-            <div className='mt-1 text-xs text-slate-500'>
-              Nakliyecilerden kazandığınız toplam para
-            </div>
-          </div>
         </div>
 
-        {/* İş İlanları Kartı */}
-        <div className='bg-white rounded-2xl p-6 sm:p-8 shadow-xl border border-gray-100 hover:shadow-2xl hover:border-blue-300 transition-all duration-300 mb-8'>
-          <div className='flex flex-col md:flex-row md:items-center md:justify-between gap-4'>
-            <div className='flex items-start gap-4'>
-              <div className='w-14 h-14 bg-gradient-to-br from-slate-800 to-blue-900 rounded-xl flex items-center justify-center shadow-lg'>
-                <Clock className='w-7 h-7 text-white' />
+        {/* Yeni İş Var - Büyük Buton */}
+        {stats.activeJobs === 0 && (
+          <div className='bg-gradient-to-br from-slate-50 to-gray-100 border border-slate-200 rounded-3xl p-8 sm:p-10 shadow-xl mb-8 text-center'>
+            <div className='mb-4'>
+              <div className='w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-slate-800 to-blue-900 rounded-2xl flex items-center justify-center shadow-lg'>
+                <Briefcase className='w-10 h-10 text-white' />
               </div>
-              <div>
-                <h2 className='text-2xl font-bold text-slate-900 mb-1'>
-                  İş İlanları
-                </h2>
-                <p className='text-slate-600 text-base'>
-                  Açık gönderiler için teklif verin ve iş alın
-                </p>
-              </div>
+              <h2 className='text-3xl font-bold mb-2 text-slate-900'>Yeni İş Fırsatları</h2>
+              <p className='text-slate-600 text-lg'>Nakliyecilerden iş al, yeni fırsatlar yakala!</p>
             </div>
-            <div>
-              <Link to='/tasiyici/market'>
-                <button className='bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 text-white px-6 py-3 rounded-lg font-medium transition-all duration-300 flex items-center gap-2 shadow-lg hover:shadow-xl'>
-                  <ArrowRight className='w-4 h-4' />
-                  Pazarı Görüntüle
-                </button>
-              </Link>
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Actions */}
-        <div className='bg-white rounded-2xl p-8 shadow-xl border border-gray-100 mb-8'>
-          <div className='flex items-center justify-between mb-8'>
-            <div>
-              <h2 className='text-2xl font-bold text-slate-900 mb-2'>
-                Hızlı İşlemler
-              </h2>
-              <p className='text-slate-600'>
-                İş fırsatlarına hızlı erişim
-              </p>
-            </div>
-            <div className='w-14 h-14 bg-gradient-to-br from-slate-800 to-blue-900 rounded-2xl flex items-center justify-center shadow-lg'>
-              <svg
-                className='w-7 h-7 text-white'
-                fill='none'
-                stroke='currentColor'
-                viewBox='0 0 24 24'
-              >
-                <path
-                  strokeLinecap='round'
-                  strokeLinejoin='round'
-                  strokeWidth={2}
-                  d='M13 10V3L4 14h7v7l9-11h-7z'
-                />
-              </svg>
-            </div>
-          </div>
-          <div className='grid grid-cols-2 md:grid-cols-4 gap-6'>
             <Link to='/tasiyici/market'>
-              <div className='group bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:border-blue-300 transition-all duration-300 hover:-translate-y-2'>
-                <div className='flex flex-col items-center text-center'>
-                  <div className='w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300 mb-4'>
-                    <Package className='w-6 h-6 text-white' />
-                  </div>
-                  <h3 className='text-lg font-bold text-slate-900 mb-2'>
-                    Pazar
-                  </h3>
-                  <p className='text-sm text-slate-600'>
-                    Açık ilanlara teklif verin
-                  </p>
-                  <div className='mt-3 w-8 h-1 bg-gradient-to-r from-slate-800 to-blue-900 rounded-full group-hover:w-12 transition-all duration-300'></div>
-                </div>
-              </div>
-            </Link>
-
-            <Link to='/tasiyici/active-jobs'>
-              <div className='group bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:border-blue-300 transition-all duration-300 hover:-translate-y-2'>
-                <div className='flex flex-col items-center text-center'>
-                  <div className='w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300 mb-4'>
-                    <Clock className='w-6 h-6 text-white' />
-                  </div>
-                  <h3 className='text-lg font-bold text-slate-900 mb-2'>
-                    Aktif İşler
-                  </h3>
-                  <p className='text-sm text-slate-600'>
-                    Devam eden işlerinizi görün
-                  </p>
-                  <div className='mt-3 w-8 h-1 bg-gradient-to-r from-slate-800 to-blue-900 rounded-full group-hover:w-12 transition-all duration-300'></div>
-                </div>
-              </div>
-            </Link>
-
-            <Link to='/tasiyici/completed-jobs'>
-              <div className='group bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:border-blue-300 transition-all duration-300 hover:-translate-y-2'>
-                <div className='flex flex-col items-center text-center'>
-                  <div className='w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300 mb-4'>
-                    <CheckCircle className='w-6 h-6 text-white' />
-                  </div>
-                  <h3 className='text-lg font-bold text-slate-900 mb-2'>
-                    Tamamlanan
-                  </h3>
-                  <p className='text-sm text-slate-600'>
-                    Bitirdiğiniz işleri görün
-                  </p>
-                  <div className='mt-3 w-8 h-1 bg-gradient-to-r from-slate-800 to-blue-900 rounded-full group-hover:w-12 transition-all duration-300'></div>
-                </div>
-              </div>
-            </Link>
-
-            <Link to='/tasiyici/my-offers'>
-              <div className='group bg-white rounded-2xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:border-blue-300 transition-all duration-300 hover:-translate-y-2'>
-                <div className='flex flex-col items-center text-center'>
-                  <div className='w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300 mb-4'>
-                    <DollarSign className='w-6 h-6 text-white' />
-                  </div>
-                  <h3 className='text-lg font-bold text-slate-900 mb-2'>
-                    Tekliflerim
-                  </h3>
-                  <p className='text-sm text-slate-600'>
-                    Verdiğiniz tekliflerin durumunu görün
-                  </p>
-                  <div className='mt-3 w-8 h-1 bg-gradient-to-r from-slate-800 to-blue-900 rounded-full group-hover:w-12 transition-all duration-300'></div>
-                </div>
-              </div>
+              <button className='bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 text-white px-8 py-4 rounded-xl font-bold text-lg transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105'>
+                🚚 İş Pazarına Git
+              </button>
             </Link>
           </div>
-        </div>
+        )}
+
 
         {/* Recent Jobs */}
         <div className='bg-white rounded-2xl p-8 shadow-xl border border-gray-100'>
@@ -531,9 +388,6 @@ const TasiyiciDashboard: React.FC = () => {
                       </div>
                     </div>
                     <div className='text-right ml-4'>
-                      <p className='text-2xl font-bold text-slate-900 mb-2'>
-                        {formatPrice(job.price)}
-                      </p>
                       <span
                         className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-semibold ${getStatusColor(job.status)} border`}
                       >

@@ -30,7 +30,6 @@ const CostCalculator: React.FC = () => {
     volume: '',
     category: '',
     urgency: 'normal',
-    insurance: false,
     specialHandling: false,
   });
 
@@ -77,7 +76,6 @@ const CostCalculator: React.FC = () => {
       urgencyOptions.find(u => u.id === formData.urgency)?.multiplier || 1;
 
     // Additional costs
-    const insuranceCost = formData.insurance ? basePrice * 0.1 : 0;
     const specialHandlingCost = formData.specialHandling ? basePrice * 0.2 : 0;
 
     const breakdown = {
@@ -89,7 +87,6 @@ const CostCalculator: React.FC = () => {
 
     const totalPrice =
       basePrice * distanceMultiplier * weightMultiplier * urgencyMultiplier +
-      insuranceCost +
       specialHandlingCost;
 
     setResult({
@@ -251,23 +248,6 @@ const CostCalculator: React.FC = () => {
                 <div className='flex items-center'>
                   <input
                     type='checkbox'
-                    id='insurance'
-                    checked={formData.insurance}
-                    onChange={e =>
-                      handleInputChange('insurance', e.target.checked)
-                    }
-                    className='w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500'
-                  />
-                  <label
-                    htmlFor='insurance'
-                    className='ml-3 text-sm text-gray-700'
-                  >
-                    Sigorta (+%10)
-                  </label>
-                </div>
-                <div className='flex items-center'>
-                  <input
-                    type='checkbox'
                     id='specialHandling'
                     checked={formData.specialHandling}
                     onChange={e =>
@@ -361,14 +341,6 @@ const CostCalculator: React.FC = () => {
                         ₺{result.breakdown.urgency.toFixed(2)}
                       </span>
                     </div>
-                    {formData.insurance && (
-                      <div className='flex justify-between items-center py-2 border-b border-gray-100'>
-                        <span className='text-gray-600'>Sigorta</span>
-                        <span className='font-medium'>
-                          ₺{(result.totalPrice * 0.1).toFixed(2)}
-                        </span>
-                      </div>
-                    )}
                     {formData.specialHandling && (
                       <div className='flex justify-between items-center py-2 border-b border-gray-100'>
                         <span className='text-gray-600'>Özel Taşıma</span>

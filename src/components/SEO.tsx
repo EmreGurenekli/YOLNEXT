@@ -96,7 +96,7 @@ const SEO: React.FC<SEOProps> = ({
             name: 'YolNext',
             logo: {
               '@type': 'ImageObject',
-              url: 'https://YolNext.com/logo.svg',
+              url: 'https://YolNext.com/img/yolnext-logo.svg',
             },
           },
         })}

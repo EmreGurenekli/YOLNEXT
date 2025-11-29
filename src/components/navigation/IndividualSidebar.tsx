@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   User,
@@ -21,6 +21,8 @@ import {
 } from 'lucide-react';
 import GlobalSearch from '../common/GlobalSearch';
 import YolNextLogo from '../common/yolnextLogo';
+import { useBadgeCounts } from '../../hooks/useBadgeCounts';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface IndividualSidebarProps {
   onLogout: () => void;
@@ -29,6 +31,8 @@ interface IndividualSidebarProps {
 const IndividualSidebar: React.FC<IndividualSidebarProps> = ({ onLogout }) => {
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { badgeCounts } = useBadgeCounts();
+  const { user } = useAuth();
 
   const menuSections = [
     {
@@ -44,8 +48,14 @@ const IndividualSidebar: React.FC<IndividualSidebarProps> = ({ onLogout }) => {
           name: 'Gönderilerim',
           href: '/individual/my-shipments',
           icon: Package,
+          badge: badgeCounts.pendingShipments > 0 ? badgeCounts.pendingShipments : undefined,
         },
-        { name: 'Teklifler', href: '/individual/offers', icon: FileText },
+        { 
+          name: 'Teklifler', 
+          href: '/individual/offers', 
+          icon: FileText,
+          badge: badgeCounts.newOffers > 0 ? badgeCounts.newOffers : undefined,
+        },
         { name: 'Geçmiş Siparişler', href: '/individual/history', icon: Clock },
       ],
     },
@@ -53,7 +63,12 @@ const IndividualSidebar: React.FC<IndividualSidebarProps> = ({ onLogout }) => {
       title: 'Takip & İletişim',
       items: [
         { name: 'Canlı Takip', href: '/individual/live-tracking', icon: Truck },
-        { name: 'Mesajlar', href: '/individual/messages', icon: MessageSquare },
+        { 
+          name: 'Mesajlar', 
+          href: '/individual/messages', 
+          icon: MessageSquare,
+          badge: badgeCounts.newMessages > 0 ? badgeCounts.newMessages : undefined,
+        },
       ],
     },
     {
@@ -109,13 +124,13 @@ const IndividualSidebar: React.FC<IndividualSidebarProps> = ({ onLogout }) => {
       `}
       >
         {/* Logo */}
-        <div className='border-b border-slate-200 bg-white overflow-hidden'>
+        <div className='border-b border-slate-200 bg-white overflow-hidden flex items-center justify-center h-24 px-2'>
           <Link
             to='/individual/dashboard'
-            className='block focus:outline-none'
+            className='block focus:outline-none flex items-center justify-center'
             onClick={() => setIsMobileMenuOpen(false)}
           >
-            <YolNextLogo size='lg' variant='normal' className='text-white' />
+            <YolNextLogo size='xl' variant='normal' showText={false} className='text-white' />
           </Link>
         </div>
 
@@ -127,7 +142,7 @@ const IndividualSidebar: React.FC<IndividualSidebarProps> = ({ onLogout }) => {
             </div>
             <div className='flex-1 min-w-0'>
               <div className='text-xs lg:text-sm font-bold text-slate-900 truncate'>
-                Kullanıcı
+                {user?.firstName || user?.fullName?.split(' ')[0] || 'Kullanıcı'}
               </div>
               <div className='text-xs text-slate-500'>Bireysel Hesap</div>
             </div>
@@ -168,7 +183,16 @@ const IndividualSidebar: React.FC<IndividualSidebarProps> = ({ onLogout }) => {
                       className={`h-4 w-4 lg:h-5 lg:w-5 mr-2 lg:mr-3 ${isActive(item.href) ? 'text-white' : 'text-slate-400 group-hover:text-slate-600'}`}
                     />
                     <span className='flex-1 truncate'>{item.name}</span>
-                    {isActive(item.href) && (
+                    {(item as any).badge && (item as any).badge > 0 && (
+                      <span className={`ml-2 px-2 py-0.5 text-xs font-bold rounded-full ${
+                        isActive(item.href)
+                          ? 'bg-white text-slate-800'
+                          : 'bg-red-500 text-white'
+                      }`}>
+                        {(item as any).badge > 99 ? '99+' : (item as any).badge}
+                      </span>
+                    )}
+                    {isActive(item.href) && !(item as any).badge && (
                       <div className='w-1.5 h-1.5 bg-white rounded-full flex-shrink-0'></div>
                     )}
                   </Link>

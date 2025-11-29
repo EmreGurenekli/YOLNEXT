@@ -42,7 +42,9 @@ class Logger {
 
   private async initSentry() {
     try {
-      const Sentry = await import('@sentry/react');
+      // @ts-expect-error - Sentry is optional dependency
+      const Sentry = await import('@sentry/react').catch(() => null);
+      if (!Sentry) return;
       Sentry.init({
         dsn: import.meta.env.VITE_SENTRY_DSN,
         environment: import.meta.env.MODE,
@@ -55,7 +57,7 @@ class Logger {
         replaysOnErrorSampleRate: 1.0,
       });
     } catch (error) {
-      console.warn('Sentry initialization failed:', error);
+      // Sentry not available, ignore
     }
   }
 
@@ -101,9 +103,11 @@ class Logger {
 
   private async captureSentryMessage(level: string, message: string, context?: LogContext) {
     try {
-      const Sentry = await import('@sentry/react');
+      // @ts-expect-error - Sentry is optional dependency
+      const Sentry = await import('@sentry/react').catch(() => null);
+      if (!Sentry) return;
       Sentry.captureMessage(message, {
-        level: level as Sentry.SeverityLevel,
+        level: level as any,
         extra: context,
       });
     } catch (error) {
@@ -113,7 +117,9 @@ class Logger {
 
   private async captureSentryError(error: Error, context?: LogContext) {
     try {
-      const Sentry = await import('@sentry/react');
+      // @ts-expect-error - Sentry is optional dependency
+      const Sentry = await import('@sentry/react').catch(() => null);
+      if (!Sentry) return;
       Sentry.captureException(error, {
         extra: context,
       });

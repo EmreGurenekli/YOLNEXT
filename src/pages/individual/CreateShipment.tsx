@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
+import { Link, useNavigate } from 'react-router-dom';
 import { 
   Package, 
   MapPin, 
@@ -21,6 +22,7 @@ import Breadcrumb from '../../components/common/Breadcrumb';
 import SuccessMessage from '../../components/common/SuccessMessage';
 
 export default function CreateShipment() {
+  const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
@@ -171,17 +173,39 @@ export default function CreateShipment() {
       const token = localStorage.getItem('authToken');
       
       // Prepare shipment data - match backend expectations
+      // Parse city from address - try multiple formats
+      const parseCityFromAddress = (address: string): { city: string; district: string } => {
+        if (!address) return { city: 'İstanbul', district: '' };
+        
+        // Try comma-separated format: "City, District, Address" or "City, Address"
+        const parts = address.split(',').map(p => p.trim()).filter(p => p);
+        
+        if (parts.length >= 2) {
+          // First part is usually city
+          return { city: parts[0], district: parts[1] || '' };
+        } else if (parts.length === 1) {
+          // Only one part - use it as city, address is the same
+          return { city: parts[0], district: '' };
+        }
+        
+        // Fallback
+        return { city: 'İstanbul', district: '' };
+      };
+
+      const pickupLocation = parseCityFromAddress(formData.pickupAddress);
+      const deliveryLocation = parseCityFromAddress(formData.deliveryAddress);
+
       const shipmentData = {
         title: formData.productDescription || 'Ev Taşınması',
         description: formData.productDescription || '',
         productDescription: formData.productDescription || '',
         category: formData.mainCategory || 'general',
-        pickupCity: formData.pickupAddress?.split(',')[0]?.trim() || 'İstanbul',
-        pickupDistrict: formData.pickupAddress?.split(',')[1]?.trim() || '',
+        pickupCity: pickupLocation.city,
+        pickupDistrict: pickupLocation.district,
         pickupAddress: formData.pickupAddress,
         pickupDate: formData.pickupDate,
-        deliveryCity: formData.deliveryAddress?.split(',')[0]?.trim() || 'İstanbul',
-        deliveryDistrict: formData.deliveryAddress?.split(',')[1]?.trim() || '',
+        deliveryCity: deliveryLocation.city,
+        deliveryDistrict: deliveryLocation.district,
         deliveryAddress: formData.deliveryAddress,
         deliveryDate: formData.deliveryDate,
         weight: formData.weight ? parseFloat(formData.weight) : 0,
@@ -190,7 +214,6 @@ export default function CreateShipment() {
           ? `${formData.dimensions.length}x${formData.dimensions.width}x${formData.dimensions.height}`
           : null,
         value: 0,
-        requiresInsurance: false,
         specialRequirements: [
           formData.roomCount ? `Oda Sayısı: ${formData.roomCount}` : null,
           formData.buildingType ? `Bina Tipi: ${formData.buildingType}` : null,
@@ -203,28 +226,47 @@ export default function CreateShipment() {
         ].filter(Boolean).join(', '),
       };
 
-      const response = await fetch('http://localhost:5000/api/shipments', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(shipmentData),
-      });
+      let response;
+      try {
+        response = await fetch('http://localhost:5000/api/shipments', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify(shipmentData),
+        });
+      } catch (networkError: any) {
+        // Network error (backend not running, CORS, etc.)
+        throw new Error(`Backend sunucusuna bağlanılamıyor: ${networkError.message}. Lütfen backend'in çalıştığından emin olun (cd backend && node postgres-backend.js)`);
+      }
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || errorData.message || 'Gönderi yayınlanamadı');
+        const errorMessage = errorData.error || errorData.message || errorData.details || `HTTP ${response.status}: Gönderi yayınlanamadı`;
+        throw new Error(errorMessage);
       }
 
-      await response.json();
+      const result = await response.json();
       
       setIsLoading(false);
-      setSuccessMessage('Gönderiniz başarıyla yayınlandı! Nakliyecilerden teklifler almaya başlayacaksınız.');
-      setShowSuccessMessage(true);
+      
+      // Verify success
+      if (result.success && (result.data?.shipment || result.data?.id)) {
+        const shipment = result.data?.shipment || result.data;
+        setSuccessMessage(`Gönderiniz başarıyla yayınlandı! Takip numaranız: ${shipment.trackingNumber || shipment.trackingnumber || shipment.id || 'N/A'}. Nakliyecilerden teklifler almaya başlayacaksınız.`);
+        setShowSuccessMessage(true);
+        
+        // Redirect to My Shipments after 2 seconds
+        setTimeout(() => {
+          navigate('/individual/my-shipments');
+        }, 2000);
+      } else {
+        throw new Error(result.message || 'Gönderi oluşturuldu ancak beklenmeyen yanıt alındı');
+      }
       
       setTimeout(() => {
-        // Reset form
+        // Reset form (only if not redirecting)
         setFormData({
           mainCategory: '',
           productDescription: '',
@@ -651,7 +693,7 @@ export default function CreateShipment() {
                     </div>
                   )}
 
-                  {/* Özel Gereksinimler - Sigorta hariç, kategoriye göre filtrelenmiş */}
+                  {/* Özel Gereksinimler - Kategoriye göre filtrelenmiş */}
                   {formData.mainCategory !== 'house_move' && (() => {
                     const getRelevantRequirements = () => {
                       switch (formData.mainCategory) {
@@ -927,10 +969,13 @@ export default function CreateShipment() {
                         <div className="flex justify-between">
                           <span className="text-slate-600">Asansör:</span>
                           <span className="font-medium text-slate-900">
-                            {formData.hasElevatorPickup ? 'Toplama var' : 'Toplama yok'}
-                            {formData.hasElevatorPickup !== formData.hasElevatorDelivery && ' / '}
-                            {formData.hasElevatorDelivery ? 'Teslimat var' : 'Teslimat yok'}
-                            {!formData.hasElevatorPickup && !formData.hasElevatorDelivery && 'Yok'}
+                            {(() => {
+                              const parts = [];
+                              if (formData.hasElevatorPickup) parts.push('Toplama var');
+                              if (formData.hasElevatorDelivery) parts.push('Teslimat var');
+                              if (parts.length === 0) return 'Yok';
+                              return parts.join(', ');
+                            })()}
                           </span>
                         </div>
                         {formData.needsPackaging && (
@@ -1003,7 +1048,7 @@ export default function CreateShipment() {
                       <div className="flex justify-between">
                         <span className="text-slate-600">Özel Gereksinimler:</span>
                         <span className="font-medium text-slate-900">
-                          {formData.specialRequirements.split(',').filter(r => r.trim() && r.trim() !== 'insurance').map(req => {
+                          {formData.specialRequirements.split(',').filter(r => r.trim()).map(req => {
                             const reqMap: { [key: string]: string } = {
                               'fragile': 'Kırılgan',
                               'urgent': 'Acil',
@@ -1038,6 +1083,58 @@ export default function CreateShipment() {
                       <span className="text-slate-600">Teslimat Tarihi:</span>
                       <span className="font-medium text-slate-900">{formData.deliveryDate}</span>
                     </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Hata Mesajı */}
+            {errors.publish && (
+              <div className="bg-red-50 border-2 border-red-300 rounded-xl p-4 mb-4">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <h4 className="font-bold text-red-800 mb-1">Hata!</h4>
+                    <p className="text-sm text-red-700">{errors.publish}</p>
+                    {errors.publish.includes('bağlanılamıyor') || errors.publish.includes('connection') || errors.publish.includes('Failed to fetch') ? (
+                      <p className="text-xs text-red-600 mt-2">
+                        Backend sunucusu çalışmıyor olabilir. Lütfen backend'i başlatın: <code className="bg-red-100 px-1 rounded">cd backend && node postgres-backend.js</code>
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* KRİTİK UYARI - Sorumluluk Reddi */}
+            <div className="bg-red-100 border-4 border-red-500 rounded-xl p-8 space-y-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="w-8 h-8 text-red-700 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <h3 className="text-xl font-bold text-red-900 mb-4">KRİTİK UYARI: YolNext SADECE BİR ARACI PLATFORMUDUR</h3>
+                  <div className="space-y-4 text-sm text-red-800 font-semibold">
+                    <p className="font-bold text-base">
+                      YolNext sadece bir pazaryeri/aracı platformdur. Taşımacılık hizmetlerini BİZZAT SAĞLAMAZ, 
+                      sigorta hizmeti VERMEZ ve HİÇBİR ŞEKİLDE SORUMLULUK KABUL ETMEZ.
+                    </p>
+                    <ul className="list-disc pl-6 space-y-2">
+                      <li><strong>Kaza, yaralanma, ölüm:</strong> YolNext KESİNLİKLE sorumlu değildir</li>
+                      <li><strong>Hırsızlık, kayıp, çalınma, hasar, kırılma:</strong> YolNext KESİNLİKLE sorumlu değildir</li>
+                      <li><strong>Gecikme, yanlış teslimat:</strong> YolNext KESİNLİKLE sorumlu değildir</li>
+                      <li><strong>Mali kayıplar, ticari kayıplar:</strong> YolNext KESİNLİKLE sorumlu değildir</li>
+                      <li><strong>Nakliyeci veya gönderici davranışları:</strong> YolNext KESİNLİKLE sorumlu değildir</li>
+                      <li><strong>SİGORTA:</strong> YolNext hiçbir sigorta hizmeti vermez. Sigorta ihtiyacınız varsa kendi sigortanızı yaptırmak TAMAMEN sizin sorumluluğunuzdadır</li>
+                    </ul>
+                    <div className="bg-red-200 border-2 border-red-400 rounded-lg p-4 mt-4">
+                      <p className="font-bold text-base">
+                        ⚠️ TÜM RİSKLER GÖNDERİCİ VE NAKLİYECİ ARASINDADIR. YOLNEXT HİÇBİR SORUMLULUK KABUL ETMEZ.
+                      </p>
+                    </div>
+                    <p className="font-semibold mt-4">
+                      <Link to="/terms" target="_blank" className="text-red-900 underline font-bold">
+                        Detaylı bilgi için Kullanım Koşulları
+                      </Link>
+                    </p>
                   </div>
                 </div>
               </div>
@@ -1197,10 +1294,3 @@ export default function CreateShipment() {
     </div>
   );
 }
-
-
-
-
-
-
-

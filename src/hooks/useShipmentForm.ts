@@ -15,7 +15,6 @@ export interface ShipmentFormData {
     working: boolean;
   };
   value: string;
-  insurance: boolean;
   specialHandling: string;
   specialRequirements: string;
   pickupAddress: string;
@@ -47,7 +46,6 @@ const initialFormData: ShipmentFormData = {
     working: true,
   },
   value: '',
-  insurance: false,
   specialHandling: '',
   specialRequirements: '',
   pickupAddress: '',

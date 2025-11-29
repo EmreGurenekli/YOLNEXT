@@ -16,6 +16,7 @@ import Contact from './pages/Contact';
 import Terms from './pages/Terms';
 import Privacy from './pages/Privacy';
 import CookiePolicy from './pages/CookiePolicy';
+import KVKKAydinlatma from './pages/KVKKAydinlatma';
 import NotFoundPage from './pages/NotFound';
 import IndividualLayout from './components/IndividualLayout';
 import CorporateLayout from './components/CorporateLayout';
@@ -36,15 +37,19 @@ import MyShipments from './pages/individual/MyShipments';
 import IndividualHistory from './pages/individual/History';
 import IndividualLiveTracking from './pages/individual/LiveTracking';
 import IndividualShipmentDetail from './pages/individual/ShipmentDetail';
-import IndividualNotifications from './pages/individual/Notifications';
+import IndividualProfile from './pages/individual/Profile';
+// IndividualNotifications removed - using badge system instead
 import IndividualDiscounts from './pages/individual/Discounts';
 import IndividualSettings from './pages/individual/Settings';
 import IndividualHelp from './pages/individual/Help';
+import IndividualComplaint from './pages/individual/Complaint';
+import IndividualNotificationSettings from './pages/individual/NotificationSettings';
+import EmailVerification from './pages/EmailVerification';
 import CorporateAnalytics from './pages/corporate/Analytics';
 import CorporateTeam from './pages/corporate/Team';
 import CorporateReports from './pages/corporate/Reports';
 import CorporateMessages from './pages/corporate/Messages';
-import CorporateNotifications from './pages/corporate/Notifications';
+// CorporateNotifications removed - using badge system instead
 import CorporateSettings from './pages/corporate/Settings';
 import CorporateHelp from './pages/corporate/Help';
 import CorporateDiscounts from './pages/corporate/Discounts';
@@ -101,11 +106,16 @@ function App() {
                     <Route path='/debug/routes' element={<DebugRoutes />} />
                     <Route path='/login' element={<Login />} />
                     <Route path='/register' element={<Register />} />
+                    <Route
+                      path='/email-verification'
+                      element={<EmailVerification />}
+                    />
                     <Route path='/about' element={<About />} />
                     <Route path='/contact' element={<Contact />} />
                     <Route path='/terms' element={<Terms />} />
                     <Route path='/privacy' element={<Privacy />} />
                     <Route path='/cookie-policy' element={<CookiePolicy />} />
+                    <Route path='/kvkk-aydinlatma' element={<KVKKAydinlatma />} />
                     <Route
                       path='/dashboard'
                       element={<IndividualDashboard />}
@@ -168,17 +178,19 @@ function App() {
                         path='live-tracking'
                         element={<IndividualLiveTracking />}
                       />
+                      <Route path='profile' element={<IndividualProfile />} />
                       <Route path='messages' element={<IndividualMessages />} />
-                      <Route
-                        path='notifications'
-                        element={<IndividualNotifications />}
-                      />
                       <Route
                         path='discounts'
                         element={<IndividualDiscounts />}
                       />
-                      <Route path='settings' element={<IndividualSettings />} />
-                      <Route path='help' element={<IndividualHelp />} />
+                    <Route path='settings' element={<IndividualSettings />} />
+                    <Route path='help' element={<IndividualHelp />} />
+                    <Route path='complaint' element={<IndividualComplaint />} />
+                    <Route
+                      path='notification-settings'
+                      element={<IndividualNotificationSettings />}
+                    />
                     </Route>
 
                     {/* Corporate Routes */}
@@ -210,10 +222,6 @@ function App() {
                       <Route path='team' element={<CorporateTeam />} />
                       <Route path='reports' element={<CorporateReports />} />
                       <Route path='messages' element={<CorporateMessages />} />
-                      <Route
-                        path='notifications'
-                        element={<CorporateNotifications />}
-                      />
                       <Route path='settings' element={<CorporateSettings />} />
                       <Route path='help' element={<CorporateHelp />} />
                       <Route
@@ -264,6 +272,8 @@ function App() {
                       <Route path='offer/:id' element={<OfferShipment />} />
                       <Route path='drivers' element={<NakliyeciDrivers />} />
                       <Route path='active-shipments' element={<NakliyeciActiveShipments />} />
+                      <Route path='completed-shipments' element={<NakliyeciCompletedShipments />} />
+                      <Route path='cancelled-shipments' element={<NakliyeciCancelledShipments />} />
                       <Route path='listings' element={<NakliyeciListings />} />
                       <Route
                         path='analytics'
@@ -298,6 +308,7 @@ function App() {
                       />
                       <Route path='messages' element={<TasiyiciMessages />} />
                       <Route path='settings' element={<TasiyiciSettings />} />
+                      <Route path='help' element={<TasiyiciHelp />} />
                     </Route>
 
                     {/* 404 Route */}

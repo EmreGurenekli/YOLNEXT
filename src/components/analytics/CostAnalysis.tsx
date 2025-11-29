@@ -108,18 +108,6 @@ const CostAnalysis: React.FC = () => {
         ],
       },
       {
-        id: 'insurance',
-        name: 'Sigorta',
-        amount: 10000,
-        percentage: 8,
-        trend: 'stable',
-        color: '#EF4444',
-        subcategories: [
-          { name: 'Araç Sigortası', amount: 6000, percentage: 60 },
-          { name: 'Kargo Sigortası', amount: 4000, percentage: 40 },
-        ],
-      },
-      {
         id: 'other',
         name: 'Diğer',
         amount: 10000,
@@ -157,14 +145,6 @@ const CostAnalysis: React.FC = () => {
           'Önleyici bakım programı ile büyük onarım maliyetlerini önleyin',
         potentialSavings: 5000,
         priority: 'medium',
-      },
-      {
-        id: '3',
-        title: 'Sigorta Yeniden Değerlendirme',
-        description:
-          'Sigorta poliçelerinizi yeniden değerlendirerek %20 tasarruf sağlayın',
-        potentialSavings: 2000,
-        priority: 'low',
       },
     ],
   };

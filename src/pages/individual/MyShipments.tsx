@@ -16,11 +16,14 @@ import {
   Search,
   Download,
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { createApiUrl } from '../../config/api';
 import { formatCurrency, formatDate } from '../../utils/format';
 import Pagination from '../../components/common/Pagination';
 import { exportShipmentsToCSV, exportShipmentsToExcel } from '../../utils/export';
+import { useAuth } from '../../contexts/AuthContext';
+import MessagingModal from '../../components/MessagingModal';
+import RatingModal from '../../components/RatingModal';
 
 interface Shipment {
   id: string;
@@ -46,6 +49,8 @@ interface Shipment {
 }
 
 const IndividualMyShipments: React.FC = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -57,12 +62,17 @@ const IndividualMyShipments: React.FC = () => {
     total: 0,
     limit: 20,
   });
+  const [showMessagingModal, setShowMessagingModal] = useState(false);
+  const [selectedCarrier, setSelectedCarrier] = useState<{id: string, name: string, email: string, type: string} | null>(null);
+  const [selectedShipmentId, setSelectedShipmentId] = useState<string | null>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null);
+  const [showRatingModal, setShowRatingModal] = useState(false);
 
   // Yeni kullanıcılar için boş veriler
   const emptyShipments: Shipment[] = [];
 
-  useEffect(() => {
-    const loadShipments = async () => {
+  const loadShipments = async () => {
       try {
         setLoading(true);
         const token = localStorage.getItem('authToken');
@@ -190,8 +200,9 @@ const IndividualMyShipments: React.FC = () => {
         setLoading(false);
         console.log('✅ Loading tamamlandı');
       }
-    };
+  };
 
+  useEffect(() => {
     loadShipments();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pagination.page, statusFilter, searchTerm]);
@@ -253,11 +264,55 @@ const IndividualMyShipments: React.FC = () => {
   };
 
   const handleViewDetails = (shipmentId: string) => {
-    console.log('Gönderi detayları:', shipmentId);
+    const shipment = shipments.find(s => s.id === shipmentId);
+    if (shipment) {
+      setSelectedShipment(shipment);
+      setShowDetailModal(true);
+    }
+  };
+
+  const handleRateCarrier = (shipment: Shipment) => {
+    if (shipment.carrierName) {
+      const carrierId = shipment.carrierName === 'Nakliyeci Demo User' 
+        ? 'demo-nakliyeci-1003' 
+        : shipment.carrierName;
+      
+      setSelectedCarrier({
+        id: carrierId,
+        name: shipment.carrierName,
+        email: 'demo@nakliyeci.com',
+        type: 'nakliyeci',
+      });
+      setSelectedShipmentId(shipment.id);
+      setShowRatingModal(true);
+    }
   };
 
   const handleTrackShipment = (shipmentId: string) => {
-    console.log('Gönderi takibi:', shipmentId);
+    navigate(`/individual/live-tracking?shipmentId=${shipmentId}`);
+  };
+
+  const handleMessage = async (shipment: Shipment) => {
+    if (!shipment.carrierName) {
+      // Eğer nakliyeci yoksa, mesajlaşma sayfasına yönlendir
+      navigate('/individual/messages');
+      return;
+    }
+
+    // Nakliyeci bilgilerini demo verilerden oluştur
+    // Backend'de demo nakliyeci ID'si genellikle "demo-nakliyeci-1003" formatında
+    const carrierId = shipment.carrierName === 'Nakliyeci Demo User' 
+      ? 'demo-nakliyeci-1003' 
+      : shipment.carrierName;
+    
+    setSelectedCarrier({
+      id: carrierId,
+      name: shipment.carrierName,
+      email: 'demo@nakliyeci.com',
+      type: 'nakliyeci',
+    });
+    setSelectedShipmentId(shipment.id);
+    setShowMessagingModal(true);
   };
 
   const handleExportCSV = () => {
@@ -415,9 +470,9 @@ const IndividualMyShipments: React.FC = () => {
               </thead>
               <tbody>
                 {filteredShipments.length > 0 ? (
-                  filteredShipments.map(shipment => (
+                  filteredShipments.map((shipment, index) => (
                     <tr
-                      key={shipment.id}
+                      key={`${shipment.id}-${shipment.trackingCode}-${index}`}
                       className='border-b border-slate-100 hover:bg-slate-50 transition-colors'
                     >
                       <td className='py-4 px-4'>
@@ -492,9 +547,20 @@ const IndividualMyShipments: React.FC = () => {
                               Takip
                             </button>
                           )}
-                          <button className='px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded-lg transition-colors'>
+                          <button
+                            onClick={() => handleMessage(shipment)}
+                            className='px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded-lg transition-colors'
+                          >
                             Mesaj
                           </button>
+                          {shipment.status === 'delivered' && shipment.carrierName && !shipment.rating && (
+                            <button
+                              onClick={() => handleRateCarrier(shipment)}
+                              className='px-3 py-1.5 bg-yellow-100 hover:bg-yellow-200 text-yellow-700 text-xs font-medium rounded-lg transition-colors'
+                            >
+                              Değerlendir
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -517,6 +583,108 @@ const IndividualMyShipments: React.FC = () => {
           </div>
         </div>
       </div>
+      
+      {/* Messaging Modal */}
+      {showMessagingModal && selectedCarrier && user && (
+        <MessagingModal
+          isOpen={showMessagingModal}
+          onClose={() => {
+            setShowMessagingModal(false);
+            setSelectedCarrier(null);
+            setSelectedShipmentId(null);
+          }}
+          otherUser={selectedCarrier}
+          currentUser={{
+            id: user.id || '',
+            name: user.fullName || 'Kullanıcı',
+          }}
+          shipmentId={selectedShipmentId || undefined}
+        />
+      )}
+
+      {/* Rating Modal */}
+      {showRatingModal && selectedCarrier && user && (
+        <RatingModal
+          isOpen={showRatingModal}
+          onClose={() => {
+            setShowRatingModal(false);
+            setSelectedCarrier(null);
+            setSelectedShipmentId(null);
+            loadShipments(); // Reload to show updated rating
+          }}
+          ratedUser={selectedCarrier}
+          currentUser={{
+            id: user.id || '',
+            name: user.fullName || 'Kullanıcı',
+          }}
+          shipmentId={selectedShipmentId || undefined}
+        />
+      )}
+
+      {/* Detail Modal */}
+      {showDetailModal && selectedShipment && (
+        <div className='fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'>
+          <div className='bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto'>
+            <div className='p-6 border-b border-gray-200 flex justify-between items-center'>
+              <h2 className='text-2xl font-bold text-gray-900'>Gönderi Detayları</h2>
+              <button
+                onClick={() => {
+                  setShowDetailModal(false);
+                  setSelectedShipment(null);
+                }}
+                className='text-gray-400 hover:text-gray-600'
+              >
+                <XCircle className='w-6 h-6' />
+              </button>
+            </div>
+            <div className='p-6 space-y-4'>
+              <div>
+                <h3 className='font-semibold text-gray-700 mb-1'>Takip Kodu</h3>
+                <p className='text-gray-900'>{selectedShipment.trackingCode}</p>
+              </div>
+              <div>
+                <h3 className='font-semibold text-gray-700 mb-1'>Başlık</h3>
+                <p className='text-gray-900'>{selectedShipment.title}</p>
+              </div>
+              <div>
+                <h3 className='font-semibold text-gray-700 mb-1'>Rota</h3>
+                <p className='text-gray-900'>{selectedShipment.from} → {selectedShipment.to}</p>
+              </div>
+              <div>
+                <h3 className='font-semibold text-gray-700 mb-1'>Durum</h3>
+                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                  selectedShipment.status === 'delivered'
+                    ? 'bg-green-100 text-green-800'
+                    : selectedShipment.status === 'in_transit'
+                      ? 'bg-blue-100 text-blue-800'
+                      : 'bg-yellow-100 text-yellow-800'
+                }`}>
+                  {getStatusInfo(selectedShipment.status).text}
+                </span>
+              </div>
+              <div>
+                <h3 className='font-semibold text-gray-700 mb-1'>Nakliyeci</h3>
+                <p className='text-gray-900'>{selectedShipment.carrierName || 'Atanmamış'}</p>
+              </div>
+              <div>
+                <h3 className='font-semibold text-gray-700 mb-1'>Fiyat</h3>
+                <p className='text-gray-900'>{formatCurrency(selectedShipment.price)}</p>
+              </div>
+              {selectedShipment.status === 'delivered' && selectedShipment.carrierName && !selectedShipment.rating && (
+                <button
+                  onClick={() => {
+                    setShowDetailModal(false);
+                    handleRateCarrier(selectedShipment);
+                  }}
+                  className='w-full px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg font-medium transition-colors'
+                >
+                  Nakliyeciyi Değerlendir
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

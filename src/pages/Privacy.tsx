@@ -16,9 +16,8 @@ const Privacy = () => {
       {/* Header */}
       <header className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <Link to="/" className="flex items-center space-x-2">
-            <YolNextLogo />
-            <span className="text-xl font-bold text-blue-600">YolNext</span>
+          <Link to="/" className="flex items-center justify-start">
+            <YolNextLogo variant='banner' size='md' showText={false} />
           </Link>
         </div>
       </header>
@@ -53,10 +52,22 @@ const Privacy = () => {
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
                 <div className="flex items-start">
                   <Lock className="w-5 h-5 text-blue-600 mr-2 mt-0.5" />
-                  <p className="text-sm text-gray-700">
-                    <strong>Veri Sorumlusu:</strong> YolNext Platform<br />
-                    <strong>İletişim:</strong> destek@yolnext.com
-                  </p>
+                  <div className="text-sm text-gray-700">
+                    <p className="font-semibold mb-2">Veri Sorumlusu Bilgileri:</p>
+                    <p className="text-red-600 font-semibold mb-2">
+                      ⚠️ ÖNEMLİ: Aşağıdaki bilgiler gerçek şirket bilgileri ile değiştirilmelidir!
+                    </p>
+                    <p>
+                      <strong>Unvan:</strong> [ŞİRKET UNVANI BURAYA EKLENMELİ]<br />
+                      <strong>Vergi No:</strong> [VERGİ NUMARASI BURAYA EKLENMELİ]<br />
+                      <strong>Vergi Dairesi:</strong> [VERGİ DAİRESİ BURAYA EKLENMELİ]<br />
+                      <strong>Ticaret Sicil No:</strong> [TİCARET SİCİL NO BURAYA EKLENMELİ]<br />
+                      <strong>Mersis No:</strong> [MERSİS NO BURAYA EKLENMELİ]<br />
+                      <strong>Adres:</strong> [TAM ADRES BURAYA EKLENMELİ]<br />
+                      <strong>Telefon:</strong> [TELEFON NUMARASI BURAYA EKLENMELİ]<br />
+                      <strong>Email:</strong> kvkk@yolnext.com
+                    </p>
+                  </div>
                 </div>
               </div>
             </section>

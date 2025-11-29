@@ -3,12 +3,12 @@ import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useAuth } from '../../contexts/AuthContext';
 import { dashboardAPI, notificationAPI, shipmentAPI } from '../../services/api';
+import { createApiUrl } from '../../config/api';
 import NotificationModal from '../../components/modals/NotificationModal';
 import {
   Package,
   CheckCircle2,
   Clock,
-  DollarSign,
   Plus,
   Bell,
   MessageSquare,
@@ -33,7 +33,6 @@ import {
   Activity,
   X,
   Route,
-  Wallet,
   Map,
   Target,
   Zap,
@@ -75,9 +74,6 @@ const Dashboard = () => {
     pendingShipments: 0,
     cancelledShipments: 0,
     successRate: 0,
-    totalEarnings: 0,
-    thisMonthEarnings: 0,
-    walletBalance: 0,
     activeDrivers: 0,
     totalOffers: 0,
     acceptedOffers: 0,
@@ -91,6 +87,7 @@ const Dashboard = () => {
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [showNotificationModal, setShowNotificationModal] = useState(false);
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
 
   // Yeni kullanıcılar için boş veriler
   const emptyData = {
@@ -100,9 +97,6 @@ const Dashboard = () => {
       pendingShipments: 0,
       cancelledShipments: 0,
       successRate: 0,
-      totalEarnings: 0,
-      thisMonthEarnings: 0,
-      walletBalance: 0,
       activeDrivers: 0,
       totalOffers: 0,
       acceptedOffers: 0,
@@ -158,6 +152,27 @@ const Dashboard = () => {
       } catch (error) {
         console.error('Bildirim sayısı alınamadı:', error);
         setUnreadCount(0);
+      }
+
+      // Wallet balance
+      try {
+        const token = localStorage.getItem('authToken');
+        const userId = user?.id || (localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user') || '{}').id : null);
+        const walletResponse = await fetch(createApiUrl('/api/wallet/nakliyeci'), {
+          headers: {
+            Authorization: `Bearer ${token || ''}`,
+            'X-User-Id': userId || '',
+            'Content-Type': 'application/json',
+          },
+        });
+        if (walletResponse.ok) {
+          const walletData = await walletResponse.json();
+          if (walletData.success) {
+            setWalletBalance(walletData.data.balance || 0);
+          }
+        }
+      } catch (error) {
+        console.error('Bakiye yüklenemedi:', error);
       }
     } catch (error) {
       console.error('Error loading dashboard data:', error);
@@ -284,6 +299,13 @@ const Dashboard = () => {
                       {stats.openListings} Açık İlan
                     </span>
                   </div>
+                  {walletBalance !== null && (
+                    <div className='bg-gradient-to-r from-emerald-500/20 to-green-500/20 backdrop-blur-sm rounded-2xl px-4 py-2 border border-emerald-400/30'>
+                      <span className='text-emerald-200 font-semibold'>
+                        💰 {walletBalance.toFixed(2)} TL
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -311,7 +333,7 @@ const Dashboard = () => {
         </div>
 
         {/* Stats Grid - ANA RENK: from-slate-800 to-blue-900 */}
-        <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6'>
+        <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6'>
           <div className='bg-white rounded-xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:border-blue-300 transition-all duration-300'>
             <div className='flex items-center justify-between mb-4'>
               <div className='w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center'>
@@ -421,42 +443,6 @@ const Dashboard = () => {
             <div className='mt-1 text-xs text-slate-500'>Açık ilanlar</div>
           </div>
 
-          <div className='bg-white rounded-xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:border-blue-300 transition-all duration-300'>
-            <div className='flex items-center justify-between mb-4'>
-              <div className='w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center'>
-                <Wallet className='w-6 h-6 text-white' />
-              </div>
-              <div className='text-right'>
-                <div className='text-2xl font-bold text-slate-900 mb-1'>
-                  ₺{stats.walletBalance.toLocaleString()}
-                </div>
-                <div className='flex items-center gap-1'>
-                  <svg
-                    className='w-3 h-3 text-blue-600'
-                    fill='none'
-                    stroke='currentColor'
-                    viewBox='0 0 24 24'
-                  >
-                    <path
-                      strokeLinecap='round'
-                      strokeLinejoin='round'
-                      strokeWidth={2}
-                      d='M7 17l9.2-9.2M17 17V7H7'
-                    />
-                  </svg>
-                  <span className='text-xs text-blue-600 font-semibold'>
-                    Bakiye
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div className='text-slate-700 font-semibold text-sm'>
-              Cüzdan Bakiyesi
-            </div>
-            <div className='mt-1 text-xs text-slate-500'>
-              Kullanılabilir tutar
-            </div>
-          </div>
         </div>
 
         {/* Quick Actions */}

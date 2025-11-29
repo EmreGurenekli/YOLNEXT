@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createApiUrl } from '../../config/api';
 import { useNavigate, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useAuth } from '../../contexts/AuthContext';
@@ -29,6 +30,7 @@ import {
   ArrowRight,
   Bell,
   AlertCircle,
+  AlertTriangle,
   FileText,
   Zap,
   Shield,
@@ -84,6 +86,8 @@ export default function Offers() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [showContactModal, setShowContactModal] = useState(false);
+  const [contactCarrier, setContactCarrier] = useState<{ phone: string; email: string } | null>(null);
   const [selectedOffer, setSelectedOffer] = useState<Offer | null>(null);
   const [offerToReject, setOfferToReject] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -108,16 +112,21 @@ export default function Offers() {
     setIsLoading(true);
     try {
       const user = localStorage.getItem('user')
-        ? JSON.parse(localStorage.getItem('user') || '{}')
+        ? (() => {
+            try {
+              return JSON.parse(localStorage.getItem('user') || '{}');
+            } catch {
+              return {};
+            }
+          })()
         : null;
       const userId = user?.id;
       const token = localStorage.getItem('authToken');
       const response = await fetch(
-        `/api/offers?${userId ? `userId=${userId}` : ''}`,
+        createApiUrl('/api/offers/individual'),
         {
           headers: {
             Authorization: `Bearer ${token || ''}`,
-            'X-User-Id': userId || '',
             'Content-Type': 'application/json',
           },
         }
@@ -128,14 +137,56 @@ export default function Offers() {
       }
 
       const data = await response.json();
-      setOffers(data.data || data.offers || (Array.isArray(data) ? data : []));
+      const rawOffers = data.data || data.offers || (Array.isArray(data) ? data : []);
+      
+      // Map backend data to frontend format
+      const mappedOffers = rawOffers.map((offer: any) => ({
+        id: offer.id?.toString() || '',
+        shipmentTitle: offer.shipmentTitle || offer.title || 'Gönderi',
+        carrierName: offer.carrierName || offer.fullName || 'Nakliyeci',
+        carrierRating: offer.carrierRating || 0,
+        carrierVerified: offer.carrierVerified || false,
+        carrierReviews: offer.carrierReviews || 0,
+        carrierExperience: offer.carrierExperience || '',
+        price: offer.price || 0,
+        estimatedDelivery: offer.estimatedDeliveryDate || offer.estimatedDelivery || '',
+        message: offer.message || '',
+        status: (offer.status === 'accepted' ? 'accepted' : offer.status === 'rejected' ? 'rejected' : 'pending') as 'pending' | 'accepted' | 'rejected',
+        createdAt: offer.createdAt || offer.created_at || new Date().toISOString(),
+        pickupAddress: offer.pickupAddress || `${offer.pickupCity || ''} ${offer.pickupDistrict || ''}`.trim() || '',
+        deliveryAddress: offer.deliveryAddress || `${offer.deliveryCity || ''} ${offer.deliveryDistrict || ''}`.trim() || '',
+        weight: offer.weight?.toString() || '',
+        dimensions: offer.dimensions || '',
+        specialFeatures: offer.specialFeatures || [],
+        tracking: offer.tracking || false,
+        priority: (offer.priority || 'medium') as 'low' | 'medium' | 'high',
+        trackingCode: offer.trackingCode || offer.tracking_code || '',
+        carrierPhone: offer.carrierPhone || offer.phone || '',
+        carrierEmail: offer.carrierEmail || offer.email || '',
+        carrierLogo: offer.carrierLogo || '',
+        recentComments: offer.recentComments || [],
+        responseTime: offer.responseTime || '',
+        successRate: offer.successRate || 0,
+      }));
+      
+      setOffers(mappedOffers);
+      
+      // Calculate stats from offers
+      const totalOffers = mappedOffers.length;
+      const pendingOffers = mappedOffers.filter((o: any) => o.status === 'pending').length;
+      const acceptedOffers = mappedOffers.filter((o: any) => o.status === 'accepted').length;
+      const rejectedOffers = mappedOffers.filter((o: any) => o.status === 'rejected').length;
+      const averagePrice = totalOffers > 0 
+        ? mappedOffers.reduce((sum: number, o: any) => sum + (o.price || 0), 0) / totalOffers 
+        : 0;
+      
       setStats(
         data.stats || {
-          totalOffers: 0,
-          pendingOffers: 0,
-          acceptedOffers: 0,
-          rejectedOffers: 0,
-          averagePrice: 0,
+          totalOffers,
+          pendingOffers,
+          acceptedOffers,
+          rejectedOffers,
+          averagePrice,
           topCarrier: '',
           responseTime: 0,
         }
@@ -160,10 +211,11 @@ export default function Offers() {
   const filteredOffers = offers.filter(offer => {
     const matchesStatus =
       filterStatus === 'all' || offer.status === filterStatus;
-    const matchesSearch =
-      offer.shipmentTitle.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      offer.carrierName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      offer.trackingCode.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = !searchTerm || searchTerm.trim() === '' || (
+      (offer.shipmentTitle || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (offer.carrierName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (offer.trackingCode || '').toLowerCase().includes(searchTerm.toLowerCase())
+    );
     return matchesStatus && matchesSearch;
   });
 
@@ -193,13 +245,25 @@ export default function Offers() {
     }
   };
 
+  const [showAcceptConfirmModal, setShowAcceptConfirmModal] = useState(false);
+  const [offerToAccept, setOfferToAccept] = useState<string | null>(null);
+
   const handleAcceptOffer = async (offerId: string) => {
+    setOfferToAccept(offerId);
+    setShowAcceptConfirmModal(true);
+  };
+
+  const confirmAcceptOffer = async () => {
+    if (!offerToAccept) return;
+    
     setIsLoading(true);
+    setShowAcceptConfirmModal(false);
+    
     try {
-      const response = await fetch(`/api/offers/${offerId}/accept`, {
+      const response = await fetch(createApiUrl(`/api/offers/${offerToAccept}/accept`), {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
+          Authorization: `Bearer ${localStorage.getItem('authToken')}`,
           'Content-Type': 'application/json',
         },
       });
@@ -214,7 +278,7 @@ export default function Offers() {
       setShowSuccessMessage(true);
       setOffers(prev =>
         prev.map(offer =>
-          offer.id === offerId
+          offer.id === offerToAccept
             ? { ...offer, status: 'accepted' as const }
             : offer
         )
@@ -234,16 +298,17 @@ export default function Offers() {
       setShowSuccessMessage(true);
     } finally {
       setIsLoading(false);
+      setOfferToAccept(null);
     }
   };
 
   const handleRejectOffer = async (offerId: string) => {
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/offers/${offerId}/reject`, {
+      const response = await fetch(createApiUrl(`/api/offers/${offerId}/reject`), {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
+          Authorization: `Bearer ${localStorage.getItem('authToken')}`,
           'Content-Type': 'application/json',
         },
       });
@@ -287,14 +352,23 @@ export default function Offers() {
   };
 
   const handleContactCarrier = (carrierPhone: string, carrierEmail: string) => {
-    // Open contact options
-    const contactMethod = window.confirm(
-      'Nakliyeci ile iletişim kurmak için telefon aramak ister misiniz? (Hayır derseniz e-posta gönderilir)'
-    );
-    if (contactMethod) {
-      window.open(`tel:${carrierPhone}`);
-    } else {
-      window.open(`mailto:${carrierEmail}`);
+    setContactCarrier({ phone: carrierPhone, email: carrierEmail });
+    setShowContactModal(true);
+  };
+
+  const handleContactPhone = () => {
+    if (contactCarrier) {
+      window.open(`tel:${contactCarrier.phone}`);
+      setShowContactModal(false);
+      setContactCarrier(null);
+    }
+  };
+
+  const handleContactEmail = () => {
+    if (contactCarrier) {
+      window.open(`mailto:${contactCarrier.email}`);
+      setShowContactModal(false);
+      setContactCarrier(null);
     }
   };
 
@@ -907,6 +981,63 @@ export default function Offers() {
         )}
       </Modal>
 
+      {/* Accept Confirmation Modal with Disclaimer */}
+      <Modal
+        isOpen={showAcceptConfirmModal}
+        onClose={() => {
+          setShowAcceptConfirmModal(false);
+          setOfferToAccept(null);
+        }}
+        title='Teklifi Kabul Et'
+      >
+        <div className='p-6 space-y-6'>
+          {/* ÖNEMLİ UYARI */}
+          <div className='bg-red-50 border-2 border-red-300 rounded-xl p-4 space-y-3'>
+            <div className='flex items-start gap-3'>
+              <AlertTriangle className='w-5 h-5 text-red-600 flex-shrink-0 mt-0.5' />
+              <div className='flex-1'>
+                <h4 className='font-bold text-red-800 mb-2'>ÖNEMLİ UYARI: Sorumluluk Reddi</h4>
+                <p className='text-sm text-red-700 font-semibold mb-2'>
+                  YolNext sadece bir aracı platformdur. Taşımacılık hizmetlerini bizzat sağlamaz ve hiçbir şekilde sorumluluk kabul etmez.
+                </p>
+                <ul className='text-xs text-red-700 space-y-1 list-disc pl-4'>
+                  <li>Kaza, yaralanma, ölüm: YolNext sorumlu değildir</li>
+                  <li>Hırsızlık, kayıp, hasar: YolNext sorumlu değildir</li>
+                  <li>Gecikme, yanlış teslimat: YolNext sorumlu değildir</li>
+                  <li>Mali kayıplar: YolNext sorumlu değildir</li>
+                </ul>
+                <p className='text-xs text-red-700 font-semibold mt-2'>
+                  Tüm riskler gönderici ve nakliyeci arasındadır.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <p className='text-slate-600'>
+            Bu teklifi kabul ederek, yukarıdaki sorumluluk reddini okuduğunuzu ve kabul ettiğinizi onaylıyorsunuz. 
+            Teklifi kabul etmek istediğinizden emin misiniz?
+          </p>
+          
+          <div className='flex justify-end gap-3'>
+            <button
+              onClick={() => {
+                setShowAcceptConfirmModal(false);
+                setOfferToAccept(null);
+              }}
+              className='px-4 py-2 text-slate-600 hover:text-slate-800 transition-colors'
+            >
+              İptal
+            </button>
+            <button
+              onClick={confirmAcceptOffer}
+              className='px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors'
+            >
+              Kabul Et ve Onayla
+            </button>
+          </div>
+        </div>
+      </Modal>
+
       {/* Reject Confirmation Modal */}
       <Modal
         isOpen={showRejectModal}
@@ -930,6 +1061,62 @@ export default function Offers() {
               className='px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors'
             >
               Reddet
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Contact Carrier Modal */}
+      <Modal
+        isOpen={showContactModal}
+        onClose={() => {
+          setShowContactModal(false);
+          setContactCarrier(null);
+        }}
+        title='Nakliyeci ile İletişim'
+        size='md'
+      >
+        <div className='p-6 space-y-4'>
+          <p className='text-slate-600 mb-4'>
+            Nakliyeci ile iletişim kurmak için bir yöntem seçin:
+          </p>
+          <div className='space-y-3'>
+            <button
+              onClick={handleContactPhone}
+              className='w-full flex items-center gap-3 p-4 bg-gradient-to-r from-green-50 to-emerald-50 hover:from-green-100 hover:to-emerald-100 border border-green-200 rounded-xl transition-all duration-300 group'
+            >
+              <div className='w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform'>
+                <Phone className='w-6 h-6 text-white' />
+              </div>
+              <div className='flex-1 text-left'>
+                <div className='font-semibold text-slate-900'>Telefon ile Ara</div>
+                <div className='text-sm text-slate-600'>{contactCarrier?.phone}</div>
+              </div>
+              <ArrowRight className='w-5 h-5 text-green-600 group-hover:translate-x-1 transition-transform' />
+            </button>
+            <button
+              onClick={handleContactEmail}
+              className='w-full flex items-center gap-3 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 border border-blue-200 rounded-xl transition-all duration-300 group'
+            >
+              <div className='w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform'>
+                <Mail className='w-6 h-6 text-white' />
+              </div>
+              <div className='flex-1 text-left'>
+                <div className='font-semibold text-slate-900'>E-posta Gönder</div>
+                <div className='text-sm text-slate-600'>{contactCarrier?.email}</div>
+              </div>
+              <ArrowRight className='w-5 h-5 text-blue-600 group-hover:translate-x-1 transition-transform' />
+            </button>
+          </div>
+          <div className='pt-4 border-t border-slate-200'>
+            <button
+              onClick={() => {
+                setShowContactModal(false);
+                setContactCarrier(null);
+              }}
+              className='w-full px-4 py-2 text-slate-600 hover:text-slate-800 transition-colors font-medium'
+            >
+              İptal
             </button>
           </div>
         </div>

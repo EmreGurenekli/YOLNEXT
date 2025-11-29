@@ -5,17 +5,16 @@ import {
   Package,
   MapPin,
   Calendar,
-  DollarSign,
   CheckCircle,
   Star,
   Eye,
   Download,
   ArrowRight,
-  TrendingUp,
 } from 'lucide-react';
 import Breadcrumb from '../../components/common/Breadcrumb';
 import LoadingState from '../../components/common/LoadingState';
 import { Link } from 'react-router-dom';
+import { createApiUrl } from '../../config/api';
 
 interface Job {
   id: number;
@@ -31,7 +30,6 @@ const TasiyiciCompletedJobs: React.FC = () => {
   const { user } = useAuth();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
-  const [totalEarnings, setTotalEarnings] = useState(0);
 
   useEffect(() => {
     loadCompletedJobs();
@@ -41,9 +39,15 @@ const TasiyiciCompletedJobs: React.FC = () => {
     try {
       setLoading(true);
       const userRaw = localStorage.getItem('user');
-      const userId = userRaw ? JSON.parse(userRaw || '{}').id : undefined;
+      let userId: string | undefined;
+      try {
+        userId = userRaw ? JSON.parse(userRaw).id : undefined;
+      } catch (error) {
+        console.error('Error parsing user data:', error);
+        userId = undefined;
+      }
       const token = localStorage.getItem('authToken');
-      const response = await fetch(`/api/shipments/tasiyici/completed`, {
+      const response = await fetch(createApiUrl('/api/shipments/tasiyici/completed'), {
         headers: {
           Authorization: `Bearer ${token || ''}`,
           'X-User-Id': userId || '',
@@ -54,11 +58,6 @@ const TasiyiciCompletedJobs: React.FC = () => {
       if (response.ok) {
         const data = await response.json();
         setJobs(data.shipments || data.data || []);
-        const total = (data.shipments || data.data || []).reduce(
-          (sum: number, job: any) => sum + (job.price || 0),
-          0
-        );
-        setTotalEarnings(total);
       }
     } catch (error) {
       console.error('Error loading completed jobs:', error);
@@ -105,18 +104,7 @@ const TasiyiciCompletedJobs: React.FC = () => {
             </div>
 
             {/* Stats Cards */}
-            <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-              <div className='bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/20'>
-                <div className='flex items-center justify-between'>
-                  <div>
-                    <div className='text-sm text-slate-300 mb-1'>Toplam Kazanç</div>
-                    <div className='text-2xl font-bold text-white'>
-                      ₺{totalEarnings.toLocaleString()}
-                    </div>
-                  </div>
-                  <TrendingUp className='w-8 h-8 text-green-300' />
-                </div>
-              </div>
+            <div className='grid grid-cols-1 gap-4'>
               <div className='bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/20'>
                 <div className='flex items-center justify-between'>
                   <div>
@@ -163,17 +151,6 @@ const TasiyiciCompletedJobs: React.FC = () => {
                           <div className='text-xs text-slate-500'>Tamamlanma</div>
                           <div className='font-medium text-slate-900'>
                             {new Date(job.completedDate).toLocaleDateString('tr-TR')}
-                          </div>
-                        </div>
-                      </div>
-                      <div className='flex items-center gap-2'>
-                        <div className='w-10 h-10 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center'>
-                          <DollarSign className='w-5 h-5 text-white' />
-                        </div>
-                        <div>
-                          <div className='text-xs text-slate-500'>Kazanç</div>
-                          <div className='font-bold text-green-600 text-lg'>
-                            ₺{job.price.toLocaleString()}
                           </div>
                         </div>
                       </div>

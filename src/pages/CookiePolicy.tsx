@@ -16,9 +16,8 @@ const CookiePolicy = () => {
       {/* Header */}
       <header className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <Link to="/" className="flex items-center space-x-2">
-            <YolNextLogo />
-            <span className="text-xl font-bold text-blue-600">YolNext</span>
+          <Link to="/" className="flex items-center justify-start">
+            <YolNextLogo variant='banner' size='md' showText={false} />
           </Link>
         </div>
       </header>

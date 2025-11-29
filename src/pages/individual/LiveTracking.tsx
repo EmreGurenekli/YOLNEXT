@@ -96,7 +96,6 @@ interface Shipment {
     height: number;
   };
   specialRequirements: string[];
-  insurance: boolean;
   signatureRequired: boolean;
   fragile: boolean;
   temperatureControlled: boolean;

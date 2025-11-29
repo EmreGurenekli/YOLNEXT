@@ -21,6 +21,7 @@ import {
   Building2,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { createApiUrl } from '../../config/api';
 
 interface ShipmentHistory {
   id: string;
@@ -54,9 +55,9 @@ const IndividualHistory: React.FC = () => {
         console.log('🔄 Geçmiş gönderiler yükleniyor...');
         setLoading(true);
 
-        const response = await fetch('/api/shipments/individual/history', {
+        const response = await fetch(createApiUrl('/api/shipments/individual/history'), {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
+            Authorization: `Bearer ${localStorage.getItem('authToken')}`,
             'Content-Type': 'application/json',
           },
         });
@@ -227,7 +228,7 @@ const IndividualHistory: React.FC = () => {
                         shipments.reduce((sum, s) => sum + s.rating, 0) /
                         shipments.length
                       ).toFixed(1)
-                    : '0.0'}
+                    : 0}
                 </p>
               </div>
               <div className='w-12 h-12 bg-gradient-to-br from-yellow-600 to-orange-700 rounded-xl flex items-center justify-center'>

@@ -10,14 +10,394 @@ import {
   Star,
   CheckCircle,
   Globe,
-  Phone,
-  Mail,
+  ArrowRight,
   Menu as MenuIcon,
   X as XIcon,
+  BarChart2,
+  Layers,
+  MessageSquare,
+  MapPin,
+  Package,
+  TrendingUp,
+  Zap,
+  Target,
+  FileText,
+  CreditCard,
+  Bell,
+  Map,
+  Route,
+  Award,
+  Lock,
+  Eye,
+  Smartphone,
+  Database,
+  Server,
+  ShoppingCart,
+  Phone,
+  Mail,
+  ThumbsUp,
+  TrendingDown,
+  Percent,
+  UserCheck,
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import YolNextLogo from '../components/common/yolnextLogo';
 import Footer from '../components/common/Footer';
-import { useNavigate } from 'react-router-dom';
+
+const personaPanels = [
+    {
+      id: 'individual',
+      title: 'Bireysel Gönderici',
+      icon: Users,
+    subtitle: 'Ev, ofis, özel gönderiler',
+    promise: "Önemli ölçüde tasarruf, anlık teklif kıyaslama",
+      features: [
+      'Hızlı gönderi formu',
+      'Tek ekranda teklif kıyaslama',
+      'Canlı konum & teslimat akışı',
+      'Mesajlaşma sistemi',
+      'Cüzdan yönetimi',
+      'Geçmiş siparişler',
+      'Değerlendirme sistemi',
+    ],
+    stats: 'Binlerce aktif kullanıcı',
+    cta: 'Bireysel Paneli Aç',
+    pages: ['Dashboard', 'Gönderi Oluştur', 'Gönderilerim', 'Teklifler', 'Canlı Takip', 'Mesajlar', 'Cüzdan'],
+    },
+    {
+      id: 'corporate',
+      title: 'Kurumsal Gönderici',
+      icon: Building2,
+    subtitle: 'Tedarik zinciri, üretim, e-ticaret',
+    promise: 'Merkezileştirilmiş operasyon ve verimli yönetim',
+      features: [
+      'Toplu gönderi sihirbazı',
+      'Departman & yetki yönetimi',
+      'Gerçek zamanlı KPI dashboard',
+      'Analitik ve raporlama',
+      'Ekip yönetimi',
+      'İndirim yönetimi',
+      'Müşteri yönetimi',
+    ],
+    stats: 'Yüzlerce şirket',
+    cta: 'Kurumsal Demo Planla',
+    pages: ['Dashboard', 'Gönderi Oluştur', 'Gönderilerim', 'Analitik', 'Raporlar', 'Ekip', 'Nakliyeciler', 'Ayarlar'],
+    },
+    {
+      id: 'carrier',
+      title: 'Nakliyeci',
+    icon: Layers,
+    subtitle: 'Filo sahipleri ve lojistik firmaları',
+    promise: 'Sürekli iş akışı + %1 komisyon',
+      features: [
+      'Yük pazarı & anlık filtre',
+      'Rota planlama aracı',
+      'Filo & sürücü puanlaması',
+      'Cüzdan + nakit akış yönetimi',
+      'İlan yönetimi',
+      'Taşıyıcı yönetimi',
+      'Aktif yükler',
+      'Tamamlanan yükler',
+    ],
+    stats: 'Yüzlerce nakliyeci',
+    cta: 'Nakliyeci Hesabı Aç',
+    pages: ['Dashboard', 'Yük Pazarı', 'Aktif Yükler', 'Tamamlanan Yükler', 'İlanlarım', 'Taşıyıcılarım', 'Cüzdan'],
+    },
+    {
+      id: 'driver',
+      title: 'Taşıyıcı',
+      icon: Truck,
+    subtitle: 'Sürücüler, sözleşmeli ekipler',
+    promise: 'İş garantisi + haftalık ödeme',
+      features: [
+        'Konum bazlı iş önerileri',
+      'Anında mesajlaşma',
+      'Kazanç takibi & puan sistemi',
+      'Destek hattı',
+      'İş pazarı',
+      'Aktif işler',
+      'Tamamlanan işler',
+      'Tekliflerim',
+    ],
+    stats: 'Binlerce taşıyıcı',
+    cta: 'Taşıyıcı Paneline Katıl',
+    pages: ['Dashboard', 'İş Pazarı', 'Aktif İşler', 'Tamamlanan İşler', 'Tekliflerim', 'Mesajlar', 'Ayarlar'],
+  },
+];
+
+const platformFeatures = [
+  {
+    icon: MapPin,
+    title: 'Konum Takibi',
+    description: 'Gönderilerinizin konum bilgilerini takip edin. Her konum güncellemesi anında panelinizde görünür.',
+  },
+  {
+    icon: MessageSquare,
+    title: 'Anlık Mesajlaşma',
+    description: 'Gönderici, nakliyeci ve taşıyıcı arasında panel içi mesajlaşma. Tüm iletişim kayıt altında.',
+  },
+  {
+    icon: CreditCard,
+    title: 'Cüzdan Sistemi',
+    description: 'Güvenli ödeme altyapısı. Ödemeler otomatik dağıtılır, cüzdanınızdan kolayca para çekebilirsiniz.',
+  },
+  {
+    icon: Route,
+    title: 'Rota Planlama',
+    description: 'Nakliyeciler için rota planlama aracı. Gönderilerinizi organize edin ve verimli rotalar oluşturun.',
+  },
+  {
+    icon: BarChart2,
+    title: 'Detaylı Analitik',
+    description: 'Kurumsal göndericiler için KPI dashboard, departman bazlı raporlama ve Excel/PDF export.',
+  },
+  {
+    icon: Bell,
+    title: 'Gerçek Zamanlı Bildirimler',
+    description: 'WebSocket ile anlık bildirimler. Teklif, teslimat, ödeme ve durum güncellemeleri anında.',
+  },
+  {
+    icon: Shield,
+    title: 'Güvenli Altyapı',
+    description: 'KVKK uyumlu, SSL şifreli güvenlik. Tüm veriler Türkiye\'de saklanır.',
+  },
+  {
+    icon: Smartphone,
+    title: 'Mobil Uyumlu',
+    description: 'Tüm paneller mobil cihazlarda mükemmel çalışır. Responsive tasarım ile her yerden erişim.',
+  },
+];
+
+const workflowSteps = [
+  {
+    step: 1,
+    title: 'Gönderi Oluştur',
+    description: 'Bireysel veya kurumsal panelden 3 adımlı form ile gönderi oluşturun. Kategori, adres, tarih ve özel gereksinimler.',
+    icon: Package,
+    color: 'blue',
+  },
+  {
+    step: 2,
+    title: 'Teklif Al',
+    description: 'Nakliyeciler yük pazarından gönderinizi görür, fiyat ve mesaj ile teklif verir. Tek ekranda karşılaştırın.',
+    icon: FileText,
+    color: 'green',
+  },
+  {
+    step: 3,
+    title: 'Teklif Kabul Et',
+    description: 'En uygun teklifi seçin, güvenli ödeme yapın. Nakliyeci gönderiyi alır ve taşıyıcıya atar.',
+    icon: CheckCircle,
+    color: 'purple',
+  },
+  {
+    step: 4,
+    title: 'Canlı Takip',
+    description: 'Taşıyıcı konum güncellemeleri yapar. Konum bilgileri ile takip, bildirimler ve mesajlaşma.',
+    icon: Map,
+    color: 'orange',
+  },
+  {
+    step: 5,
+    title: 'Teslimat',
+    description: 'Teslimat tamamlanır, onay verilir, değerlendirme yapılır. Ödemeler otomatik dağıtılır.',
+    icon: Award,
+    color: 'emerald',
+  },
+];
+
+const categories = [
+  { name: 'Ev Taşınması', icon: Building2, description: 'Oda sayısı, bina tipi, kat bilgileri ile detaylı taşıma' },
+  { name: 'Soğuk Zincir', icon: Package, description: 'Soğuk zincir gerektiren ürünler için taşıma' },
+  { name: 'Tehlikeli Madde', icon: Shield, description: 'Tehlikeli madde kategorisinde taşıma' },
+  { name: 'E-Ticaret', icon: ShoppingCart, description: 'Toplu dağıtım, rota optimizasyonu, hızlı teslimat' },
+  { name: 'Kurumsal Lojistik', icon: Truck, description: 'Tedarik zinciri, üretim, depo yönetimi' },
+  { name: 'Özel Yük', icon: Layers, description: 'Ağır yük, özel boyut, özel gereksinimler' },
+];
+
+const advantages = [
+  {
+    icon: DollarSign,
+    title: 'Tamamen Ücretsiz',
+    description: 'Göndericiler için üyelik ve gönderi oluşturma tamamen ücretsiz. Sadece nakliyeciler kazançları üzerinden %1 sabit komisyon öder.',
+    stat: '₺0',
+  },
+  {
+    icon: Clock,
+    title: 'Hızlı Operasyon',
+    description: 'Hızlı teklif alma süreci. Hızlı teslimat seçenekleri ile ihtiyacınıza uygun zaman diliminde teslimat.',
+    stat: 'Hızlı',
+  },
+  {
+    icon: TrendingUp,
+    title: 'Önemli Tasarruf',
+    description: 'Geleneksel kargo firmalarına göre önemli ölçüde tasarruf. Şeffaf fiyatlandırma, rekabetçi teklifler.',
+    stat: 'Tasarruf',
+  },
+  {
+    icon: Eye,
+    title: 'Tam Şeffaflık',
+    description: 'Her adımda bilgi. Puan sistemi, yorumlar, belgeler, konum takibi. Hiçbir şey gizli değil.',
+    stat: 'Tam',
+  },
+];
+
+const caseStories = [
+  {
+    title: 'Ev Taşınması',
+    category: 'Bireysel',
+    impact: 'Önemli Tasarruf',
+    detail: 'Bireysel gönderici birden fazla nakliyeciden teklif aldı. En uygun teklifi seçerek geleneksel yöntemlere göre önemli ölçüde tasarruf sağladı. Nakliyeci işi hızlıca taşıyıcıya atadı. Canlı takip ile tüm süreç şeffaf bir şekilde izlendi.',
+    metrics: { offers: 'Çoklu teklif', tracking: 'Canlı takip', satisfaction: 'Yüksek memnuniyet' },
+  },
+  {
+    title: 'Soğuk Zincir Taşımacılığı',
+    category: 'Kurumsal',
+    impact: 'Verimli Süreç',
+    detail: 'Kurumsal gönderici soğuk zincir gereksinimlerini özel alanlarla bildirdi. Uygun nakliyeci seçildi ve özel gereksinimler karşılandı. Süreç verimli bir şekilde tamamlandı.',
+    metrics: { quality: 'Özel gereksinimler', efficiency: 'Verimli süreç', reliability: 'Güvenilir teslimat' },
+  },
+  {
+    title: 'E-Ticaret Dağıtımı',
+    category: 'Nakliyeci',
+    impact: 'Operasyon Verimliliği',
+    detail: 'Nakliyeci rota planlaması aracını kullanarak birden fazla gönderiyi tek turda organize etti. Zaman ve yakıt tasarrufu sağlandı. Sürücüler düzenli ödeme aldı.',
+    metrics: { planning: 'Rota optimizasyonu', efficiency: 'Zaman tasarrufu', payment: 'Düzenli ödeme' },
+  },
+];
+
+const faqItems = [
+  {
+    question: 'Gerçekten ücretsiz mi?',
+    answer:
+      'Evet! Bireysel ve kurumsal göndericiler için üyelik ve gönderi oluşturma tamamen ücretsizdir. Hiçbir gizli ücret yoktur. Sadece nakliyeciler kazançları üzerinden %1 sabit komisyon öder. Bu komisyon da sadece başarılı teslimatlar için geçerlidir.',
+  },
+  {
+    question: 'Hangi belgeler gerekiyor?',
+    answer:
+      'Bireysel göndericiler için TC kimlik doğrulaması yeterlidir. Kurumsal göndericiler için vergi levhası ve imza sirküsü gerekir. Nakliyeci ve taşıyıcılar için yetki belgeleri, araç ruhsatları ve gerekli lisanslar yüklenir. Tüm belgeler güvenli şekilde saklanır.',
+  },
+  {
+    question: 'Ödemeler nasıl yapılıyor?',
+    answer:
+      'Teklif kabul edildiğinde güvenli ödeme alınır (Iyzico entegrasyonu). Ödeme teslimat tamamlanana kadar güvende tutulur. Teslimat onaylandıktan sonra nakliyeci ve taşıyıcı payları otomatik olarak cüzdanlarına aktarılır. Para çekme işlemleri kısa sürede tamamlanır.',
+  },
+  {
+    question: 'Canlı takip nasıl çalışıyor?',
+    answer:
+      'Taşıyıcı konum güncellemeleri yapar. Bu güncellemeler WebSocket ile anında gönderici paneline ulaşır. Konum bilgilerini takip edebilirsiniz.',
+  },
+  {
+    question: 'Destek alabilir miyim?',
+    answer:
+      'Panel içi mesajlaşma 7/24 aktif. Telefon desteği hafta içi 09:00-18:00 saatleri arasında, e-posta desteği ise 24 saat içinde yanıtlanır. Hızlı yanıt süresi ile destek alırsınız.',
+  },
+  {
+    question: 'Rota planlama nasıl çalışıyor?',
+    answer:
+      'Nakliyeciler için rota planlama aracı. Birden fazla gönderiyi organize ederek verimli rotalar oluşturabilirsiniz.',
+  },
+];
+
+const trustPillars = [
+  {
+    icon: Shield,
+    title: 'Tam Güven',
+    description: 'KVKK uyumlu ve SSL güvencesiyle tüm veriler Türkiye sınırları içinde tutulur.',
+  },
+  {
+    icon: CheckCircle,
+    title: 'İşleyen Ekosistem',
+    description: 'Bireysel → Nakliyeci → Taşıyıcı döngüsü tek panelde uçtan uca yönetilir.',
+  },
+  {
+    icon: Star,
+    title: 'Gerçek Yorumlar',
+    description: 'Yüksek puanlı değerlendirmeler ve detaylı hizmet puanlaması ile güvenilir hizmet.',
+  },
+  {
+    icon: Globe,
+    title: '81 İl Kapsamı',
+    description: '81 il, tüm ilçeler ve sınır kapıları dahil yaygın hizmet ağı.',
+  },
+];
+
+const proofMetrics = [
+  { title: 'Binlerce', description: 'Aktif kullanıcı', accent: 'text-blue-500' },
+  { title: 'Yüzbinlerce', description: 'Tamamlanan teslimat', accent: 'text-emerald-500' },
+  { title: 'Yüksek', description: 'Memnuniyet oranı', accent: 'text-amber-500' },
+  { title: '81', description: 'İl kapsamı', accent: 'text-indigo-500' },
+];
+
+const testimonials = [
+  {
+    name: 'Ahmet Yılmaz',
+    role: 'Bireysel Gönderici',
+    location: 'İstanbul',
+    rating: 5,
+    comment: 'Ev taşınmamda birden fazla nakliyeciden teklif aldım. En uygun fiyatı buldum ve geleneksel yöntemlere göre önemli ölçüde tasarruf sağladım. Süreç çok şeffaftı.',
+    savings: 'Tasarruf sağladı',
+  },
+  {
+    name: 'Ayşe Demir',
+    role: 'Kurumsal Gönderici',
+    location: 'Ankara',
+    rating: 5,
+    comment: 'Şirketimiz için toplu gönderi yönetimi çok kolaylaştı. Raporlama özellikleri sayesinde maliyetlerimizi önemli ölçüde azalttık.',
+    savings: 'Maliyet azalışı',
+  },
+  {
+    name: 'Mehmet Kaya',
+    role: 'Nakliyeci',
+    location: 'İzmir',
+    rating: 5,
+    comment: 'Yük pazarı sayesinde sürekli iş buluyorum. %1 komisyon çok uygun. Düzenli gönderi alıyorum.',
+    savings: 'Düzenli iş akışı',
+  },
+  {
+    name: 'Ali Çelik',
+    role: 'Taşıyıcı',
+    location: 'Bursa',
+    rating: 5,
+    comment: 'Nakliyecilerden düzenli iş alıyorum. Ödemeler haftalık ve zamanında. Kazancım önemli ölçüde arttı.',
+    savings: 'Artış gösterdi',
+  },
+];
+
+const pricingComparison = [
+  { feature: 'Üyelik Ücreti', traditional: 'Aylık ücret var', yolnext: '₺0', savings: 'Yıllık tasarruf' },
+  { feature: 'Gönderi Başına Ücret', traditional: 'Her gönderide ücret', yolnext: '₺0', savings: 'Her gönderide' },
+  { feature: 'Komisyon Oranı', traditional: 'Yüksek oran', yolnext: '%1', savings: 'Önemli fark' },
+  { feature: 'Gizli Ücret', traditional: 'Var', yolnext: 'Yok', savings: 'Şeffaf' },
+  { feature: 'Minimum Sipariş', traditional: 'Var', yolnext: 'Yok', savings: 'Esnek' },
+];
+
+const whyChoose = {
+  individual: [
+    { icon: DollarSign, title: '₺0 Üyelik', desc: 'Hiçbir ücret ödemeden başlayın' },
+    { icon: TrendingDown, title: 'Önemli Tasarruf', desc: 'Geleneksel kargodan çok daha uygun' },
+    { icon: FileText, title: 'Çoklu Teklif', desc: 'Tek ekranda tüm teklifleri karşılaştırın' },
+    { icon: Clock, title: 'Hızlı Süreç', desc: 'Kısa sürede teklif alın' },
+  ],
+  corporate: [
+    { icon: BarChart2, title: 'KPI Dashboard', desc: 'Gerçek zamanlı analitik ve raporlama' },
+    { icon: Users, title: 'Ekip Yönetimi', desc: 'Departman bazlı yetki ve takip' },
+    { icon: TrendingUp, title: 'Verimlilik Artışı', desc: 'Operasyonel verimlilik artışı' },
+    { icon: FileText, title: 'Toplu Gönderi', desc: 'Tek seferde yüzlerce gönderi' },
+  ],
+  carrier: [
+    { icon: Target, title: 'Sürekli İş', desc: 'Yük pazarından sürekli iş fırsatları' },
+    { icon: Percent, title: '%1 Komisyon', desc: 'En düşük komisyon oranı' },
+    { icon: Route, title: 'Rota Planlama', desc: 'Verimli rota organizasyonu' },
+    { icon: CreditCard, title: 'Haftalık Ödeme', desc: 'Düzenli ve zamanında ödemeler' },
+  ],
+  driver: [
+    { icon: Package, title: 'İş Garantisi', desc: 'Nakliyecilerden düzenli iş' },
+    { icon: MapPin, title: 'Konum Bazlı', desc: 'Yakınınızdaki iş fırsatları' },
+    { icon: Clock, title: 'Haftalık Ödeme', desc: 'Düzenli kazanç akışı' },
+    { icon: Star, title: 'Puan Sistemi', desc: 'Yüksek puan = Daha fazla iş' },
+  ],
+};
 
 const LandingPage: React.FC = () => {
   const navigate = useNavigate();
@@ -25,1029 +405,862 @@ const LandingPage: React.FC = () => {
   const [selectedUserType, setSelectedUserType] = useState('individual');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleGetStarted = async () => {
+  const selectedPersona =
+    personaPanels.find(persona => persona.id === selectedUserType) || personaPanels[0];
+
+  const handleNavigate = async (path: string, state?: Record<string, string>) => {
     try {
       setIsLoading(true);
-      // Simulate loading
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      navigate('/register');
+      await new Promise(resolve => setTimeout(resolve, 600));
+      navigate(path, state ? { state } : undefined);
     } catch (error) {
-      console.error('Kayıt sayfasına yönlendirme hatası:', error);
-      // Error handling - kullanıcıya bilgi verilebilir
+      console.error('Navigasyon hatası:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleLogin = async () => {
-    try {
-      setIsLoading(true);
-      // Simulate loading
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      navigate('/login');
-    } catch (error) {
-      console.error('Giriş sayfasına yönlendirme hatası:', error);
-      // Error handling - kullanıcıya bilgi verilebilir
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleUserTypeSelect = async (userType: string) => {
-    try {
-      setIsLoading(true);
-      // Simulate loading
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      navigate('/register', { state: { userType } });
-    } catch (error) {
-      console.error('Kullanıcı tipi seçimi hatası:', error);
-      // Error handling - kullanıcıya bilgi verilebilir
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const userTypes = [
-    {
-      id: 'individual',
-      title: 'Bireysel Gönderici',
-      icon: Users,
-      color: 'blue',
-      description: 'Kişisel eşyalarınızı güvenle gönderin',
-      features: [
-        'Gönderi oluşturma ve yönetimi',
-        'Teklif alma ve değerlendirme',
-        'Canlı takip ve bildirimler',
-        'Sipariş geçmişi',
-        'Mesajlaşma sistemi',
-        'Profil yönetimi',
-      ],
-      advantages: [
-        'Kolay gönderi oluşturma',
-        'Çoklu teklif karşılaştırma',
-        'Gerçek zamanlı takip',
-        'Güvenli ödeme sistemi',
-      ],
-      stats: '25,000+ aktif kullanıcı',
-      buttonText: 'Bireysel Hesap Oluştur',
-    },
-    {
-      id: 'corporate',
-      title: 'Kurumsal Gönderici',
-      icon: Building2,
-      color: 'green',
-      description: 'İş süreçlerinizi optimize edin',
-      features: [
-        'Toplu gönderi yönetimi',
-        'Ekip ve departman yönetimi',
-        'Analitik raporlar ve dashboard',
-        'Teklif yönetimi',
-        'Mesajlaşma sistemi',
-        'Takım yönetimi',
-      ],
-      advantages: [
-        'Toplu gönderi indirimleri',
-        'Detaylı analitik raporlar',
-        'Ekip bazlı yönetim',
-        'Gelişmiş dashboard',
-      ],
-      stats: '1,200+ şirket',
-      buttonText: 'Kurumsal Hesap Oluştur',
-    },
-    {
-      id: 'carrier',
-      title: 'Nakliyeci',
-      icon: Building2,
-      color: 'purple',
-      description: 'Taşımacılık şirketinizi büyütün',
-      features: [
-        'Açık gönderileri görüntüleme',
-        'Teklif verme ve yönetimi',
-        'Filo yönetimi ve takip',
-        'Kazanç takibi',
-        'Mesajlaşma sistemi',
-        'Analitik raporlar',
-      ],
-      advantages: [
-        'Sürekli iş fırsatları',
-        'Filo yönetim sistemi',
-        'Detaylı kazanç analizi',
-        'Performans takibi',
-      ],
-      stats: '850+ şirket',
-      buttonText: 'Nakliyeci Hesabı Oluştur',
-    },
-    {
-      id: 'driver',
-      title: 'Taşıyıcı',
-      icon: Truck,
-      color: 'orange',
-      description: 'Esnek çalışma imkanları',
-      features: [
-        'Aktif iş yönetimi',
-        'Kazanç takibi',
-        'Konum güncelleme',
-        'Tamamlanan işler',
-        'Profil yönetimi',
-        'Mesajlaşma sistemi',
-      ],
-      advantages: [
-        'Esnek çalışma saatleri',
-        'Haftalık kazanç takibi',
-        'Konum bazlı iş önerileri',
-        'Değerlendirme sistemi',
-      ],
-      stats: '3,500+ taşıyıcı',
-      buttonText: 'Taşıyıcı Hesabı Oluştur',
-    },
+  const menuItems = [
+    { label: 'Özellikler', href: '#features' },
+    { label: 'Paneller', href: '#panels' },
+    { label: 'İş Akışı', href: '#workflow' },
+    { label: 'Kategoriler', href: '#categories' },
+    { label: 'Vaka Analizleri', href: '#cases' },
+    { label: 'SSS', href: '#faq' },
   ];
 
-  const selectedUser =
-    userTypes.find(user => user.id === selectedUserType) || userTypes[0];
-
   return (
-    <div className='min-h-screen bg-white'>
+    <div className='min-h-screen bg-white text-gray-900'>
       <Helmet>
-        <title>
-          YolNext - Türkiye'nin En Büyük Lojistik Platformu | 4 Kullanıcı Tipi
-        </title>
+        <title>YolNext | Türkiye'nin 4 Panelli Lojistik Ekosistemi</title>
         <meta
           name='description'
-          content='YolNext ile lojistik ihtiyaçlarınızı karşılayın. Bireysel, kurumsal, nakliyeci ve taşıyıcılar için özel tasarlanmış platform. 81 ilde hizmet, rekabetçi fiyatlar, güvenli teslimat.'
-        />
-        <meta
-          name='keywords'
-          content='lojistik, kargo, taşımacılık, nakliye, gönderi, teslimat, bireysel, kurumsal, nakliyeci, taşıyıcı, YolNext'
-        />
-        <meta name='author' content='YolNext' />
-        <meta
-          property='og:title'
-          content="YolNext - Türkiye'nin En Büyük Lojistik Platformu"
-        />
-        <meta
-          property='og:description'
-          content='4 farklı kullanıcı tipi için özel tasarlanmış, 81 ilde hizmet veren güvenilir lojistik platformu. Rekabetçi fiyatlarla hızlı teslimat.'
-        />
-        <meta property='og:type' content='website' />
-        <meta property='og:url' content='https://yolnext.com' />
-        <meta name='twitter:card' content='summary_large_image' />
-        <meta name='twitter:title' content='YolNext - Lojistik Platformu' />
-        <meta
-          name='twitter:description'
-          content='4 kullanıcı tipi, 81 il, rekabetçi fiyatlar. Lojistik ihtiyaçlarınız için tek platform.'
+          content='Bireysel, kurumsal, nakliyeci ve taşıyıcı panellerini tek platformda buluşturan YolNext ile lojistik süreçlerinizi önemli ölçüde tasarrufla yönetin.'
         />
         <link rel='canonical' href='https://yolnext.com' />
-        <style>{`
-          @keyframes fade-in-up {
-            from {
-              opacity: 0;
-              transform: translateY(30px);
-            }
-            to {
-              opacity: 1;
-              transform: translateY(0);
-            }
-          }
-          
-          @keyframes count-up {
-            from {
-              opacity: 0;
-              transform: scale(0.5);
-            }
-            to {
-              opacity: 1;
-              transform: scale(1);
-            }
-          }
-          
-          .animate-fade-in-up {
-            animation: fade-in-up 0.8s ease-out forwards;
-            opacity: 0;
-          }
-          
-          .animate-count-up {
-            animation: count-up 1s ease-out forwards;
-            opacity: 0;
-          }
-          
-          .delay-200 {
-            animation-delay: 0.2s;
-          }
-          
-          .delay-400 {
-            animation-delay: 0.4s;
-          }
-          
-          .delay-600 {
-            animation-delay: 0.6s;
-          }
-          
-          .delay-800 {
-            animation-delay: 0.8s;
-          }
-          
-          .delay-1000 {
-            animation-delay: 1s;
-          }
-          
-          @keyframes pulse-glow {
-            0%, 100% {
-              box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
-            }
-            50% {
-              box-shadow: 0 0 30px rgba(59, 130, 246, 0.6);
-            }
-          }
-          
-          .animate-pulse-glow {
-            animation: pulse-glow 2s ease-in-out infinite;
-          }
-          
-          @keyframes float {
-            0%, 100% {
-              transform: translateY(0px);
-            }
-            50% {
-              transform: translateY(-10px);
-            }
-          }
-          
-          .animate-float {
-            animation: float 3s ease-in-out infinite;
-          }
-        `}</style>
       </Helmet>
 
-      {/* 1. HEADER */}
-      <header
-        className='bg-white border-b border-gray-200 sticky top-0 z-50'
-        role='banner'
-      >
-        <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
-          <div className='flex justify-between items-center h-16'>
-            <YolNextLogo variant='banner' className='text-gray-900 h-8' />
-            <nav
-              className='hidden md:flex space-x-8'
-              role='navigation'
-              aria-label='Ana menü'
-            >
-              <a
-                href='#features'
-                className='min-h-[44px] px-3 py-2 flex items-center text-gray-600 hover:text-gray-900 text-sm font-medium'
-                aria-label='Özellikler bölümüne git'
-              >
-                Özellikler
-              </a>
-              <a
-                href='#panels'
-                className='min-h-[44px] px-3 py-2 flex items-center text-gray-600 hover:text-gray-900 text-sm font-medium'
-                aria-label='Paneller bölümüne git'
-              >
-                Paneller
-              </a>
-              <a
-                href='#contact'
-                className='min-h-[44px] px-3 py-2 flex items-center text-gray-600 hover:text-gray-900 text-sm font-medium'
-                aria-label='İletişim bölümüne git'
-              >
-                İletişim
-              </a>
+      <header className='sticky top-0 z-50 bg-white/95 backdrop-blur-xl border-b border-slate-200/50 shadow-sm'>
+        <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between'>
+          <div className='flex items-center space-x-8'>
+            <YolNextLogo variant='banner' size='md' className='h-9' />
+            <nav className='hidden lg:flex items-center space-x-6 text-sm font-medium text-slate-700'>
+              {menuItems.map(item => (
+                <a
+                  key={item.href}
+                  href={item.href}
+                  className='hover:text-slate-900 transition-colors duration-200'
+                >
+                  {item.label}
+                </a>
+              ))}
             </nav>
-            <div className='hidden md:flex items-center space-x-4'>
+          </div>
+
+          <div className='hidden md:flex items-center space-x-3'>
               <button
-                onClick={handleLogin}
+              onClick={() => handleNavigate('/login')}
                 disabled={isLoading}
-                className='min-h-[44px] px-3 py-2 text-gray-600 hover:text-gray-900 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed'
-                aria-label='Giriş yap'
+              className='px-5 py-2 rounded-xl font-semibold text-sm text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 transition disabled:opacity-50'
               >
                 {isLoading ? 'Yükleniyor...' : 'Giriş Yap'}
               </button>
               <button
-                onClick={handleGetStarted}
+              onClick={() => handleNavigate('/register')}
                 disabled={isLoading}
-                className='min-h-[44px] bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-2 rounded-lg text-sm font-medium transition-all duration-300'
-                aria-label='Ücretsiz hesap oluştur'
+              className='px-6 py-2 rounded-xl font-semibold text-sm text-white bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 shadow-lg hover:shadow-xl transition disabled:opacity-50'
               >
-                {isLoading ? 'Yükleniyor...' : 'Başla'}
+              {isLoading ? 'Hazırlanıyor...' : 'Ücretsiz Deneyin'}
               </button>
             </div>
-            <div className='md:hidden'>
+
               <button
-                onClick={() => setIsMenuOpen(!isMenuOpen)}
-                className='min-w-[44px] min-h-[44px] p-2 text-gray-600 hover:text-gray-900'
-                aria-label={isMenuOpen ? 'Menüyü kapat' : 'Menüyü aç'}
-                aria-expanded={isMenuOpen}
-              >
-                {isMenuOpen ? (
-                  <XIcon className='h-6 w-6' />
-                ) : (
-                  <MenuIcon className='h-6 w-6' />
-                )}
+            onClick={() => setIsMenuOpen(prev => !prev)}
+            className='md:hidden p-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 transition'
+            aria-label='Menüyü aç/kapat'
+            >
+            {isMenuOpen ? <XIcon className='h-5 w-5' /> : <MenuIcon className='h-5 w-5' />}
               </button>
-            </div>
           </div>
-        </div>
+
         {isMenuOpen && (
-          <div className='md:hidden border-t border-gray-200'>
-            <div className='px-4 py-3 space-y-3'>
+          <div className='md:hidden border-t border-slate-200 bg-white/95 backdrop-blur-xl px-4 py-6 space-y-4'>
+            {menuItems.map(item => (
               <a
-                href='#features'
-                className='min-h-[44px] flex items-center text-gray-600 hover:text-gray-900 text-sm font-medium px-2 py-2'
+                key={item.href}
+                href={item.href}
+                className='block text-slate-700 font-medium hover:text-slate-900 transition'
+                onClick={() => setIsMenuOpen(false)}
               >
-                Özellikler
+                {item.label}
               </a>
-              <a
-                href='#panels'
-                className='min-h-[44px] flex items-center text-gray-600 hover:text-gray-900 text-sm font-medium px-2 py-2'
-              >
-                Paneller
-              </a>
-              <a
-                href='#contact'
-                className='min-h-[44px] flex items-center text-gray-600 hover:text-gray-900 text-sm font-medium px-2 py-2'
-              >
-                İletişim
-              </a>
-              <div className='pt-3 border-t border-gray-200 space-y-2'>
+            ))}
+            <div className='pt-4 border-t border-slate-200 flex flex-col gap-3'>
                 <button
-                  onClick={handleLogin}
-                  disabled={isLoading}
-                  className='min-h-[44px] flex items-center text-gray-600 hover:text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed w-full text-left px-2 py-2'
+                onClick={() => handleNavigate('/login')}
+                className='w-full border border-slate-200 bg-slate-50 rounded-xl py-3 font-semibold text-slate-700 hover:bg-slate-100 transition'
                 >
-                  {isLoading ? 'Yükleniyor...' : 'Giriş Yap'}
+                Giriş Yap
                 </button>
                 <button
-                  onClick={handleGetStarted}
-                  disabled={isLoading}
-                  className='min-h-[44px] bg-gradient-to-r from-slate-800 to-blue-900 disabled:opacity-50 disabled:cursor-not-allowed text-white flex items-center px-3 py-2 rounded-lg w-full text-left'
+                onClick={() => handleNavigate('/register')}
+                className='w-full bg-gradient-to-r from-slate-800 to-blue-900 text-white rounded-xl py-3 font-semibold hover:from-slate-700 hover:to-blue-800 shadow-lg transition'
                 >
-                  {isLoading ? 'Yükleniyor...' : 'Başla'}
+                Ücretsiz Deneyin
                 </button>
-              </div>
             </div>
           </div>
         )}
       </header>
 
-      {/* 2. HERO BÖLÜMÜ - SADE VE PROFESYONEL */}
-      <section className='py-24 bg-white'>
-        <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
-          <div className='grid lg:grid-cols-2 gap-16 items-center'>
-            {/* Sol Taraf - İçerik */}
-            <div>
-              <h1 className='text-5xl md:text-6xl font-bold text-gray-900 mb-8 leading-tight'>
-                <span className='bg-gradient-to-r from-slate-800 to-blue-900 bg-clip-text text-transparent'>
-                  %40 Tasarruf
-                </span>
-                <br />
-                ile Lojistikte
-                <br />
-                <span className='text-gray-900'>Yeni Çağ</span>
-              </h1>
+      <main>
+        {/* HERO SECTION - Glassmorphism Design with Gradient Background */}
+        <section id='hero' className='relative min-h-screen bg-gradient-to-br from-slate-800 via-slate-900 to-blue-900 overflow-hidden'>
+          {/* Subtle Pattern Overlay */}
+          <div className='absolute inset-0 opacity-10'>
+            <div className='absolute inset-0' style={{
+              backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.15) 1px, transparent 0)',
+              backgroundSize: '40px 40px'
+            }}></div>
+          </div>
 
-              <p className='text-xl text-gray-600 mb-8 max-w-2xl'>
-                4 farklı kullanıcı tipi için özel tasarlanmış, 81 ilde hizmet
-                veren güvenilir lojistik platformu
-              </p>
+          {/* Gradient Orbs for Depth */}
+          <div className='absolute top-0 right-0 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl'></div>
+          <div className='absolute bottom-0 left-0 w-96 h-96 bg-slate-700/20 rounded-full blur-3xl'></div>
 
-              {/* Ücretsiz Kullanım Vurgusu */}
-              <div className='bg-green-50 border-2 border-green-200 rounded-2xl p-6 mb-12'>
-                <div className='flex items-center justify-center space-x-4'>
-                  <div className='bg-green-500 text-white px-4 py-2 rounded-full font-bold text-lg'>
-                    🎉 TAMAMEN ÜCRETSİZ
-                  </div>
-                  <div className='text-center'>
-                    <div className='text-2xl font-bold text-green-700'>
-                      %0 Üyelik Ücreti
+          <div className='relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
+            <div className='pt-32 lg:pt-40 pb-24 lg:pb-32'>
+              <div className='grid lg:grid-cols-12 gap-12 lg:gap-16 items-center'>
+                
+                {/* Left Content */}
+                <div className='lg:col-span-7 space-y-10'>
+                  {/* Badge */}
+                  <div className='inline-flex items-center gap-3 mb-8'>
+                    <div className='px-4 py-2 bg-white/10 backdrop-blur-md text-white text-xs font-semibold uppercase tracking-[0.15em] rounded-full border border-white/20 shadow-lg'>
+                      Türkiye'nin En Büyük Lojistik Pazar Yeri
                     </div>
-                    <div className='text-green-600'>
-                      Sadece nakliyeci %1 komisyon öder
+                    <div className='flex items-center gap-2 px-3 py-1.5 bg-white/10 backdrop-blur-md rounded-full border border-white/20'>
+                      <div className='w-2 h-2 bg-blue-400 rounded-full animate-pulse'></div>
+                      <span className='text-xs font-medium text-white/90'>Canlı</span>
                     </div>
                   </div>
-                </div>
-              </div>
-
-              <div className='flex flex-col sm:flex-row gap-6 mb-16'>
-                <button
-                  onClick={handleGetStarted}
-                  disabled={isLoading}
-                  className='bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 disabled:opacity-50 disabled:cursor-not-allowed text-white px-10 py-4 rounded-xl font-bold text-lg transition-all duration-300 transform hover:scale-105 shadow-lg'
-                >
-                  {isLoading ? '⏳ Yükleniyor...' : '🚀 Ücretsiz Başla'}
-                </button>
-                <button
-                  onClick={handleLogin}
-                  disabled={isLoading}
-                  className='border-2 border-gray-300 hover:border-gray-400 disabled:opacity-50 disabled:cursor-not-allowed text-gray-700 hover:text-gray-900 px-10 py-4 rounded-xl font-bold text-lg transition-all duration-300 hover:bg-gray-50'
-                >
-                  {isLoading ? '⏳ Yükleniyor...' : '🔑 Giriş Yap'}
-                </button>
-              </div>
-
-              {/* Güven Göstergeleri */}
-              <div className='flex flex-wrap justify-center items-center gap-6 text-sm text-gray-500 mb-8'>
-                <div className='flex items-center gap-2'>
-                  <Shield className='w-4 h-4 text-green-500' />
-                  <span>SSL Güvenli</span>
-                </div>
-                <div className='flex items-center gap-2'>
-                  <CheckCircle className='w-4 h-4 text-green-500' />
-                  <span>30,550+ Kullanıcı</span>
-                </div>
-                <div className='flex items-center gap-2'>
-                  <Star className='w-4 h-4 text-yellow-500' />
-                  <span>4.9/5 Puan</span>
-                </div>
-                <div className='flex items-center gap-2'>
-                  <Globe className='w-4 h-4 text-blue-500' />
-                  <span>81 İl</span>
-                </div>
-              </div>
-
-              {/* İstatistikler */}
-              <div className='grid grid-cols-2 gap-8'>
-                <div className='text-center'>
-                  <div className='text-4xl font-bold text-gray-900 mb-2'>
-                    30,550+
-                  </div>
-                  <div className='text-gray-600'>Kullanıcı</div>
-                </div>
-                <div className='text-center'>
-                  <div className='text-4xl font-bold text-gray-900 mb-2'>
-                    500,000+
-                  </div>
-                  <div className='text-gray-600'>Teslimat</div>
-                </div>
-                <div className='text-center'>
-                  <div className='text-4xl font-bold text-gray-900 mb-2'>
-                    %99.9
-                  </div>
-                  <div className='text-gray-600'>Memnuniyet</div>
-                </div>
-                <div className='text-center'>
-                  <div className='text-4xl font-bold text-gray-900 mb-2'>
-                    81
-                  </div>
-                  <div className='text-gray-600'>İl</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Sağ Taraf - Banner Görseli */}
-            <div className='relative animate-float'>
-              <div
-                className='w-full h-96 lg:h-[600px] rounded-2xl bg-cover bg-center shadow-2xl'
-                style={{
-                  backgroundImage: `url('/img/yolnext_web_sitesi_i_in_ana_sayfa_hero_banner__Bir_reklam_ajans_n_n_haz_rlad____gibi__her_detay___zen.png')`,
-                }}
-              >
-                <div className='absolute inset-0 bg-gradient-to-t from-black/20 to-transparent rounded-2xl'></div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 3. YOLNEXT NEDİR? */}
-      <section className='py-20 bg-gray-50'>
-        <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
-          <div className='text-center mb-16 animate-fade-in-up'>
-            <h2 className='text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 mb-6'>
-              <span className='bg-gradient-to-r from-slate-800 to-blue-900 bg-clip-text text-transparent'>
-                YolNext
-              </span>{' '}
-              Nedir?
-            </h2>
-            <p className='text-lg sm:text-xl text-gray-600 max-w-4xl mx-auto'>
-              Türkiye'nin ilk çok kullanıcılı lojistik platformu. 4 farklı
-              kullanıcı tipini bir araya getirerek rekabetçi fiyatlarla hızlı ve
-              güvenilir taşımacılık hizmeti sunan sistem.
-            </p>
-          </div>
-          <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 lg:gap-12'>
-            <div className='text-center group hover:scale-105 transition-all duration-300 animate-fade-in-up delay-200'>
-              <div className='w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-r from-slate-800 to-blue-900 rounded-3xl flex items-center justify-center mx-auto mb-6 group-hover:rotate-12 transition-transform duration-300'>
-                <Truck className='w-8 h-8 sm:w-10 sm:h-10 text-white' />
-              </div>
-              <h3 className='text-xl sm:text-2xl font-bold text-gray-900 mb-4'>
-                Çoklu Kullanıcı Sistemi
-              </h3>
-              <p className='text-gray-600 text-base sm:text-lg'>
-                Bireysel, kurumsal, nakliyeci ve şoförleri tek platformda
-                buluşturan sistem
-              </p>
-            </div>
-            <div className='text-center group hover:scale-105 transition-all duration-300 animate-fade-in-up delay-400'>
-              <div className='w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-r from-slate-800 to-blue-900 rounded-3xl flex items-center justify-center mx-auto mb-6 group-hover:rotate-12 transition-transform duration-300'>
-                <Globe className='w-8 h-8 sm:w-10 sm:h-10 text-white' />
-              </div>
-              <h3 className='text-xl sm:text-2xl font-bold text-gray-900 mb-4'>
-                81 İl Kapsamı
-              </h3>
-              <p className='text-gray-600 text-base sm:text-lg'>
-                Türkiye genelinde kesintisiz hizmet ağı ve geniş taşıyıcı ağı
-              </p>
-            </div>
-            <div className='text-center group hover:scale-105 transition-all duration-300 animate-fade-in-up delay-600 sm:col-span-2 lg:col-span-1'>
-              <div className='w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-r from-slate-800 to-blue-900 rounded-3xl flex items-center justify-center mx-auto mb-6 group-hover:rotate-12 transition-transform duration-300'>
-                <Shield className='w-8 h-8 sm:w-10 sm:h-10 text-white' />
-              </div>
-              <h3 className='text-xl sm:text-2xl font-bold text-gray-900 mb-4'>
-                Güvenli Platform
-              </h3>
-              <p className='text-gray-600 text-base sm:text-lg'>
-                SSL şifreleme, güvenli ödeme sistemi ve sigortalı taşımacılık
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 4. KULLANICI TİPLERİ - NAVİGASYON TAB'LARI */}
-      <section
-        id='panels'
-        className='py-24 bg-gradient-to-br from-gray-50 to-blue-50'
-      >
-        <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
-          <div className='text-center mb-16 animate-fade-in-up'>
-            <h2 className='text-5xl md:text-6xl font-bold text-gray-900 mb-8'>
-              Platformumuzu{' '}
-              <span className='bg-gradient-to-r from-slate-800 to-blue-900 bg-clip-text text-transparent'>
-                Kimler
-              </span>{' '}
-              Kullanıyor?
-            </h2>
-            <p className='text-xl text-gray-600 max-w-4xl mx-auto leading-relaxed'>
-              Her sektörden binlerce kullanıcı YolNext ile lojistik
-              ihtiyaçlarını karşılıyor. Size uygun paneli seçin ve detayları
-              görün.
-            </p>
-          </div>
-
-          {/* Navigasyon Tab'ları */}
-          <div
-            className='flex flex-wrap justify-center gap-4 mb-12'
-            role='tablist'
-            aria-label='Kullanıcı tipleri seçimi'
-          >
-            {userTypes.map((userType, index) => (
-              <button
-                key={userType.id}
-                onClick={() => setSelectedUserType(userType.id)}
-                className={`flex items-center space-x-3 px-8 py-4 rounded-2xl font-semibold text-lg transition-all duration-300 transform hover:scale-105 animate-fade-in-up ${
-                  selectedUserType === userType.id
-                    ? 'bg-gradient-to-r from-slate-800 to-blue-900 text-white shadow-lg animate-pulse-glow'
-                    : 'bg-white text-gray-700 hover:bg-gray-50 shadow-md hover:shadow-lg'
-                }`}
-                style={{ animationDelay: `${index * 0.1}s` }}
-                role='tab'
-                aria-selected={selectedUserType === userType.id}
-                aria-controls={`panel-${userType.id}`}
-                aria-label={`${userType.title} panelini seç`}
-              >
-                <userType.icon className='w-6 h-6' aria-hidden='true' />
-                <span>{userType.title}</span>
-              </button>
-            ))}
-          </div>
-
-          {/* Seçilen Panel Detayları */}
-          <div
-            className='bg-white rounded-3xl shadow-2xl overflow-hidden'
-            role='tabpanel'
-            id={`panel-${selectedUserType}`}
-            aria-labelledby={`tab-${selectedUserType}`}
-          >
-            <div className='grid lg:grid-cols-2 gap-0'>
-              {/* Sol Taraf - Genel Bilgiler */}
-              <div className='p-12 bg-gradient-to-br from-gray-50 to-white'>
-                <div className='flex items-center space-x-4 mb-8'>
-                  <div className='w-16 h-16 bg-gradient-to-r from-slate-800 to-blue-900 rounded-2xl flex items-center justify-center'>
-                    <selectedUser.icon className='w-8 h-8 text-white' />
-                  </div>
-                  <div>
-                    <h3 className='text-3xl font-bold text-gray-900'>
-                      {selectedUser.title}
-                    </h3>
-                    <p className='text-gray-600 text-lg'>
-                      {selectedUser.description}
+                  
+                  {/* Main Heading */}
+                  <div className='space-y-6'>
+                    <h1 className='text-5xl md:text-6xl lg:text-7xl font-bold text-white leading-[1.1] tracking-tight'>
+                      Lojistik İşlerinizi
+                      <br />
+                      <span className='bg-gradient-to-r from-blue-300 to-blue-100 bg-clip-text text-transparent'>Dijitalleştirin</span>
+                    </h1>
+                    
+                    <p className='text-lg md:text-xl text-white/80 leading-relaxed max-w-2xl font-normal'>
+                      4 panelli ekosistem ile göndericiler, nakliyeciler ve taşıyıcılar tek platformda buluşuyor. 
+                      <span className='block mt-2 text-white/90 font-medium'>
+                        Önemli ölçüde tasarruf ile geleneksel kargodan çok daha uygun.
+                      </span>
                     </p>
                   </div>
+
+                  {/* CTA Buttons */}
+                  <div className='flex flex-col sm:flex-row gap-4 pt-4'>
+                    <button
+                      onClick={() => handleNavigate('/register')}
+                      className='group px-8 py-4 bg-white text-slate-900 rounded-xl font-semibold text-base shadow-2xl hover:shadow-white/20 hover:bg-white/95 transition-all duration-200 flex items-center justify-center gap-2'
+                    >
+                      Ücretsiz Başla
+                      <ArrowRight className='h-5 w-5 group-hover:translate-x-1 transition-transform' />
+                    </button>
+                    <button
+                      onClick={() => handleNavigate('/login')}
+                      className='px-8 py-4 rounded-xl font-semibold text-base text-white bg-white/10 backdrop-blur-md border-2 border-white/30 hover:border-white/50 hover:bg-white/20 transition-all duration-200 shadow-lg'
+                    >
+                      Giriş Yap
+                    </button>
+                  </div>
+
+                  {/* Quick Stats - Glassmorphism Cards */}
+                  <div className='grid grid-cols-3 gap-4 pt-12'>
+                    <div className='bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20 shadow-xl hover:bg-white/15 transition-all duration-300'>
+                      <div className='text-4xl font-bold text-white mb-2'>₺0</div>
+                      <div className='text-sm font-semibold text-white/90'>Üyelik Ücreti</div>
+                      <div className='text-xs text-white/70 mt-1'>Tamamen ücretsiz</div>
+                    </div>
+                    <div className='bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20 shadow-xl hover:bg-white/15 transition-all duration-300'>
+                      <div className='text-4xl font-bold text-white mb-2'>Tasarruf</div>
+                      <div className='text-sm font-semibold text-white/90'>Önemli Ölçüde</div>
+                      <div className='text-xs text-white/70 mt-1'>Geleneksel yöntemlere göre</div>
+                    </div>
+                    <div className='bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20 shadow-xl hover:bg-white/15 transition-all duration-300'>
+                      <div className='text-4xl font-bold text-white mb-2'>Hızlı</div>
+                      <div className='text-sm font-semibold text-white/90'>Teklif Süresi</div>
+                      <div className='text-xs text-white/70 mt-1'>Kısa sürede teklif</div>
+                    </div>
+                  </div>
                 </div>
 
-                <div className='mb-8'>
-                  <h4 className='text-xl font-bold text-gray-900 mb-4'>
-                    Özellikler
-                  </h4>
-                  <div className='grid grid-cols-1 sm:grid-cols-2 gap-3'>
-                    {selectedUser.features.map((feature, index) => (
-                      <div key={index} className='flex items-center'>
-                        <CheckCircle className='w-5 h-5 text-green-500 mr-3 flex-shrink-0' />
-                        <span className='text-gray-700'>{feature}</span>
+                {/* Right Content - Glassmorphism Cards */}
+                <div className='lg:col-span-5 space-y-6'>
+                  {/* Main Stat Card - Enhanced */}
+                  <div className='bg-white/10 backdrop-blur-xl rounded-2xl p-8 border border-white/20 shadow-2xl hover:bg-white/15 transition-all duration-300'>
+                    <div className='flex items-center gap-4 mb-6'>
+                      <div className='w-16 h-16 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/30 shadow-lg'>
+                        <Users className='h-8 w-8 text-white' />
                       </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className='mb-8'>
-                  <h4 className='text-xl font-bold text-gray-900 mb-4'>
-                    Avantajlar
-                  </h4>
-                  <div className='space-y-3'>
-                    {selectedUser.advantages.map((advantage, index) => (
-                      <div key={index} className='flex items-start'>
-                        <Star className='w-5 h-5 text-yellow-500 mr-3 mt-0.5 flex-shrink-0' />
-                        <span className='text-gray-700'>{advantage}</span>
+                      <div>
+                        <div className='text-xs font-semibold text-white/80 uppercase tracking-wider mb-1'>Toplam Aktif</div>
+                        <div className='text-sm font-medium text-white/90'>Kullanıcı Sayısı</div>
                       </div>
-                    ))}
+                    </div>
+                    <div className='text-7xl font-bold text-white mb-4'>Binlerce</div>
+                    <div className='flex items-center gap-3 mb-4'>
+                      <div className='flex items-center gap-2'>
+                        <div className='w-2.5 h-2.5 bg-blue-400 rounded-full animate-pulse'></div>
+                        <span className='text-sm font-medium text-white/90'>Canlı veri</span>
+                      </div>
+                      <span className='text-white/50'>•</span>
+                      <span className='text-sm text-white/70'>Gerçek zamanlı</span>
+                    </div>
+                    <div className='pt-4 border-t border-white/20'>
+                      <div className='flex items-center justify-between text-sm'>
+                        <span className='text-white/70'>Sürekli büyüyor</span>
+                        <span className='text-blue-300 font-semibold'>Yeni kullanıcılar katılıyor</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Secondary Stats - Enhanced */}
+                  <div className='grid grid-cols-2 gap-4'>
+                    <div className='bg-white/10 backdrop-blur-xl rounded-xl p-6 border border-white/20 shadow-xl hover:bg-white/15 hover:scale-[1.02] transition-all duration-300'>
+                      <div className='w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center mb-4 border border-white/30'>
+                        <Package className='h-6 w-6 text-white' />
+                      </div>
+                      <div className='text-3xl font-bold text-white mb-1'>Yüzbinlerce</div>
+                      <div className='text-xs font-semibold text-white/80 uppercase tracking-wide mb-1'>Teslimat</div>
+                      <div className='text-xs text-white/60'>Tamamlanan işlem</div>
+                      <div className='mt-3 pt-3 border-t border-white/10'>
+                        <div className='flex items-center gap-1 text-xs'>
+                          <TrendingUp className='h-3 w-3 text-blue-300' />
+                          <span className='text-blue-300 font-medium'>Sürekli artış</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className='bg-white/10 backdrop-blur-xl rounded-xl p-6 border border-white/20 shadow-xl hover:bg-white/15 hover:scale-[1.02] transition-all duration-300'>
+                      <div className='w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center mb-4 border border-white/30'>
+                        <Star className='h-6 w-6 text-white fill-white' />
+                      </div>
+                      <div className='text-3xl font-bold text-white mb-1'>Yüksek</div>
+                      <div className='text-xs font-semibold text-white/80 uppercase tracking-wide mb-1'>Memnuniyet</div>
+                      <div className='text-xs text-white/60'>Kullanıcı puanı</div>
+                      <div className='mt-3 pt-3 border-t border-white/10'>
+                        <div className='flex items-center gap-1 text-xs'>
+                          <Star className='h-3 w-3 text-amber-300 fill-amber-300' />
+                          <span className='text-amber-300 font-medium'>Yüksek puan</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Coverage Card - Enhanced */}
+                  <div className='bg-white/10 backdrop-blur-xl rounded-xl p-6 border border-white/20 shadow-xl'>
+                    <div className='flex items-center gap-4 mb-4'>
+                      <div className='w-14 h-14 bg-white/20 rounded-lg flex items-center justify-center border border-white/30'>
+                        <Globe className='h-7 w-7 text-white' />
+                      </div>
+                      <div>
+                        <div className='text-3xl font-bold text-white'>81</div>
+                        <div className='text-xs font-semibold text-white/80 uppercase tracking-wide'>İl Kapsamı</div>
+                      </div>
+                    </div>
+                    <div className='space-y-3 pt-4 border-t border-white/20'>
+                      <div className='flex items-center justify-between'>
+                        <div className='flex items-center gap-2.5 text-sm'>
+                          <MapPin className='h-4 w-4 text-blue-300' />
+                          <span className='font-medium text-white/90'>Tüm Türkiye</span>
+                        </div>
+                        <span className='text-xs text-white/60'>Tüm ilçeler</span>
+                      </div>
+                      <div className='flex items-center justify-between'>
+                        <div className='flex items-center gap-2.5 text-sm'>
+                          <Truck className='h-4 w-4 text-blue-300' />
+                          <span className='font-medium text-white/90'>7/24 Hizmet</span>
+                        </div>
+                        <span className='text-xs text-white/60'>Kesintisiz</span>
+                      </div>
+                      <div className='flex items-center justify-between'>
+                        <div className='flex items-center gap-2.5 text-sm'>
+                          <Zap className='h-4 w-4 text-blue-300' />
+                          <span className='font-medium text-white/90'>Anında İşlem</span>
+                        </div>
+                        <span className='text-xs text-white/60'>Gerçek zamanlı</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        </section>
 
-                <div className='flex items-center justify-between'>
-                  <div className='text-sm text-gray-500'>
-                    <span className='font-semibold text-gray-900'>
-                      {selectedUser.stats}
-                    </span>
+        {/* PLATFORM FEATURES */}
+        <section id='features' className='bg-white py-24'>
+        <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
+            <div className='text-center max-w-3xl mx-auto mb-16'>
+              <p className='text-xs font-semibold uppercase tracking-[0.4em] text-blue-600 mb-4'>Platform Özellikleri</p>
+              <h2 className='text-4xl md:text-5xl font-bold text-slate-900 mb-6'>
+                Lojistik Süreçlerinizi Dijitalleştirin
+              </h2>
+              <p className='text-lg text-slate-600'>
+                Modern teknoloji ile donatılmış platformumuz, tüm lojistik ihtiyaçlarınızı tek yerden yönetmenizi sağlar.
+              </p>
+              </div>
+
+            <div className='grid gap-8 md:grid-cols-2 lg:grid-cols-4'>
+              {platformFeatures.map((feature, idx) => (
+                <div
+                  key={idx}
+                  className='group rounded-3xl border border-slate-200 bg-white p-6 hover:-translate-y-2 hover:shadow-xl transition-all duration-300'
+                >
+                  <div className='w-14 h-14 bg-gradient-to-br from-slate-800 to-blue-900 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform'>
+                    <feature.icon className='h-7 w-7 text-white' />
                   </div>
+                  <h3 className='text-xl font-bold text-slate-900 mb-2'>{feature.title}</h3>
+                  <p className='text-sm text-slate-600 leading-relaxed'>{feature.description}</p>
+                </div>
+                    ))}
+          </div>
+        </div>
+      </section>
+
+        {/* PANELS SECTION */}
+        <section id='panels' className='bg-gradient-to-b from-white to-slate-50 py-24'>
+        <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
+            <div className='text-center max-w-3xl mx-auto mb-16'>
+              <p className='text-xs font-semibold uppercase tracking-[0.4em] text-blue-600 mb-4'>4 Panel</p>
+              <h2 className='text-4xl md:text-5xl font-bold text-slate-900 mb-6'>
+                Her Rol İçin Özel Tasarım
+              </h2>
+              <p className='text-lg text-slate-600'>
+                Bireysel gönderici, kurumsal şirket, nakliyeci veya taşıyıcı - herkes için optimize edilmiş panel.
+            </p>
+          </div>
+
+            <div className='grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-12'>
+              {personaPanels.map(panel => {
+                const isSelected = selectedUserType === panel.id;
+                return (
                   <button
-                    onClick={() => handleUserTypeSelect(selectedUserType)}
-                    disabled={isLoading}
-                    className='bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 disabled:opacity-50 disabled:cursor-not-allowed text-white px-8 py-4 rounded-xl font-bold text-lg transition-all duration-300 transform hover:scale-105 shadow-lg'
+                    key={panel.id}
+                    onClick={() => setSelectedUserType(panel.id)}
+                    className={`rounded-3xl border p-6 text-left transition-all ${
+                      isSelected
+                        ? 'border-blue-600 bg-blue-50 shadow-lg scale-105'
+                        : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-md'
+                    }`}
                   >
-                    {isLoading ? '⏳ Yükleniyor...' : selectedUser.buttonText}
+                    <div className={`mb-4 flex h-12 w-12 items-center justify-center rounded-2xl transition-colors ${
+                      isSelected ? 'bg-blue-600' : 'bg-slate-100'
+                    }`}>
+                      <panel.icon className={`h-6 w-6 ${isSelected ? 'text-white' : 'text-slate-900'}`} />
+                  </div>
+                    <p className={`text-xs font-semibold uppercase tracking-[0.2em] mb-2 ${
+                      isSelected ? 'text-blue-600' : 'text-slate-500'
+                    }`}>
+                      {panel.subtitle}
+                    </p>
+                    <h3 className={`text-xl font-bold mb-2 ${isSelected ? 'text-slate-900' : 'text-slate-900'}`}>
+                      {panel.title}
+                    </h3>
+                    <p className={`text-sm mb-4 ${isSelected ? 'text-slate-700' : 'text-slate-600'}`}>
+                      {panel.promise}
+                    </p>
+                    <p className={`text-xs font-semibold ${isSelected ? 'text-blue-600' : 'text-slate-500'}`}>
+                      {panel.stats}
+                    </p>
                   </button>
-                </div>
-              </div>
-
-              {/* Sağ Taraf - Görsel/İstatistikler */}
-              <div className='p-12 bg-gradient-to-br from-slate-800 to-blue-900 text-white'>
-                <h4 className='text-2xl font-bold mb-8'>
-                  Neden {selectedUser.title}?
-                </h4>
-
-                <div className='space-y-6'>
-                  <div className='bg-white/10 backdrop-blur-sm rounded-2xl p-6'>
-                    <h5 className='text-lg font-semibold mb-3'>
-                      Kullanıcı Memnuniyeti
-                    </h5>
-                    <div className='flex items-center space-x-4'>
-                      <div className='text-4xl font-bold'>%99.9</div>
-                      <div className='text-white/80'>Memnuniyet oranı</div>
-                    </div>
-                    <div className='mt-2 text-white/70 text-sm'>
-                      ⭐⭐⭐⭐⭐ 4.9/5 yıldız (2,500+ yorum)
-                    </div>
-                  </div>
-
-                  <div className='bg-white/10 backdrop-blur-sm rounded-2xl p-6'>
-                    <h5 className='text-lg font-semibold mb-3'>
-                      Hizmet Kapsamı
-                    </h5>
-                    <div className='flex items-center space-x-4'>
-                      <div className='text-4xl font-bold'>81</div>
-                      <div className='text-white/80'>İl kapsamı</div>
-                    </div>
-                  </div>
-
-                  <div className='bg-white/10 backdrop-blur-sm rounded-2xl p-6'>
-                    <h5 className='text-lg font-semibold mb-3'>
-                      Ücretsiz Kullanım
-                    </h5>
-                    <div className='flex items-center space-x-4'>
-                      <div className='text-4xl font-bold'>%0</div>
-                      <div className='text-white/80'>Üyelik ücreti</div>
-                    </div>
-                    <div className='mt-2 text-white/70 text-sm'>
-                      Sadece nakliyeci %1 komisyon öder
-                    </div>
-                  </div>
+                );
+              })}
                 </div>
 
-                <div className='mt-8 p-6 bg-white/5 rounded-2xl'>
-                  <h5 className='text-lg font-semibold mb-3'>
-                    Hızlı Başlangıç
-                  </h5>
-                  <div className='space-y-2 text-sm text-white/80'>
-                    <div className='flex items-center'>
-                      <span className='w-6 h-6 bg-white/20 rounded-full flex items-center justify-center text-xs font-bold mr-3'>
-                        1
-                      </span>
-                      Hesap oluşturun
-                    </div>
-                    <div className='flex items-center'>
-                      <span className='w-6 h-6 bg-white/20 rounded-full flex items-center justify-center text-xs font-bold mr-3'>
-                        2
-                      </span>
-                      Profilinizi tamamlayın
-                    </div>
-                    <div className='flex items-center'>
-                      <span className='w-6 h-6 bg-white/20 rounded-full flex items-center justify-center text-xs font-bold mr-3'>
-                        3
-                      </span>
-                      Hemen kullanmaya başlayın
-                    </div>
+            <div className='rounded-3xl border border-slate-200 bg-white p-8 shadow-xl'>
+              <div className='flex flex-wrap items-start justify-between gap-6 mb-8'>
+                <div className='space-y-2'>
+                  <p className='text-xs font-semibold uppercase tracking-[0.2em] text-slate-500'>Seçili Panel</p>
+                  <h3 className='text-3xl font-bold text-slate-900'>{selectedPersona.title}</h3>
+                  <p className='text-sm text-slate-600'>{selectedPersona.stats}</p>
+                      </div>
+                <button
+                  onClick={() => handleNavigate('/register', { userType: selectedPersona.id })}
+                  className='inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-slate-800 to-blue-900 text-white px-6 py-3 font-semibold shadow-xl hover:from-slate-700 hover:to-blue-800 transition'
+                >
+                  {selectedPersona.cta}
+                  <ArrowRight className='h-5 w-5' />
+                </button>
+                </div>
+
+              <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8'>
+                {selectedPersona.features.map((feature, idx) => (
+                  <div key={idx} className='flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 hover:bg-white hover:shadow-md transition'>
+                    <CheckCircle className='h-5 w-5 text-emerald-600 flex-shrink-0 mt-0.5' />
+                    <p className='text-sm text-slate-700 font-medium'>{feature}</p>
+                      </div>
+                    ))}
                   </div>
+
+              <div className='pt-6 border-t border-slate-200'>
+                <p className='text-sm font-semibold text-slate-700 mb-3'>Panel Sayfaları:</p>
+                <div className='flex flex-wrap gap-2'>
+                  {selectedPersona.pages.map((page, idx) => (
+                    <span
+                      key={idx}
+                      className='px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-xs font-medium border border-blue-200'
+                    >
+                      {page}
+                    </span>
+                  ))}
                 </div>
               </div>
-            </div>
-          </div>
-        </div>
-      </section>
+                </div>
+                  </div>
+        </section>
 
-      {/* 5. ANA FAYDALAR */}
-      <section id='features' className='py-20 bg-white'>
+        {/* WORKFLOW SECTION */}
+        <section id='workflow' className='bg-slate-900 py-24 text-white'>
         <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
-          <div className='text-center mb-16 animate-fade-in-up'>
-            <h2 className='text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 mb-6'>
-              Neden{' '}
-              <span className='bg-gradient-to-r from-slate-800 to-blue-900 bg-clip-text text-transparent'>
-                YolNext
-              </span>
-              ?
-            </h2>
-            <p className='text-lg sm:text-xl text-gray-600 max-w-3xl mx-auto'>
-              Her kullanıcı tipinin ihtiyacına özel tasarlanmış güçlü özellikler
+            <div className='text-center max-w-3xl mx-auto mb-16'>
+              <p className='text-xs font-semibold uppercase tracking-[0.4em] text-blue-300 mb-4'>İş Akışı</p>
+              <h2 className='text-4xl md:text-5xl font-bold mb-6'>
+                5 Adımda Tamamlanan Süreç
+              </h2>
+              <p className='text-lg text-white/70'>
+                Gönderi oluşturma'dan teslimata kadar tüm süreç tek platformda, şeffaf ve hızlı.
             </p>
-          </div>
-          <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12'>
-            <div className='text-center group hover:scale-105 transition-all duration-300 animate-fade-in-up delay-200'>
-              <div className='w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-r from-slate-800 to-blue-900 rounded-3xl flex items-center justify-center mx-auto mb-6 group-hover:rotate-12 transition-transform duration-300'>
-                <DollarSign className='w-8 h-8 sm:w-10 sm:h-10 text-white' />
-              </div>
-              <h3 className='text-2xl sm:text-3xl font-bold text-gray-900 mb-4'>
-                Tamamen Ücretsiz
-              </h3>
-              <p className='text-gray-600 text-base sm:text-lg'>
-                %0 üyelik ücreti, sadece nakliyeci %1 komisyon öder
-              </p>
-            </div>
-            <div className='text-center group hover:scale-105 transition-all duration-300 animate-fade-in-up delay-400'>
-              <div className='w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-r from-slate-800 to-blue-900 rounded-3xl flex items-center justify-center mx-auto mb-6 group-hover:rotate-12 transition-transform duration-300'>
-                <Clock className='w-8 h-8 sm:w-10 sm:h-10 text-white' />
-              </div>
-              <h3 className='text-2xl sm:text-3xl font-bold text-gray-900 mb-4'>
-                Hızlı Teslimat
-              </h3>
-              <p className='text-gray-600 text-base sm:text-lg'>
-                Geniş taşıyıcı ağı ile hızlı ve güvenilir teslimat
-              </p>
-            </div>
-            <div className='text-center group hover:scale-105 transition-all duration-300 animate-fade-in-up delay-600'>
-              <div className='w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-r from-slate-800 to-blue-900 rounded-3xl flex items-center justify-center mx-auto mb-6 group-hover:rotate-12 transition-transform duration-300'>
-                <Globe className='w-8 h-8 sm:w-10 sm:h-10 text-white' />
-              </div>
-              <h3 className='text-2xl sm:text-3xl font-bold text-gray-900 mb-4'>
-                81 İl Kapsamı
-              </h3>
-              <p className='text-gray-600 text-base sm:text-lg'>
-                Türkiye genelinde kesintisiz hizmet ağı
-              </p>
-            </div>
-            <div className='text-center group hover:scale-105 transition-all duration-300 animate-fade-in-up delay-800 sm:col-span-2 lg:col-span-1'>
-              <div className='w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-3xl flex items-center justify-center mx-auto mb-6 group-hover:rotate-12 transition-transform duration-300'>
-                <Star className='w-8 h-8 sm:w-10 sm:h-10 text-white' />
-              </div>
-              <h3 className='text-2xl sm:text-3xl font-bold text-gray-900 mb-4'>
-                Yorum & Puan Sistemi
-              </h3>
-              <p className='text-gray-600 text-base sm:text-lg'>
-                Güvenilir değerlendirme sistemi ile kaliteli hizmet
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
+                  </div>
 
-      {/* 6. NASIL ÇALIŞIR? */}
-      <section className='py-20 bg-gray-50'>
-        <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
-          <div className='text-center mb-16 animate-fade-in-up'>
-            <h2 className='text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 mb-6'>
-              Nasıl{' '}
-              <span className='bg-gradient-to-r from-slate-800 to-blue-900 bg-clip-text text-transparent'>
-                Çalışır
-              </span>
-              ?
-            </h2>
-            <p className='text-lg sm:text-xl text-gray-600 max-w-3xl mx-auto'>
-              Sadece 3 adımda gönderinizi oluşturun ve teslimat alın
-            </p>
-          </div>
-          <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 lg:gap-12'>
-            <div className='text-center group hover:scale-105 transition-all duration-300 animate-fade-in-up delay-200'>
-              <div className='w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-r from-slate-800 to-blue-900 rounded-3xl flex items-center justify-center mx-auto mb-6 group-hover:rotate-12 transition-transform duration-300'>
-                <span className='text-2xl sm:text-3xl font-bold text-white'>
-                  1
-                </span>
+            <div className='grid gap-8 md:grid-cols-2 lg:grid-cols-5'>
+              {workflowSteps.map((step, idx) => (
+                <div key={idx} className='relative'>
+                  {idx < workflowSteps.length - 1 && (
+                    <div className='hidden lg:block absolute top-12 left-full w-full h-0.5 bg-white/20 -z-10' style={{ width: 'calc(100% - 3rem)' }}></div>
+                  )}
+                  <div className='rounded-3xl border border-white/15 bg-white/5 p-6 backdrop-blur hover:bg-white/10 hover:-translate-y-2 transition-all duration-300'>
+                    <div className={`mb-4 flex h-14 w-14 items-center justify-center rounded-2xl text-white text-xl font-bold shadow-lg ${
+                      step.color === 'blue' ? 'bg-blue-600' :
+                      step.color === 'green' ? 'bg-green-600' :
+                      step.color === 'purple' ? 'bg-purple-600' :
+                      step.color === 'orange' ? 'bg-orange-600' :
+                      'bg-emerald-600'
+                    }`}>
+                      {step.step}
               </div>
-              <h3 className='text-xl sm:text-2xl font-bold text-gray-900 mb-4'>
-                Gönderi Oluştur
-              </h3>
-              <p className='text-gray-600 text-base sm:text-lg'>
-                3 tıklama ile gönderi detaylarınızı girin
-              </p>
-            </div>
-            <div className='text-center group hover:scale-105 transition-all duration-300 animate-fade-in-up delay-400'>
-              <div className='w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-r from-slate-800 to-blue-900 rounded-3xl flex items-center justify-center mx-auto mb-6 group-hover:rotate-12 transition-transform duration-300'>
-                <span className='text-2xl sm:text-3xl font-bold text-white'>
-                  2
-                </span>
-              </div>
-              <h3 className='text-xl sm:text-2xl font-bold text-gray-900 mb-4'>
-                Teklif Al
-              </h3>
-              <p className='text-gray-600 text-base sm:text-lg'>
-                Otomatik fiyat teklifleri alın ve seçin
-              </p>
-            </div>
-            <div className='text-center group hover:scale-105 transition-all duration-300 animate-fade-in-up delay-600 sm:col-span-2 lg:col-span-1'>
-              <div className='w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-r from-slate-800 to-blue-900 rounded-3xl flex items-center justify-center mx-auto mb-6 group-hover:rotate-12 transition-transform duration-300'>
-                <span className='text-2xl sm:text-3xl font-bold text-white'>
-                  3
-                </span>
-              </div>
-              <h3 className='text-xl sm:text-2xl font-bold text-gray-900 mb-4'>
-                Teslimat
-              </h3>
-              <p className='text-gray-600 text-base sm:text-lg'>
-                2 günde kapınızda teslimat alın
-              </p>
+                    <h3 className='text-xl font-semibold mb-2'>{step.title}</h3>
+                    <p className='text-sm text-white/70 leading-relaxed'>{step.description}</p>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* 7. KARŞILAŞTIRMA TABLOSU */}
-      <section className='py-20 bg-white'>
-        <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
-          <div className='text-center mb-16 animate-fade-in-up'>
-            <h2 className='text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 mb-6'>
-              Geleneksel Kargo vs{' '}
-              <span className='bg-gradient-to-r from-slate-800 to-blue-900 bg-clip-text text-transparent'>
-                YolNext
-              </span>
-            </h2>
-            <p className='text-lg sm:text-xl text-gray-600 max-w-3xl mx-auto'>
-              Neden YolNext'i tercih etmelisiniz? Karşılaştırın ve farkı görün
-            </p>
-          </div>
+        {/* CATEGORIES */}
+        <section id='categories' className='bg-white py-24'>
+          <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
+            <div className='text-center max-w-3xl mx-auto mb-16'>
+              <p className='text-xs font-semibold uppercase tracking-[0.4em] text-blue-600 mb-4'>Kategoriler</p>
+              <h2 className='text-4xl md:text-5xl font-bold text-slate-900 mb-6'>
+                Her Tür Gönderi İçin Çözüm
+              </h2>
+              <p className='text-lg text-slate-600'>
+                Ev taşınmasından soğuk zincire, tehlikeli maddelerden e-ticarete kadar tüm kategoriler.
+              </p>
+            </div>
 
-          <div className='bg-white rounded-3xl shadow-2xl overflow-hidden'>
-            <div className='overflow-x-auto'>
-              <table className='w-full'>
-                <thead className='bg-gray-50'>
-                  <tr>
-                    <th className='px-6 py-4 text-left text-sm font-semibold text-gray-900'>
-                      Özellik
-                    </th>
-                    <th className='px-6 py-4 text-center text-sm font-semibold text-gray-500'>
-                      Geleneksel Kargo
-                    </th>
-                    <th className='px-6 py-4 text-center text-sm font-semibold text-slate-800'>
-                      YolNext
-                    </th>
+            <div className='grid gap-6 md:grid-cols-2 lg:grid-cols-3'>
+              {categories.map((category, idx) => (
+                <div
+                  key={idx}
+                  className='rounded-3xl border border-slate-200 bg-white p-6 hover:-translate-y-2 hover:shadow-xl transition-all duration-300'
+                >
+                  <div className='w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-xl flex items-center justify-center mb-4'>
+                    <category.icon className='h-6 w-6 text-white' />
+                    </div>
+                  <h3 className='text-xl font-bold text-slate-900 mb-2'>{category.name}</h3>
+                  <p className='text-sm text-slate-600'>{category.description}</p>
+                </div>
+              ))}
+                </div>
+              </div>
+        </section>
+
+        {/* PRICING COMPARISON */}
+        <section className='bg-gradient-to-b from-slate-50 to-white py-24'>
+          <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
+            <div className='text-center max-w-3xl mx-auto mb-16'>
+              <p className='text-xs font-semibold uppercase tracking-[0.4em] text-blue-600 mb-4'>Fiyatlandırma</p>
+              <h2 className='text-4xl md:text-5xl font-bold text-slate-900 mb-6'>
+                Geleneksel Yöntemler vs YolNext
+              </h2>
+              <p className='text-lg text-slate-600'>
+                Şeffaf fiyatlandırma ile ne kadar tasarruf edeceğinizi görün.
+              </p>
+              </div>
+
+            <div className='rounded-3xl border border-slate-200 bg-white p-8 shadow-xl overflow-hidden'>
+              <div className='overflow-x-auto'>
+                <table className='w-full'>
+                  <thead>
+                    <tr className='border-b-2 border-slate-200 bg-gradient-to-r from-slate-50 to-blue-50'>
+                      <th className='text-left py-4 px-6 font-bold text-slate-900'>Özellik</th>
+                      <th className='text-center py-4 px-6 font-bold text-slate-700'>Geleneksel Yöntemler</th>
+                      <th className='text-center py-4 px-6 font-bold text-emerald-600'>YolNext</th>
+                      <th className='text-center py-4 px-6 font-bold text-blue-600'>Tasarruf</th>
                   </tr>
                 </thead>
-                <tbody className='divide-y divide-gray-200'>
-                  <tr>
-                    <td className='px-6 py-4 text-sm font-medium text-gray-900'>
-                      Üyelik Ücreti
-                    </td>
-                    <td className='px-6 py-4 text-center text-sm text-red-600 font-semibold'>
-                      ₺50-200/ay
-                    </td>
-                    <td className='px-6 py-4 text-center text-sm text-green-600 font-semibold'>
-                      ₺0
-                    </td>
-                  </tr>
-                  <tr className='bg-gray-50'>
-                    <td className='px-6 py-4 text-sm font-medium text-gray-900'>
-                      Gönderi Ücreti
-                    </td>
-                    <td className='px-6 py-4 text-center text-sm text-red-600 font-semibold'>
-                      ₺25-50
-                    </td>
-                    <td className='px-6 py-4 text-center text-sm text-green-600 font-semibold'>
-                      ₺0
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className='px-6 py-4 text-sm font-medium text-gray-900'>
-                      Teslimat Süresi
-                    </td>
-                    <td className='px-6 py-4 text-center text-sm text-gray-600'>
-                      3-7 gün
-                    </td>
-                    <td className='px-6 py-4 text-center text-sm text-green-600 font-semibold'>
-                      2 gün
-                    </td>
-                  </tr>
-                  <tr className='bg-gray-50'>
-                    <td className='px-6 py-4 text-sm font-medium text-gray-900'>
-                      Canlı Takip
-                    </td>
-                    <td className='px-6 py-4 text-center text-sm text-red-600'>
-                      ❌ Yok
-                    </td>
-                    <td className='px-6 py-4 text-center text-sm text-green-600'>
-                      ✅ Var
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className='px-6 py-4 text-sm font-medium text-gray-900'>
-                      Teklif Karşılaştırma
-                    </td>
-                    <td className='px-6 py-4 text-center text-sm text-red-600'>
-                      ❌ Yok
-                    </td>
-                    <td className='px-6 py-4 text-center text-sm text-green-600'>
-                      ✅ Var
-                    </td>
-                  </tr>
-                  <tr className='bg-gray-50'>
-                    <td className='px-6 py-4 text-sm font-medium text-gray-900'>
-                      Yorum Sistemi
-                    </td>
-                    <td className='px-6 py-4 text-center text-sm text-red-600'>
-                      ❌ Yok
-                    </td>
-                    <td className='px-6 py-4 text-center text-sm text-green-600'>
-                      ✅ Var
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className='px-6 py-4 text-sm font-medium text-gray-900'>
-                      Müşteri Desteği
-                    </td>
-                    <td className='px-6 py-4 text-center text-sm text-gray-600'>
-                      Sınırlı
-                    </td>
-                    <td className='px-6 py-4 text-center text-sm text-green-600 font-semibold'>
-                      7/24
-                    </td>
-                  </tr>
+                <tbody>
+                    {pricingComparison.map((row, idx) => (
+                      <tr key={idx} className={`border-b border-slate-100 ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}>
+                        <td className='py-4 px-6 font-semibold text-slate-900'>{row.feature}</td>
+                        <td className='py-4 px-6 text-center text-slate-600'>{row.traditional}</td>
+                        <td className='py-4 px-6 text-center font-bold text-emerald-600'>{row.yolnext}</td>
+                        <td className='py-4 px-6 text-center font-semibold text-blue-600'>{row.savings}</td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
-            </div>
+              </div>
           </div>
         </div>
       </section>
 
-      {/* 8. CTA BÖLÜMÜ */}
-      <section className='py-20 bg-gradient-to-r from-slate-800 via-slate-900 to-blue-900'>
-        <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center'>
-          <h2 className='text-3xl sm:text-4xl md:text-6xl font-bold text-white mb-8'>
-            Hemen <span className='text-blue-400'>Başlayın</span>
-          </h2>
-          <p className='text-lg sm:text-xl text-white/90 mb-8 max-w-3xl mx-auto'>
-            Kayıt olun, gönderinizi oluşturun ve en uygun teklifi alın. Hiçbir
-            ücret yok!
-          </p>
+        {/* ADVANTAGES */}
+        <section className='bg-white py-24'>
+        <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
+            <div className='text-center max-w-3xl mx-auto mb-16'>
+              <p className='text-xs font-semibold uppercase tracking-[0.4em] text-blue-600 mb-4'>Avantajlar</p>
+              <h2 className='text-4xl md:text-5xl font-bold text-slate-900 mb-6'>
+                Neden YolNext?
+              </h2>
+          </div>
 
-          {/* Ücretsiz Kullanım Vurgusu */}
-          <div className='bg-white/10 backdrop-blur-sm rounded-2xl p-6 mb-12 max-w-4xl mx-auto'>
-            <div className='text-center'>
-              <div className='text-3xl font-bold text-white mb-2'>
-                🎉 TAMAMEN ÜCRETSİZ KULLANIM
+            <div className='grid gap-8 md:grid-cols-2 lg:grid-cols-4'>
+              {advantages.map((advantage, idx) => (
+                <div
+                  key={idx}
+                  className='rounded-3xl border border-slate-200 bg-white p-8 hover:-translate-y-2 hover:shadow-xl transition-all duration-300 text-center'
+                >
+                  <div className='w-16 h-16 bg-gradient-to-br from-slate-800 to-blue-900 rounded-2xl flex items-center justify-center mx-auto mb-4'>
+                    <advantage.icon className='h-8 w-8 text-white' />
               </div>
-              <div className='text-white/90 text-lg'>
-                <span className='font-bold'>%0 üyelik ücreti</span> •
-                <span className='font-bold'>%0 gönderi ücreti</span> •
-                <span className='font-bold'>%0 gizli ücret</span>
-              </div>
-              <div className='text-white/80 text-sm mt-2'>
-                Sadece nakliyeci %1 komisyon öder, diğer her şey ücretsiz!
-              </div>
+                  <div className='text-4xl font-bold text-blue-600 mb-2'>{advantage.stat}</div>
+                  <h3 className='text-xl font-bold text-slate-900 mb-3'>{advantage.title}</h3>
+                  <p className='text-sm text-slate-600 leading-relaxed'>{advantage.description}</p>
+                </div>
+              ))}
             </div>
           </div>
+        </section>
+
+        {/* WHY CHOOSE BY USER TYPE */}
+        <section className='bg-gradient-to-b from-white to-slate-50 py-24'>
+          <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
+            <div className='text-center max-w-3xl mx-auto mb-16'>
+              <p className='text-xs font-semibold uppercase tracking-[0.4em] text-blue-600 mb-4'>Size Özel</p>
+              <h2 className='text-4xl md:text-5xl font-bold text-slate-900 mb-6'>
+                Rolünüze Göre Avantajlar
+              </h2>
+              <p className='text-lg text-slate-600'>
+                Her kullanıcı tipi için özel olarak tasarlanmış avantajlar.
+              </p>
+            </div>
+
+            <div className='grid gap-8 md:grid-cols-2 lg:grid-cols-4'>
+              {personaPanels.map((panel, panelIdx) => {
+                const reasons = whyChoose[panel.id as keyof typeof whyChoose];
+                return (
+                  <div
+                    key={panelIdx}
+                    className='rounded-3xl border border-slate-200 bg-white p-6 hover:-translate-y-2 hover:shadow-xl transition-all duration-300'
+                  >
+                    <div className='flex items-center gap-3 mb-6'>
+                      <div className='w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-xl flex items-center justify-center'>
+                        <panel.icon className='h-6 w-6 text-white' />
+                      </div>
+                      <h3 className='text-xl font-bold text-slate-900'>{panel.title}</h3>
+                    </div>
+                    <div className='space-y-4'>
+                      {reasons.map((reason, reasonIdx) => (
+                        <div key={reasonIdx} className='flex items-start gap-3'>
+                          <div className='w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0'>
+                            <reason.icon className='h-5 w-5 text-blue-600' />
+                          </div>
+                          <div>
+                            <h4 className='font-semibold text-slate-900 text-sm mb-1'>{reason.title}</h4>
+                            <p className='text-xs text-slate-600'>{reason.desc}</p>
+          </div>
+              </div>
+              ))}
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+        </div>
+      </section>
+
+        {/* TRUST PILLARS */}
+        <section className='bg-slate-900 py-24 text-white'>
+        <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
+            <div className='text-center max-w-3xl mx-auto mb-16'>
+              <p className='text-xs font-semibold uppercase tracking-[0.4em] text-blue-300 mb-4'>Güven</p>
+              <h2 className='text-4xl md:text-5xl font-bold mb-6'>
+                Güvenilir ve Güvenli Platform
+              </h2>
+            </div>
+
+            <div className='grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-12'>
+              {trustPillars.map((pillar, idx) => (
+                <div
+                  key={idx}
+                  className='rounded-3xl border border-white/15 bg-white/5 p-6 backdrop-blur hover:bg-white/10 hover:-translate-y-2 transition-all duration-300'
+                >
+                  <div className='mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10'>
+                    <pillar.icon className='h-6 w-6 text-white' />
+                  </div>
+                  <h3 className='text-xl font-bold mb-2'>{pillar.title}</h3>
+                  <p className='text-sm text-white/70'>{pillar.description}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* CASE STUDIES */}
+        <section id='cases' className='bg-white py-24'>
+          <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
+            <div className='text-center max-w-3xl mx-auto mb-16'>
+              <p className='text-xs font-semibold uppercase tracking-[0.4em] text-blue-600 mb-4'>Vaka Analizleri</p>
+              <h2 className='text-4xl md:text-5xl font-bold text-slate-900 mb-6'>
+                Gerçek Başarı Hikayeleri
+              </h2>
+              <p className='text-lg text-slate-600'>
+                Platformumuzu kullanan kullanıcıların deneyimleri ve başarı hikayeleri.
+              </p>
+            </div>
+
+            <div className='grid gap-8 md:grid-cols-2 lg:grid-cols-3 mb-16'>
+              {caseStories.map((story, idx) => (
+                <div
+                  key={idx}
+                  className='rounded-3xl border border-slate-200 bg-white p-8 hover:-translate-y-2 hover:shadow-xl transition-all duration-300'
+                >
+                  <div className='flex items-center justify-between mb-4'>
+                    <span className='px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold'>
+                      {story.category}
+                    </span>
+                    <span className='text-2xl font-bold text-emerald-600'>{story.impact}</span>
+                  </div>
+                  <h3 className='text-xl font-bold text-slate-900 mb-3'>{story.title}</h3>
+                  <p className='text-sm text-slate-600 mb-4 leading-relaxed'>{story.detail}</p>
+                  <div className='pt-4 border-t border-slate-100'>
+                    <div className='flex flex-wrap gap-2'>
+                      {Object.entries(story.metrics).map(([key, value], i) => (
+                        <span key={i} className='px-2 py-1 bg-slate-100 text-slate-700 rounded text-xs font-medium'>
+                          {key}: {value}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* USER TESTIMONIALS */}
+            <div className='text-center max-w-3xl mx-auto mb-12'>
+              <p className='text-xs font-semibold uppercase tracking-[0.4em] text-blue-600 mb-4'>Kullanıcı Yorumları</p>
+              <h2 className='text-4xl md:text-5xl font-bold text-slate-900 mb-6'>
+                Kullanıcılarımız Ne Diyor?
+              </h2>
+              <p className='text-lg text-slate-600'>
+                Türkiye'nin dört bir yanından gerçek kullanıcı deneyimleri.
+              </p>
+            </div>
+
+            <div className='grid gap-6 md:grid-cols-2 lg:grid-cols-4'>
+              {testimonials.map((testimonial, idx) => (
+                <div
+                  key={idx}
+                  className='rounded-3xl border border-slate-200 bg-white p-6 hover:-translate-y-2 hover:shadow-xl transition-all duration-300'
+                >
+                  <div className='flex items-center gap-1 mb-3'>
+                    {[...Array(testimonial.rating)].map((_, i) => (
+                      <Star key={i} className='h-4 w-4 fill-amber-400 text-amber-400' />
+                    ))}
+                  </div>
+                  <p className='text-sm text-slate-700 mb-4 leading-relaxed'>{testimonial.comment}</p>
+                  <div className='pt-4 border-t border-slate-100'>
+                    <div className='flex items-center justify-between'>
+                      <div>
+                        <p className='font-semibold text-slate-900'>{testimonial.name}</p>
+                        <p className='text-xs text-slate-500'>{testimonial.role} • {testimonial.location}</p>
+                      </div>
+                      <div className='text-right'>
+                        <p className='text-xs font-semibold text-emerald-600'>{testimonial.savings}</p>
+                        <p className='text-xs text-slate-500'>Tasarruf</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* CTA SECTION */}
+        <section className='bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 py-24 text-white'>
+          <div className='max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center'>
+            <h2 className='text-4xl md:text-5xl font-bold mb-6'>
+              4 Panelli Ekosisteme Katılın
+            </h2>
+            <p className='text-xl text-slate-200 mb-8 leading-relaxed'>
+                  Kayıt tamamen ücretsiz, kredi kartı gerekmez, 2 dakikada kayıt olun. 
+              <br />
+                  Binlerce kullanıcı bu sistemi kullanıyor.
+            </p>
+            <div className='flex flex-col sm:flex-row items-center justify-center gap-4'>
+                <button
+                  onClick={() => handleNavigate('/register')}
+                className='bg-white text-slate-900 px-10 py-5 rounded-xl font-bold text-lg shadow-2xl hover:bg-slate-100 transition-all duration-300 flex items-center gap-2'
+                >
+                  Ücretsiz Kayıt Ol
+                  <ArrowRight className='h-5 w-5' />
+                </button>
+                <button
+                  onClick={() => handleNavigate('/contact')}
+                className='px-10 py-5 rounded-xl font-bold text-lg text-white border-2 border-white/30 hover:border-white/50 hover:bg-white/10 transition-all duration-300'
+                >
+                  Kurumsal Demo
+                </button>
+            </div>
+            <div className='flex flex-wrap justify-center gap-8 mt-12 text-sm'>
+              <div className='flex items-center gap-2'>
+                <CheckCircle className='h-5 w-5 text-emerald-400' />
+                <span>Kayıt Ücretsiz</span>
+              </div>
+              <div className='flex items-center gap-2'>
+                <Shield className='h-5 w-5 text-blue-400' />
+                <span>Kredi Kartı Gerekmez</span>
+              </div>
+              <div className='flex items-center gap-2'>
+                <Clock className='h-5 w-5 text-cyan-400' />
+                <span>2 Dakikada Kayıt Ol</span>
+              </div>
+          </div>
+        </div>
+      </section>
+
+        {/* HOW TO START */}
+        <section className='bg-gradient-to-b from-slate-50 to-white py-24'>
+          <div className='max-w-4xl mx-auto px-4 sm:px-6 lg:px-8'>
+            <div className='text-center max-w-3xl mx-auto mb-16'>
+              <p className='text-xs font-semibold uppercase tracking-[0.4em] text-blue-600 mb-4'>Başlangıç</p>
+              <h2 className='text-4xl md:text-5xl font-bold text-slate-900 mb-6'>
+                Nasıl Başlarım?
+              </h2>
+              <p className='text-lg text-slate-600'>
+                3 basit adımda YolNext ekosistemine katılın.
+                </p>
+          </div>
+
+            <div className='grid gap-6 md:grid-cols-3'>
+              <div className='rounded-3xl border border-slate-200 bg-white p-8 text-center'>
+                <div className='w-16 h-16 bg-gradient-to-br from-slate-800 to-blue-900 rounded-2xl flex items-center justify-center mx-auto mb-4'>
+                  <span className='text-2xl font-bold text-white'>1</span>
+                </div>
+                <h3 className='text-xl font-bold text-slate-900 mb-3'>Ücretsiz Kayıt Ol</h3>
+                <p className='text-sm text-slate-600 mb-4'>TC kimlik veya vergi numaranız ile 2 dakikada kayıt olun. Kredi kartı gerekmez.</p>
           <button
-            onClick={handleGetStarted}
-            disabled={isLoading}
-            className='bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-gray-900 px-8 sm:px-12 py-4 sm:py-6 rounded-2xl font-bold text-xl sm:text-2xl transition-all duration-300 transform hover:scale-105 shadow-2xl mb-8'
+                  onClick={() => handleNavigate('/register')}
+                  className='text-blue-600 font-semibold text-sm hover:text-blue-700 flex items-center gap-1 mx-auto'
           >
-            {isLoading ? '⏳ Yükleniyor...' : '🚀 Ücretsiz Başla'}
+                  Kayıt Ol <ArrowRight className='h-4 w-4' />
           </button>
-          <div className='flex flex-wrap justify-center items-center gap-6 text-blue-200 text-sm'>
-            <div className='flex items-center gap-2'>
-              <CheckCircle className='w-5 h-5' />
-              <span>Kayıt ücretsiz</span>
-            </div>
-            <div className='flex items-center gap-2'>
-              <CheckCircle className='w-5 h-5' />
-              <span>Gizlilik korunur</span>
-            </div>
-            <div className='flex items-center gap-2'>
-              <CheckCircle className='w-5 h-5' />
-              <span>İstediğinizde çıkın</span>
+              </div>
+
+              <div className='rounded-3xl border border-slate-200 bg-white p-8 text-center'>
+                <div className='w-16 h-16 bg-gradient-to-br from-slate-800 to-blue-900 rounded-2xl flex items-center justify-center mx-auto mb-4'>
+                  <span className='text-2xl font-bold text-white'>2</span>
+                </div>
+                <h3 className='text-xl font-bold text-slate-900 mb-3'>Profilinizi Tamamlayın</h3>
+                <p className='text-sm text-slate-600 mb-4'>Gerekli belgeleri yükleyin. Onay süreci hızlı bir şekilde tamamlanır.</p>
+                <div className='flex items-center justify-center gap-1 text-slate-500 text-sm'>
+                  <UserCheck className='h-4 w-4' />
+                  <span>Hızlı Onay</span>
+                </div>
+              </div>
+
+              <div className='rounded-3xl border border-slate-200 bg-white p-8 text-center'>
+                <div className='w-16 h-16 bg-gradient-to-br from-slate-800 to-blue-900 rounded-2xl flex items-center justify-center mx-auto mb-4'>
+                  <span className='text-2xl font-bold text-white'>3</span>
+                </div>
+                <h3 className='text-xl font-bold text-slate-900 mb-3'>İlk İşleminizi Yapın</h3>
+                <p className='text-sm text-slate-600 mb-4'>Gönderi oluşturun, teklif verin veya iş alın. Platform kullanıma hazır!</p>
+                <div className='flex items-center justify-center gap-1 text-emerald-600 text-sm font-semibold'>
+                  <CheckCircle className='h-4 w-4' />
+                  <span>Hemen Başla</span>
+                </div>
+              </div>
             </div>
           </div>
+        </section>
+
+        {/* FAQ */}
+        <section id='faq' className='bg-white py-24'>
+          <div className='max-w-4xl mx-auto px-4 sm:px-6 lg:px-8'>
+            <div className='text-center max-w-3xl mx-auto mb-16'>
+              <p className='text-xs font-semibold uppercase tracking-[0.4em] text-blue-600 mb-4'>Sık Sorulanlar</p>
+              <h2 className='text-4xl md:text-5xl font-bold text-slate-900 mb-6'>
+                Merak Ettikleriniz
+              </h2>
+              <p className='text-lg text-slate-600'>
+                4 panelli ekosistem hakkında en çok sorulan sorular ve detaylı cevapları.
+              </p>
+            </div>
+
+            <div className='space-y-4'>
+              {faqItems.map((item, idx) => (
+                <details
+                  key={idx}
+                  className='group rounded-3xl border border-slate-200 bg-white p-6 shadow-sm open:shadow-md open:border-blue-300 transition hover:-translate-y-1'
+                >
+                  <summary className='flex cursor-pointer items-center justify-between text-lg font-semibold text-slate-900'>
+                    <span>{item.question}</span>
+                    <div className='ml-4 flex h-8 w-8 items-center justify-center rounded-xl bg-slate-100 text-slate-900 transition-transform group-open:rotate-45'>
+                      <span className='text-xl font-bold'>+</span>
+            </div>
+                  </summary>
+                  <div className='mt-4 pt-4 border-t border-slate-100'>
+                    <p className='text-sm text-slate-600 leading-relaxed'>{item.answer}</p>
+            </div>
+                </details>
+              ))}
+          </div>
+
+            <div className='text-center mt-12'>
+              <button
+                onClick={() => handleNavigate('/contact')}
+                className='inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-slate-800 to-blue-900 text-white px-6 py-3 font-semibold shadow-xl hover:from-slate-700 hover:to-blue-800 transition'
+              >
+                Daha Fazla Soru Sor
+                <ArrowRight className='h-5 w-5' />
+              </button>
+            </div>
         </div>
       </section>
+      </main>
 
-      {/* 9. FOOTER */}
       <Footer />
     </div>
   );
 };
 
 export default LandingPage;
+

@@ -15,8 +15,11 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   const { isAuthenticated, isLoading, user } = useAuth();
   const location = useLocation();
 
+  console.log('ProtectedRoute - isAuthenticated:', isAuthenticated, 'isLoading:', isLoading, 'user:', user);
+
   // Loading durumunda loading göster
   if (isLoading) {
+    console.log('ProtectedRoute - showing loading state');
     return (
       <div className='min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center'>
         <LoadingState message='Kimlik doğrulanıyor...' />
@@ -26,11 +29,13 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
   // Kullanıcı giriş yapmamışsa login sayfasına yönlendir
   if (!isAuthenticated) {
+    console.log('ProtectedRoute - redirecting to login');
     return <Navigate to='/login' state={{ from: location }} replace />;
   }
 
   // Rol kontrolü gerekliyse
   if (requiredRole && user?.role !== requiredRole) {
+    console.log('ProtectedRoute - role mismatch, redirecting to user panel');
     // Kullanıcının kendi panel'ine yönlendir
     const panelRoutes = {
       individual: '/individual/dashboard',
@@ -44,6 +49,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return <Navigate to={userPanelRoute} replace />;
   }
 
+  console.log('ProtectedRoute - allowing access to protected route');
   return <>{children}</>;
 };
 

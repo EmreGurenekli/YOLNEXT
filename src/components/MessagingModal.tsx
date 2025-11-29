@@ -72,9 +72,10 @@ const MessagingModal: React.FC<MessagingModalProps> = ({
 
       if (response.ok) {
         const data = await response.json();
-        setMessages(data);
+        setMessages(data.data || data || []);
       } else {
         console.error('Failed to load conversation');
+        setMessages([]);
       }
     } catch (error) {
       console.error('Error loading conversation:', error);
@@ -107,19 +108,23 @@ const MessagingModal: React.FC<MessagingModalProps> = ({
       if (response.ok) {
         const data = await response.json();
         // Add the new message to the list
+        const messageData = data.data || data;
         const newMsg: Message = {
-          id: data.data.id,
+          id: messageData.id || Date.now().toString(),
           sender_id: currentUser.id,
-          receiver_id: otherUser?.id,
+          receiver_id: otherUser?.id || '',
           message: newMessage.trim(),
-          created_at: data.data.created_at,
+          created_at: messageData.created_at || new Date().toISOString(),
           sender_name: currentUser.name,
-          receiver_name: otherUser?.name,
+          receiver_name: otherUser?.name || '',
         };
         setMessages(prev => [...prev, newMsg]);
         setNewMessage('');
+        // Reload conversation to get updated messages
+        loadConversation();
       } else {
-        console.error('Failed to send message');
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Failed to send message:', errorData.message || 'Unknown error');
       }
     } catch (error) {
       console.error('Error sending message:', error);

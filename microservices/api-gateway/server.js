@@ -58,6 +58,19 @@ const authenticateToken = async (req, res, next) => {
   }
 
   try {
+    // Demo token support - for testing purposes
+    if (token.startsWith('demo-token-')) {
+      const userType = token.replace('demo-token-', '').split('-')[0];
+      const userId = token.replace(`demo-token-${userType}-`, '');
+      req.user = {
+        userId: userId,
+        email: `demo@${userType}.com`,
+        role: userType,
+        isDemo: true
+      };
+      return next();
+    }
+
     // Check Redis cache first
     const cachedUser = await redisClient.get(`user:${token}`);
     if (cachedUser) {

@@ -145,6 +145,11 @@ const apiRequest = async <T = any>(
   }
 };
 
+const isDemoToken = () => {
+  const token = localStorage.getItem('authToken');
+  return !!token && token.startsWith('demo-token-');
+};
+
 // API methods
 export const api = {
   // GET request
@@ -235,7 +240,12 @@ export const dashboardAPI = {
   getStats: (userType: string) => api.get(`/api/dashboard/stats/${userType}`),
 };
 export const notificationAPI = {
-  getUnreadCount: () => api.get('/api/notifications/unread-count'),
+  getUnreadCount: () => {
+    if (isDemoToken()) {
+      return Promise.resolve({ success: true, data: { unreadCount: 0 } });
+    }
+    return api.get('/api/notifications/unread-count');
+  },
   getNotifications: () => api.get('/api/notifications'),
   markAsRead: (id: number) => api.put(`/api/notifications/${id}/read`),
   markAllAsRead: () => api.put('/api/notifications/mark-all-read'),
@@ -244,7 +254,12 @@ export const notificationAPI = {
 };
 export const shipmentAPI = shipmentsApi;
 export const messageAPI = {
-  getAll: () => api.get('/api/messages'),
+  getAll: () => {
+    if (isDemoToken()) {
+      return Promise.resolve({ success: true, data: [] });
+    }
+    return api.get('/api/messages');
+  },
   send: (messageData: any) => api.post('/api/messages', messageData),
 };
 

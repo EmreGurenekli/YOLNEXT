@@ -111,6 +111,7 @@ const Drivers = () => {
     try {
       setLinking(true);
       setCodeMsg(null);
+      setLookupError(null);
       const storedUser = localStorage.getItem('user');
       const userId = storedUser ? (JSON.parse(storedUser)?.id || '') : '';
       const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
@@ -126,14 +127,18 @@ const Drivers = () => {
       const data = await response.json().catch(() => ({}));
       if (!response.ok || data.success === false) {
         setCodeMsg(data.message || 'Kod doğrulanamadı');
+        setLookupError(data.message || 'Kod doğrulanamadı');
         return;
       }
-      setCodeMsg(data.message || 'Eklendi');
+      setCodeMsg(data.message || 'Taşıyıcı başarıyla eklendi');
+      setLookupData(null);
+      setLookupError(null);
       setDriverCode('');
       loadDrivers();
       setShowCodeInline(false);
     } catch (e) {
       setCodeMsg('Beklenmeyen bir hata oluştu');
+      setLookupError('Beklenmeyen bir hata oluştu');
     } finally {
       setLinking(false);
     }
@@ -144,8 +149,10 @@ const Drivers = () => {
     setLookupData(null);
     setLookupError(null);
     const code = driverCode.trim();
+    // Accept both DRV-XXX-XXX format and email format
     const pattern = /^DRV-[A-Z]{3}-[0-9]{3,}$/;
-    if (!pattern.test(code)) return;
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!pattern.test(code) && !emailPattern.test(code)) return;
     const t = setTimeout(async () => {
       try {
         setLookupLoading(true);

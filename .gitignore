@@ -1,38 +1,53 @@
-# Build outputs
+﻿# Dependencies
 node_modules/
 dist/
+coverage/
 build/
+
+# Test files
+test-results/
+test-screenshots/
+test-videos/
+screenshots/
 *.log
+*.cache
 
-# Environment files
-.env
-.env.local
-.env.production
-.env.development
-
-# IDE
+# Cursor/IDE
 .vscode/
-.idea/
-*.swp
-*.swo
+.cursor/
+*.code-workspace
 
 # OS
 .DS_Store
 Thumbs.db
 
-# Temporary files
-*.tmp
-*.temp
-temp/
-tmp/
+# Legacy
+legacy/
 
-# Database files (keep schemas, ignore data)
-*.db
-*.sqlite
-*.sqlite3
-!database/*.sql
-!backend/database/*.sql
+# Environment files (CRITICAL - Never commit these!)
+.env
+.env.local
+.env.development
+.env.production
+.env.*.local
+*.env
+!.env.example
 
-# Silinen eski dosyalar - BUNLAR ASLA GERİ GETİRİLMEMELİ
-# Bu dosyalar commit edildi ve kalıcı olarak kaldırıldı
-# Eğer geri getirilirse, bu dosya güncellenecek ve uyarı verilecek
+# Sensitive data
+backend-data.json
+*.key
+*.pem
+*.cert
+ssl/
+secrets/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Production builds
+dist/
+build/

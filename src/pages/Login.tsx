@@ -74,7 +74,9 @@ export default function Login() {
     setError('');
 
     try {
+      console.log('handleDemoLogin called with userType:', userType);
       const result = await demoLogin(userType);
+      console.log('demoLogin result:', result);
 
       if (result.success) {
         // Kullanıcı tipine göre doğru panele yönlendir
@@ -86,25 +88,18 @@ export default function Login() {
         };
         const panelRoute = routes[userType] || '/individual/dashboard';
         
+        console.log('Navigating to panel route:', panelRoute);
         // Kısa bir gecikme ekleyerek state'in güncellenmesini bekle
         setTimeout(() => {
           navigate(panelRoute, { replace: true });
         }, 100);
       } else {
-        const errorMsg = result.error || 'Demo giriş başarısız';
-        if (errorMsg.includes('bağlanılamıyor') || errorMsg.includes('connection') || errorMsg.includes('Sunucuya')) {
-          setError('Backend sunucusu çalışmıyor. Lütfen backend\'i başlatın (cd backend && node postgres-backend.js) ve tekrar deneyin.');
-        } else {
-          setError(errorMsg);
-        }
+        console.log('Demo login failed');
+        setError('Demo giriş başarısız');
       }
     } catch (err: any) {
-      const errorMessage = err?.message || 'Bilinmeyen bir hata oluştu';
-      if (errorMessage.includes('bağlanılamıyor') || errorMessage.includes('connection') || errorMessage.includes('Sunucuya')) {
-        setError('Backend sunucusu çalışmıyor. Lütfen backend\'i başlatın (cd backend && node postgres-backend.js) ve tekrar deneyin.');
-      } else {
-        setError(`Demo giriş yapılırken bir hata oluştu: ${errorMessage}`);
-      }
+      console.error('handleDemoLogin error:', err);
+      setError(`Demo giriş yapılırken bir hata oluştu: ${err?.message || 'Bilinmeyen bir hata oluştu'}`);
     } finally {
       setIsLoading(false);
     }
@@ -189,8 +184,8 @@ export default function Login() {
           <div className='absolute bottom-0 left-0 w-64 h-64 bg-gradient-to-tr from-slate-400/10 to-blue-400/10 rounded-full translate-y-32 -translate-x-32'></div>
 
           <div className='relative z-10 flex flex-col justify-center px-12 text-white'>
-            <div className='flex items-center mb-8'>
-              <YolNextLogo variant='banner' className='text-white h-12' />
+            <div className='flex items-center justify-start mb-8'>
+              <YolNextLogo variant='banner' size='lg' className='h-12' />
             </div>
 
             <h1 className='text-4xl font-bold mb-6 bg-gradient-to-r from-white to-blue-200 bg-clip-text text-transparent'>
@@ -250,7 +245,7 @@ export default function Login() {
           <div className='w-full max-w-md'>
             {/* Mobile Logo */}
             <div className='lg:hidden flex items-center justify-center mb-8'>
-              <YolNextLogo variant='banner' className='text-gray-900 h-10' />
+              <YolNextLogo variant='banner' size='md' className='h-10' />
             </div>
 
             <div className='text-center mb-8'>

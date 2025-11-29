@@ -12,7 +12,9 @@ export const initSentry = async () => {
   }
 
   try {
-    const Sentry = await import('@sentry/react');
+    // @ts-expect-error - Sentry is optional dependency
+    const Sentry = await import('@sentry/react').catch(() => null);
+    if (!Sentry) return;
     
     Sentry.init({
       dsn: import.meta.env.VITE_SENTRY_DSN,
@@ -37,7 +39,7 @@ export const initSentry = async () => {
 
     console.log('✅ Sentry initialized');
   } catch (error) {
-    console.warn('⚠️ Sentry initialization failed:', error);
+    // Sentry not available, ignore
   }
 };
 

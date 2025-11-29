@@ -25,6 +25,8 @@ import Breadcrumb from '../../components/common/Breadcrumb';
 import LoadingState from '../../components/common/LoadingState';
 import EmptyState from '../../components/common/EmptyState';
 import SuccessMessage from '../../components/common/SuccessMessage';
+import Modal from '../../components/common/Modal';
+import { createApiUrl } from '../../config/api';
 
 interface Listing {
   id: number;
@@ -55,6 +57,8 @@ const Listings: React.FC = () => {
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [showError, setShowError] = useState(false);
+  const [showAcceptBidModal, setShowAcceptBidModal] = useState(false);
+  const [bidToAccept, setBidToAccept] = useState<number | null>(null);
 
   const headers = () => {
     const userRaw = localStorage.getItem('user');
@@ -70,7 +74,7 @@ const Listings: React.FC = () => {
   const loadListings = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/carrier-market/listings?mine=1', {
+      const res = await fetch(createApiUrl('/api/carrier-market/listings?mine=1'), {
         headers: headers(),
       });
       if (!res.ok) throw new Error('İlanlar alınamadı');
@@ -100,7 +104,7 @@ const Listings: React.FC = () => {
       setLoadingBids(true);
       setSelectedListing(listingId);
       const res = await fetch(
-        `/api/carrier-market/bids?listingId=${listingId}`,
+        createApiUrl(`/api/carrier-market/bids?listingId=${listingId}`),
         { headers: headers() }
       );
       if (!res.ok) throw new Error('Teklifler alınamadı');
@@ -113,26 +117,36 @@ const Listings: React.FC = () => {
     }
   };
 
-  const acceptBid = async (bidId: number) => {
-    if (!confirm('Bu teklifi kabul etmek istediğinize emin misiniz?')) {
-      return;
-    }
+  const handleAcceptBidClick = (bidId: number) => {
+    setBidToAccept(bidId);
+    setShowAcceptBidModal(true);
+  };
+
+  const acceptBid = async () => {
+    if (!bidToAccept) return;
 
     try {
-      const res = await fetch(`/api/carrier-market/bids/${bidId}/accept`, {
+      const res = await fetch(createApiUrl(`/api/carrier-market/bids/${bidToAccept}/accept`), {
         method: 'POST',
         headers: headers(),
       });
-      if (!res.ok) throw new Error('Kabul edilemedi');
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Kabul edilemedi');
+      }
       setSuccessMessage('Teklif kabul edildi! İş taşıyıcıya atandı.');
       setShowSuccess(true);
       setTimeout(() => setShowSuccess(false), 3000);
+      setShowAcceptBidModal(false);
+      setBidToAccept(null);
       await loadListings();
       if (selectedListing) await loadBids(selectedListing);
     } catch (e) {
-      setErrorMessage('Teklif kabul edilemedi. Lütfen tekrar deneyin.');
+      setErrorMessage(e instanceof Error ? e.message : 'Teklif kabul edilemedi. Lütfen tekrar deneyin.');
       setShowError(true);
       setTimeout(() => setShowError(false), 3000);
+      setShowAcceptBidModal(false);
+      setBidToAccept(null);
     }
   };
 
@@ -404,7 +418,7 @@ const Listings: React.FC = () => {
                                 <div className="ml-4">
                                   {bid.status === 'pending' ? (
                             <button
-                                      onClick={() => acceptBid(bid.id)}
+                                      onClick={() => handleAcceptBidClick(bid.id)}
                                       className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl flex items-center gap-2"
                             >
                                       <CheckCircle className="w-5 h-5" />
@@ -456,6 +470,51 @@ const Listings: React.FC = () => {
             </button>
           </div>
         )}
+
+        {/* Accept Bid Confirmation Modal */}
+        <Modal
+          isOpen={showAcceptBidModal}
+          onClose={() => {
+            setShowAcceptBidModal(false);
+            setBidToAccept(null);
+          }}
+          title="Teklifi Kabul Et"
+          size="md"
+        >
+          <div className="p-6 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl flex items-center justify-center flex-shrink-0">
+                <CheckCircle className="w-6 h-6 text-white" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-bold text-slate-900 mb-2">
+                  Teklifi Kabul Etmek İstediğinize Emin misiniz?
+                </h3>
+                <p className="text-slate-600">
+                  Bu teklifi kabul ettiğinizde, iş taşıyıcıya atanacak ve ilan kapatılacaktır. Bu işlem geri alınamaz.
+                </p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
+              <button
+                onClick={() => {
+                  setShowAcceptBidModal(false);
+                  setBidToAccept(null);
+                }}
+                className="px-4 py-2 text-slate-600 hover:text-slate-800 transition-colors font-medium"
+              >
+                İptal
+              </button>
+              <button
+                onClick={acceptBid}
+                className="px-6 py-2 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white rounded-lg font-semibold transition-all duration-300 shadow-lg hover:shadow-xl flex items-center gap-2"
+              >
+                <CheckCircle className="w-5 h-5" />
+                Evet, Kabul Et
+              </button>
+            </div>
+          </div>
+        </Modal>
       </div>
     </div>
   );

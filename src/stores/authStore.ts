@@ -1,8 +1,7 @@
-// @ts-ignore - zustand type definitions may not be available
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore
+// @ts-ignore - zustand type definitions may not be available
 import { create } from 'zustand';
-// @ts-ignore
+// @ts-ignore - zustand middleware types
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { logger } from '../services/logger';
 
@@ -64,14 +63,23 @@ export const useAuthStore = create<AuthStore>()(
       },
 
       logout: () => {
-        const { user } = get();
-        logger.info('User logged out', { userId: user?.id });
-        set({
-          user: null,
-          token: null,
-          isAuthenticated: false,
-          error: null,
-        });
+        console.log('authStore logout function called - DISABLED');
+        console.trace('authStore logout call stack');
+        // const { user } = get();
+        // logger.info('User logged out', { userId: user?.id });
+        // // Clear localStorage as well
+        // try {
+        //   localStorage.removeItem('authToken');
+        //   localStorage.removeItem('user');
+        // } catch (error) {
+        //   console.error('Error clearing localStorage on logout:', error);
+        // }
+        // set({
+        //   user: null,
+        //   token: null,
+        //   isAuthenticated: false,
+        //   error: null,
+        // });
       },
 
       updateUser: (userData: Partial<User>) => {

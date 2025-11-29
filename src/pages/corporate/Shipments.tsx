@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
+import { createApiUrl } from '../../config/api';
 
 interface Shipment {
   id: number;
@@ -133,10 +134,7 @@ export default function CorporateShipments() {
         const userRaw = localStorage.getItem('user');
         const userId = userRaw ? JSON.parse(userRaw || '{}').id : undefined;
         const token = localStorage.getItem('authToken');
-        const url = userId
-          ? `/api/shipments?userId=${userId}`
-          : '/api/shipments';
-        const response = await fetch(url, {
+        const response = await fetch(createApiUrl('/api/shipments/corporate'), {
           headers: {
             Authorization: `Bearer ${token || ''}`,
             'X-User-Id': userId || '',

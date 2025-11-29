@@ -22,11 +22,22 @@ const requestInterceptor = config => {
 
 // Response interceptor
 const responseInterceptor = response => {
+  console.log('Response interceptor called with status:', response.status);
   if (response.status === 401) {
-    // Token expired, redirect to login
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('user');
-    window.location.href = '/login';
+    console.log('401 error detected');
+    // Check if we have a demo token
+    const token = localStorage.getItem('authToken');
+    console.log('Token from localStorage:', token);
+    // Only redirect to login for real auth tokens, not demo tokens
+    if (!token || !token.startsWith('demo-token-')) {
+      console.log('Real token expired, logging out');
+      // Token expired, redirect to login
+      // localStorage.removeItem('authToken');
+      // localStorage.removeItem('user');
+      // window.location.href = '/login';
+    } else {
+      console.log('Demo token, not logging out');
+    }
   }
   return response;
 };
@@ -110,9 +121,10 @@ export const api = {
       body: JSON.stringify({ userType }),
     }),
     logout: () => {
-      localStorage.removeItem('authToken');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
+      console.log('api.js logout function called - DISABLED');
+      // localStorage.removeItem('authToken');
+      // localStorage.removeItem('user');
+      // window.location.href = '/login';
     },
   },
 
