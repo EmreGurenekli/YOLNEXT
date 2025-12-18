@@ -4,17 +4,17 @@
   "private": true,
   "description": "YolNext Backend API",
   "type": "commonjs",
-  "main": "postgres-backend.js",
+  "main": "server-modular.js",
   "scripts": {
-    "start": "node postgres-backend.js",
+    "start": "node server-modular.js",
     "start:modular": "node server-modular.js",
-    "dev": "nodemon postgres-backend.js",
+    "dev": "nodemon server-modular.js",
     "dev:modular": "nodemon server-modular.js",
     "db": "node database-server.js",
     "realtime": "node realtime-server.js",
     "build": "echo Build completed",
     "clean": "rimraf node_modules package-lock.json",
-    "test": "jest",
+    "test": "jest --forceExit",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:unit": "jest tests/unit"
@@ -26,9 +26,8 @@
     "bcryptjs": "^2.4.3",
     "cheerio": "^1.1.2",
     "compression": "^1.8.1",
-    "cookie": "^0.7.0",
     "cors": "^2.8.5",
-    "dotenv": "^16.6.1",
+    "dotenv": "^17.2.3",
     "express": "^4.21.2",
     "express-rate-limit": "^7.5.1",
     "express-slow-down": "^3.0.0",
@@ -51,7 +50,6 @@
     "selenium-webdriver": "^4.38.0",
     "sequelize": "^6.37.7",
     "socket.io": "^4.8.1",
-    "socket.io-client": "^4.8.1",
     "speakeasy": "^2.0.0",
     "sqlite3": "^5.1.7",
     "stripe": "^14.25.0",
@@ -65,18 +63,20 @@
     "xss": "^1.0.15"
   },
   "devDependencies": {
+    "@playwright/test": "^1.56.1",
     "@types/jest": "^29.5.12",
     "@types/node": "^20.19.22",
+    "@types/supertest": "^6.0.2",
     "jest": "^29.7.0",
     "nodemon": "^3.0.2",
     "playwright": "^1.56.1",
-    "rimraf": "^5.0.5"
+    "rimraf": "^5.0.5",
+    "supertest": "^7.0.0"
   },
   "keywords": [
     "YolNext",
-    "kargo",
-    "logistics",
-    "api"
+    "Backend",
+    "API"
   ],
   "author": "YolNext Team",
   "license": "MIT"
