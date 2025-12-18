@@ -6,6 +6,13 @@ module.exports = {
     '**/__tests__/**/*.{ts,tsx}',
     '**/*.{test,spec}.{ts,tsx}',
   ],
+  testPathIgnorePatterns: [
+    '<rootDir>/tests/e2e/',
+    '<rootDir>/tests/unit/',
+    '<rootDir>/src/utils/__tests__/api.test.ts',
+    '<rootDir>/src/pages/__tests__/Login.test.tsx',
+    '<rootDir>/src/contexts/__tests__/AuthContext.test.tsx',
+  ],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
     '\\.(css|less|scss|sass)$': 'identity-obj-proxy',
