@@ -25,14 +25,16 @@ if %errorlevel% neq 0 (
 echo ✅ npm is installed
 
 echo.
-echo [3/4] Installing dependencies...
-npm install --silent
-if %errorlevel% neq 0 (
-    echo ❌ Failed to install dependencies
+echo [3/4] Checking dependencies...
+set "ROOT=%~dp0..\.."
+if not exist "%ROOT%\node_modules" (
+    echo ❌ Dependencies are not installed.
+    echo Please run: npm install
+    echo (Run it from the project root: %ROOT%)
     pause
     exit /b 1
 )
-echo ✅ Dependencies installed
+echo ✅ Dependencies look installed
 
 echo.
 echo [4/4] Starting frontend server...
@@ -44,4 +46,5 @@ echo 2. Run: netstat -ano | findstr :5173
 echo 3. Kill any process using port 5173
 echo.
 
+cd /d %ROOT%
 npm run dev

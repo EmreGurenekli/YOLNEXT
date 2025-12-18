@@ -27,7 +27,7 @@ echo ========================================
 echo CACHE TEMIZLENDI!
 echo ========================================
 echo.
-echo Simdi QUICK-START.bat calistirin
+echo Simdi start-system.bat calistirin
 echo.
 pause
 

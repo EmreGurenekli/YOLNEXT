@@ -1,27 +1,26 @@
 @echo off
-echo Starting Yolnext Test...
+setlocal
 
-echo Starting Backend...
-start "Backend" /min cmd /c "node backend/simple-stable-server.js"
+echo Starting YolNext Panel Test...
 
-timeout /t 3 /nobreak >nul
-
-echo Starting Frontend...
-start "Frontend" /min cmd /c "npm run dev"
+echo Starting full system...
+call "%~dp0start-full-system.bat"
 
 timeout /t 8 /nobreak >nul
 
-echo Testing all panels...
+echo Opening all panels...
 start http://localhost:5173/individual/create-shipment
 timeout /t 2 /nobreak >nul
 start http://localhost:5173/corporate/create-shipment
 timeout /t 2 /nobreak >nul
-start http://localhost:5173/nakliyeci/shipments
+start http://localhost:5173/nakliyeci/dashboard
 timeout /t 2 /nobreak >nul
-start http://localhost:5173/tasiyici/shipments
+start http://localhost:5173/tasiyici/dashboard
 
 echo All panels opened for testing!
 pause
+
+endlocal
 
 
 

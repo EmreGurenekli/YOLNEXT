@@ -13,11 +13,11 @@ start http://localhost:5173/corporate/create-shipment
 timeout /t 2 /nobreak >nul
 
 echo Nakliyeci Panel aciliyor...
-start http://localhost:5173/nakliyeci/shipments
+start http://localhost:5173/nakliyeci/dashboard
 timeout /t 2 /nobreak >nul
 
 echo Tasiyici Panel aciliyor...
-start http://localhost:5173/tasiyici/shipments
+start http://localhost:5173/tasiyici/dashboard
 
 echo.
 echo ========================================

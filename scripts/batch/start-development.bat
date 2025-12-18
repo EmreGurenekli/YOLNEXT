@@ -5,16 +5,9 @@ echo ========================================
 
 echo Starting development servers...
 
-REM Start Backend
-echo Starting Backend Server...
-start "YolNext Backend" cmd /k "cd backend && node app.js"
-
-REM Wait for backend to start
-timeout /t 3 /nobreak >nul
-
-REM Start Frontend
-echo Starting Frontend Server...
-start "YolNext Frontend" cmd /k "npm run dev"
+REM Canonical dev start: backend/server-modular.js + Vite frontend
+set "ROOT=%~dp0..\.."
+start "YolNext Dev All" cmd /k "cd /d %ROOT% && npm run dev:all"
 
 echo ========================================
 echo Development servers started!

@@ -1,6 +1,12 @@
 @echo off
-echo Starting YolNext Stable Backend...
-cd backend
-node simple-stable-server.js
-pause
+setlocal
+
+echo ========================================
+echo YolNext Stable Backend (Alias)
+echo ========================================
+echo Redirecting to start-backend.bat ...
+
+call "%~dp0start-backend.bat"
+
+endlocal
 

@@ -1,9 +1,10 @@
 @echo off
 REM YolNext Backend Starter (permanent)
 echo ================================
-echo  Starting Backend (Minimal Offers Server)
+echo  Starting Backend (server-modular)
 echo ================================
-cd backend
+set "ROOT=%~dp0..\.."
+cd /d %ROOT%\backend
 
 SET NODE_ENV=development
 SET PORT=5000
@@ -11,7 +12,7 @@ SET PORT=5000
 echo NODE_ENV=%NODE_ENV%
 echo PORT=%PORT%
 
-node minimal-offers-server.js
+node server-modular.js
 
 pause
 
