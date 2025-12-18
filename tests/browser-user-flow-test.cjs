@@ -29,7 +29,7 @@ async function checkBackend() {
       return true;
     }
   } catch (error) {
-    log('❌ Backend is not running. Please start it first: cd backend && node postgres-backend.js', 'error');
+    log('❌ Backend is not running. Please start it first: cd backend && node server-modular.js', 'error');
     return false;
   }
   return false;

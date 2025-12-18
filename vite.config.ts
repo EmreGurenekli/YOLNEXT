@@ -17,8 +17,24 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     open: false,
-    hmr: { overlay: true },
+    hmr: { 
+      overlay: true,
+      protocol: 'ws',
+    },
     cors: true,
+    watch: {
+      usePolling: false,
+      interval: 1000,
+      ignored: [
+        '**/node_modules/**', 
+        '**/.git/**',
+        '**/backend/server-modular.js', // Large file - don't watch
+        '**/dist/**',
+        '**/coverage/**',
+        '**/test-results/**',
+        '**/logs/**',
+      ],
+    },
     fs: {
       strict: false,
       allow: ['..'],
@@ -28,12 +44,22 @@ export default defineConfig({
         target: 'http://localhost:5000',
         changeOrigin: true,
         secure: false,
+        timeout: 10000,
+        ws: true,
       },
     },
   },
   build: {
     outDir: 'dist',
     sourcemap: false,
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true,
+        drop_debugger: true,
+        pure_funcs: ['console.log', 'console.info', 'console.debug'],
+      },
+    },
     rollupOptions: {
       output: {
         manualChunks: {
@@ -45,16 +71,16 @@ export default defineConfig({
       },
     },
     chunkSizeWarningLimit: 1000,
-    minify: 'terser',
-    terserOptions: {
-      compress: {
-        drop_console: true,
-        drop_debugger: true,
-        pure_funcs: ['console.log', 'console.info', 'console.debug'],
-      },
-    },
   },
   optimizeDeps: {
     include: ['react', 'react-dom', 'react-router-dom', 'lucide-react'],
+    // Backend files are automatically excluded via watch.ignored
+  },
+  logLevel: 'warn',
+  clearScreen: false,
+  // Performance optimizations
+  esbuild: {
+    target: 'es2020',
+    logOverride: { 'this-is-undefined-in-esm': 'silent' },
   },
 });

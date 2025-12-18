@@ -10,7 +10,7 @@ try {
         Write-Host "✅ Backend çalışıyor" -ForegroundColor Green
     }
 } catch {
-    Write-Host "❌ Backend çalışmıyor. 'cd backend; node simple-stable-server.js' komutunu çalıştırın" -ForegroundColor Red
+    Write-Host "❌ Backend çalışmıyor. 'cd backend; node server-modular.js' komutunu çalıştırın" -ForegroundColor Red
     exit 1
 }
 

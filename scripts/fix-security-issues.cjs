@@ -213,7 +213,11 @@ app.use(helmet({
     const fs = require('fs');
     const path = require('path');
     
-    const backendFile = path.join(__dirname, 'backend', 'stable-backend.cjs');
+    const backendFile = path.join(__dirname, '..', 'backend', 'server-modular.js');
+    if (!fs.existsSync(backendFile)) {
+      console.warn('⚠️ Backend entrypoint not found, skipping backend patch step:', backendFile);
+      return;
+    }
     let backendContent = fs.readFileSync(backendFile, 'utf8');
     
     // Güvenlik kodlarını ekle
@@ -323,14 +327,25 @@ app.get('/api/csrf-token', (req, res) => {
 
 `;
 
-    // Backend dosyasına güvenlik kodlarını ekle
-    const insertPosition = backendContent.indexOf('// Middleware');
-    if (insertPosition !== -1) {
-      backendContent = backendContent.slice(0, insertPosition) + securityCode + backendContent.slice(insertPosition);
-      fs.writeFileSync(backendFile, backendContent);
-      console.log('✅ Güvenlik kodları backend\'e eklendi');
+    // SAFE MODE: Do not mutate backend code automatically.
+    // This script is a helper; it should generate a snippet for manual review/application.
+    const outFile = path.join(__dirname, 'security-backend-snippet.js');
+    fs.writeFileSync(outFile, securityCode);
+    console.log('✅ Güvenlik kodu snippet olarak oluşturuldu:', outFile);
+
+    const applyPatch = String(process.env.APPLY_BACKEND_PATCH || '').toLowerCase() === 'true';
+    if (applyPatch) {
+      // Apply only with explicit opt-in, and only if a stable marker exists.
+      const insertPosition = backendContent.indexOf('// Middleware');
+      if (insertPosition !== -1) {
+        const nextContent = backendContent.slice(0, insertPosition) + securityCode + backendContent.slice(insertPosition);
+        fs.writeFileSync(backendFile, nextContent);
+        console.log('✅ APPLY_BACKEND_PATCH=true: Güvenlik kodları backend\'e eklendi');
+      } else {
+        console.log('⚠️ APPLY_BACKEND_PATCH=true: Uygun ekleme konumu bulunamadı, backend dosyası değiştirilmedi');
+      }
     } else {
-      console.log('⚠️ Backend dosyasında uygun konum bulunamadı');
+      console.log('ℹ️ Backend dosyası değiştirilmedi (SAFE). Uygulamak istersen: APPLY_BACKEND_PATCH=true');
     }
     
     console.log('\n🎉 GÜVENLİK AÇIKLARI DÜZELTİLDİ!');

@@ -122,7 +122,7 @@ function validateEnvironmentVariable(varConfig, envValue) {
 function checkFilePermissions() {
   const criticalFiles = [
     '.env.production',
-    'simple-backend.js',
+    'backend/server-modular.js',
   ];
 
   const issues = [];
@@ -271,4 +271,67 @@ if (require.main === module) {
 }
 
 module.exports = { validateEnvironmentVariable, REQUIRED_VARS };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

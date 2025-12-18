@@ -71,8 +71,8 @@ log.info(`📡 Port: ${PORT}`);
 log.info(`🌍 Environment: ${NODE_ENV}`);
 log.info(`🔒 CORS Origin: ${process.env.CORS_ORIGIN || 'NOT SET'}`);
 
-// Check if backend file exists
-const backendFile = path.join(__dirname, '..', 'simple-backend.js');
+// Check if backend entrypoint exists
+const backendFile = path.join(__dirname, '..', 'backend', 'server-modular.js');
 if (!fs.existsSync(backendFile)) {
   log.error(`Backend file not found: ${backendFile}`);
   process.exit(1);

@@ -243,7 +243,7 @@ async function runComprehensiveTests() {
   
   if (!backendReady) {
     console.error('❌ Backend server not running. Please start it first.');
-    console.log('Run: cd backend && node postgres-backend.js');
+    console.log('Run: cd backend && node server-modular.js');
     return;
   }
   

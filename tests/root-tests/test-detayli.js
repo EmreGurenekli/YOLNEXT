@@ -161,7 +161,7 @@ async function test() {
     }
     if (error.code === 'ECONNREFUSED') {
       console.error('\n⚠️  Backend çalışmıyor! Lütfen şu komutu çalıştırın:');
-      console.error('   node simple-backend.js');
+      console.error('   cd backend && node server-modular.js');
     }
     console.error('Full error:', error);
   }

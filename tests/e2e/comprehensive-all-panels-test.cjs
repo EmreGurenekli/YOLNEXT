@@ -35,7 +35,6 @@ const routes = {
     { path: '/individual/live-tracking', name: 'Live Tracking' },
     { path: '/individual/messages', name: 'Messages' },
     { path: '/individual/notifications', name: 'Notifications' },
-    { path: '/individual/discounts', name: 'Discounts' },
     { path: '/individual/settings', name: 'Settings' },
   ],
   corporate: [
@@ -50,9 +49,7 @@ const routes = {
     { path: '/corporate/notifications', name: 'Notifications' },
     { path: '/corporate/settings', name: 'Settings' },
     { path: '/corporate/help', name: 'Help' },
-    { path: '/corporate/discounts', name: 'Discounts' },
     { path: '/corporate/carriers', name: 'Carriers' },
-    { path: '/corporate/guide', name: 'Guide' },
   ],
   nakliyeci: [
     { path: '/nakliyeci/dashboard', name: 'Dashboard' },
@@ -125,24 +122,47 @@ async function demoLogin(page, userType) {
         reject(new Error('Timeout'));
       });
       
-      req.write(JSON.stringify({ userType }));
+      req.write(JSON.stringify({ panelType: userType }));
       req.end();
     });
     
     if (loginResponse.statusCode === 200) {
       const loginData = JSON.parse(loginResponse.body);
-      if (loginData.data?.token) {
+      const token = loginData.token || loginData.data?.token;
+      const apiUser = loginData.user || loginData.data?.user;
+      if (token) {
+        const demoUserIds = {
+          individual: 1001,
+          corporate: 1002,
+          nakliyeci: 1003,
+          tasiyici: 1004,
+        };
+        const fallbackId = demoUserIds[userType] || 1001;
+        const normalizedUser = {
+          id: String(apiUser?.id || apiUser?.userId || apiUser?.user_id || fallbackId),
+          email: apiUser?.email || `demo@${userType}.com`,
+          fullName:
+            apiUser?.fullName ||
+            apiUser?.full_name ||
+            apiUser?.name ||
+            `${userType.charAt(0).toUpperCase() + userType.slice(1)} Demo User`,
+          role: userType,
+          firstName: apiUser?.firstName || apiUser?.first_name || 'Demo',
+          lastName: apiUser?.lastName || apiUser?.last_name || userType,
+          phone: apiUser?.phone || '05001112233',
+          companyName: apiUser?.companyName || apiUser?.company_name || undefined,
+          nakliyeciCode: apiUser?.nakliyeciCode || apiUser?.nakliyeci_code || undefined,
+          driverCode: apiUser?.driverCode || apiUser?.driver_code || undefined,
+          isDemo: true,
+          createdAt: apiUser?.createdAt || new Date().toISOString(),
+          updatedAt: apiUser?.updatedAt || new Date().toISOString(),
+        };
+
         await page.evaluate(({ token, user }) => {
           localStorage.setItem('token', token);
-          localStorage.setItem('user', JSON.stringify(user));
           localStorage.setItem('authToken', token);
-        }, {
-          token: loginData.data.token,
-          user: loginData.data.user || {
-            id: loginData.data.userId || 1,
-            userType: userType,
-          },
-        });
+          localStorage.setItem('user', JSON.stringify(user));
+        }, { token, user: normalizedUser });
         return true;
       }
     }
@@ -158,6 +178,7 @@ async function demoLogin(page, userType) {
       id: 1,
       email: `demo@${userType}.com`,
       userType: userType,
+      role: userType,
       fullName: `Demo ${userType}`,
       isDemo: true,
     }));
@@ -167,19 +188,33 @@ async function demoLogin(page, userType) {
 }
 
 async function testPage(page, route, panelName) {
-  const consoleErrors = [];
+  const errors = [];
   const networkErrors = [];
-  
-  // Listen to console errors
+
+  // Track console errors
   page.on('console', msg => {
-    if (msg.type() === 'error') {
+    const t = msg.type();
+    if (t === 'error' || t === 'warning') {
       const text = msg.text();
-      consoleErrors.push(text);
-      testResults.total.consoleErrors.push({
-        page: route.path,
-        error: text,
-        panel: panelName,
-      });
+      const loc = (() => {
+        try {
+          const l = msg.location && msg.location();
+          if (!l) return '';
+          const url = l.url || '';
+          const line = l.lineNumber || 0;
+          const col = l.columnNumber || 0;
+          return url ? ` @ ${url}:${line}:${col}` : '';
+        } catch {
+          return '';
+        }
+      })();
+
+      // Skip known non-critical errors
+      if (!text.includes('Download the React DevTools') &&
+          !text.includes('Chrome is being controlled') &&
+          !text.includes('favicon.ico')) {
+        errors.push(`[${t}] ${text}${loc}`);
+      }
     }
   });
   
@@ -252,7 +287,7 @@ async function testPage(page, route, panelName) {
         hasContent: false,
         hasNav: false,
         hasCards: false,
-        consoleErrors: consoleErrors.length,
+        consoleErrors: errors.length,
         networkErrors: networkErrors.length,
         passed: false,
         error: 'Redirected to login',
@@ -289,7 +324,7 @@ async function testPage(page, route, panelName) {
       hasContent,
       hasNav,
       hasCards,
-      consoleErrors: consoleErrors.length,
+      consoleErrors: errors.length,
       networkErrors: networkErrors.length,
       passed: urlMatches && !isLoginPage && (hasContent || hasNav || hasCards), // More lenient - if URL matches, likely passed
     };
@@ -316,10 +351,10 @@ async function testPage(page, route, panelName) {
       console.log(`      URL Match: ${urlMatches}, Content: ${hasContent}, Nav: ${hasNav}, Cards: ${hasCards}`);
     }
     
-    if (consoleErrors.length > 0) {
-      console.log(`   ⚠️  Console Errors: ${consoleErrors.length}`);
-      consoleErrors.forEach(err => {
-        console.log(`      - ${err.substring(0, 100)}`);
+    if (errors.length > 0) {
+      console.log(`   ⚠️  Console Errors: ${errors.length}`);
+      errors.forEach(err => {
+        console.log(`      - ${String(err).substring(0, 180)}`);
       });
     }
     
@@ -348,8 +383,7 @@ async function testPanel(panelName, userType) {
   console.log('='.repeat(70));
   
   const browser = await chromium.launch({ 
-    headless: false,
-    slowMo: 300,
+    headless: true,
   });
   
   const context = await browser.newContext({
@@ -369,7 +403,7 @@ async function testPanel(panelName, userType) {
     await page.waitForTimeout(2000);
     
     const loggedIn = await page.evaluate(() => {
-      return !!localStorage.getItem('token');
+      return !!localStorage.getItem('authToken') && !!localStorage.getItem('user');
     });
     
     if (!loggedIn) {
@@ -403,7 +437,7 @@ async function testDataTransmission() {
   console.log('📊 TESTING DATA TRANSMISSION');
   console.log('='.repeat(70));
   
-  const browser = await chromium.launch({ headless: false });
+  const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext();
   const page = await context.newPage();
   

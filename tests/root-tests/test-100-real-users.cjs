@@ -146,7 +146,7 @@ async function createRealUser(userType, scenario) {
       }
     } catch (healthError) {
       console.error(`  ⚠️ Backend'e bağlanılamıyor: ${healthError.message}`);
-      console.error(`  💡 Backend'i başlatın: cd backend && node postgres-backend.js`);
+      console.error(`  💡 Backend'i başlatın: cd backend && node server-modular.js`);
       return null;
     }
     
@@ -252,7 +252,7 @@ async function createRealUser(userType, scenario) {
     if (error.name === 'AbortError') {
       console.error(`  ⚠️ Timeout: Backend yanıt vermiyor`);
     } else if (error.code === 'ECONNREFUSED') {
-      console.error(`  ⚠️ Backend çalışmıyor. Başlatın: cd backend && node postgres-backend.js`);
+      console.error(`  ⚠️ Backend çalışmıyor. Başlatın: cd backend && node server-modular.js`);
     } else {
       console.error(`  ⚠️ User creation error: ${error.message}`);
     }

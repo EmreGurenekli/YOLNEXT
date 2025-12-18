@@ -24,7 +24,16 @@
       ]
     },
     "incremental": true,
-    "tsBuildInfoFile": ".tsbuildinfo"
+    "tsBuildInfoFile": ".tsbuildinfo",
+    // Performance optimizations - ULTRA AGGRESSIVE for Cursor
+    "maxNodeModuleJsDepth": 0,
+    "disableSourceOfProjectReferenceRedirect": true,
+    "disableSolutionSearching": true,
+    "disableReferencedProjectLoad": true,
+    "skipDefaultLibCheck": true,
+    // Additional performance optimizations
+    "assumeChangesOnlyAffectDirectDependencies": true,
+    "preserveWatchOutput": false
   },
   "include": [
     "src"

@@ -84,7 +84,7 @@ class SecurityAuditor {
   checkSecurityHeaders() {
     console.log('🔍 Checking security headers configuration...');
     
-    const backendFile = path.join(__dirname, '../backend/postgres-backend.js');
+    const backendFile = path.join(__dirname, '../backend/server-modular.js');
     if (!fs.existsSync(backendFile)) {
       this.warnings.push('Backend file not found for security headers check');
       return;
@@ -110,7 +110,7 @@ class SecurityAuditor {
   checkDatabaseSecurity() {
     console.log('🔍 Checking database security...');
     
-    const backendFile = path.join(__dirname, '../backend/postgres-backend.js');
+    const backendFile = path.join(__dirname, '../backend/server-modular.js');
     if (!fs.existsSync(backendFile)) {
       return;
     }
@@ -135,7 +135,7 @@ class SecurityAuditor {
   checkAuthentication() {
     console.log('🔍 Checking authentication security...');
     
-    const backendFile = path.join(__dirname, '../backend/postgres-backend.js');
+    const backendFile = path.join(__dirname, '../backend/server-modular.js');
     if (!fs.existsSync(backendFile)) {
       return;
     }
@@ -160,7 +160,7 @@ class SecurityAuditor {
   checkFileUploadSecurity() {
     console.log('🔍 Checking file upload security...');
     
-    const backendFile = path.join(__dirname, '../backend/postgres-backend.js');
+    const backendFile = path.join(__dirname, '../backend/server-modular.js');
     if (!fs.existsSync(backendFile)) {
       return;
     }
