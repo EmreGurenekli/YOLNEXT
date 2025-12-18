@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS users (
     company_name VARCHAR(255),
     tax_number VARCHAR(50),
     address TEXT,
+    city VARCHAR(100),
     is_verified BOOLEAN DEFAULT FALSE,
     is_active BOOLEAN DEFAULT TRUE,
     last_login TIMESTAMP,

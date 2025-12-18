@@ -17,7 +17,7 @@ async function initRedis() {
         reconnectStrategy: (retries) => {
           if (retries > 3) {
             console.warn('⚠️ Redis connection failed after 3 retries. Running without cache.');
-            return null; // Stop retrying
+            return false; // Stop retrying
           }
           return Math.min(retries * 50, 500); // Exponential backoff
         }

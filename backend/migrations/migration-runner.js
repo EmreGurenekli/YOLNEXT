@@ -13,9 +13,12 @@ const logger = {
 class MigrationRunner {
   constructor() {
     this.pool = new Pool({
-      connectionString: process.env.DATABASE_URL || 'postgresql://username:password@localhost:5432/yolnext',
+      connectionString:
+        process.env.DATABASE_URL ||
+        process.env.DB_URL ||
+        'postgresql://postgres:2563@localhost:5432/yolnext',
     });
-    this.migrationsPath = path.join(__dirname, 'migrations');
+    this.migrationsPath = __dirname;
   }
 
   async init() {
@@ -29,6 +32,37 @@ class MigrationRunner {
           executed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
       `);
+
+      // Baseline support:
+      // This repo may be running against an existing database that already has tables created
+      // (from earlier bootstrap scripts). In that case, running 001_initial_schema.sql can fail.
+      // If migrations table is empty but users table exists, mark 001-004 as already executed.
+      const migCountRes = await this.pool.query('SELECT COUNT(*)::int as count FROM migrations');
+      const migCount = (migCountRes.rows && migCountRes.rows[0] && migCountRes.rows[0].count) || 0;
+
+      if (Number(migCount) === 0) {
+        const usersTableRes = await this.pool.query(
+          `SELECT to_regclass('public.users') as exists`
+        );
+        const hasUsersTable = Boolean(usersTableRes.rows?.[0]?.exists);
+
+        if (hasUsersTable) {
+          const baseline = [
+            { version: '001', filename: '001_initial_schema.sql' },
+            { version: '002', filename: '002_postgresql_schema.sql' },
+            { version: '003', filename: '003_legal_compliance.sql' },
+            { version: '004', filename: '004_add_district_columns.sql' },
+          ];
+
+          for (const b of baseline) {
+            await this.pool.query(
+              'INSERT INTO migrations (version, filename) VALUES ($1, $2) ON CONFLICT (version) DO NOTHING',
+              [b.version, b.filename]
+            );
+          }
+          logger.info('Detected existing schema; baselined migrations 001-004');
+        }
+      }
       
       logger.info('Migration system initialized');
     } catch (error) {

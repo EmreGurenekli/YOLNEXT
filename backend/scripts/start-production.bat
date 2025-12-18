@@ -52,5 +52,5 @@ if "%RUN_MIGRATIONS%"=="true" (
 
 REM Start the application
 echo ✅ Starting application...
-node postgres-backend.js
+node server-modular.js
 

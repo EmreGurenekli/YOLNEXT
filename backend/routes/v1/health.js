@@ -1,0 +1,29 @@
+// Health check routes - Modular version
+const express = require('express');
+const { comprehensiveHealthCheck } = require('../../utils/healthCheck');
+
+function createHealthRoutes(pool) {
+  const router = express.Router();
+
+  router.get('/', async (req, res) => {
+    try {
+      const health = await comprehensiveHealthCheck(pool);
+      const statusCode = health.status === 'healthy' ? 200 : 503;
+      res.status(statusCode).json(health);
+    } catch (error) {
+      res.status(503).json({
+        status: 'unhealthy',
+        error: error.message,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  });
+
+  return router;
+}
+
+module.exports = createHealthRoutes;
+
+
+
+

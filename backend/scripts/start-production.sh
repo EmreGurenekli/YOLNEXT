@@ -58,5 +58,4 @@ mkdir -p uploads
 
 # Start the application
 echo "✅ Starting application..."
-exec node postgres-backend.js
-
+exec node server-modular.js

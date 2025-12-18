@@ -1,3 +1,10 @@
+/**
+ * Error Logger Utility
+ * 
+ * Centralized error logging with Sentry integration.
+ * Handles both production (Sentry) and development (console) logging.
+ */
+
 const Sentry = require('@sentry/node');
 
 /**
@@ -11,18 +18,22 @@ class ErrorLogger {
 
   /**
    * Log error to Sentry and console
+   * @param {Error} error - Error object
+   * @param {object} context - Additional context
    */
   logError(error, context = {}) {
-    const errorMessage = error.message || String(error);
-    const stack = error.stack || 'No stack trace';
+    const errorMessage = error?.message || String(error);
+    const stack = error?.stack || 'No stack trace';
 
-    // Console logging (always)
-    console.error('❌ ERROR:', {
-      message: errorMessage,
-      stack,
-      context,
-      timestamp: new Date().toISOString(),
-    });
+    // Console logging in development
+    if (process.env.NODE_ENV === 'development') {
+      console.error('❌ ERROR:', {
+        message: errorMessage,
+        stack,
+        context,
+        timestamp: new Date().toISOString(),
+      });
+    }
 
     // Sentry logging (if enabled)
     if (this.isSentryEnabled) {
@@ -42,9 +53,17 @@ class ErrorLogger {
 
   /**
    * Log warning
+   * @param {string} message - Warning message
+   * @param {object} context - Additional context
    */
   logWarning(message, context = {}) {
-    console.warn('⚠️ WARNING:', { message, context, timestamp: new Date().toISOString() });
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('⚠️ WARNING:', {
+        message,
+        context,
+        timestamp: new Date().toISOString(),
+      });
+    }
 
     if (this.isSentryEnabled) {
       Sentry.captureMessage(message, {
@@ -56,13 +75,24 @@ class ErrorLogger {
 
   /**
    * Log info
+   * @param {string} message - Info message
+   * @param {object} context - Additional context
    */
   logInfo(message, context = {}) {
-    console.log('ℹ️ INFO:', { message, context, timestamp: new Date().toISOString() });
+    if (process.env.NODE_ENV === 'development') {
+      console.log('ℹ️ INFO:', {
+        message,
+        context,
+        timestamp: new Date().toISOString(),
+      });
+    }
   }
 
   /**
    * Log API error with request context
+   * @param {Error} error - Error object
+   * @param {object} req - Express request object
+   * @param {object} additionalContext - Additional context
    */
   logApiError(error, req, additionalContext = {}) {
     const context = {
@@ -81,11 +111,21 @@ class ErrorLogger {
 
   /**
    * Sanitize request body (remove sensitive data)
+   * @param {object} body - Request body
+   * @returns {object} Sanitized body
    */
   sanitizeRequestBody(body) {
-    if (!body) return null;
+    if (!body || typeof body !== 'object') return null;
 
-    const sensitiveFields = ['password', 'token', 'creditCard', 'cvv', 'cardNumber'];
+    const sensitiveFields = [
+      'password',
+      'token',
+      'creditCard',
+      'cvv',
+      'cardNumber',
+      'authToken',
+      'refreshToken',
+    ];
     const sanitized = { ...body };
 
     sensitiveFields.forEach(field => {
@@ -99,66 +139,30 @@ class ErrorLogger {
 
   /**
    * Log database error
+   * @param {Error} error - Database error
+   * @param {string} operation - Database operation
+   * @param {object} context - Additional context
    */
-  logDatabaseError(error, query = null, params = null) {
-    const context = {
-      type: 'database_error',
-      query: query ? query.substring(0, 200) : null, // Truncate long queries
-      params: params ? JSON.stringify(params).substring(0, 200) : null,
-    };
-
-    this.logError(error, context);
-  }
-
-  /**
-   * Log payment error (sensitive)
-   */
-  logPaymentError(error, paymentContext = {}) {
-    const sanitizedContext = {
-      ...paymentContext,
-      cardNumber: paymentContext.cardNumber ? '***REDACTED***' : null,
-      cvv: paymentContext.cvv ? '***REDACTED***' : null,
-      token: paymentContext.token ? '***REDACTED***' : null,
-    };
-
-    this.logError(error, { type: 'payment_error', ...sanitizedContext });
+  logDatabaseError(error, operation, context = {}) {
+    this.logError(error, {
+      type: 'database',
+      operation,
+      ...context,
+    });
   }
 
   /**
    * Log authentication error
+   * @param {Error} error - Authentication error
+   * @param {object} context - Additional context
    */
-  logAuthError(error, authContext = {}) {
-    const sanitizedContext = {
-      ...authContext,
-      password: authContext.password ? '***REDACTED***' : null,
-      token: authContext.token ? '***REDACTED***' : null,
-    };
-
-    this.logError(error, { type: 'auth_error', ...sanitizedContext });
-  }
-
-  /**
-   * Set user context for Sentry
-   */
-  setUserContext(user) {
-    if (this.isSentryEnabled && user) {
-      Sentry.setUser({
-        id: user.id,
-        email: user.email,
-        role: user.role,
-      });
-    }
-  }
-
-  /**
-   * Clear user context
-   */
-  clearUserContext() {
-    if (this.isSentryEnabled) {
-      Sentry.setUser(null);
-    }
+  logAuthError(error, context = {}) {
+    this.logError(error, {
+      type: 'authentication',
+      ...context,
+    });
   }
 }
 
+// Export singleton instance
 module.exports = new ErrorLogger();
-
