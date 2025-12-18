@@ -6,7 +6,7 @@ import React, {
   ReactNode,
 } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { createApiUrl } from '../config/api';
+import { createApiUrl, getApiConfig } from '../config/api';
 import { useAuth } from './AuthContext';
 
 interface WebSocketContextType {
@@ -29,6 +29,8 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
 }) => {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  const [connectionAttempts, setConnectionAttempts] = useState(0);
+  const [hasLoggedError, setHasLoggedError] = useState(false);
   const { user, token } = useAuth();
 
   useEffect(() => {
@@ -37,22 +39,30 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
       return;
     }
 
-    // WebSocket bağlantısını kur
-    const base = createApiUrl('/').replace(/\/$/, ''); // Remove trailing slash
+    // WebSocket bağlantısını kur - use base URL without /api
+    const config = getApiConfig();
+    const base = config.baseURL.replace(/\/$/, ''); // Remove trailing slash and /api
     const newSocket = io(base, {
-      transports: ['websocket'],
+      transports: ['websocket', 'polling'], // Fallback to polling if websocket fails
       autoConnect: true,
       reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000,
+      reconnectionAttempts: 3, // Reduced attempts
+      reconnectionDelay: 2000, // Increased delay
+      reconnectionDelayMax: 10000, // Max delay
+      timeout: 20000, // Increased timeout
       auth: {
         token: token,
       },
     });
 
+    let connectionTimeout: ReturnType<typeof setTimeout>;
+
     newSocket.on('connect', () => {
       console.log('🔌 WebSocket connected');
       setIsConnected(true);
+      setConnectionAttempts(0);
+      setHasLoggedError(false);
+      clearTimeout(connectionTimeout);
 
       // Kullanıcı bilgilerini gönder (hem authenticate hem join)
       const userRole = user.role || 'individual';
@@ -62,29 +72,64 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
         userRole: userRole,
         userType: userRole // Backend compatibility
       });
-
     });
 
-    newSocket.on('disconnect', () => {
-      console.log('🔌 WebSocket disconnected');
+    newSocket.on('disconnect', (reason) => {
+      console.log('🔌 WebSocket disconnected:', reason);
       setIsConnected(false);
+      
+      // Only attempt reconnection if it's not a manual disconnect
+      if (reason === 'io server disconnect') {
+        // Server disconnected, don't reconnect
+        newSocket.connect();
+      }
+    });
+
+    newSocket.on('reconnect_attempt', (attemptNumber) => {
+      setConnectionAttempts(attemptNumber);
+      if (attemptNumber >= 3 && !hasLoggedError) {
+        console.warn('🔌 WebSocket reconnection attempts exceeded, disabling real-time features');
+        setHasLoggedError(true);
+        newSocket.disconnect(); // Stop reconnection attempts
+      }
     });
 
     newSocket.on('connect_error', error => {
-      // Only log WebSocket errors if they're not namespace/auth related
-      if (!error.message?.includes('Invalid namespace') && !error.message?.includes('Authentication')) {
+      // Only log first error to avoid spam
+      if (!hasLoggedError && connectionAttempts === 0) {
+        // Check if it's a timeout or connection refused
+        if (error.message?.includes('timeout') || error.message?.includes('ECONNREFUSED')) {
+          console.warn(
+            '🔌 WebSocket connection unavailable (real-time features disabled)'
+          );
+          setHasLoggedError(true);
+          // Disable reconnection after first timeout
+          newSocket.io.reconnection(false);
+        } else if (!error.message?.includes('Invalid namespace') && !error.message?.includes('Authentication')) {
       console.warn(
-        '🔌 WebSocket connection error (continuing without real-time features):',
+            '🔌 WebSocket connection error:',
         error.message
       );
       }
-      // Don't set isConnected to false here to avoid repeated error messages
+      }
     });
+
+    // Set a timeout to disable reconnection if initial connection fails
+    connectionTimeout = setTimeout(() => {
+      if (!isConnected && connectionAttempts === 0) {
+        console.warn('🔌 WebSocket initial connection timeout, disabling real-time features');
+        newSocket.io.reconnection(false);
+        setHasLoggedError(true);
+      }
+    }, 10000); // 10 seconds timeout
 
     setSocket(newSocket);
 
     return () => {
+      clearTimeout(connectionTimeout);
       newSocket.close();
+      setConnectionAttempts(0);
+      setHasLoggedError(false);
     };
   }, [user, token]);
 

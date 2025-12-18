@@ -1,7 +1,6 @@
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore - zustand type definitions may not be available
+// @ts-expect-error - zustand type definitions may not be available
 import { create } from 'zustand';
-// @ts-ignore - zustand middleware types
+// @ts-expect-error - zustand middleware types
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { logger } from '../services/logger';
 

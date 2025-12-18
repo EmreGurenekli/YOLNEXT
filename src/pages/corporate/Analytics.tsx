@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import Breadcrumb from '../../components/common/Breadcrumb';
 import LoadingState from '../../components/common/LoadingState';
+import { createApiUrl } from '../../config/api';
 
 export default function CorporateAnalytics() {
   const [selectedPeriod, setSelectedPeriod] = useState('30days');
@@ -23,14 +24,17 @@ export default function CorporateAnalytics() {
   const [isLoading, setIsLoading] = useState(false);
   const [analyticsData, setAnalyticsData] = useState<any>(null);
   const [carriers, setCarriers] = useState<any[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   // Load analytics data from API
   const loadAnalytics = async () => {
     setIsLoading(true);
+    setError(null);
     try {
-      const response = await fetch('/api/analytics/corporate', {
+      const period = selectedPeriod === '7days' ? '7' : selectedPeriod === '30days' ? '30' : selectedPeriod === '90days' ? '90' : '365';
+      const response = await fetch(createApiUrl(`/api/analytics/dashboard/corporate?period=${period}`), {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
+          Authorization: `Bearer ${localStorage.getItem('authToken')}`,
           'Content-Type': 'application/json',
         },
       });
@@ -39,10 +43,24 @@ export default function CorporateAnalytics() {
         throw new Error('Failed to load analytics');
       }
 
-      const data = await response.json();
-      setAnalyticsData(data);
+      const raw = await response.json();
+      const serverData = raw?.data || raw || {};
+
+      // Normalize backend verisini UI'nin beklediği forma çevir
+      const normalized = {
+        totalShipments: serverData.totalShipments ?? 0,
+        totalRevenue: serverData.totalRevenue ?? serverData.revenue ?? 0,
+        customerSatisfaction: serverData.customerSatisfaction ?? serverData.averageRating ?? 0,
+        monthlyGrowth: serverData.monthlyGrowth ?? 0,
+        revenueGrowth: serverData.revenueGrowth ?? 0,
+        satisfactionImprovement: serverData.satisfactionImprovement ?? 0,
+        chartData: serverData.chartData ?? serverData.monthlyTrend ?? [],
+      };
+
+      setAnalyticsData(normalized);
     } catch (error) {
       console.error('Error loading analytics:', error);
+      setError('Analitik veriler yüklenemedi. Lütfen daha sonra tekrar deneyin.');
       // Set empty data on error
       setAnalyticsData({
         totalShipments: 0,
@@ -61,16 +79,21 @@ export default function CorporateAnalytics() {
   // Load carriers for filtering
   const loadCarriers = async () => {
     try {
-      const response = await fetch('/api/carriers', {
+      const response = await fetch(createApiUrl('/api/carriers/corporate'), {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
+          Authorization: `Bearer ${localStorage.getItem('authToken')}`,
           'Content-Type': 'application/json',
         },
       });
 
       if (response.ok) {
         const data = await response.json();
-        setCarriers(data.carriers || []);
+        const carriersData =
+          (Array.isArray(data.carriers) ? data.carriers : null) ||
+          (Array.isArray(data.data) ? data.data : null) ||
+          (Array.isArray(data.data?.carriers) ? data.data.carriers : null) ||
+          [];
+        setCarriers(carriersData);
       }
     } catch (error) {
       console.error('Error loading carriers:', error);
@@ -117,10 +140,6 @@ export default function CorporateAnalytics() {
     URL.revokeObjectURL(url);
   };
 
-  if (isLoading) {
-    return <LoadingState message='Analitik veriler yükleniyor...' />;
-  }
-
   return (
     <div className='min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100'>
       <Helmet>
@@ -136,6 +155,16 @@ export default function CorporateAnalytics() {
         <div className='mb-4 sm:mb-6'>
           <Breadcrumb items={breadcrumbItems} />
         </div>
+
+        {isLoading && !analyticsData && (
+          <LoadingState message='Analitik veriler yükleniyor...' />
+        )}
+
+        {error && (
+          <div className='mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800'>
+            {error}
+          </div>
+        )}
 
         {/* Header */}
         <div className='text-center mb-8 sm:mb-12'>

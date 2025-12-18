@@ -1,4 +1,5 @@
 import { getApiConfig, createApiUrl, API_ENDPOINTS } from '../config/api';
+import { LoginCredentials } from '../types/auth';
 
 // API Response interface
 interface ApiResponse<T = any> {
@@ -7,6 +8,17 @@ interface ApiResponse<T = any> {
   message?: string;
   error?: string;
   status?: number;
+}
+
+// Register data interface
+interface RegisterData {
+  name: string;
+  email: string;
+  password: string;
+  panel_type: string;
+  company_name?: string;
+  location?: string;
+  phone?: string;
 }
 
 // API Error class
@@ -46,7 +58,14 @@ const apiRequest = async <T = any>(
   options: RequestInit = {}
 ): Promise<ApiResponse<T>> => {
   const config = getApiConfig();
-  const url = createApiUrl(endpoint);
+  // Remove /api prefix if present to avoid double /api/api/
+  let normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  if (normalizedEndpoint.startsWith('/api/')) {
+    normalizedEndpoint = normalizedEndpoint.substring(4);
+  } else if (normalizedEndpoint.startsWith('/api')) {
+    normalizedEndpoint = normalizedEndpoint.substring(4);
+  }
+  const url = createApiUrl(normalizedEndpoint);
 
   // Default headers
   const defaultHeaders: HeadersInit = {
@@ -186,20 +205,14 @@ export const api = {
 };
 
 // Specific API calls
-export const authApi = {
-  login: (credentials: { email: string; password: string }) =>
-    api.post(API_ENDPOINTS.LOGIN, credentials),
-
-  register: (userData: any) => api.post(API_ENDPOINTS.REGISTER, userData),
-
-  // Demo login sadece development ortamında kullanılabilir
-  demoLogin: (userType: string) => {
-    if (import.meta.env.MODE === 'production') {
-      throw new Error('Demo login production ortamında devre dışı');
-    }
-    return api.post(API_ENDPOINTS.DEMO_LOGIN, { userType });
-  },
-
+export const authAPI = {
+  login: (credentials: LoginCredentials) => api.post(API_ENDPOINTS.LOGIN, credentials),
+  register: (data: RegisterData) => api.post(API_ENDPOINTS.REGISTER, data),
+  forgotPassword: (email: string) => api.post(API_ENDPOINTS.FORGOT_PASSWORD, { email }),
+  resetPassword: (token: string, password: string) =>
+    api.post(API_ENDPOINTS.RESET_PASSWORD, { token, password }),
+  deleteAccount: (data: { password?: string; reason?: string }) =>
+    api.delete(API_ENDPOINTS.DELETE_ACCOUNT),
   getProfile: () => api.get(API_ENDPOINTS.PROFILE),
 };
 
@@ -230,27 +243,26 @@ export const offersApi = {
   accept: (id: string) =>
     api.post(API_ENDPOINTS.OFFERS_ACCEPT.replace(':id', id)),
 
-  reject: (id: string) => api.post(`${API_ENDPOINTS.OFFERS}/${id}/reject`),
+  reject: (id: string) => api.put(`${API_ENDPOINTS.OFFERS}/${id}/reject`),
 };
 
 // Additional API exports for compatibility
-export const authAPI = authApi;
-export const userAPI = authApi;
+export const userAPI = authAPI;
 export const dashboardAPI = {
-  getStats: (userType: string) => api.get(`/api/dashboard/stats/${userType}`),
+  getStats: (userType: string) => api.get(`dashboard/stats/${userType}`),
 };
 export const notificationAPI = {
   getUnreadCount: () => {
     if (isDemoToken()) {
       return Promise.resolve({ success: true, data: { unreadCount: 0 } });
     }
-    return api.get('/api/notifications/unread-count');
+    return api.get('/notifications/unread-count');
   },
-  getNotifications: () => api.get('/api/notifications'),
-  markAsRead: (id: number) => api.put(`/api/notifications/${id}/read`),
-  markAllAsRead: () => api.put('/api/notifications/mark-all-read'),
-  deleteNotification: (id: number) => api.delete(`/api/notifications/${id}`),
-  deleteAllNotifications: () => api.delete('/api/notifications'),
+  getNotifications: () => api.get('/notifications'),
+  markAsRead: (id: number) => api.put(`/notifications/${id}/read`),
+  markAllAsRead: () => api.put('/notifications/mark-all-read'),
+  deleteNotification: (id: number) => api.delete(`/notifications/${id}`),
+  deleteAllNotifications: () => api.delete('/notifications'),
 };
 export const shipmentAPI = shipmentsApi;
 export const messageAPI = {
@@ -258,9 +270,25 @@ export const messageAPI = {
     if (isDemoToken()) {
       return Promise.resolve({ success: true, data: [] });
     }
-    return api.get('/api/messages');
+    return api.get('/messages');
   },
-  send: (messageData: any) => api.post('/api/messages', messageData),
+  send: (messageData: any) => api.post('/messages', messageData),
+};
+
+export const kvkkAPI = {
+  requestDataAccess: () => api.get(API_ENDPOINTS.KVKK_DATA_ACCESS),
+  deleteData: () => api.post(API_ENDPOINTS.KVKK_DELETE_DATA),
+};
+
+// Carriers API
+export const carriersAPI = {
+  getCorporate: () => api.get(API_ENDPOINTS.CARRIERS_CORPORATE),
+  linkCorporate: (data: { code?: string | null; email?: string | null }) => 
+    api.post(API_ENDPOINTS.CARRIERS_CORPORATE_LINK, data),
+};
+
+export const driversAPI = {
+  link: (data: any) => api.post(API_ENDPOINTS.DRIVERS_LINK, data),
 };
 
 // Health check

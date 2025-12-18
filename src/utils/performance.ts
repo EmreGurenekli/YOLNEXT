@@ -99,13 +99,14 @@ export const measurePerformance = (name: string, fn: () => void) => {
   const start = performance.now();
   fn();
   const end = performance.now();
-  console.log(`${name} took ${end - start} milliseconds`);
+  // Performance measurement (console.log removed for performance)
+  if (import.meta.env.DEV && end - start > 100) {
+    console.warn(`${name} took ${end - start}ms (slow)`);
+  }
 };
 
 // Bundle analyzer helper
 export const analyzeBundle = () => {
-  if (import.meta.env.DEV) {
-    // Bundle analyzer is not available in Vite
-    console.log('Bundle analysis not available in Vite');
-  }
+  // Bundle analyzer is not available in Vite
+  // Log removed for performance
 };

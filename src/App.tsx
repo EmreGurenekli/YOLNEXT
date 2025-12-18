@@ -18,46 +18,31 @@ import Privacy from './pages/Privacy';
 import CookiePolicy from './pages/CookiePolicy';
 import KVKKAydinlatma from './pages/KVKKAydinlatma';
 import NotFoundPage from './pages/NotFound';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import IndividualLayout from './components/IndividualLayout';
 import CorporateLayout from './components/CorporateLayout';
 import IndividualDashboard from './pages/individual/Dashboard';
 import CorporateDashboard from './pages/corporate/Dashboard';
 import CorporateCreateShipment from './pages/corporate/CreateShipment';
-import CorporateShipments from './pages/corporate/Shipments';
 import NakliyeciDashboard from './pages/nakliyeci/Dashboard';
-import NakliyeciVehicleOptimization from './pages/nakliyeci/VehicleOptimization';
 import NakliyeciOffers from './pages/nakliyeci/Offers';
 import TasiyiciDashboard from './pages/tasiyici/Dashboard';
 import CreateShipment from './pages/individual/CreateShipment';
 import IndividualMessages from './pages/individual/Messages';
 import IndividualOffers from './pages/individual/Offers';
-import IndividualAgreements from './pages/individual/Agreements';
-import IndividualShipments from './pages/individual/Shipments';
 import MyShipments from './pages/individual/MyShipments';
 import IndividualHistory from './pages/individual/History';
 import IndividualLiveTracking from './pages/individual/LiveTracking';
 import IndividualShipmentDetail from './pages/individual/ShipmentDetail';
-import IndividualProfile from './pages/individual/Profile';
-// IndividualNotifications removed - using badge system instead
-import IndividualDiscounts from './pages/individual/Discounts';
 import IndividualSettings from './pages/individual/Settings';
 import IndividualHelp from './pages/individual/Help';
-import IndividualComplaint from './pages/individual/Complaint';
-import IndividualNotificationSettings from './pages/individual/NotificationSettings';
 import EmailVerification from './pages/EmailVerification';
 import CorporateAnalytics from './pages/corporate/Analytics';
-import CorporateTeam from './pages/corporate/Team';
-import CorporateReports from './pages/corporate/Reports';
 import CorporateMessages from './pages/corporate/Messages';
-// CorporateNotifications removed - using badge system instead
 import CorporateSettings from './pages/corporate/Settings';
-import CorporateHelp from './pages/corporate/Help';
-import CorporateDiscounts from './pages/corporate/Discounts';
 import CorporateCarriers from './pages/corporate/Carriers';
-import CorporateGuide from './pages/corporate/CorporateGuide';
 import CorporateOffers from './pages/corporate/Offers';
-import NakliyeciShipments from './pages/nakliyeci/Shipments';
-import OfferShipment from './pages/nakliyeci/OfferShipment';
 import NakliyeciAnalytics from './pages/nakliyeci/Analytics';
 import NakliyeciMessages from './pages/nakliyeci/Messages';
 import NakliyeciSettings from './pages/nakliyeci/Settings';
@@ -65,11 +50,8 @@ import NakliyeciHelp from './pages/nakliyeci/Help';
 import NakliyeciJobs from './pages/nakliyeci/Jobs';
 import NakliyeciRoutePlanner from './pages/nakliyeci/RoutePlanner';
 import NakliyeciDrivers from './pages/nakliyeci/Drivers';
-import NakliyeciListings from './pages/nakliyeci/Listings';
 import NakliyeciWallet from './pages/nakliyeci/Wallet';
 import NakliyeciActiveShipments from './pages/nakliyeci/ActiveShipments';
-import NakliyeciCompletedShipments from './pages/nakliyeci/CompletedShipments';
-import NakliyeciCancelledShipments from './pages/nakliyeci/CancelledShipments';
 import NakliyeciLayout from './components/NakliyeciLayout';
 import TasiyiciJobs from './pages/tasiyici/Jobs';
 import TasiyiciMyOffers from './pages/tasiyici/MyOffers';
@@ -85,13 +67,21 @@ import OnboardingWizard from './components/onboarding/OnboardingWizard';
 import CostCalculator from './components/calculators/CostCalculator';
 import CaseStudies from './components/case-studies/CaseStudies';
 import CommissionCalculator from './components/calculators/CommissionCalculator';
-import DepartmentReporting from './pages/corporate/DepartmentReporting';
-import WorkflowManagement from './components/workflow/WorkflowManagement';
-import DetailedReporting from './components/reports/DetailedReporting';
-import CostAnalysis from './components/analytics/CostAnalysis';
-import DebugRoutes from './pages/DebugRoutes';
+import { ADMIN_SLUG } from './config/admin';
+import AdminGuard from './components/admin/AdminGuard';
+import AdminLayout from './components/admin/AdminLayout';
+import AdminLogin from './pages/admin/AdminLogin';
+import AdminUsers from './pages/admin/Users';
+import AdminIndexRedirect from './pages/admin/IndexRedirect';
+import AdminOps from './pages/admin/Ops';
+import AdminOperations from './pages/admin/Operations';
+import AdminCases from './pages/admin/Cases';
+import AdminFlags from './pages/admin/Flags';
+import { Navigate } from 'react-router-dom';
 
 function App() {
+  const adminBase = `/${ADMIN_SLUG}`;
+
   return (
     <ErrorBoundary>
       <ThemeProvider>
@@ -103,9 +93,10 @@ function App() {
                 <div className='App'>
                   <Routes>
                     <Route path='/' element={<LandingPage />} />
-                    <Route path='/debug/routes' element={<DebugRoutes />} />
                     <Route path='/login' element={<Login />} />
                     <Route path='/register' element={<Register />} />
+                    <Route path='/forgot-password' element={<ForgotPassword />} />
+                    <Route path='/reset-password' element={<ResetPassword />} />
                     <Route
                       path='/email-verification'
                       element={<EmailVerification />}
@@ -142,6 +133,32 @@ function App() {
                       }
                     />
 
+                    {/* Hidden Admin Routes */}
+                    <Route path={`${adminBase}/login`} element={<AdminLogin />} />
+                    <Route
+                      path={adminBase}
+                      element={
+                        <AdminGuard>
+                          <AdminLayout />
+                        </AdminGuard>
+                      }
+                    >
+                      <Route index element={<AdminIndexRedirect />} />
+                      <Route path='command-center' element={<Navigate to={`${adminBase}/ops`} replace />} />
+                      <Route path='assistant' element={<Navigate to={`${adminBase}/ops`} replace />} />
+                      <Route path='inbox' element={<Navigate to={`${adminBase}/ops`} replace />} />
+                      <Route path='dashboard' element={<Navigate to={`${adminBase}/ops`} replace />} />
+                      <Route path='search' element={<Navigate to={`${adminBase}/ops`} replace />} />
+                      <Route path='users' element={<AdminUsers />} />
+                      <Route path='ops' element={<AdminOperations />} />
+                      <Route path='system' element={<AdminOps />} />
+                      <Route path='cases' element={<AdminCases />} />
+                      <Route path='complaints' element={<Navigate to={`${adminBase}/system`} replace />} />
+                      <Route path='flags' element={<AdminFlags />} />
+                      <Route path='planner' element={<Navigate to={`${adminBase}/ops`} replace />} />
+                      <Route path='audit' element={<Navigate to={`${adminBase}/system`} replace />} />
+                    </Route>
+
                     {/* Individual Routes */}
                     <Route
                       path='/individual'
@@ -155,19 +172,13 @@ function App() {
                         path='dashboard'
                         element={<IndividualDashboard />}
                       />
+                      <Route path='notifications' element={<Navigate to='/individual/dashboard' replace />} />
+                      <Route path='notification-settings' element={<Navigate to='/individual/dashboard' replace />} />
                       <Route
                         path='create-shipment'
                         element={<CreateShipment />}
                       />
                       <Route path='offers' element={<IndividualOffers />} />
-                      <Route
-                        path='agreements'
-                        element={<IndividualAgreements />}
-                      />
-                      <Route
-                        path='shipments'
-                        element={<IndividualShipments />}
-                      />
                       <Route path='my-shipments' element={<MyShipments />} />
                       <Route
                         path='shipments/:id'
@@ -178,19 +189,9 @@ function App() {
                         path='live-tracking'
                         element={<IndividualLiveTracking />}
                       />
-                      <Route path='profile' element={<IndividualProfile />} />
                       <Route path='messages' element={<IndividualMessages />} />
-                      <Route
-                        path='discounts'
-                        element={<IndividualDiscounts />}
-                      />
-                    <Route path='settings' element={<IndividualSettings />} />
-                    <Route path='help' element={<IndividualHelp />} />
-                    <Route path='complaint' element={<IndividualComplaint />} />
-                    <Route
-                      path='notification-settings'
-                      element={<IndividualNotificationSettings />}
-                    />
+                      <Route path='settings' element={<IndividualSettings />} />
+                      <Route path='help' element={<IndividualHelp />} />
                     </Route>
 
                     {/* Corporate Routes */}
@@ -206,40 +207,32 @@ function App() {
                         path='dashboard'
                         element={<CorporateDashboard />}
                       />
+                      <Route path='shipments/new' element={<Navigate to='/corporate/create-shipment' replace />} />
+                      <Route
+                        path='shipments/:id'
+                        element={
+                          <Navigate
+                            to='/corporate/shipments'
+                            replace
+                          />
+                        }
+                      />
                       <Route
                         path='create-shipment'
                         element={<CorporateCreateShipment />}
                       />
                       <Route
                         path='shipments'
-                        element={<CorporateShipments />}
+                        element={<MyShipments basePath='/corporate' />}
                       />
                       <Route path='offers' element={<CorporateOffers />} />
                       <Route
                         path='analytics'
                         element={<CorporateAnalytics />}
                       />
-                      <Route path='team' element={<CorporateTeam />} />
-                      <Route path='reports' element={<CorporateReports />} />
                       <Route path='messages' element={<CorporateMessages />} />
-                      <Route path='settings' element={<CorporateSettings />} />
-                      <Route path='help' element={<CorporateHelp />} />
-                      <Route
-                        path='discounts'
-                        element={<CorporateDiscounts />}
-                      />
+                    <Route path='settings' element={<CorporateSettings />} />
                       <Route path='carriers' element={<CorporateCarriers />} />
-                      <Route path='guide' element={<CorporateGuide />} />
-                      <Route
-                        path='department-reporting'
-                        element={<DepartmentReporting />}
-                      />
-                      <Route path='workflow' element={<WorkflowManagement />} />
-                      <Route
-                        path='detailed-reports'
-                        element={<DetailedReporting />}
-                      />
-                      <Route path='cost-analysis' element={<CostAnalysis />} />
                     </Route>
 
                     {/* Nakliyeci Routes */}
@@ -261,20 +254,8 @@ function App() {
                         element={<NakliyeciRoutePlanner />}
                       />
                       <Route path='offers' element={<NakliyeciOffers />} />
-                      <Route
-                        path='vehicle-optimization'
-                        element={<NakliyeciVehicleOptimization />}
-                      />
-                      <Route
-                        path='shipments'
-                        element={<NakliyeciShipments />}
-                      />
-                      <Route path='offer/:id' element={<OfferShipment />} />
                       <Route path='drivers' element={<NakliyeciDrivers />} />
                       <Route path='active-shipments' element={<NakliyeciActiveShipments />} />
-                      <Route path='completed-shipments' element={<NakliyeciCompletedShipments />} />
-                      <Route path='cancelled-shipments' element={<NakliyeciCancelledShipments />} />
-                      <Route path='listings' element={<NakliyeciListings />} />
                       <Route
                         path='analytics'
                         element={<NakliyeciAnalytics />}

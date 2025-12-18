@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import {
@@ -21,8 +21,6 @@ import {
   Info,
   Zap,
   Target,
-  Mail,
-  Phone,
   ChevronDown,
   ChevronUp,
   Star,
@@ -34,12 +32,14 @@ import {
   Navigation,
   Calendar,
   FileCheck,
+  Filter,
 } from 'lucide-react';
 import Breadcrumb from '../../components/common/Breadcrumb';
 
 const TasiyiciHelp = () => {
   const [openFAQ, setOpenFAQ] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   const breadcrumbItems = [
     { label: 'Ana Sayfa', href: '/tasiyici/dashboard' },
@@ -101,15 +101,23 @@ const TasiyiciHelp = () => {
       items: [
         {
           question: 'Taşıyıcı hesabı nasıl oluşturulur?',
-          answer: 'Kayıt sayfasından "Taşıyıcı" seçeneğini seçin. Kişisel bilgilerinizi girin ve belgelerinizi (ehliyet, ruhsat vb.) yükleyin. Hesabınız doğrulandıktan sonra işlere başvurmaya başlayabilirsiniz.',
+          answer: 'Kayıt sayfasından "Taşıyıcı" seçeneğini seçin. Kişisel bilgilerinizi girin:\n• Ad, soyad\n• Telefon numarası\n• E-posta adresi\n• Adres bilgileri\n• Araç bilgileri (plaka, model, tip)\n\nBelgelerinizi yükleyin:\n• Ehliyet\n• Araç ruhsatı\n• Kimlik belgesi\n\nHesabınız doğrulandıktan sonra işlere başvurmaya başlayabilirsiniz. Doğrulama genellikle 1-2 iş günü içinde tamamlanır.',
+          keywords: ['hesap', 'taşıyıcı', 'oluştur', 'kayıt', 'belge'],
         },
         {
           question: 'Taşıyıcı olmanın avantajları nelerdir?',
-          answer: 'Esnek çalışma saatleri, çeşitli iş fırsatları, güvenli ödeme, performans bazlı kazanç ve nakliyeci ile doğrudan iletişim gibi avantajlar sunulmaktadır.',
+          answer: 'Taşıyıcı olarak:\n• Esnek çalışma saatleri\n• Çeşitli iş fırsatları\n• Güvenli ödeme sistemi\n• Performans bazlı kazanç\n• Nakliyeci ile doğrudan iletişim\n• Kolay görev yönetimi\n• Performans takibi ve puan sistemi\n• Düzenli iş fırsatları\n\nPlatform tamamen ücretsizdir. Ödemeler nakliyeci ile anlaşmanıza göre yapılır.',
+          keywords: ['avantaj', 'özellik', 'taşıyıcı', 'fayda'],
         },
         {
           question: 'Hangi belgeler gereklidir?',
-          answer: 'Ehliyet, araç ruhsatı ve kimlik belgesi gereklidir. Belgeleriniz doğrulandıktan sonra işlere başvurabilirsiniz.',
+          answer: 'Zorunlu belgeler:\n• Ehliyet (geçerli)\n• Araç ruhsatı\n• Kimlik belgesi\n\nİsteğe bağlı belgeler:\n• Taşımacılık belgesi (varsa)\n• Sigorta belgesi\n• Araç fotoğrafları\n\nBelgeleriniz doğrulandıktan sonra işlere başvurabilirsiniz. Belgelerinizi Ayarlar sayfasından güncelleyebilirsiniz.',
+          keywords: ['belge', 'ehliyet', 'ruhsat', 'kimlik', 'gerekli'],
+        },
+        {
+          question: 'Belge doğrulama süresi ne kadar?',
+          answer: 'Belgeleriniz yüklendikten sonra:\n• İlk kontrol: 24 saat içinde\n• Doğrulama: 1-2 iş günü içinde\n• Onay: E-posta ile bildirilir\n\nDoğrulama sonrası işlere başvurabilirsiniz. Belgelerinizde sorun varsa size bildirilir ve düzeltmeniz istenir.',
+          keywords: ['doğrulama', 'süre', 'belge', 'onay'],
         },
       ],
     },
@@ -119,19 +127,28 @@ const TasiyiciHelp = () => {
       items: [
         {
           question: 'İşlere nasıl başvururum?',
-          answer: 'İş Pazarı sayfasından açık ilanları görüntüleyin. İlgilendiğiniz işe tıklayın ve "Başvur" butonuna basın. Başvurunuz nakliyeciye iletilecektir.',
+          answer: 'İş Pazarı sayfasından açık ilanları görüntüleyin:\n1. İlgilendiğiniz işe tıklayın\n2. İş detaylarını inceleyin (rota, adres, özel gereksinimler, ödeme)\n3. "Başvur" butonuna basın\n4. Başvurunuz nakliyeciye iletilecektir\n\nNakliyeci başvurunuzu inceler ve kabul eder veya reddeder. Kabul edildiğinde size bildirim gönderilir.',
+          keywords: ['başvuru', 'iş', 'ilan', 'nasıl'],
         },
         {
           question: 'Kaç işe aynı anda başvurabilirim?',
-          answer: 'Aynı anda birden fazla işe başvurabilirsiniz. Ancak kabul edilen işleri zamanında tamamlamanız önemlidir.',
+          answer: 'Aynı anda birden fazla işe başvurabilirsiniz. Ancak:\n• Kabul edilen işleri zamanında tamamlamanız önemlidir\n• Çok fazla başvuru yapıp az kabul almak yerine, uygun işlere odaklanın\n• Başvuru kabul oranınız performans puanınızı etkiler\n\nAktif işlerinizi yönetebilir ve kapasitenize göre başvuru yapabilirsiniz.',
+          keywords: ['başvuru', 'kaç', 'sınırsız', 'limit'],
         },
         {
           question: 'Başvurumu iptal edebilir miyim?',
-          answer: 'Nakliyeci kabul etmeden önce başvurunuzu iptal edebilirsiniz. Ancak kabul edilen başvurular için iptal koşulları nakliyeci ile anlaşmanıza bağlıdır.',
+          answer: 'Nakliyeci kabul etmeden önce başvurunuzu iptal edebilirsiniz:\n• İş Pazarı sayfasından başvurduğunuz işi bulun\n• "Başvuruyu İptal Et" butonuna tıklayın\n• Onaylayın\n\nAncak kabul edilen başvurular için iptal koşulları nakliyeci ile anlaşmanıza bağlıdır. İptal etmek isterseniz nakliyeci ile iletişime geçmeniz gerekir.',
+          keywords: ['iptal', 'başvuru', 'vazgeç'],
         },
         {
           question: 'Başvurum ne zaman kabul edilir?',
-          answer: 'Nakliyeci başvurunuzu inceler ve kabul eder. Kabul edildiğinde size bildirim gönderilir.',
+          answer: 'Başvuru süreci:\n1. Başvurunuz nakliyeciye iletilecektir\n2. Nakliyeci başvurunuzu inceler\n3. Kabul edildiğinde size bildirim gönderilir\n4. İş "Aktif İşler" sayfanıza eklenir\n\nKabul süresi nakliyeciye bağlıdır. Genellikle birkaç saat içinde yanıt alırsınız. Uzun süre yanıt gelmezse başka işlere başvurabilirsiniz.',
+          keywords: ['kabul', 'süre', 'yanıt', 'bildirim'],
+        },
+        {
+          question: 'Başvuru kabul oranını nasıl artırabilirim?',
+          answer: 'Başvuru kabul oranını artırmak için:\n• Yüksek performans puanına sahip olun\n• Profil bilgilerinizi tam ve güncel tutun\n• Belgelerinizi eksiksiz yükleyin\n• Uygun işlere başvurun (araç tipinize, deneyiminize uygun)\n• Zamanında teslimat yaparak güven oluşturun\n• Nakliyeci ile iletişime geçin\n\nYüksek kabul oranı daha fazla iş ve daha iyi puan anlamına gelir.',
+          keywords: ['kabul', 'oran', 'artır', 'başarı', 'performans'],
         },
       ],
     },
@@ -141,19 +158,33 @@ const TasiyiciHelp = () => {
       items: [
         {
           question: 'Atanan görevleri nasıl görüntülerim?',
-          answer: 'Aktif İşler sayfasından tüm atanmış görevlerinizi görüntüleyebilirsiniz. Görev detaylarına tıklayarak rota, adres ve özel gereksinimleri görebilirsiniz.',
+          answer: 'Aktif İşler sayfasından tüm atanmış görevlerinizi görüntüleyebilirsiniz:\n• Görev listesi\n• Görev durumları\n• Rota bilgileri\n• Adres bilgileri\n• Özel gereksinimler\n• Ödeme bilgileri\n\nGörev detaylarına tıklayarak tüm bilgileri görebilirsiniz. Harita üzerinde rota bilgisini görüntüleyebilirsiniz.',
+          keywords: ['görev', 'aktif', 'görüntüle', 'liste'],
         },
         {
           question: 'Görev durumunu nasıl güncellerim?',
-          answer: 'Görev detay sayfasından durum güncellemesi yapabilirsiniz. "Yola Çıktı", "Teslimatta" ve "Teslim Edildi" gibi durumları seçebilirsiniz.',
+          answer: 'Görev durumunu güncelleme:\n1. Aktif İşler sayfasından görevi seçin\n2. Görev detay sayfasına gidin\n3. Durum butonlarını kullanın:\n   • "Yükü Aldım": Gönderiyi toplama adresinden aldınız\n   • "Yoldayım": Gönderi ile yola çıktınız\n   • "Teslim Ettim": Gönderiyi teslim ettiniz\n\nDurum güncellemeleri otomatik olarak nakliyeciye bildirilir. İnternet olmasa bile butonlar çalışır, internet gelince otomatik gönderilir.',
+          keywords: ['durum', 'güncelle', 'yükü aldım', 'yoldayım', 'teslim ettim'],
         },
         {
-          question: 'İş durumunu nasıl güncellerim?',
-          answer: 'Aktif işler sayfasında veya iş detay sayfasında "Yükü Aldım", "Yoldayım" ve "Teslim Ettim" butonlarını kullanarak durumunuzu güncelleyebilirsiniz. İnternet olmasa bile butonlar çalışır, internet gelince otomatik gönderilir.',
+          question: 'İnternet olmadan durum güncellemesi yapabilir miyim?',
+          answer: 'Evet, internet olmadan da durum güncellemesi yapabilirsiniz:\n• Durum butonları offline modda çalışır\n• Güncellemeler yerel olarak kaydedilir\n• İnternet geldiğinde otomatik olarak gönderilir\n• Hiçbir bilgi kaybolmaz\n\nBu özellik sayesinde internet bağlantısı olmayan bölgelerde de çalışabilirsiniz.',
+          keywords: ['offline', 'internet', 'yok', 'çalışır'],
         },
         {
           question: 'Görevi nasıl tamamlarım?',
-          answer: 'Gönderiyi teslim ettikten sonra görev detay sayfasından "Teslim Edildi" durumunu seçin. Gönderici onayı sonrası ödeme süreci başlar.',
+          answer: 'Görevi tamamlama:\n1. Gönderiyi teslim adresine götürün\n2. Teslimatı gerçekleştirin\n3. Görev detay sayfasından "Teslim Ettim" butonuna basın\n4. Nakliyeci teslimat durumunu kontrol eder ve süreci kapatır\n\nGörev tamamlandıktan sonra ödeme süreci başlar. Ödeme nakliyeci ile anlaşmanıza göre yapılır.',
+          keywords: ['tamamla', 'teslim', 'onay', 'ödeme'],
+        },
+        {
+          question: 'Rota bilgisini nasıl görüntülerim?',
+          answer: 'Rota bilgisi:\n• Görev detay sayfasından harita görüntüleyebilirsiniz\n• Toplama ve teslimat adresleri harita üzerinde gösterilir\n• Navigasyon uygulamanızı açabilirsiniz\n• Mesafe ve tahmini süre bilgisi görüntülenir\n\nHarita üzerinden direkt navigasyon başlatabilirsiniz.',
+          keywords: ['rota', 'harita', 'navigasyon', 'adres'],
+        },
+        {
+          question: 'Birden fazla görevi aynı anda yönetebilir miyim?',
+          answer: 'Evet, birden fazla görevi aynı anda yönetebilirsiniz:\n• Aktif İşler sayfasından tüm görevlerinizi görüntüleyebilirsiniz\n• Her görev için ayrı durum güncellemesi yapabilirsiniz\n• Rota planlama ile birden fazla görevi optimize edebilirsiniz\n\nAncak görevleri zamanında tamamlamanız önemlidir. Geç teslimat performans puanınızı düşürür.',
+          keywords: ['çoklu', 'birden fazla', 'yönet', 'rota'],
         },
       ],
     },
@@ -163,15 +194,23 @@ const TasiyiciHelp = () => {
       items: [
         {
           question: 'Belgelerimi nasıl güncellerim?',
-          answer: 'Ayarlar sayfasından "Belgeler" sekmesine gidin. Yeni belge yüklemek için "Belge Ekle" butonuna tıklayın. Mevcut belgeleri güncelleyebilir veya silebilirsiniz.',
+          answer: 'Ayarlar sayfasından "Belgeler" sekmesine gidin:\n• Yeni belge yüklemek için "Belge Ekle" butonuna tıklayın\n• Mevcut belgeleri güncelleyebilir veya silebilirsiniz\n• Belge türünü seçin (ehliyet, ruhsat, kimlik vb.)\n• Belgeyi yükleyin\n• Kaydedin\n\nBelgeleriniz güncellendikten sonra tekrar doğrulanır. Doğrulama 1-2 iş günü sürer.',
+          keywords: ['belge', 'güncelle', 'yükle', 'ayarlar'],
         },
         {
           question: 'Profil bilgilerimi nasıl düzenlerim?',
-          answer: 'Ayarlar sayfasından "Profil" sekmesine gidin. Kişisel bilgilerinizi, iletişim bilgilerinizi ve araç bilgilerinizi güncelleyebilirsiniz.',
+          answer: 'Ayarlar sayfasından "Profil" sekmesine gidin:\n• Kişisel bilgilerinizi güncelleyebilirsiniz (ad, soyad, telefon, e-posta)\n• İletişim bilgilerinizi düzenleyebilirsiniz\n• Araç bilgilerinizi güncelleyebilirsiniz (plaka, model, tip)\n• Adres bilgilerinizi düzenleyebilirsiniz\n\nProfil bilgileriniz nakliyecilerle paylaşılır, bu yüzden güncel tutmanız önemlidir.',
+          keywords: ['profil', 'güncelle', 'düzenle', 'bilgi'],
         },
         {
-          question: 'Belge doğrulama süresi ne kadar?',
-          answer: 'Belgeleriniz yüklendikten sonra 1-2 iş günü içinde doğrulanır. Doğrulama sonrası işlere başvurabilirsiniz.',
+          question: 'Araç bilgilerimi nasıl güncellerim?',
+          answer: 'Ayarlar sayfasından "Araç" sekmesine gidin:\n• Araç plakasını güncelleyebilirsiniz\n• Araç modelini değiştirebilirsiniz\n• Araç tipini seçebilirsiniz (kamyon, kamyonet, tır vb.)\n• Araç fotoğrafları ekleyebilirsiniz\n• Ruhsat bilgilerini güncelleyebilirsiniz\n\nAraç bilgileriniz iş başvurularında görüntülenir.',
+          keywords: ['araç', 'plaka', 'model', 'güncelle'],
+        },
+        {
+          question: 'Belge süresi doldu, ne yapmalıyım?',
+          answer: 'Belge süresi dolduğunda:\n1. Ayarlar sayfasından belgeyi güncelleyin\n2. Yeni belgeyi yükleyin\n3. Belge doğrulaması beklenir (1-2 iş günü)\n4. Doğrulama tamamlanana kadar yeni işlere başvurabilirsiniz, ancak bazı işler için belge gerekebilir\n\nBelgelerinizi süresi dolmadan önce güncellemeniz önerilir.',
+          keywords: ['belge', 'süre', 'doldu', 'güncelle'],
         },
       ],
     },
@@ -181,15 +220,44 @@ const TasiyiciHelp = () => {
       items: [
         {
           question: 'Puan sistemi nasıl çalışır?',
-          answer: 'Tamamlanan her görev için gönderici ve nakliyeci size puan verir. Ortalama puanınız profil sayfanızda görüntülenir ve yeni iş başvurularında önemlidir.',
+          answer: 'Puan sistemi:\n• Tamamlanan her görev için nakliyeci size puan verir (1-5 yıldız)\n• Ortalama puanınız profil sayfanızda görüntülenir\n• Yüksek puan daha fazla iş başvurusu kabul şansı sağlar\n• Puanlar görev tamamlandıktan sonra verilir\n\nPuanınız iş başvurularında önemlidir. Yüksek puanlı taşıyıcılar daha fazla iş alır.',
+          keywords: ['puan', 'yıldız', 'performans', 'değerlendirme'],
         },
         {
           question: 'Puanımı nasıl yükseltebilirim?',
-          answer: 'Görevleri zamanında tamamlayarak, müşteri memnuniyetine önem vererek ve profesyonel davranarak puanınızı yükseltebilirsiniz.',
+          answer: 'Puanınızı yükseltmek için:\n• Görevleri zamanında tamamlayın\n• Müşteri memnuniyetine önem verin\n• Profesyonel davranın\n• İletişim kurun\n• Gönderileri dikkatli taşıyın\n• Özel gereksinimlere dikkat edin\n• Sorun durumunda hemen iletişime geçin\n\nYüksek puan daha fazla iş ve daha iyi kazanç anlamına gelir.',
+          keywords: ['puan', 'yükselt', 'artır', 'başarı'],
         },
         {
           question: 'Performans raporlarını nasıl görüntülerim?',
-          answer: 'Dashboard\'dan performans istatistiklerinizi görebilirsiniz. Tamamlanan görev sayısı, ortalama puan ve toplam kazanç gibi bilgileri görüntüleyebilirsiniz.',
+          answer: 'Ana Sayfa\'dan performans istatistiklerinizi görebilirsiniz:\n• Tamamlanan görev sayısı\n• Ortalama puan\n• Toplam kazanç\n• Başvuru kabul oranı\n• Aktif görev sayısı\n• Aylık kazanç grafiği\n\nBu bilgiler iş performansınızı değerlendirmenize yardımcı olur.',
+          keywords: ['performans', 'rapor', 'istatistik', 'ana sayfa'],
+        },
+        {
+          question: 'Puanım düşükse ne yapmalıyım?',
+          answer: 'Puanınız düşükse:\n• Görevleri daha dikkatli tamamlayın\n• Müşteri iletişimini iyileştirin\n• Zamanında teslimat yapın\n• Sorun durumunda hemen iletişime geçin\n• Profesyonel davranın\n• Özel gereksinimlere dikkat edin\n\nZamanla puanınız yükselir. Yeni görevlerde daha iyi performans göstererek puanınızı artırabilirsiniz.',
+          keywords: ['puan', 'düşük', 'artır', 'iyileştir'],
+        },
+      ],
+    },
+    {
+      category: 'Ödeme ve Kazanç',
+      icon: DollarSign,
+      items: [
+        {
+          question: 'Ödemeleri nasıl alırım?',
+          answer: 'Tamamlanan görevler için ödemeler nakliyeci tarafından yapılır:\n• Görev tamamlandıktan sonra\n• Nakliyeci süreci kapattıktan sonra\n• Ödeme tutarı görev başında belirtilir\n• Ödeme nakliyeci ile anlaşmanıza göre yapılır\n\nÖdeme detayları görev sayfasından görüntülenebilir.',
+          keywords: ['ödeme', 'al', 'nakliyeci', 'görev'],
+        },
+        {
+          question: 'Ödeme ne zaman yapılır?',
+          answer: 'Ödeme zamanlaması:\n• Görev tamamlandıktan sonra\n• Nakliyeci süreci kapattıktan sonra\n• Nakliyeci ile anlaşmanıza göre\n• Genellikle 24 saat içinde\n\nÖdeme gecikirse nakliyeci ile iletişime geçebilir veya destek ekibimizle iletişime geçebilirsiniz.',
+          keywords: ['ödeme', 'zaman', 'ne zaman', 'süre'],
+        },
+        {
+          question: 'Ödeme geçmişini nasıl görüntülerim?',
+          answer: 'Ödeme geçmişi:\n• Aktif İşler sayfasından tamamlanan görevlerinizi görebilirsiniz\n• Görev bazlı ödeme detayları\n• Tarih ve tutar bilgileri\n\nAna Sayfa\'dan toplam kazanç ve aylık kazanç grafiğini görebilirsiniz.',
+          keywords: ['ödeme', 'geçmiş', 'rapor', 'görev'],
         },
       ],
     },
@@ -199,15 +267,23 @@ const TasiyiciHelp = () => {
       items: [
         {
           question: 'Görevi iptal edebilir miyim?',
-          answer: 'Kabul edilen görevler için iptal koşulları nakliyeci ile anlaşmanıza bağlıdır. Acil durumlarda nakliyeci ile iletişime geçerek iptal talebinde bulunabilirsiniz.',
+          answer: 'Kabul edilen görevler için iptal koşulları nakliyeci ile anlaşmanıza bağlıdır:\n• Görevi henüz almadıysanız: Nakliyeci ile iletişime geçin\n• Görevi aldıysanız: Acil durumlarda nakliyeci ile iletişime geçerek iptal talebinde bulunabilirsiniz\n• İptal durumunda performans puanınız etkilenebilir\n\nİptal etmek isterseniz görev detay sayfasından nakliyeci ile iletişime geçin.',
+          keywords: ['iptal', 'görev', 'vazgeç'],
         },
         {
           question: 'Sorun yaşarsam ne yapmalıyım?',
-          answer: 'Herhangi bir sorun yaşarsanız görev detay sayfasından nakliyeci ile iletişime geçebilir veya destek ekibimizle iletişime geçebilirsiniz.',
+          answer: 'Herhangi bir sorun yaşarsanız:\n• Görev detay sayfasından nakliyeci ile iletişime geçin\n• Mesaj göndererek sorunu açıklayın\n• Acil durumlarda telefon ile iletişime geçin\n• Destek ekibimizle iletişime geçin\n• Şikayet sayfasından sorununuzu bildirin\n\nTüm iletişimler kayıt altına alınır ve değerlendirilir.',
+          keywords: ['sorun', 'şikayet', 'iletişim', 'destek'],
         },
         {
           question: 'Gönderi hasar gördüyse ne yapmalıyım?',
-          answer: 'Hemen nakliyeci ve gönderici ile iletişime geçin. Durumu bildirin ve fotoğraf çekin. Destek ekibimiz süreci yönetmenize yardımcı olacaktır.',
+          answer: 'Gönderi hasar gördüyse:\n1. Hemen nakliyeci ile iletişime geçin\n2. Durumu bildirin\n3. Hasar fotoğrafları çekin\n4. Görev detay sayfasından mesaj gönderin\n5. Destek ekibimizle iletişime geçin\n\nHasar durumunda çözüm süreçleri nakliyeci tarafından yönetilir. Dürüstlük ve hızlı iletişim önemlidir.',
+          keywords: ['hasar', 'bozuk', 'sorun', 'sigorta'],
+        },
+        {
+          question: 'Yanlış adrese gittim, ne yapmalıyım?',
+          answer: 'Yanlış adrese gittiyseniz:\n1. Hemen nakliyeci ile iletişime geçin\n2. Doğru adresi öğrenin\n3. Gönderiyi doğru adrese teslim edin\n\nYanlış adres durumunda ek ücret talep edilemez. Doğru adrese teslim etmek sizin sorumluluğunuzdadır.',
+          keywords: ['yanlış adres', 'hata', 'düzelt'],
         },
       ],
     },
@@ -215,13 +291,36 @@ const TasiyiciHelp = () => {
 
   const allFAQs = faqCategories.flatMap(cat => cat.items);
 
-  const filteredFAQs = allFAQs.filter(faq =>
-    faq.question.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    faq.answer.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredFAQs = useMemo(() => {
+    if (!searchTerm.trim()) {
+      if (selectedCategory) {
+        const category = faqCategories.find(cat => cat.category === selectedCategory);
+        return category ? category.items : [];
+      }
+      return allFAQs;
+    }
+
+    const searchLower = searchTerm.toLowerCase();
+    return allFAQs.filter(faq => {
+      const questionMatch = faq.question.toLowerCase().includes(searchLower);
+      const answerMatch = faq.answer.toLowerCase().includes(searchLower);
+      const keywordMatch = faq.keywords?.some(keyword => keyword.toLowerCase().includes(searchLower));
+      return questionMatch || answerMatch || keywordMatch;
+    });
+  }, [searchTerm, selectedCategory, allFAQs, faqCategories]);
 
   const toggleFAQ = (index: number) => {
     setOpenFAQ(openFAQ === index ? null : index);
+  };
+
+  const handleCategoryClick = (category: string) => {
+    setSelectedCategory(selectedCategory === category ? null : category);
+    setSearchTerm('');
+    const categoryIndex = faqCategories.findIndex(cat => cat.category === category);
+    if (categoryIndex !== -1) {
+      const firstFAQIndex = faqCategories.slice(0, categoryIndex).reduce((acc, cat) => acc + cat.items.length, 0);
+      setOpenFAQ(firstFAQIndex);
+    }
   };
 
   return (
@@ -261,12 +360,20 @@ const TasiyiciHelp = () => {
                 <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-300 w-5 h-5" />
                 <input
                   type="text"
-                  placeholder="Sorunuzu arayın..."
+                  placeholder="Sorunuzu yazın ve arayın... (örn: iş nasıl bulunur, görev nasıl tamamlanır)"
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setSelectedCategory(null);
+                  }}
                   className="w-full pl-12 pr-4 py-3.5 border border-white/20 bg-white/10 backdrop-blur-sm rounded-xl focus:border-white/40 focus:ring-2 focus:ring-white/20 outline-none transition-all text-white placeholder:text-slate-300"
                 />
               </div>
+              {searchTerm && (
+                <div className="mt-2 text-sm text-slate-300">
+                  <strong>{filteredFAQs.length}</strong> sonuç bulundu
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -306,11 +413,11 @@ const TasiyiciHelp = () => {
             </div>
             <div>
               <h2 className='text-2xl font-bold text-slate-900'>Taşıyıcı Kullanım Rehberi</h2>
-              <p className='text-slate-600'>5 adımda taşıyıcı olarak platformu kullanmaya başlayın</p>
+              <p className='text-slate-600'>4 adımda taşıyıcı olarak platformu kullanmaya başlayın</p>
             </div>
           </div>
 
-          <div className='grid grid-cols-1 md:grid-cols-5 gap-4'>
+          <div className='grid grid-cols-1 md:grid-cols-4 gap-4'>
             {guideSteps.map((step, index) => {
               const Icon = step.icon;
               return (
@@ -347,24 +454,21 @@ const TasiyiciHelp = () => {
             <h2 className='text-2xl font-bold text-slate-900'>Sık Sorulan Sorular</h2>
           </div>
 
-          {searchTerm ? (
-            <div className='mb-4 text-slate-600 text-sm'>
-              <strong>{filteredFAQs.length}</strong> sonuç bulundu
-            </div>
-          ) : (
+          {!searchTerm && (
             <div className='mb-6'>
               <div className='flex flex-wrap gap-2'>
                 {faqCategories.map((category, index) => {
                   const Icon = category.icon;
+                  const isSelected = selectedCategory === category.category;
                   return (
                     <button
                       key={index}
-                      onClick={() => {
-                        const categoryIndex = faqCategories.findIndex(cat => cat.category === category.category);
-                        const firstFAQIndex = faqCategories.slice(0, categoryIndex).reduce((acc, cat) => acc + cat.items.length, 0);
-                        setOpenFAQ(firstFAQIndex);
-                      }}
-                      className='flex items-center gap-2 px-3 py-2 bg-slate-50 text-slate-700 rounded-lg hover:bg-slate-100 border border-gray-200 transition-colors text-sm font-medium'
+                      onClick={() => handleCategoryClick(category.category)}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors text-sm font-medium ${
+                        isSelected
+                          ? 'bg-blue-50 text-blue-700 border-blue-300'
+                          : 'bg-slate-50 text-slate-700 border-gray-200 hover:bg-slate-100'
+                      }`}
                     >
                       <Icon className='w-4 h-4' />
                       {category.category}
@@ -376,7 +480,7 @@ const TasiyiciHelp = () => {
           )}
 
           <div className='space-y-3'>
-            {(searchTerm ? filteredFAQs : allFAQs).map((item, index) => {
+            {filteredFAQs.map((item, index) => {
               const isOpen = openFAQ === index;
               return (
                 <div
@@ -408,7 +512,7 @@ const TasiyiciHelp = () => {
                   {isOpen && (
                     <div className='px-4 pb-4 pt-0 border-t border-gray-200'>
                       <div className='pl-11 pt-3'>
-                        <p className='text-slate-600 leading-relaxed text-sm'>{item.answer}</p>
+                        <p className='text-slate-600 leading-relaxed text-sm whitespace-pre-line'>{item.answer}</p>
                       </div>
                     </div>
                   )}
@@ -420,60 +524,10 @@ const TasiyiciHelp = () => {
           {searchTerm && filteredFAQs.length === 0 && (
             <div className='text-center py-12'>
               <Search className='w-12 h-12 text-slate-300 mx-auto mb-4' />
-              <p className='text-slate-600'>Aradığınız soru bulunamadı. Lütfen farklı bir arama terimi deneyin.</p>
+              <p className='text-slate-600 mb-2'>Aradığınız soru bulunamadı.</p>
+              <p className='text-slate-500 text-sm'>Lütfen farklı bir arama terimi deneyin veya yukarıdaki kategorilere bakın.</p>
             </div>
           )}
-        </div>
-
-        {/* Support Options */}
-        <div className='grid grid-cols-1 md:grid-cols-3 gap-4 mb-6'>
-          <div className='bg-white rounded-xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:border-blue-300 transition-all duration-300'>
-            <div className='w-10 h-10 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center mb-4'>
-              <MessageCircle className='w-5 h-5 text-white' />
-            </div>
-            <h3 className='text-base font-semibold text-slate-900 mb-2'>Canlı Destek</h3>
-            <p className='text-slate-600 mb-4 text-sm'>
-              7/24 canlı destek hattımızdan anında yardım alın
-            </p>
-            <Link
-              to='/contact'
-              className='inline-flex items-center text-slate-900 font-medium text-sm hover:gap-2 transition-all'
-            >
-              Başlat <ArrowRight className='w-4 h-4 ml-1' />
-            </Link>
-          </div>
-
-          <div className='bg-white rounded-xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:border-blue-300 transition-all duration-300'>
-            <div className='w-10 h-10 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center mb-4'>
-              <Mail className='w-5 h-5 text-white' />
-            </div>
-            <h3 className='text-base font-semibold text-slate-900 mb-2'>Email Desteği</h3>
-            <p className='text-slate-600 mb-4 text-sm'>
-              Sorularınızı email ile gönderin, 24 saat içinde yanıt alın
-            </p>
-            <a
-              href='mailto:destek@yolnext.com'
-              className='inline-flex items-center text-slate-900 font-medium text-sm hover:gap-2 transition-all'
-            >
-              Email Gönder <ArrowRight className='w-4 h-4 ml-1' />
-            </a>
-          </div>
-
-          <div className='bg-white rounded-xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:border-blue-300 transition-all duration-300'>
-            <div className='w-10 h-10 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center mb-4'>
-              <Phone className='w-5 h-5 text-white' />
-            </div>
-            <h3 className='text-base font-semibold text-slate-900 mb-2'>Telefon Desteği</h3>
-            <p className='text-slate-600 mb-4 text-sm'>
-              Hafta içi 09:00-18:00 arası telefon desteği
-            </p>
-            <a
-              href='tel:+905551234567'
-              className='inline-flex items-center text-slate-900 font-medium text-sm hover:gap-2 transition-all'
-            >
-              Ara <ArrowRight className='w-4 h-4 ml-1' />
-            </a>
-          </div>
         </div>
 
         {/* Contact CTA */}
@@ -496,13 +550,6 @@ const TasiyiciHelp = () => {
                 <MessageCircle className='w-5 h-5' />
                 İletişime Geç
               </Link>
-              <a
-                href='mailto:destek@yolnext.com'
-                className='bg-white/10 backdrop-blur-sm text-white px-6 py-3 rounded-lg font-semibold hover:bg-white/20 transition-colors flex items-center gap-2 border border-white/20'
-              >
-                <Mail className='w-5 h-5' />
-                Email Gönder
-              </a>
             </div>
           </div>
         </div>

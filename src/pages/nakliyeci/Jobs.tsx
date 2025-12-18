@@ -52,6 +52,16 @@ interface Job {
   shipperName?: string;
   shipperEmail?: string;
   shipperPhone?: string;
+  category?: string;
+  subcategory?: string;
+  pickupCity?: string;
+  pickupDistrict?: string;
+  deliveryCity?: string;
+  deliveryDistrict?: string;
+  senderType?: string;
+  userType?: string;
+  user_type?: string;
+  role?: string;
 }
 
 const Jobs: React.FC = () => {
@@ -82,13 +92,13 @@ const Jobs: React.FC = () => {
 
   useEffect(() => {
     loadJobs();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pagination.page, statusFilter, searchTerm]);
+  }, [pagination.page, statusFilter, searchTerm, filterFromCity, filterToCity]);
 
   const loadJobs = async () => {
     try {
       setLoading(true);
       setError(null);
+      console.log('[JOBS] Loading jobs...');
 
       const params = new URLSearchParams({
         page: pagination.page.toString(),
@@ -103,24 +113,64 @@ const Jobs: React.FC = () => {
         params.append('search', searchTerm.trim());
       }
 
-      const response = await fetch(
-        `${createApiUrl('/api/shipments/open')}?${params.toString()}`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('authToken')}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error('Gönderiler yüklenemedi');
+      // Add city filters to API request
+      if (filterFromCity && filterFromCity.trim()) {
+        params.append('fromCity', filterFromCity.trim());
+      }
+      if (filterToCity && filterToCity.trim()) {
+        params.append('toCity', filterToCity.trim());
       }
 
-      const data = await response.json();
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+      let response: Response;
+      try {
+        response = await fetch(
+          `${createApiUrl('/api/shipments/open')}?${params.toString()}`,
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem('authToken')}`,
+              'Content-Type': 'application/json; charset=utf-8',
+              'Accept': 'application/json; charset=utf-8',
+            },
+            signal: controller.signal,
+          }
+        );
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('[JOBS] API error response:', errorText);
+          throw new Error(`Gönderiler yüklenemedi: ${response.status} ${response.statusText}`);
+        }
+      } catch (fetchError: any) {
+        clearTimeout(timeoutId);
+        if (fetchError.name === 'AbortError') {
+          throw new Error('İstek zaman aşımına uğradı. Lütfen tekrar deneyin.');
+        }
+        throw fetchError;
+      }
+
+      // Ensure proper UTF-8 decoding
+      const responseText = await response.text();
+      const data = JSON.parse(responseText);
+      console.log('[JOBS] API response:', data);
 
       if (data.success) {
-        setJobs(data.data || []);
+        // Map API response to include all necessary fields
+        const mappedJobs = (data.data || []).map((job: any) => ({
+          ...job,
+          shipperName: job.senderName || job.shipperName,
+          senderType: job.senderType || job.userType || job.user_type || job.role,
+          pickupCity: job.pickupCity,
+          pickupDistrict: job.pickupDistrict,
+          deliveryCity: job.deliveryCity,
+          deliveryDistrict: job.deliveryDistrict,
+        }));
+        setJobs(mappedJobs);
+        console.log('[JOBS] Jobs loaded:', mappedJobs.length);
         if (data.pagination) {
           setPagination(prev => ({
             ...prev,
@@ -134,48 +184,60 @@ const Jobs: React.FC = () => {
       }
     } catch (err) {
       console.error('Gönderiler yüklenemedi:', err);
-      setError(err instanceof Error ? err.message : 'Bilinmeyen hata');
+      const errorMessage = err instanceof Error ? err.message : 'Bilinmeyen hata';
+      setError(errorMessage);
+      // Set empty jobs array to show empty state instead of staying in loading
+      setJobs([]);
     } finally {
       setLoading(false);
     }
   };
 
   const submitOffer = async () => {
-    if (!selectedJob || !offerPrice) return;
+    const trimmedPrice = offerPrice.trim();
+    if (!selectedJob || !trimmedPrice || isNaN(parseFloat(trimmedPrice)) || parseFloat(trimmedPrice) <= 0) {
+      return;
+    }
 
     try {
+      const offerData = {
+        shipmentId: selectedJob.id,
+        price: parseFloat(trimmedPrice),
+        message: offerMessage.trim(),
+        estimatedDelivery: new Date(
+          Date.now() + 3 * 24 * 60 * 60 * 1000
+        ).toISOString(), // 3 gün sonra
+      };
       const response = await fetch(createApiUrl('/api/offers'), {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${localStorage.getItem('authToken')}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          shipmentId: selectedJob.id,
-          price: parseFloat(offerPrice),
-          message: offerMessage,
-          estimatedDelivery: new Date(
-            Date.now() + 3 * 24 * 60 * 60 * 1000
-          ).toISOString(), // 3 gün sonra
-        }),
+        body: JSON.stringify(offerData),
       });
 
+      const data = await response.json();
+      
       if (response.ok) {
         setShowOfferModal(false);
         setOfferPrice('');
         setOfferMessage('');
-        setSuccessMessage('Teklifiniz başarıyla gönderildi!');
+        setSuccessMessage(data.message || 'Teklifiniz başarıyla gönderildi!');
         setShowSuccessMessage(true);
-        // Bu nakliyeci için ilgili ilanı listeden kaldır
-        setJobs(prev => prev.filter(j => j.id !== selectedJob.id));
+        setError(null);
+        // Reload jobs to ensure sync with backend
+        await loadJobs();
         setSelectedJob(null);
       } else {
-        console.error('Failed to submit offer');
-        setError('Teklif gönderilemedi');
+        const errorMessage = data.message || data.error || 'Teklif gönderilemedi';
+        setError(errorMessage);
+        setShowOfferModal(false);
       }
     } catch (error) {
-      console.error('Error submitting offer:', error);
-      setError('Teklif gönderilemedi');
+      const errorMessage = error instanceof Error ? error.message : 'Teklif gönderilirken bir hata oluştu';
+      setError(errorMessage);
+      setShowOfferModal(false);
     }
   };
 
@@ -274,64 +336,49 @@ const Jobs: React.FC = () => {
     return { from, to, type, free: cleaned };
   };
 
-  // Extract city name from address
-  const getCityFromAddress = (address?: string): string => {
-    if (!address) return '';
-    const parts = address.split(',');
-    const cityPart = parts[parts.length - 1]?.trim() || '';
-    return cityPart.replace(/\s*(İl|İli|Şehri)$/i, '').trim();
-  };
-
-  const { from, to, type, free } = parseSearchFilters(searchTerm);
+  const { type, free } = parseSearchFilters(searchTerm);
   
-  // Combine search term filters with dedicated city filters
-  const effectiveFromCity = filterFromCity || from;
-  const effectiveToCity = filterToCity || to;
-  
+  // Backend already filters by city, so we only need to filter by:
+  // - Free text search (if not using city filters)
+  // - Status
+  // - Price
+  // - Type
   const filteredJobs = jobs
     .filter(job => {
-    const jt = normalize(job.title);
-    const jd = normalize(job.description);
-    const jp = normalize(job.pickupAddress);
-    const jv = normalize(job.deliveryAddress);
-      const pickupCity = normalize(getCityFromAddress(job.pickupAddress));
-      const deliveryCity = normalize(getCityFromAddress(job.deliveryAddress));
+      const jt = normalize(job.title);
+      const jd = normalize(job.description);
+      const jp = normalize(job.pickupAddress || '');
+      const jv = normalize(job.deliveryAddress || '');
+      const pickupCity = normalize(job.pickupCity || '');
+      const deliveryCity = normalize(job.deliveryCity || '');
       
-    const matchesSearch =
-      !free ||
-      jt.includes(free) ||
-      jd.includes(free) ||
-      jp.includes(free) ||
-      jv.includes(free);
+      // Free text search (only if not using city filters from search term)
+      const matchesSearch =
+        !free ||
+        jt.includes(free) ||
+        jd.includes(free) ||
+        jp.includes(free) ||
+        jv.includes(free) ||
+        pickupCity.includes(free) ||
+        deliveryCity.includes(free);
 
-    const matchesStatus = statusFilter === 'all' || job.status === statusFilter;
+      const matchesStatus = statusFilter === 'all' || job.status === statusFilter;
 
-    const matchesPrice =
-      priceFilter === 'all' ||
-      (priceFilter === 'low' && job.price < 500) ||
-      (priceFilter === 'medium' && job.price >= 500 && job.price < 1000) ||
-      (priceFilter === 'high' && job.price >= 1000);
-
-      // City filtering - check both dedicated filters and search term filters
-      const matchesFrom = !effectiveFromCity || 
-        pickupCity.includes(normalize(effectiveFromCity)) ||
-        jp.includes(normalize(effectiveFromCity));
+      const matchesPrice =
+        priceFilter === 'all' ||
+        (priceFilter === 'low' && job.price < 500) ||
+        (priceFilter === 'medium' && job.price >= 500 && job.price < 1000) ||
+        (priceFilter === 'high' && job.price >= 1000);
       
-      const matchesTo = !effectiveToCity || 
-        deliveryCity.includes(normalize(effectiveToCity)) ||
-        jv.includes(normalize(effectiveToCity));
-      
-    const inferred = inferLoadType(job);
-    const matchesType = !type || inferred === type;
+      const inferred = inferLoadType(job);
+      const matchesType = !type || inferred === type;
 
-    return (
-      matchesSearch &&
-      matchesStatus &&
-      matchesPrice &&
-      matchesFrom &&
-      matchesTo &&
-      matchesType
-    );
+      return (
+        matchesSearch &&
+        matchesStatus &&
+        matchesPrice &&
+        matchesType
+      );
     })
     .sort((a, b) => {
       let comparison = 0;
@@ -343,12 +390,13 @@ const Jobs: React.FC = () => {
       } else if (sortBy === 'price') {
         comparison = (a.price || 0) - (b.price || 0);
       } else if (sortBy === 'distance') {
-        const pickupCityA = getCityFromAddress(a.pickupAddress);
-        const deliveryCityA = getCityFromAddress(a.deliveryAddress);
-        const pickupCityB = getCityFromAddress(b.pickupAddress);
-        const deliveryCityB = getCityFromAddress(b.deliveryAddress);
+        // Use direct city fields for sorting
+        const pickupCityA = (a.pickupCity || '').length;
+        const deliveryCityA = (a.deliveryCity || '').length;
+        const pickupCityB = (b.pickupCity || '').length;
+        const deliveryCityB = (b.deliveryCity || '').length;
         // Simple approximation
-        comparison = (pickupCityA.length + deliveryCityA.length) - (pickupCityB.length + deliveryCityB.length);
+        comparison = (pickupCityA + deliveryCityA) - (pickupCityB + deliveryCityB);
       }
       
       return sortOrder === 'asc' ? comparison : -comparison;
@@ -356,6 +404,25 @@ const Jobs: React.FC = () => {
 
   // Using format helpers from utils/format.ts
   const formatPrice = formatCurrency;
+
+  // Category name mapping
+  const getCategoryName = (category?: string): string => {
+    if (!category) return 'Genel Gönderi';
+    
+    const categoryMap: { [key: string]: string } = {
+      'house_move': 'Ev Taşınması',
+      'furniture_goods': 'Mobilya Taşıma',
+      'electronics': 'Elektronik & Teknoloji',
+      'clothing': 'Giyim & Tekstil',
+      'food': 'Gıda & İçecek',
+      'construction': 'İnşaat Malzemeleri',
+      'automotive': 'Otomotiv',
+      'medical': 'Tıbbi Malzemeler',
+      'other': 'Diğer',
+    };
+    
+    return categoryMap[category.toLowerCase()] || category;
+  };
 
   const breadcrumbItems = [
     {
@@ -369,6 +436,9 @@ const Jobs: React.FC = () => {
   if (loading) {
     return (
       <div className='min-h-screen bg-gradient-to-br from-slate-50 to-slate-50'>
+        <Helmet>
+          <title>İş İlanları - Nakliyeci Panel - YolNext</title>
+        </Helmet>
         <div className='max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6'>
           <LoadingState message='İş ilanları yükleniyor...' />
         </div>
@@ -623,10 +693,10 @@ const Jobs: React.FC = () => {
                   <div className='flex items-start justify-between mb-3'>
                     <div className='flex-1'>
                       <h3 className='text-lg font-bold text-slate-900 mb-1'>
-                        {job.title}
+                        {getCategoryName(job.category)}
                       </h3>
-                      <p className='text-sm text-slate-600 line-clamp-2'>
-                        {job.description}
+                      <p className='text-sm text-slate-600 line-clamp-3 break-words'>
+                        {job.description || job.title || 'Açıklama belirtilmemiş'}
                       </p>
                     </div>
                     <span
@@ -653,15 +723,91 @@ const Jobs: React.FC = () => {
                   <div className='flex items-center gap-2 text-slate-600 mb-3'>
                     <MapPin className='w-4 h-4' />
                     <span className='text-sm'>
-                      {job.pickupAddress} → {job.deliveryAddress}
+                      {(() => {
+                        // Fix common encoding issues for Turkish characters
+                        const fixEncoding = (str: string | null | undefined): string => {
+                          if (!str) return '';
+                          let fixed = str;
+                          
+                          // Remove replacement characters first
+                          fixed = fixed.replace(/\uFFFD/g, '');
+                          fixed = fixed.replace(/�/g, '');
+                          
+                          // Fix common encoding issues (replacement characters)
+                          fixed = fixed.replace(/�/g, 'İ');
+                          fixed = fixed.replace(/�/g, 'ı');
+                          fixed = fixed.replace(/�/g, 'ş');
+                          fixed = fixed.replace(/�/g, 'Ş');
+                          fixed = fixed.replace(/�/g, 'ğ');
+                          fixed = fixed.replace(/�/g, 'Ğ');
+                          fixed = fixed.replace(/�/g, 'ü');
+                          fixed = fixed.replace(/�/g, 'Ü');
+                          fixed = fixed.replace(/�/g, 'ö');
+                          fixed = fixed.replace(/�/g, 'Ö');
+                          fixed = fixed.replace(/�/g, 'ç');
+                          fixed = fixed.replace(/�/g, 'Ç');
+                          
+                          // Fix common city name issues (case-insensitive, with or without Turkish chars)
+                          fixed = fixed.replace(/^stanbul$/i, 'İstanbul');
+                          fixed = fixed.replace(/^Istanbul$/i, 'İstanbul');
+                          fixed = fixed.replace(/^zmir$/i, 'İzmir');
+                          fixed = fixed.replace(/^Izmir$/i, 'İzmir');
+                          fixed = fixed.replace(/^anlurfa$/i, 'Şanlıurfa');
+                          fixed = fixed.replace(/^Sanliurfa$/i, 'Şanlıurfa');
+                          fixed = fixed.replace(/^Diyarbakr$/i, 'Diyarbakır');
+                          fixed = fixed.replace(/^Diyarbakir$/i, 'Diyarbakır');
+                          fixed = fixed.replace(/^Balkesir$/i, 'Balıkesir');
+                          fixed = fixed.replace(/^Balikesir$/i, 'Balıkesir');
+                          fixed = fixed.replace(/^Kahramanmara$/i, 'Kahramanmaraş');
+                          fixed = fixed.replace(/^Kahramanmaras$/i, 'Kahramanmaraş');
+                          fixed = fixed.replace(/^Aydn$/i, 'Aydın');
+                          fixed = fixed.replace(/^Aydin$/i, 'Aydın');
+                          fixed = fixed.replace(/^Tekirda$/i, 'Tekirdağ');
+                          fixed = fixed.replace(/^Tekirdag$/i, 'Tekirdağ');
+                          fixed = fixed.replace(/^Mula$/i, 'Muğla');
+                          fixed = fixed.replace(/^Mugla$/i, 'Muğla');
+                          fixed = fixed.replace(/^Elaz$/i, 'Elazığ');
+                          fixed = fixed.replace(/^Elazig$/i, 'Elazığ');
+                          fixed = fixed.replace(/^Ktahya$/i, 'Kütahya');
+                          fixed = fixed.replace(/^Kutahya$/i, 'Kütahya');
+                          fixed = fixed.replace(/^Uak$/i, 'Uşak');
+                          fixed = fixed.replace(/^Usak$/i, 'Uşak');
+                          fixed = fixed.replace(/^anakkale$/i, 'Çanakkale');
+                          fixed = fixed.replace(/^Canakkale$/i, 'Çanakkale');
+                          fixed = fixed.replace(/^orum$/i, 'Çorum');
+                          fixed = fixed.replace(/^Corum$/i, 'Çorum');
+                          fixed = fixed.replace(/^Nevehir$/i, 'Nevşehir');
+                          fixed = fixed.replace(/^Nevsehir$/i, 'Nevşehir');
+                          fixed = fixed.replace(/^Nide$/i, 'Niğde');
+                          fixed = fixed.replace(/^Nigde$/i, 'Niğde');
+                          fixed = fixed.replace(/^Krehir$/i, 'Kırşehir');
+                          fixed = fixed.replace(/^Kirsehir$/i, 'Kırşehir');
+                          fixed = fixed.replace(/^Kr�ehir$/i, 'Kırşehir');
+                          fixed = fixed.replace(/^Ar$/i, 'Ağrı');
+                          fixed = fixed.replace(/^Agri$/i, 'Ağrı');
+                          fixed = fixed.replace(/^Idr$/i, 'Iğdır');
+                          fixed = fixed.replace(/^Igdir$/i, 'Iğdır');
+                          fixed = fixed.replace(/^Bingl$/i, 'Bingöl');
+                          fixed = fixed.replace(/^Bingol$/i, 'Bingöl');
+                          fixed = fixed.replace(/^Mu(?![ğla])$/i, 'Muş'); // Mu but not Muğla
+                          fixed = fixed.replace(/^Mus$/i, 'Muş');
+                          fixed = fixed.replace(/^rnak$/i, 'Şırnak');
+                          fixed = fixed.replace(/^Sirnak$/i, 'Şırnak');
+                          
+                          return fixed;
+                        };
+                        const from = job.pickupCity 
+                          ? (job.pickupDistrict ? `${fixEncoding(job.pickupCity)}, ${fixEncoding(job.pickupDistrict)}` : fixEncoding(job.pickupCity))
+                          : (job.pickupAddress || 'Adres belirtilmemiş');
+                        const to = job.deliveryCity 
+                          ? (job.deliveryDistrict ? `${fixEncoding(job.deliveryCity)}, ${fixEncoding(job.deliveryDistrict)}` : fixEncoding(job.deliveryCity))
+                          : (job.deliveryAddress || 'Adres belirtilmemiş');
+                        return `${from} → ${to}`;
+                      })()}
                     </span>
                   </div>
 
                   <div className='flex items-center gap-4 text-sm text-slate-600'>
-                    <div className='flex items-center gap-1'>
-                      <Package className='w-4 h-4' />
-                      <span>{job.weight}kg</span>
-                    </div>
                     <div className='flex items-center gap-1'>
                       <Clock className='w-4 h-4' />
                       <span>{formatDate(job.pickupDate, 'long')}</span>
@@ -671,19 +817,18 @@ const Jobs: React.FC = () => {
 
                 {/* Content */}
                 <div className='p-4 sm:p-6'>
-                  <div className='flex items-center justify-between mb-4'>
-                    <div>
-                      <div className='text-2xl font-bold text-slate-900'>
-                        {formatPrice(job.price)}
-                      </div>
-                      <div className='text-sm text-slate-600'>
-                        Teklif fiyatı
-                      </div>
-                    </div>
+                  <div className='flex items-center justify-end mb-4'>
                     <div className='text-right'>
                       <div className='text-sm text-slate-600'>Gönderen</div>
                       <div className='font-medium text-slate-900'>
-                        {job.shipperName || 'Bilinmiyor'}
+                        {(() => {
+                          const senderType = job.senderType || job.userType || job.user_type || job.role;
+                          // Sadece individual veya corporate gönderen olabilir
+                          if (senderType === 'individual') return 'Bireysel Gönderici';
+                          if (senderType === 'corporate') return 'Kurumsal Gönderici';
+                          // Diğer roller (nakliyeci, tasiyici) gönderen olamaz
+                          return 'Bilinmiyor';
+                        })()}
                       </div>
                     </div>
                   </div>
@@ -693,7 +838,7 @@ const Jobs: React.FC = () => {
                       <div className='text-sm font-medium text-slate-700 mb-1'>
                         Özel Gereksinimler:
                       </div>
-                      <div className='text-sm text-slate-600'>
+                      <div className='text-sm text-slate-600 break-words whitespace-pre-wrap'>
                         {job.specialRequirements}
                       </div>
                     </div>
@@ -733,7 +878,12 @@ const Jobs: React.FC = () => {
         {showOfferModal && selectedJob && (
           <Modal
             isOpen={showOfferModal}
-            onClose={() => setShowOfferModal(false)}
+            onClose={() => {
+              setShowOfferModal(false);
+              setOfferPrice('');
+              setOfferMessage('');
+              setSelectedJob(null);
+            }}
             title='Teklif Ver'
           >
             <div className='space-y-4'>
@@ -742,7 +892,15 @@ const Jobs: React.FC = () => {
                   {selectedJob.title}
                 </h4>
                 <p className='text-sm text-slate-600'>
-                  {selectedJob.pickupAddress} → {selectedJob.deliveryAddress}
+                  {(() => {
+                    const from = selectedJob.pickupCity 
+                      ? (selectedJob.pickupDistrict ? `${selectedJob.pickupCity}, ${selectedJob.pickupDistrict}` : selectedJob.pickupCity)
+                      : (selectedJob.pickupAddress || 'Adres belirtilmemiş');
+                    const to = selectedJob.deliveryCity 
+                      ? (selectedJob.deliveryDistrict ? `${selectedJob.deliveryCity}, ${selectedJob.deliveryDistrict}` : selectedJob.deliveryCity)
+                      : (selectedJob.deliveryAddress || 'Adres belirtilmemiş');
+                    return `${from} → ${to}`;
+                  })()}
                 </p>
               </div>
 
@@ -755,7 +913,16 @@ const Jobs: React.FC = () => {
                   min='1'
                   step='1'
                   value={offerPrice}
-                  onChange={e => setOfferPrice(e.target.value)}
+                  onChange={e => {
+                    const value = e.target.value.trim();
+                    setOfferPrice(value);
+                  }}
+                  onBlur={e => {
+                    const value = e.target.value.trim();
+                    if (value && !isNaN(parseFloat(value)) && parseFloat(value) > 0) {
+                      setOfferPrice(value);
+                    }
+                  }}
                   className='w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500'
                   placeholder='Teklif fiyatınızı girin'
                 />
@@ -767,7 +934,8 @@ const Jobs: React.FC = () => {
                 </label>
                 <textarea
                   value={offerMessage}
-                  onChange={e => setOfferMessage(e.target.value)}
+                  onChange={e => setOfferMessage(e.target.value.trimStart())}
+                  onBlur={e => setOfferMessage(e.target.value.trim())}
                   className='w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500'
                   rows={3}
                   placeholder='Göndericiye mesajınızı yazın...'
@@ -779,16 +947,17 @@ const Jobs: React.FC = () => {
                   onClick={submitOffer}
                   disabled={
                     !offerPrice ||
-                    isNaN(parseFloat(offerPrice)) ||
-                    parseFloat(offerPrice) <= 0
+                    offerPrice.trim() === '' ||
+                    isNaN(parseFloat(offerPrice.trim())) ||
+                    parseFloat(offerPrice.trim()) <= 0
                   }
-                  className={`flex-1 py-2 px-4 rounded-lg transition-all duration-200 font-medium ${!offerPrice || isNaN(parseFloat(offerPrice)) || parseFloat(offerPrice) <= 0 ? 'bg-slate-300 text-slate-500 cursor-not-allowed' : 'bg-gradient-to-r from-slate-800 to-blue-900 text-white hover:shadow-lg'}`}
+                  className={`flex-1 py-2 px-4 rounded-lg transition-all duration-200 font-medium ${!offerPrice || offerPrice.trim() === '' || isNaN(parseFloat(offerPrice.trim())) || parseFloat(offerPrice.trim()) <= 0 ? 'bg-slate-300 text-slate-500 cursor-not-allowed' : 'bg-gradient-to-r from-slate-800 to-blue-900 text-white hover:shadow-lg'}`}
                 >
                   Teklif Gönder
                 </button>
                 <button
                   onClick={() => setShowOfferModal(false)}
-                  className='px-4 py-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors'
+                  className='px-4 py-2 bg-gradient-to-r from-slate-500 to-slate-600 hover:from-slate-600 hover:to-slate-700 text-white rounded-lg transition-all duration-200 shadow-md hover:shadow-lg'
                 >
                   İptal
                 </button>

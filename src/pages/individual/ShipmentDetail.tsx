@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { realApiService } from '../../services/realApi';
 import { useNavigate, useParams } from 'react-router-dom';
+import { createApiUrl } from '../../config/api';
 
 interface ShipmentDetail {
   id: string;
@@ -206,13 +207,14 @@ const IndividualShipmentDetail: React.FC = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [showOffers, setShowOffers] = useState(false);
   const [showDocuments, setShowDocuments] = useState(false);
+  const [isConfirming, setIsConfirming] = useState(false);
 
   useEffect(() => {
     const fetchShipmentDetail = async () => {
       setLoading(true);
       try {
         // Gerçek API çağrısı
-        const response = await fetch(`/api/shipments/${id}`, {
+        const response = await fetch(createApiUrl(`/api/shipments/${id}`), {
           headers: {
             Authorization: `Bearer ${localStorage.getItem('authToken')}`,
             'Content-Type': 'application/json',
@@ -221,13 +223,18 @@ const IndividualShipmentDetail: React.FC = () => {
 
         if (response.ok) {
           const data = await response.json();
-          setShipment(data.shipment);
+          const maybeShipment =
+            data?.shipment ||
+            data?.data?.shipment ||
+            data?.data ||
+            data;
+          setShipment(maybeShipment || null);
         } else {
-          console.error('Failed to fetch shipment detail');
+          // Failed to fetch shipment detail
           setShipment(null);
         }
       } catch (error) {
-        console.error('Error fetching shipment detail:', error);
+        // Error fetching shipment detail
         setShipment(null);
       } finally {
         setLoading(false);
@@ -239,26 +246,146 @@ const IndividualShipmentDetail: React.FC = () => {
     }
   }, [id]);
 
-  const handleAcceptOffer = (offerId: string) => {
-    console.log('Accept offer:', offerId);
-    // Implement offer acceptance logic
+  const handleAcceptOffer = async (offerId: string) => {
+    if (!window.confirm('Bu teklifi kabul etmek istediğinizden emin misiniz? Diğer tüm teklifler otomatik olarak reddedilecektir.')) {
+      return;
+    }
+
+    setIsConfirming(true);
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(createApiUrl(`/api/offers/${offerId}/accept`), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        // Reload shipment data to get updated status
+        const detailResponse = await fetch(createApiUrl(`/api/shipments/${id}`), {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        if (detailResponse.ok) {
+          const detailData = await detailResponse.json();
+          setShipment(detailData.shipment || detailData.data);
+        }
+        alert('Teklif başarıyla kabul edildi!');
+        // Navigate to shipments page
+        navigate('/individual/my-shipments');
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        alert(errorData.message || 'Teklif kabul edilemedi');
+      }
+    } catch (error) {
+      alert('Teklif kabul edilirken bir hata oluştu');
+    } finally {
+      setIsConfirming(false);
+    }
   };
 
-  const handleRejectOffer = (offerId: string) => {
-    console.log('Reject offer:', offerId);
-    // Implement offer rejection logic
+  const handleRejectOffer = async (offerId: string) => {
+    if (!window.confirm('Bu teklifi reddetmek istediğinizden emin misiniz?')) {
+      return;
+    }
+
+    setIsConfirming(true);
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(createApiUrl(`/api/offers/${offerId}/reject`), {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        // Reload shipment data to get updated offers
+        const detailResponse = await fetch(createApiUrl(`/api/shipments/${id}`), {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        if (detailResponse.ok) {
+          const detailData = await detailResponse.json();
+          setShipment(detailData.shipment || detailData.data);
+        }
+        alert('Teklif reddedildi');
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        alert(errorData.message || 'Teklif reddedilemedi');
+      }
+    } catch (error) {
+      alert('Teklif reddedilirken bir hata oluştu');
+    } finally {
+      setIsConfirming(false);
+    }
   };
 
   const handleContactCarrier = () => {
     if (shipment?.carrier) {
-      console.log('Contact carrier:', shipment.carrier.phone);
+      // Contact carrier
       // Implement contact logic
     }
   };
 
   const handleDownloadDocument = (document: Document) => {
-    console.log('Download document:', document.url);
+    // Download document
     // Implement document download logic
+  };
+
+  const handleConfirmDelivery = async () => {
+    if (!shipment || shipment.status !== 'delivered') {
+      return;
+    }
+
+    if (!window.confirm('Teslimatı onaylamak istediğinizden emin misiniz?')) {
+      return;
+    }
+
+    setIsConfirming(true);
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(createApiUrl(`/api/shipments/${shipment.id}/confirm-delivery`), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        // Update local state
+        setShipment((prev: ShipmentDetail | null) => prev ? { ...prev, status: 'delivered' } : null);
+        alert('Teslimat başarıyla onaylandı!');
+        // Reload shipment data
+        const detailResponse = await fetch(createApiUrl(`/api/shipments/${shipment.id}`), {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        if (detailResponse.ok) {
+          const detailData = await detailResponse.json();
+          setShipment(detailData.shipment || detailData.data);
+        }
+      } else {
+        const errorData = await response.json();
+        alert(errorData.message || 'Teslimat onaylanamadı');
+      }
+    } catch (error) {
+      // Error confirming delivery
+      alert('Teslimat onaylanırken bir hata oluştu');
+    } finally {
+      setIsConfirming(false);
+    }
   };
 
   if (loading) {
@@ -282,7 +409,7 @@ const IndividualShipmentDetail: React.FC = () => {
           <p className='text-gray-600 mb-4'>Aradığınız gönderi bulunamadı.</p>
           <button
             onClick={() => navigate('/individual/my-shipments')}
-            className='px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors duration-200'
+            className='px-4 py-2 bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 text-white rounded-md transition-all duration-200 shadow-md hover:shadow-lg'
           >
             Gönderilerime Dön
           </button>
@@ -318,7 +445,7 @@ const IndividualShipmentDetail: React.FC = () => {
             <button className='flex items-center px-4 py-2 bg-gray-600 text-white rounded-md text-sm font-medium hover:bg-gray-700 transition-colors duration-200 shadow-md'>
               <Download className='w-4 h-4 mr-2' /> İndir
             </button>
-            <button className='flex items-center px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors duration-200 shadow-md'>
+            <button className='flex items-center px-4 py-2 bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 text-white rounded-md text-sm font-medium transition-all duration-200 shadow-md hover:shadow-lg'>
               <Share2 className='w-4 h-4 mr-2' /> Paylaş
             </button>
           </div>
@@ -745,7 +872,7 @@ const IndividualShipmentDetail: React.FC = () => {
                                 </button>
                                 <button
                                   onClick={() => handleRejectOffer(offer.id)}
-                                  className='px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700'
+                                  className='px-3 py-1 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white rounded text-sm transition-all duration-200 shadow-md hover:shadow-lg'
                                 >
                                   Reddet
                                 </button>
@@ -870,7 +997,7 @@ const IndividualShipmentDetail: React.FC = () => {
                 <div className='flex space-x-2'>
                   <button
                     onClick={handleContactCarrier}
-                    className='flex-1 px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors duration-200'
+                    className='flex-1 px-4 py-2 bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 text-white rounded-md text-sm font-medium transition-all duration-200 shadow-md hover:shadow-lg'
                   >
                     <Phone className='w-4 h-4 inline mr-2' />
                     Ara
@@ -889,15 +1016,30 @@ const IndividualShipmentDetail: React.FC = () => {
                 Hızlı İşlemler
               </h3>
               <div className='space-y-3'>
-                <button className='w-full flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700 transition-colors duration-200'>
-                  <CheckCircle className='w-4 h-4 mr-2' />
-                  Teslimatı Onayla
-                </button>
-                <button className='w-full flex items-center justify-center px-4 py-2 bg-yellow-600 text-white rounded-md text-sm font-medium hover:bg-yellow-700 transition-colors duration-200'>
+                {shipment?.status === 'delivered' && (
+                  <button
+                    onClick={handleConfirmDelivery}
+                    disabled={isConfirming}
+                    className='w-full flex items-center justify-center px-4 py-2 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-md text-sm font-medium transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed'
+                  >
+                    {isConfirming ? (
+                      <>
+                        <RefreshCw className='w-4 h-4 mr-2 animate-spin' />
+                        Onaylanıyor...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className='w-4 h-4 mr-2' />
+                        Teslimatı Onayla
+                      </>
+                    )}
+                  </button>
+                )}
+                <button className='w-full flex items-center justify-center px-4 py-2 bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 text-white rounded-md text-sm font-medium transition-all duration-200 shadow-md hover:shadow-lg'>
                   <RefreshCw className='w-4 h-4 mr-2' />
                   Durumu Güncelle
                 </button>
-                <button className='w-full flex items-center justify-center px-4 py-2 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700 transition-colors duration-200'>
+                <button className='w-full flex items-center justify-center px-4 py-2 bg-gradient-to-r from-slate-500 to-slate-600 hover:from-slate-600 hover:to-slate-700 text-white rounded-md text-sm font-medium transition-all duration-200 shadow-md hover:shadow-lg'>
                   <XCircle className='w-4 h-4 mr-2' />
                   İptal Et
                 </button>

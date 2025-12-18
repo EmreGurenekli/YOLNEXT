@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import Breadcrumb from '../../components/common/Breadcrumb';
 import LoadingState from '../../components/common/LoadingState';
+import RatingModal from '../../components/RatingModal';
 import { Link } from 'react-router-dom';
 import { createApiUrl } from '../../config/api';
 
@@ -24,12 +25,25 @@ interface Job {
   completedDate: string;
   price: number;
   rating: number;
+  carrierId?: number;
+  carrierName?: string;
+  hasRatedCarrier?: boolean;
 }
+
+const safeDateText = (value?: string) => {
+  if (!value) return '-';
+  const d = new Date(value);
+  if (!Number.isFinite(d.getTime())) return '-';
+  return d.toLocaleDateString('tr-TR');
+};
 
 const TasiyiciCompletedJobs: React.FC = () => {
   const { user } = useAuth();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [selectedCarrier, setSelectedCarrier] = useState<{id: string; name: string; email: string; type: string} | null>(null);
+  const [selectedShipmentId, setSelectedShipmentId] = useState<string | null>(null);
 
   useEffect(() => {
     loadCompletedJobs();
@@ -57,7 +71,24 @@ const TasiyiciCompletedJobs: React.FC = () => {
 
       if (response.ok) {
         const data = await response.json();
-        setJobs(data.shipments || data.data || []);
+        const rows = Array.isArray(data)
+          ? data
+          : (data.shipments || data.data || []);
+
+        const mapped = (Array.isArray(rows) ? rows : []).map((s: any) => ({
+          id: typeof s.id === 'number' ? s.id : parseInt(String(s.id || 0), 10),
+          title: String(s.title || s.shipmentTitle || 'Gönderi'),
+          pickupCity: String(s.pickupCity || s.pickup_city || ''),
+          deliveryCity: String(s.deliveryCity || s.delivery_city || ''),
+          completedDate: String(s.updatedAt || s.updated_at || s.completedAt || s.completed_at || s.createdAt || s.created_at || ''),
+          price: typeof s.price === 'number' ? s.price : parseFloat(String(s.price || s.displayPrice || 0)) || 0,
+          rating: typeof s.rating === 'number' ? s.rating : parseFloat(String(s.rating || 0)) || 0,
+          carrierId: s.carrierId != null ? Number(s.carrierId) : (s.nakliyeci_id != null ? Number(s.nakliyeci_id) : undefined),
+          carrierName: String(s.carrierName || ''),
+          hasRatedCarrier: Boolean(s.hasRatedCarrier || s.has_rated_carrier),
+        }));
+
+        setJobs(mapped);
       }
     } catch (error) {
       console.error('Error loading completed jobs:', error);
@@ -150,7 +181,7 @@ const TasiyiciCompletedJobs: React.FC = () => {
                         <div>
                           <div className='text-xs text-slate-500'>Tamamlanma</div>
                           <div className='font-medium text-slate-900'>
-                            {new Date(job.completedDate).toLocaleDateString('tr-TR')}
+                            {safeDateText(job.completedDate)}
                           </div>
                         </div>
                       </div>
@@ -175,13 +206,33 @@ const TasiyiciCompletedJobs: React.FC = () => {
 
                 <div className='flex items-center justify-between pt-4 border-t border-gray-200'>
                   <span className='text-sm text-slate-500'>#{job.id}</span>
-                  <Link
-                    to={`/tasiyici/jobs/${job.id}`}
-                    className='px-4 py-2 bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 text-white rounded-lg font-medium transition-all duration-300 flex items-center gap-2 shadow-lg hover:shadow-xl'
-                  >
-                    <Eye className='w-4 h-4' />
-                    Detayları Gör
-                  </Link>
+                  <div className='flex gap-2'>
+                    {job.carrierId && !job.hasRatedCarrier && (
+                      <button
+                        onClick={() => {
+                          setSelectedCarrier({
+                            id: job.carrierId?.toString() || '',
+                            name: job.carrierName || 'Nakliyeci',
+                            email: '',
+                            type: 'nakliyeci',
+                          });
+                          setSelectedShipmentId(job.id.toString());
+                          setShowRatingModal(true);
+                        }}
+                        className='px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg font-medium transition-all duration-300 flex items-center gap-2 shadow-lg hover:shadow-xl'
+                      >
+                        <Star className='w-4 h-4' />
+                        Değerlendir
+                      </button>
+                    )}
+                    <Link
+                      to={`/tasiyici/jobs/${job.id}`}
+                      className='px-4 py-2 bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 text-white rounded-lg font-medium transition-all duration-300 flex items-center gap-2 shadow-lg hover:shadow-xl'
+                    >
+                      <Eye className='w-4 h-4' />
+                      Detayları Gör
+                    </Link>
+                  </div>
                 </div>
               </div>
             ))}
@@ -203,6 +254,25 @@ const TasiyiciCompletedJobs: React.FC = () => {
             </Link>
           </div>
         )}
+
+      {/* Rating Modal */}
+      {showRatingModal && selectedCarrier && user && (
+        <RatingModal
+          isOpen={showRatingModal}
+          onClose={() => {
+            setShowRatingModal(false);
+            setSelectedCarrier(null);
+            setSelectedShipmentId(null);
+            loadCompletedJobs(); // Reload to show updated rating
+          }}
+          ratedUser={selectedCarrier}
+          currentUser={{
+            id: user.id || '',
+            name: user.fullName || 'Kullanıcı',
+          }}
+          shipmentId={selectedShipmentId || undefined}
+        />
+      )}
       </div>
     </div>
   );

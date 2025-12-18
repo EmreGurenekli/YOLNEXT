@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Star, User, MessageSquare, ThumbsUp } from 'lucide-react';
+import { X, Star, User, MessageSquare, ThumbsUp, CheckCircle } from 'lucide-react';
 import { createApiUrl } from '../config/api';
 
 interface RatingModalProps {
@@ -38,10 +38,14 @@ const RatingModal: React.FC<RatingModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [existingRatings, setExistingRatings] = useState<Rating[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   useEffect(() => {
     if (isOpen && ratedUser.id) {
       loadExistingRatings();
+      setError('');
+      setSuccess('');
     }
   }, [isOpen, ratedUser.id]);
 
@@ -62,7 +66,8 @@ const RatingModal: React.FC<RatingModalProps> = ({
 
       if (response.ok) {
         const data = await response.json();
-        setExistingRatings(data);
+        // Backend returns { success: true, data: { ratings: [...], averageRating: ..., totalRatings: ... } }
+        setExistingRatings(data.data?.ratings || data.ratings || data || []);
       }
     } catch (error) {
       console.error('Error loading ratings:', error);
@@ -75,9 +80,18 @@ const RatingModal: React.FC<RatingModalProps> = ({
     e.preventDefault();
     if (rating === 0 || isSubmitting) return;
 
+    setError('');
+    setSuccess('');
+
     try {
       setIsSubmitting(true);
       const token = localStorage.getItem('authToken');
+
+      if (!token) {
+        setError('Oturum açmanız gerekiyor');
+        setIsSubmitting(false);
+        return;
+      }
 
       const response = await fetch(createApiUrl('/api/ratings'), {
         method: 'POST',
@@ -87,34 +101,41 @@ const RatingModal: React.FC<RatingModalProps> = ({
         },
         body: JSON.stringify({
           rated_user_id: ratedUser.id,
+          ratedUserId: ratedUser.id,
           rating,
           comment: comment.trim(),
           shipment_id: shipmentId,
+          shipmentId: shipmentId,
         }),
       });
 
-      if (response.ok) {
         const data = await response.json();
+
+      if (response.ok && data.success !== false) {
         setExistingRatings(prev => [
           {
-            id: data.data.id,
-            rating: data.data.rating,
-            comment: data.data.comment,
+            id: data.data?.id || Date.now().toString(),
+            rating: data.data?.rating || rating,
+            comment: data.data?.comment || comment.trim(),
             rater_name: currentUser.name,
-            created_at: data.data.created_at,
+            created_at: data.data?.created_at || new Date().toISOString(),
           },
           ...prev,
         ]);
         setRating(0);
         setComment('');
-        alert('Değerlendirme başarıyla gönderildi!');
+        setSuccess('Değerlendirme başarıyla gönderildi!');
+        // Modal'ı 2 saniye sonra kapat
+        setTimeout(() => {
+          onClose();
+        }, 2000);
       } else {
-        const error = await response.json();
-        alert(error.error || 'Değerlendirme gönderilemedi');
+        const errorMessage = data.message || data.error || 'Değerlendirme gönderilemedi';
+        setError(errorMessage);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error submitting rating:', error);
-      alert('Değerlendirme gönderilemedi');
+      setError(error.message || 'Değerlendirme gönderilirken bir hata oluştu');
     } finally {
       setIsSubmitting(false);
     }
@@ -165,6 +186,33 @@ const RatingModal: React.FC<RatingModalProps> = ({
             </h3>
 
             <form onSubmit={handleSubmitRating} className='space-y-6'>
+              {/* Error Message */}
+              {error && (
+                <div className='bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3'>
+                  <div className='w-5 h-5 text-red-600 flex-shrink-0 mt-0.5'>
+                    <X className='w-5 h-5' />
+                  </div>
+                  <p className='text-sm text-red-800 flex-1'>{error}</p>
+                  <button
+                    type='button'
+                    onClick={() => setError('')}
+                    className='text-red-600 hover:text-red-800'
+                  >
+                    <X className='w-4 h-4' />
+                  </button>
+                </div>
+              )}
+
+              {/* Success Message */}
+              {success && (
+                <div className='bg-green-50 border border-green-200 rounded-lg p-4 flex items-start gap-3'>
+                  <div className='w-5 h-5 text-green-600 flex-shrink-0 mt-0.5'>
+                    <ThumbsUp className='w-5 h-5' />
+                  </div>
+                  <p className='text-sm text-green-800 flex-1'>{success}</p>
+                </div>
+              )}
+
               {/* Star Rating */}
               <div>
                 <label className='block text-sm font-medium text-gray-700 mb-3'>

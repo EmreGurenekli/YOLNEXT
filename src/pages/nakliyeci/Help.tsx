@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import {
@@ -14,7 +14,6 @@ import {
   CheckCircle,
   Clock,
   Search,
-  CreditCard,
   Bell,
   BarChart3,
   Users,
@@ -23,8 +22,6 @@ import {
   Info,
   Zap,
   Target,
-  Mail,
-  Phone,
   ChevronDown,
   ChevronUp,
   Star,
@@ -34,14 +31,17 @@ import {
   FileCheck,
   Calendar,
   Route,
-  Wallet,
   Award,
+  Filter,
+  Navigation,
+  TrendingDown,
 } from 'lucide-react';
 import Breadcrumb from '../../components/common/Breadcrumb';
 
 const NakliyeciHelp = () => {
   const [openFAQ, setOpenFAQ] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   const breadcrumbItems = [
     { label: 'Ana Sayfa', href: '/nakliyeci/dashboard' },
@@ -104,7 +104,7 @@ const NakliyeciHelp = () => {
       step: 5,
       title: 'Takip ve Ödeme',
       description: 'Gönderileri takip edin ve ödemeleri alın',
-      icon: Wallet,
+      icon: DollarSign,
     },
   ];
 
@@ -115,15 +115,23 @@ const NakliyeciHelp = () => {
       items: [
         {
           question: 'Nakliyeci hesabı nasıl oluşturulur?',
-          answer: 'Kayıt sayfasından "Nakliyeci" seçeneğini seçin. Şirket bilgilerinizi, vergi numarası ve belgelerinizi girin. Hesabınız doğrulandıktan sonra gönderilere teklif vermeye başlayabilirsiniz.',
+          answer: 'Kayıt sayfasından "Nakliyeci" seçeneğini seçin. Şirket bilgilerinizi girin:\n• Şirket adı\n• Vergi numarası\n• Vergi dairesi\n• İletişim bilgileri\n• Yetkili kişi bilgileri\n\nBelgelerinizi yükleyin (vergi kayıt belgesi, taşımacılık belgesi vb.). Hesabınız doğrulandıktan sonra gönderilere teklif vermeye başlayabilirsiniz. Doğrulama genellikle 1-2 iş günü içinde tamamlanır.',
+          keywords: ['hesap', 'nakliyeci', 'oluştur', 'kayıt', 'doğrulama'],
         },
         {
           question: 'Nakliyeci olmanın avantajları nelerdir?',
-          answer: 'Açık gönderilere teklif verme, taşıyıcı yönetimi, analitik ve raporlama, güvenli ödeme ve müşteri yönetimi gibi özellikler sunulmaktadır.',
+          answer: 'Nakliyeci olarak:\n• Açık gönderilere teklif verme\n• Taşıyıcı yönetimi ve atama\n• Detaylı analitik ve raporlama\n• Güvenli ödeme sistemi\n• Müşteri yönetimi ve iletişim\n• Rota planlama araçları\n• Performans takibi\n• Komisyon: Sadece %1 (platform ücreti)\n\nPlatform tamamen ücretsizdir, sadece tamamlanan gönderiler için %1 komisyon alınır.',
+          keywords: ['avantaj', 'özellik', 'nakliyeci', 'fayda', 'komisyon'],
         },
         {
           question: 'Komisyon oranı nedir?',
-          answer: 'YolNext platformu %1 komisyon alır. Bu, tamamlanan her gönderi için geçerlidir. Komisyon ödeme sırasında otomatik olarak kesilir.',
+          answer: 'YolNext platformu tamamlanan her gönderi için %1 komisyon alır. Bu komisyon:\n• Gönderi teslim edilip gönderici onay verdiğinde kesilir\n• Komisyon platform ücretidir\n\nKomisyon dışında hiçbir ücret yoktur. Platform kullanımı tamamen ücretsizdir.',
+          keywords: ['komisyon', '%1', 'ücret', 'ödeme'],
+        },
+        {
+          question: 'Hesap doğrulama süreci nasıl işler?',
+          answer: 'Doğrulama süreci:\n1. Şirket bilgileriniz kontrol edilir\n2. Vergi numarası doğrulanır\n3. Yüklediğiniz belgeler incelenir (vergi kayıt belgesi, taşımacılık belgesi vb.)\n4. Doğrulama tamamlandığında e-posta ile bilgilendirilirsiniz\n\nDoğrulama genellikle 1-2 iş günü içinde tamamlanır. Doğrulama sonrası gönderilere teklif vermeye başlayabilirsiniz.',
+          keywords: ['doğrulama', 'süreç', 'belge', 'onay'],
         },
       ],
     },
@@ -133,19 +141,33 @@ const NakliyeciHelp = () => {
       items: [
         {
           question: 'Gönderilere nasıl teklif veririm?',
-          answer: 'Yük Pazarı sayfasından açık gönderileri görüntüleyin. İlgilendiğiniz gönderiye tıklayın ve "Teklif Ver" butonuna basın. Fiyat, teslimat süresi ve özel notlarınızı ekleyerek teklif oluşturun.',
-        },
-        {
-          question: 'Teklifimi nasıl düzenleyebilirim?',
-          answer: 'Teklif verildikten sonra gönderici kabul etmeden önce teklifinizi düzenleyebilir veya iptal edebilirsiniz. Gönderici kabul ettikten sonra değişiklik yapılamaz.',
-        },
-        {
-          question: 'Kaç gönderiye teklif verebilirim?',
-          answer: 'Sınırsız sayıda gönderiye teklif verebilirsiniz. Ancak kabul edilen gönderilerinizi zamanında teslim etmeniz önemlidir.',
+          answer: 'Yük Pazarı sayfasından açık gönderileri görüntüleyin:\n1. İlgilendiğiniz gönderiye tıklayın\n2. Gönderi detaylarını inceleyin (kategori, ağırlık, hacim, adresler, özel gereksinimler)\n3. "Teklif Ver" butonuna basın\n4. Fiyat, teslimat süresi ve özel notlarınızı girin\n5. Teklifi gönderin\n\nGönderici teklifinizi görüntüleyip kabul edebilir veya reddedebilir.',
+          keywords: ['teklif', 'ver', 'nasıl', 'gönderi', 'fiyat'],
         },
         {
           question: 'Teklif fiyatını nasıl belirlemeliyim?',
-          answer: 'Mesafe, ağırlık, hacim, özel gereksinimler ve yakıt maliyetlerini göz önünde bulundurarak rekabetçi bir fiyat belirleyin. Platform üzerinden benzer gönderilerin fiyatlarını inceleyebilirsiniz.',
+          answer: 'Teklif fiyatını belirlerken şu faktörleri göz önünde bulundurun:\n• Mesafe (km)\n• Ağırlık ve hacim\n• Özel gereksinimler (kırılgan, soğuk zincir, acil vb.)\n• Yakıt maliyetleri\n• Araç ve işçilik maliyetleri\n• Kar marjı\n\nPlatform üzerinden benzer gönderilerin fiyatlarını inceleyerek rekabetçi bir fiyat belirleyebilirsiniz. Düşük fiyat daha fazla kabul şansı sağlar, ancak karlılığınızı da koruyun.',
+          keywords: ['fiyat', 'belirle', 'hesapla', 'maliyet', 'kar'],
+        },
+        {
+          question: 'Teklifimi nasıl düzenleyebilirim?',
+          answer: 'Teklif verildikten sonra gönderici kabul etmeden önce:\n• Teklifinizi düzenleyebilirsiniz (fiyat, süre, notlar)\n• Teklifinizi iptal edebilirsiniz\n\nGönderici kabul ettikten sonra teklif değiştirilemez. Eğer değişiklik yapmanız gerekiyorsa, gönderici ile iletişime geçmeniz gerekir.',
+          keywords: ['düzenle', 'değiştir', 'güncelle', 'iptal'],
+        },
+        {
+          question: 'Kaç gönderiye teklif verebilirim?',
+          answer: 'Sınırsız sayıda gönderiye teklif verebilirsiniz. Ancak:\n• Kabul edilen gönderileri zamanında teslim etmeniz önemlidir\n• Çok fazla teklif verip az kabul almak yerine, uygun gönderilere odaklanın\n• Teklif kabul oranınız performans puanınızı etkiler\n\nAktif gönderilerinizi yönetebilir ve kapasitenize göre teklif verebilirsiniz.',
+          keywords: ['sınırsız', 'kaç', 'limit', 'kapasite'],
+        },
+        {
+          question: 'Teklif kabul oranını nasıl artırabilirim?',
+          answer: 'Teklif kabul oranını artırmak için:\n• Rekabetçi fiyatlar belirleyin\n• Hızlı teslimat süreleri sunun\n• Yüksek performans puanına sahip olun\n• Gönderici ile iletişime geçin ve sorularını yanıtlayın\n• Özel notlar ekleyerek profesyonelliğinizi gösterin\n• Zamanında teslimat yaparak güven oluşturun\n\nYüksek kabul oranı daha fazla iş ve daha iyi puan anlamına gelir.',
+          keywords: ['kabul', 'oran', 'artır', 'başarı', 'performans'],
+        },
+        {
+          question: 'Rota planlama nasıl çalışır?',
+          answer: 'Rota Planlama sayfasından:\n• Birden fazla gönderiyi tek rotada birleştirebilirsiniz\n• Optimize edilmiş rota önerileri alabilirsiniz\n• Mesafe ve süre hesaplamaları yapabilirsiniz\n• Yakıt maliyetlerini hesaplayabilirsiniz\n\nRota planlama ile daha verimli çalışabilir ve maliyetlerinizi düşürebilirsiniz.',
+          keywords: ['rota', 'planlama', 'optimize', 'mesafe'],
         },
       ],
     },
@@ -155,19 +177,28 @@ const NakliyeciHelp = () => {
       items: [
         {
           question: 'Taşıyıcı nasıl eklenir?',
-          answer: 'Taşıyıcılarım sayfasından "Taşıyıcı Ekle" butonuna tıklayın. Taşıyıcı bilgilerini girin ve belgelerini yükleyin. Taşıyıcı hesabı oluşturulduktan sonra görevlere atayabilirsiniz.',
+          answer: 'Taşıyıcılarım sayfasından:\n1. "Taşıyıcı Ekle" butonuna tıklayın\n2. Taşıyıcı bilgilerini girin (ad, soyad, telefon, e-posta)\n3. Araç bilgilerini girin (plaka, model, tip)\n4. Belgelerini yükleyin (ehliyet, ruhsat)\n5. Kaydedin\n\nTaşıyıcı hesabı oluşturulduktan sonra görevlere atayabilirsiniz. Taşıyıcı kendi hesabı ile giriş yapar ve görevlerini görüntüler.',
+          keywords: ['taşıyıcı', 'ekle', 'yönet', 'araç'],
         },
         {
           question: 'Gönderiyi taşıyıcıya nasıl atarım?',
-          answer: 'Aktif Yükler sayfasından gönderiyi seçin ve "Taşıyıcıya Ata" butonuna tıklayın. Mevcut taşıyıcılarınızdan birini seçin veya yeni bir ilan oluşturun.',
+          answer: 'Aktif Yükler sayfasından:\n1. Gönderiyi seçin\n2. "Taşıyıcıya Ata" butonuna tıklayın\n3. Mevcut taşıyıcılarınızdan birini seçin\n4. Veya "Yeni İlan Oluştur" ile taşıyıcı pazarına ilan verin\n5. Atama yapın\n\nTaşıyıcı atandıktan sonra gönderi durumu güncellenir ve taşıyıcıya bildirim gönderilir.',
+          keywords: ['ata', 'taşıyıcı', 'görev', 'ilan'],
         },
         {
           question: 'Taşıyıcı performansını nasıl takip ederim?',
-          answer: 'Taşıyıcılarım sayfasından her taşıyıcının istatistiklerini, tamamladığı görevleri ve puanlarını görüntüleyebilirsiniz.',
+          answer: 'Taşıyıcılarım sayfasından:\n• Her taşıyıcının istatistiklerini görüntüleyebilirsiniz\n• Tamamlanan görev sayısı\n• Ortalama puan\n• Tamamlanma oranı\n• Toplam kazanç\n• Son aktivite tarihi\n\nPerformans verilerine göre taşıyıcıları değerlendirebilir ve ödüllendirebilirsiniz.',
+          keywords: ['performans', 'takip', 'istatistik', 'puan'],
         },
         {
           question: 'Taşıyıcı ile nasıl iletişim kurarım?',
-          answer: 'Gönderi detay sayfasından taşıyıcı ile mesajlaşabilirsiniz. Ayrıca telefon numarası üzerinden de iletişim kurabilirsiniz.',
+          answer: 'Gönderi detay sayfasından taşıyıcı ile mesajlaşabilirsiniz:\n• Mesaj gönderebilirsiniz\n• Durum güncellemeleri isteyebilirsiniz\n• Sorularınızı sorabilirsiniz\n\nAyrıca telefon numarası üzerinden de iletişim kurabilirsiniz. Tüm mesajlaşmalar kayıt altına alınır.',
+          keywords: ['iletişim', 'mesaj', 'taşıyıcı', 'sohbet'],
+        },
+        {
+          question: 'Taşıyıcı pazarı nedir?',
+          answer: 'Taşıyıcı pazarı, gönderilerinizi taşıyıcılara ilan vererek atama yapabileceğiniz bir sistemdir:\n• Gönderi için ilan oluşturun\n• Taşıyıcılar ilanı görüntüleyip başvurabilir\n• Başvuran taşıyıcılardan birini seçin\n• Atama yapın\n\nBu sistem ile daha geniş bir taşıyıcı havuzuna erişebilirsiniz.',
+          keywords: ['pazar', 'ilan', 'başvuru', 'taşıyıcı'],
         },
       ],
     },
@@ -177,37 +208,54 @@ const NakliyeciHelp = () => {
       items: [
         {
           question: 'Gönderileri nasıl takip ederim?',
-          answer: 'Aktif Yükler sayfasından tüm gönderilerinizin durumunu görebilirsiniz. Canlı takip özelliği ile taşıyıcının konumunu gerçek zamanlı takip edebilirsiniz.',
+          answer: 'Aktif Yükler sayfasından tüm gönderilerinizin durumunu görebilirsiniz:\n• Beklemede: Teklif bekleniyor\n• Teklif Kabul Edildi: Gönderici teklifinizi kabul etti\n• Taşıyıcı Atandı: Gönderi taşıyıcıya atandı\n• Yola Çıktı: Taşıyıcı gönderiyi aldı ve yola çıktı\n• Teslimatta: Gönderi teslimat adresine yaklaştı\n• Teslim Edildi: Gönderi başarıyla teslim edildi\n\nCanlı takip özelliği ile taşıyıcının konumunu gerçek zamanlı takip edebilirsiniz.',
+          keywords: ['takip', 'durum', 'canlı', 'konum'],
         },
         {
           question: 'Gönderi durumlarını nasıl güncellerim?',
-          answer: 'Gönderi detay sayfasından durum güncellemesi yapabilirsiniz. Taşıyıcı atandıktan sonra durum güncellemeleri otomatik olarak göndericiye bildirilir.',
+          answer: 'Gönderi durumları genellikle taşıyıcı tarafından güncellenir:\n• Taşıyıcı gönderiyi aldığında: "Yola Çıktı"\n• Teslimat adresine yaklaştığında: "Teslimatta"\n• Teslim ettiğinde: "Teslim Edildi"\n\nAncak siz de gönderi detay sayfasından durum güncellemesi yapabilirsiniz. Durum güncellemeleri otomatik olarak göndericiye bildirilir.',
+          keywords: ['durum', 'güncelle', 'taşıyıcı'],
+        },
+        {
+          question: 'Canlı takip nasıl çalışır?',
+          answer: 'Canlı takip özelliği ile:\n• Taşıyıcının gerçek zamanlı konumunu görebilirsiniz\n• Harita üzerinde gönderinin nerede olduğunu görebilirsiniz\n• Tahmini varış süresini görebilirsiniz\n• Rota bilgisini görebilirsiniz\n\nBu özellik taşıyıcı gönderiyi aldıktan sonra aktif olur. Taşıyıcının konum paylaşımı açık olmalıdır.',
+          keywords: ['canlı takip', 'konum', 'harita', 'rota'],
         },
         {
           question: 'Teslimat nasıl onaylanır?',
-          answer: 'Taşıyıcı gönderiyi teslim ettikten sonra gönderici onay verir. Onay sonrası ödeme süreci başlar.',
+          answer: 'Teslimat süreci:\n1. Taşıyıcı gönderiyi teslim eder\n2. Gönderici teslimatı kontrol eder\n3. Gönderici teslimatı onaylar\n4. Onay sonrası ödeme süreci başlar\n5. Ödeme gönderici ile anlaşmanıza göre yapılır (komisyon düşülür)\n\nGönderici onay vermezse, durum "Beklemede" olarak kalır ve iletişime geçmeniz gerekir.',
+          keywords: ['teslimat', 'onay', 'gönderici', 'ödeme'],
+        },
+        {
+          question: 'Gönderi gecikirse ne yapmalıyım?',
+          answer: 'Gönderi gecikirse:\n1. Gönderici ile iletişime geçin ve durumu açıklayın\n2. Yeni teslimat tarihi belirleyin\n3. Gerekirse taşıyıcı ile iletişime geçin\n4. Sorun devam ederse destek ekibimizle iletişime geçin\n\nGecikme durumunda göndericiye bilgi vermeniz önemlidir. İletişim kurarak sorunları çözebilirsiniz.',
+          keywords: ['gecikme', 'sorun', 'iletişim', 'tarih'],
         },
       ],
     },
     {
-      category: 'Ödeme ve Cüzdan',
-      icon: Wallet,
+      category: 'Ödeme ve Komisyon',
+      icon: DollarSign,
       items: [
         {
           question: 'Ödemeleri nasıl alırım?',
-          answer: 'Tamamlanan gönderiler için ödemeler otomatik olarak cüzdanınıza yüklenir. Cüzdan sayfasından bakiyenizi görüntüleyebilir ve para çekme işlemi yapabilirsiniz.',
-        },
-        {
-          question: 'Para çekme süreci nasıl işler?',
-          answer: 'Cüzdan sayfasından "Para Çek" butonuna tıklayın. Banka hesap bilgilerinizi girin ve çekmek istediğiniz tutarı belirtin. 1-3 iş günü içinde para hesabınıza yatırılır.',
+          answer: 'Tamamlanan gönderiler için ödemeler gönderici ile anlaşmanıza göre yapılır:\n• Gönderi teslim edilip gönderici onay verdiğinde\n• Ödeme süreci gönderici ile anlaşmanıza bağlıdır\n• Platform %1 komisyon alır\n\nÖdeme detayları gönderici ile görüşülerek belirlenir.',
+          keywords: ['ödeme', 'al', 'gönderici', 'teslimat'],
         },
         {
           question: 'Komisyon ne zaman kesilir?',
-          answer: 'Gönderi teslim edilip gönderici onay verdiğinde ödeme cüzdanınıza yüklenir. Komisyon (%1) bu sırada otomatik olarak kesilir.',
+          answer: 'Komisyon (%1) gönderi teslim edilip gönderici onay verdiğinde otomatik olarak kesilir:\n• Komisyon platform ücretidir\n• Komisyon gönderi fiyatı üzerinden hesaplanır\n\nKomisyon dışında hiçbir ücret yoktur. Platform kullanımı tamamen ücretsizdir.',
+          keywords: ['komisyon', '%1', 'kes', 'ücret'],
         },
         {
           question: 'Fatura nasıl alırım?',
-          answer: 'Tamamlanan gönderiler için otomatik olarak e-fatura oluşturulur. Faturalar sayfasından tüm faturalarınızı görüntüleyebilir ve indirebilirsiniz.',
+          answer: 'Tamamlanan gönderiler için otomatik olarak e-fatura oluşturulur:\n• Faturalar sayfasından tüm faturalarınızı görüntüleyebilirsiniz\n• Fatura detayları: gönderi bilgileri, gönderici bilgileri, ödeme bilgileri, tarih ve fiyat\n• Faturaları PDF olarak indirebilirsiniz\n• Fatura numarası ile takip edebilirsiniz\n\nFaturalar muhasebe sisteminize aktarılabilir.',
+          keywords: ['fatura', 'e-fatura', 'indir', 'pdf'],
+        },
+        {
+          question: 'Ödeme geçmişini nasıl görüntülerim?',
+          answer: 'Ödeme geçmişi:\n• Gönderilerim sayfasından tamamlanan gönderilerinizi görebilirsiniz\n• Gönderi bazlı ödeme detayları\n• Komisyon kesintileri\n• Tarih ve tutar bilgileri\n\nAnalitik sayfasından toplu ödeme raporları alabilirsiniz.',
+          keywords: ['ödeme', 'geçmiş', 'rapor', 'gönderi'],
         },
       ],
     },
@@ -217,11 +265,18 @@ const NakliyeciHelp = () => {
       items: [
         {
           question: 'Hangi raporlar mevcuttur?',
-          answer: 'Gönderi istatistikleri, kazanç analizleri, taşıyıcı performans raporları, kategori bazlı analizler ve zaman bazlı trendler görüntüleyebilirsiniz.',
+          answer: 'Detaylı analitik ve raporlar:\n• Gönderi istatistikleri (toplam, kabul edilen, tamamlanan)\n• Kazanç analizleri (günlük, haftalık, aylık)\n• Taşıyıcı performans raporları\n• Kategori bazlı analizler\n• Zaman bazlı trendler\n• Teklif kabul oranı\n• Ortalama gönderi değeri\n• Toplam kazanç\n\nRaporları görsel grafikler ve tablolar halinde görüntüleyebilirsiniz.',
+          keywords: ['rapor', 'analitik', 'istatistik', 'grafik'],
         },
         {
           question: 'Raporları nasıl dışa aktarırım?',
-          answer: 'Analitik sayfasından CSV veya Excel formatında raporları dışa aktarabilirsiniz. Özel tarih aralığı seçerek detaylı raporlar oluşturabilirsiniz.',
+          answer: 'Raporları dışa aktarma:\n1. Analitik sayfasından istediğiniz raporu seçin\n2. Tarih aralığı belirleyin\n3. "Dışa Aktar" butonuna tıklayın\n4. Format seçin (CSV, Excel, PDF)\n5. İndirin\n\nÖzel tarih aralığı seçerek detaylı raporlar oluşturabilirsiniz.',
+          keywords: ['dışa aktar', 'excel', 'csv', 'pdf'],
+        },
+        {
+          question: 'Performans metrikleri nelerdir?',
+          answer: 'Performans metrikleri:\n• Teklif kabul oranı\n• Ortalama gönderi değeri\n• Toplam kazanç\n• Tamamlanan gönderi sayısı\n• Ortalama puan\n• Taşıyıcı performansı\n• Kategori bazlı başarı oranı\n\nBu metrikler işinizi geliştirmenize yardımcı olur.',
+          keywords: ['performans', 'metrik', 'başarı', 'oran'],
         },
       ],
     },
@@ -231,11 +286,23 @@ const NakliyeciHelp = () => {
       items: [
         {
           question: 'Teklifi iptal edebilir miyim?',
-          answer: 'Gönderici kabul etmeden önce teklifinizi iptal edebilirsiniz. Ancak kabul edilen teklifler için iptal koşulları gönderici ile anlaşmanıza bağlıdır.',
+          answer: 'Gönderici kabul etmeden önce teklifinizi iptal edebilirsiniz:\n• Teklifler sayfasından teklifinizi seçin\n• "İptal Et" butonuna tıklayın\n• Onaylayın\n\nAncak kabul edilen teklifler için iptal koşulları gönderici ile anlaşmanıza bağlıdır. İptal durumunda gönderici ile iletişime geçmeniz gerekir.',
+          keywords: ['iptal', 'teklif', 'vazgeç'],
+        },
+        {
+          question: 'Gönderi iptal edilirse ne olur?',
+          answer: 'Gönderi iptal edilirse:\n• Gönderici iptal ederse: İptal koşullarına göre iade yapılır\n• Siz iptal ederseniz: Gönderici ile anlaşmanız gerekir\n• İptal durumunda ödeme yapılmaz\n• İptal edilen gönderiler raporlarda görüntülenir\n\nİptal işlemi Gönderilerim sayfasından yapılır.',
+          keywords: ['iptal', 'gönderi', 'iade', 'ödeme'],
         },
         {
           question: 'Sorun yaşarsam ne yapmalıyım?',
-          answer: 'Herhangi bir sorun yaşarsanız gönderi detay sayfasından gönderici ile iletişime geçebilir veya destek ekibimizle iletişime geçebilirsiniz.',
+          answer: 'Herhangi bir sorun yaşarsanız:\n• Gönderi detay sayfasından gönderici ile iletişime geçin\n• Mesaj göndererek sorunu açıklayın\n• Destek ekibimizle iletişime geçin\n• Şikayet sayfasından sorununuzu bildirin\n\nTüm iletişimler kayıt altına alınır ve değerlendirilir.',
+          keywords: ['sorun', 'şikayet', 'iletişim', 'destek'],
+        },
+        {
+          question: 'Gönderi hasar gördüyse ne yapmalıyım?',
+          answer: 'Gönderi hasar gördüyse:\n1. Hemen gönderici ile iletişime geçin\n2. Durumu bildirin\n3. Hasar fotoğrafları çekin\n4. Taşıyıcı ile iletişime geçin\n5. Destek ekibimizle iletişime geçin\n\nHasar durumunda sigorta kapsamı ve çözüm süreçleri değerlendirilir.',
+          keywords: ['hasar', 'bozuk', 'sorun', 'sigorta'],
         },
       ],
     },
@@ -243,13 +310,36 @@ const NakliyeciHelp = () => {
 
   const allFAQs = faqCategories.flatMap(cat => cat.items);
 
-  const filteredFAQs = allFAQs.filter(faq =>
-    faq.question.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    faq.answer.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredFAQs = useMemo(() => {
+    if (!searchTerm.trim()) {
+      if (selectedCategory) {
+        const category = faqCategories.find(cat => cat.category === selectedCategory);
+        return category ? category.items : [];
+      }
+      return allFAQs;
+    }
+
+    const searchLower = searchTerm.toLowerCase();
+    return allFAQs.filter(faq => {
+      const questionMatch = faq.question.toLowerCase().includes(searchLower);
+      const answerMatch = faq.answer.toLowerCase().includes(searchLower);
+      const keywordMatch = faq.keywords?.some(keyword => keyword.toLowerCase().includes(searchLower));
+      return questionMatch || answerMatch || keywordMatch;
+    });
+  }, [searchTerm, selectedCategory, allFAQs, faqCategories]);
 
   const toggleFAQ = (index: number) => {
     setOpenFAQ(openFAQ === index ? null : index);
+  };
+
+  const handleCategoryClick = (category: string) => {
+    setSelectedCategory(selectedCategory === category ? null : category);
+    setSearchTerm('');
+    const categoryIndex = faqCategories.findIndex(cat => cat.category === category);
+    if (categoryIndex !== -1) {
+      const firstFAQIndex = faqCategories.slice(0, categoryIndex).reduce((acc, cat) => acc + cat.items.length, 0);
+      setOpenFAQ(firstFAQIndex);
+    }
   };
 
   return (
@@ -276,7 +366,7 @@ const NakliyeciHelp = () => {
               <div className='flex-1'>
                 <h1 className='text-3xl font-bold mb-2 bg-gradient-to-r from-white to-blue-200 bg-clip-text text-transparent'>
                   Nakliyeci Yardım Merkezi
-          </h1>
+                </h1>
                 <p className='text-slate-200 text-lg leading-relaxed'>
                   Nakliyeci olarak platformu nasıl kullanacağınız hakkında kapsamlı bilgiler. Sorularınızın cevaplarını burada bulabilirsiniz.
                 </p>
@@ -289,12 +379,20 @@ const NakliyeciHelp = () => {
                 <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-300 w-5 h-5" />
                 <input
                   type="text"
-                  placeholder="Sorunuzu arayın..."
+                  placeholder="Sorunuzu yazın ve arayın... (örn: teklif nasıl verilir, taşıyıcı nasıl atanır)"
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setSelectedCategory(null);
+                  }}
                   className="w-full pl-12 pr-4 py-3.5 border border-white/20 bg-white/10 backdrop-blur-sm rounded-xl focus:border-white/40 focus:ring-2 focus:ring-white/20 outline-none transition-all text-white placeholder:text-slate-300"
                 />
               </div>
+              {searchTerm && (
+                <div className="mt-2 text-sm text-slate-300">
+                  <strong>{filteredFAQs.length}</strong> sonuç bulundu
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -314,7 +412,7 @@ const NakliyeciHelp = () => {
                 </div>
                 <h3 className='text-base font-semibold text-slate-900 mb-2'>
                   {action.title}
-              </h3>
+                </h3>
                 <p className='text-sm text-slate-600 mb-4'>
                   {action.description}
                 </p>
@@ -375,24 +473,21 @@ const NakliyeciHelp = () => {
             <h2 className='text-2xl font-bold text-slate-900'>Sık Sorulan Sorular</h2>
           </div>
 
-          {searchTerm ? (
-            <div className='mb-4 text-slate-600 text-sm'>
-              <strong>{filteredFAQs.length}</strong> sonuç bulundu
-            </div>
-          ) : (
+          {!searchTerm && (
             <div className='mb-6'>
               <div className='flex flex-wrap gap-2'>
                 {faqCategories.map((category, index) => {
                   const Icon = category.icon;
+                  const isSelected = selectedCategory === category.category;
                   return (
                     <button
                       key={index}
-                      onClick={() => {
-                        const categoryIndex = faqCategories.findIndex(cat => cat.category === category.category);
-                        const firstFAQIndex = faqCategories.slice(0, categoryIndex).reduce((acc, cat) => acc + cat.items.length, 0);
-                        setOpenFAQ(firstFAQIndex);
-                      }}
-                      className='flex items-center gap-2 px-3 py-2 bg-slate-50 text-slate-700 rounded-lg hover:bg-slate-100 border border-gray-200 transition-colors text-sm font-medium'
+                      onClick={() => handleCategoryClick(category.category)}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors text-sm font-medium ${
+                        isSelected
+                          ? 'bg-blue-50 text-blue-700 border-blue-300'
+                          : 'bg-slate-50 text-slate-700 border-gray-200 hover:bg-slate-100'
+                      }`}
                     >
                       <Icon className='w-4 h-4' />
                       {category.category}
@@ -404,7 +499,7 @@ const NakliyeciHelp = () => {
           )}
 
           <div className='space-y-3'>
-            {(searchTerm ? filteredFAQs : allFAQs).map((item, index) => {
+            {filteredFAQs.map((item, index) => {
               const isOpen = openFAQ === index;
               return (
                 <div
@@ -436,7 +531,7 @@ const NakliyeciHelp = () => {
                   {isOpen && (
                     <div className='px-4 pb-4 pt-0 border-t border-gray-200'>
                       <div className='pl-11 pt-3'>
-                        <p className='text-slate-600 leading-relaxed text-sm'>{item.answer}</p>
+                        <p className='text-slate-600 leading-relaxed text-sm whitespace-pre-line'>{item.answer}</p>
                       </div>
                     </div>
                   )}
@@ -448,60 +543,10 @@ const NakliyeciHelp = () => {
           {searchTerm && filteredFAQs.length === 0 && (
             <div className='text-center py-12'>
               <Search className='w-12 h-12 text-slate-300 mx-auto mb-4' />
-              <p className='text-slate-600'>Aradığınız soru bulunamadı. Lütfen farklı bir arama terimi deneyin.</p>
+              <p className='text-slate-600 mb-2'>Aradığınız soru bulunamadı.</p>
+              <p className='text-slate-500 text-sm'>Lütfen farklı bir arama terimi deneyin veya yukarıdaki kategorilere bakın.</p>
             </div>
           )}
-        </div>
-
-        {/* Support Options */}
-        <div className='grid grid-cols-1 md:grid-cols-3 gap-4 mb-6'>
-          <div className='bg-white rounded-xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:border-blue-300 transition-all duration-300'>
-            <div className='w-10 h-10 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center mb-4'>
-              <MessageCircle className='w-5 h-5 text-white' />
-            </div>
-            <h3 className='text-base font-semibold text-slate-900 mb-2'>Canlı Destek</h3>
-            <p className='text-slate-600 mb-4 text-sm'>
-              7/24 canlı destek hattımızdan anında yardım alın
-            </p>
-            <Link
-              to='/contact'
-              className='inline-flex items-center text-slate-900 font-medium text-sm hover:gap-2 transition-all'
-            >
-              Başlat <ArrowRight className='w-4 h-4 ml-1' />
-            </Link>
-          </div>
-
-          <div className='bg-white rounded-xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:border-blue-300 transition-all duration-300'>
-            <div className='w-10 h-10 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center mb-4'>
-              <Mail className='w-5 h-5 text-white' />
-            </div>
-            <h3 className='text-base font-semibold text-slate-900 mb-2'>Email Desteği</h3>
-            <p className='text-slate-600 mb-4 text-sm'>
-              Sorularınızı email ile gönderin, 24 saat içinde yanıt alın
-            </p>
-            <a
-              href='mailto:destek@yolnext.com'
-              className='inline-flex items-center text-slate-900 font-medium text-sm hover:gap-2 transition-all'
-            >
-              Email Gönder <ArrowRight className='w-4 h-4 ml-1' />
-            </a>
-          </div>
-
-          <div className='bg-white rounded-xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:border-blue-300 transition-all duration-300'>
-            <div className='w-10 h-10 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center mb-4'>
-              <Phone className='w-5 h-5 text-white' />
-            </div>
-            <h3 className='text-base font-semibold text-slate-900 mb-2'>Telefon Desteği</h3>
-            <p className='text-slate-600 mb-4 text-sm'>
-              Hafta içi 09:00-18:00 arası telefon desteği
-            </p>
-            <a
-              href='tel:+905551234567'
-              className='inline-flex items-center text-slate-900 font-medium text-sm hover:gap-2 transition-all'
-            >
-              Ara <ArrowRight className='w-4 h-4 ml-1' />
-            </a>
-          </div>
         </div>
 
         {/* Contact CTA */}
@@ -524,14 +569,7 @@ const NakliyeciHelp = () => {
                 <MessageCircle className='w-5 h-5' />
                 İletişime Geç
               </Link>
-              <a
-                href='mailto:destek@yolnext.com'
-                className='bg-white/10 backdrop-blur-sm text-white px-6 py-3 rounded-lg font-semibold hover:bg-white/20 transition-colors flex items-center gap-2 border border-white/20'
-              >
-                <Mail className='w-5 h-5' />
-                Email Gönder
-              </a>
-              </div>
+            </div>
           </div>
         </div>
       </div>

@@ -39,6 +39,9 @@ import {
   TrendingDown,
   UserPlus,
   TruckIcon,
+  Copy,
+  CheckCircle,
+  AlertCircle,
 } from 'lucide-react';
 import Breadcrumb from '../../components/common/Breadcrumb';
 import EmptyState from '../../components/common/EmptyState';
@@ -88,6 +91,7 @@ const Dashboard = () => {
   const [successMessage, setSuccessMessage] = useState('');
   const [showNotificationModal, setShowNotificationModal] = useState(false);
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  const [copiedCode, setCopiedCode] = useState(false);
 
   // Yeni kullanıcılar için boş veriler
   const emptyData = {
@@ -118,8 +122,22 @@ const Dashboard = () => {
       // Dashboard stats
       try {
         const statsResponse = await dashboardAPI.getStats('nakliyeci');
-        if (statsResponse.data?.success) {
-          setStats(statsResponse.data.data);
+        if (statsResponse?.success) {
+          const backendStats =
+            (statsResponse.data?.stats || statsResponse.data || {}) as any;
+          setStats({
+            ...emptyData.stats,
+            totalShipments: backendStats.activeShipments || 0,
+            pendingShipments: backendStats.activeShipments || 0,
+            totalOffers: backendStats.totalOffers || 0,
+            acceptedOffers: backendStats.acceptedOffers || 0,
+            openListings: backendStats.openListings || 0,
+            deliveredShipments: 0,
+            cancelledShipments: 0,
+            successRate: 0,
+            activeDrivers: 0,
+            routeOptimizations: 0,
+          });
         } else {
           setStats(emptyData.stats);
         }
@@ -128,11 +146,15 @@ const Dashboard = () => {
         setStats(emptyData.stats);
       }
 
-      // Recent shipments
+      // Recent shipments - Use nakliyeci-specific endpoint
       try {
-        const shipmentsResponse = await shipmentAPI.getAll();
-        if (shipmentsResponse.data?.success) {
-          setRecentShipments(shipmentsResponse.data.data);
+        const shipmentsResponse = await shipmentAPI.getNakliyeci();
+        if (shipmentsResponse?.success) {
+          const rows =
+            (Array.isArray(shipmentsResponse.data) ? shipmentsResponse.data : null) ||
+            (Array.isArray((shipmentsResponse.data as any)?.shipments) ? (shipmentsResponse.data as any).shipments : null) ||
+            [];
+          setRecentShipments(rows);
         } else {
           setRecentShipments(emptyData.recentShipments);
         }
@@ -144,8 +166,12 @@ const Dashboard = () => {
       // Unread notifications count
       try {
         const notificationsResponse = await notificationAPI.getUnreadCount();
-        if (notificationsResponse.data?.success) {
-          setUnreadCount(notificationsResponse.data.data.count);
+        if (notificationsResponse?.success) {
+          setUnreadCount(
+            (notificationsResponse.data as any)?.count ||
+              (notificationsResponse.data as any)?.unreadCount ||
+              0
+          );
         } else {
           setUnreadCount(0);
         }
@@ -231,7 +257,7 @@ const Dashboard = () => {
     return (
       <div className='min-h-screen bg-white flex items-center justify-center'>
         <LoadingState
-          message='Dashboard yükleniyor...'
+          message='Ana Sayfa yükleniyor...'
           size='lg'
           className='py-12'
         />
@@ -306,6 +332,30 @@ const Dashboard = () => {
                       </span>
                     </div>
                   )}
+                  {(user?.nakliyeciCode || (user as any)?.nakliyecicode) && (
+                    <div className='bg-gradient-to-r from-slate-800/30 to-blue-900/30 backdrop-blur-sm rounded-2xl px-4 py-2 border border-slate-400/30 flex items-center gap-2'>
+                      <span className='text-slate-200 font-medium text-sm'>Kodum:</span>
+                      <span className='text-white font-mono font-bold text-base'>{user?.nakliyeciCode || (user as any)?.nakliyecicode}</span>
+                      <button
+                        onClick={() => {
+                          const code = user?.nakliyeciCode || (user as any)?.nakliyecicode;
+                          if (code) {
+                            navigator.clipboard.writeText(code);
+                            setCopiedCode(true);
+                            setTimeout(() => setCopiedCode(false), 2000);
+                          }
+                        }}
+                        className='ml-1 p-1.5 hover:bg-white/10 rounded-lg transition-colors'
+                        title='Kodu Kopyala'
+                      >
+                        {copiedCode ? (
+                          <CheckCircle className='w-4 h-4 text-emerald-300' />
+                        ) : (
+                          <Copy className='w-4 h-4 text-slate-300' />
+                        )}
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -327,6 +377,39 @@ const Dashboard = () => {
                     Yük Pazarı
                   </button>
                 </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Komisyon İade Politikası Bilgilendirmesi */}
+        <div className='bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-300 rounded-xl p-4 mb-6 shadow-lg'>
+          <div className='flex items-start gap-3'>
+            <div className='flex-shrink-0 w-10 h-10 bg-amber-500 rounded-lg flex items-center justify-center'>
+              <AlertCircle className='w-6 h-6 text-white' />
+            </div>
+            <div className='flex-1'>
+              <h3 className='font-bold text-amber-900 mb-2 text-lg'>
+                💰 Komisyon ve İade Politikası
+              </h3>
+              <div className='space-y-2 text-sm text-amber-800'>
+                <p className='font-semibold'>✅ Komisyon Kesme:</p>
+                <ul className='list-disc list-inside ml-2 space-y-1'>
+                  <li>Teklifiniz kabul edildiğinde teklif tutarının <strong>%1'i</strong> cüzdanınızdan otomatik kesilir</li>
+                  <li>Komisyon kesilmeden önce cüzdan bakiyeniz kontrol edilir</li>
+                </ul>
+                <p className='font-semibold mt-3'>⚠️ İade Koşulları (Çok Sınırlı):</p>
+                <ul className='list-disc list-inside ml-2 space-y-1'>
+                  <li><strong>Sadece taşıyıcı atanmadan önce</strong> iptal edilirse iade yapılır</li>
+                  <li><strong>İlk 24 saat içinde</strong> iptal edilirse iade yapılır</li>
+                  <li>İade yapılırsa <strong>işlem maliyeti (min. 2 TL)</strong> kesilir</li>
+                  <li><strong className='text-red-600'>Taşıyıcı atandıktan sonra iade yapılmaz</strong></li>
+                  <li><strong className='text-red-600'>24 saat sonra iade yapılmaz</strong></li>
+                </ul>
+                <p className='mt-3 text-xs bg-amber-100 p-2 rounded border border-amber-200'>
+                  <strong>Not:</strong> Bu politika ödeme altyapı maliyetlerini ve sistemin sürdürülebilirliğini korumak için gereklidir. 
+                  Lütfen teklif verirken dikkatli olun ve sadece kesin işler için teklif verin.
+                </p>
               </div>
             </div>
           </div>
@@ -494,14 +577,14 @@ const Dashboard = () => {
               </div>
             </Link>
 
-            <Link to='/nakliyeci/shipments'>
+            <Link to='/nakliyeci/active-shipments'>
               <div className='group bg-white rounded-2xl p-6 shadow-lg border border-slate-200 hover:shadow-xl hover:border-purple-300 transition-all duration-300 hover:-translate-y-2'>
                 <div className='flex flex-col items-center text-center'>
                   <div className='w-12 h-12 bg-gradient-to-br from-purple-600 to-purple-800 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300 mb-4'>
                     <Package className='w-6 h-6 text-white' />
                   </div>
                   <h3 className='text-lg font-bold text-slate-900 mb-2'>
-                    Yüklerim
+                    Gönderilerim
                   </h3>
                   <p className='text-sm text-slate-600'>
                     Aktif ve tamamlanan yükler
@@ -540,7 +623,7 @@ const Dashboard = () => {
               <p className='text-slate-600'>Aktif yüklerinizi takip edin</p>
             </div>
             <Link
-              to='/nakliyeci/shipments'
+              to='/nakliyeci/active-shipments'
               className='text-blue-600 hover:text-blue-700 font-medium flex items-center gap-2'
             >
               Tümünü Gör

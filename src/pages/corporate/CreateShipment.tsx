@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import {
   Package,
@@ -7,35 +8,25 @@ import {
   Check,
   ArrowLeft,
   ArrowRight,
-  Building2,
-  Eye,
   Send,
   Weight,
   Ruler,
   Palette,
   Thermometer,
   AlertTriangle,
-  Building,
   Cpu,
   Shirt,
   Car,
-  Wheat,
-  Gem,
-  Layers,
   Box,
-  Activity,
-  Shield,
   Star,
   Calendar,
   Clock,
-  User,
   Plus,
   FileText,
   Factory,
   ShoppingCart,
   UtensilsCrossed,
   Hammer,
-  Wrench,
   Pill,
   Flame,
   Archive,
@@ -44,20 +35,110 @@ import {
   Snowflake,
   Package2,
   Printer,
-  Settings
+  Settings,
+  type LucideIcon
 } from 'lucide-react';
 import Breadcrumb from '../../components/common/Breadcrumb';
-import EmptyState from '../../components/common/EmptyState';
-import LoadingState from '../../components/common/LoadingState';
-import Modal from '../../components/common/Modal';
 import SuccessMessage from '../../components/common/SuccessMessage';
-import { shipmentAPI } from '../../services/api';
+import { turkeyCities } from '../../data/turkey-cities-districts';
+
+// Shipment data interface
+interface ShipmentData {
+  title: string;
+  description: string;
+  productDescription?: string;
+  category: string;
+  pickupCity: string;
+  pickupDistrict: string;
+  pickupAddress: string;
+  pickupDate: string;
+  deliveryCity: string;
+  deliveryDistrict: string;
+  deliveryAddress: string;
+  deliveryDate: string;
+  weight: number;
+  volume?: number;
+  dimensions: string | null;
+  value?: number;
+  specialRequirements: string;
+  quantity?: number;
+  price?: number;
+  publishType?: string;
+  targetNakliyeciId?: string | null;
+  categoryData?: Record<string, unknown>;
+  [key: string]: unknown; // Allow additional properties
+}
+
+import { createApiUrl } from '../../config/api';
+
+// Temporary workaround - direct API calls
+const shipmentAPI = {
+  create: async (data: ShipmentData) => {
+    const apiUrl = createApiUrl('/api/shipments');
+    
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(data)
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorData: any = null;
+      try {
+        errorData = JSON.parse(errorText);
+      } catch {
+        errorData = null;
+      }
+
+      const message =
+        (errorData && (errorData.details || errorData.detail || errorData.error || errorData.message)) ||
+        (errorText && errorText.trim() ? errorText.trim().slice(0, 500) : null) ||
+        `HTTP error! status: ${response.status}`;
+
+      throw new Error(message);
+    }
+    
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      const text = await response.text();
+      throw new Error(`Expected JSON but got ${contentType}. Response: ${text.substring(0, 100)}`);
+    }
+    
+    return response.json();
+  }
+};
+
+const carriersAPI = {
+  getCorporate: async () => {
+    const apiUrl = createApiUrl('/api/carriers/corporate');
+    
+    const response = await fetch(apiUrl, {
+      headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      const text = await response.text();
+      throw new Error(`Expected JSON but got ${contentType}. Response: ${text.substring(0, 100)}`);
+    }
+    
+    return response.json();
+  }
+};
 
 // Kategori tanımlamaları - Her kategori için özel gereksinimler
 interface CategoryConfig {
   id: string;
   name: string;
-  icon: any;
+  icon: LucideIcon;
   description: string;
   requiredFields: string[];
   optionalFields: string[];
@@ -65,18 +146,20 @@ interface CategoryConfig {
 }
 
 export default function CreateShipment() {
+  const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
-  const [nakliyeciler, setNakliyeciler] = useState<any[]>([]);
+  const [nakliyeciler, setNakliyeciler] = useState<Array<{ id: string; companyName?: string; name?: string; fullName?: string; email?: string }>>([]);
   const [loadingNakliyeciler, setLoadingNakliyeciler] = useState(false);
   
   const [formData, setFormData] = useState({
     mainCategory: '',
     productDescription: '',
+    unitType: '',
     weight: '',
     quantity: '',
     dimensions: {
@@ -105,25 +188,21 @@ export default function CreateShipment() {
     
     // Gıda & İçecek
     requiresColdChain: false,
-    temperatureRange: '',
+    temperatureSetpoint: '',
     expiryDate: '',
     hasCertification: false,
-    productType: '', // 'food' veya 'beverage'
-    boxCount: '', // Koli sayısı
-    totalWeight: '', // Toplam ağırlık (kg)
-    volume: '', // Hacim (litre) - içecekler için
     
     // Kimyasal & Tehlikeli
     hazardClass: '',
+    unNumber: '',
     hasMSDS: false,
     requiresSpecialPermit: false,
     
     // Soğutmalı
     coldChainRequired: false,
-    temperature: '',
     
     // Büyük Boy & Makine
-    requiresCrane: false,
+    loadingEquipment: '',
     requiresSpecialVehicle: false,
     isFragile: false,
     
@@ -165,8 +244,8 @@ export default function CreateShipment() {
       name: 'Ham Madde & Endüstriyel Mal',
       icon: Factory,
       description: 'Üretim için ham madde, endüstriyel malzemeler',
-      requiredFields: ['materialType', 'weight', 'quantity', 'isPalletized'],
-      optionalFields: ['palletCount', 'packagingType'],
+      requiredFields: ['unitType', 'weight', 'quantity'],
+      optionalFields: [],
       specialRequirements: ['fragile', 'urgent', 'signature']
     },
     {
@@ -174,8 +253,8 @@ export default function CreateShipment() {
       name: 'Perakende & Tüketim Malı',
       icon: ShoppingCart,
       description: 'Mağaza, perakende satış ürünleri',
-      requiredFields: ['weight', 'quantity', 'dimensions'],
-      optionalFields: ['packagingType'],
+      requiredFields: ['unitType', 'weight', 'quantity'],
+      optionalFields: ['dimensions'],
       specialRequirements: ['fragile', 'valuable', 'signature']
     },
     {
@@ -183,8 +262,8 @@ export default function CreateShipment() {
       name: 'Elektronik & Teknoloji',
       icon: Cpu,
       description: 'Elektronik cihazlar, teknoloji ürünleri',
-      requiredFields: ['weight', 'dimensions', 'isOriginalPackaging'],
-      optionalFields: ['requiresAntiStatic'],
+      requiredFields: ['unitType', 'weight', 'quantity'],
+      optionalFields: ['dimensions', 'isOriginalPackaging', 'requiresAntiStatic'],
       specialRequirements: ['fragile', 'valuable']
     },
     {
@@ -192,8 +271,8 @@ export default function CreateShipment() {
       name: 'Tekstil & Giyim',
       icon: Shirt,
       description: 'Tekstil ürünleri, giyim eşyaları',
-      requiredFields: ['weight', 'quantity'],
-      optionalFields: ['packagingType'],
+      requiredFields: ['unitType', 'weight', 'quantity'],
+      optionalFields: [],
       specialRequirements: ['signature']
     },
     {
@@ -201,8 +280,8 @@ export default function CreateShipment() {
       name: 'Gıda & İçecek',
       icon: UtensilsCrossed,
       description: 'Gıda ürünleri, içecekler, restoran malzemeleri',
-      requiredFields: ['productType', 'boxCount', 'totalWeight', 'requiresColdChain'],
-      optionalFields: ['palletCount', 'volume', 'expiryDate', 'hasCertification', 'temperatureRange'],
+      requiredFields: ['unitType', 'weight', 'quantity'],
+      optionalFields: ['requiresColdChain', 'temperatureSetpoint', 'expiryDate', 'hasCertification'],
       specialRequirements: ['temperature', 'urgent', 'signature']
     },
     {
@@ -210,8 +289,8 @@ export default function CreateShipment() {
       name: 'Mobilya & Ev Eşyası',
       icon: Box,
       description: 'Mobilya, ev eşyaları, dekorasyon',
-      requiredFields: ['weight', 'dimensions', 'quantity'],
-      optionalFields: ['requiresAssembly'],
+      requiredFields: ['unitType', 'weight', 'quantity'],
+      optionalFields: ['dimensions', 'requiresAssembly'],
       specialRequirements: ['fragile', 'requiresSpecialVehicle']
     },
     {
@@ -219,8 +298,8 @@ export default function CreateShipment() {
       name: 'İnşaat Malzemeleri',
       icon: Hammer,
       description: 'İnşaat malzemeleri, yapı malzemeleri',
-      requiredFields: ['weight', 'materialQuantity', 'quantity'],
-      optionalFields: ['requiresWeatherProtection', 'requiresSpecialVehicle'],
+      requiredFields: ['unitType', 'weight', 'quantity'],
+      optionalFields: ['materialQuantity', 'requiresWeatherProtection', 'requiresSpecialVehicle'],
       specialRequirements: ['requiresCrane', 'urgent']
     },
     {
@@ -228,8 +307,8 @@ export default function CreateShipment() {
       name: 'Otomotiv Parçaları',
       icon: Car,
       description: 'Araç parçaları, yedek parça, aksesuar',
-      requiredFields: ['weight', 'quantity'],
-      optionalFields: ['packagingType'],
+      requiredFields: ['unitType', 'weight', 'quantity'],
+      optionalFields: [],
       specialRequirements: ['fragile', 'valuable']
     },
     {
@@ -237,8 +316,8 @@ export default function CreateShipment() {
       name: 'Medikal & İlaç',
       icon: Pill,
       description: 'Tıbbi malzemeler, ilaçlar, sağlık ürünleri',
-      requiredFields: ['weight', 'quantity', 'temperatureControlled', 'requiresPharmaLicense'],
-      optionalFields: ['temperatureRange'],
+      requiredFields: ['unitType', 'weight', 'quantity'],
+      optionalFields: ['temperatureControlled', 'temperatureSetpoint', 'requiresPharmaLicense'],
       specialRequirements: ['temperature', 'urgent']
     },
     {
@@ -246,8 +325,8 @@ export default function CreateShipment() {
       name: 'Kimyasal & Tehlikeli Madde',
       icon: Flame,
       description: 'Kimyasal maddeler, tehlikeli yükler',
-      requiredFields: ['weight', 'hazardClass', 'hasMSDS', 'requiresSpecialPermit'],
-      optionalFields: ['quantity'],
+      requiredFields: ['unitType', 'weight', 'quantity', 'hazardClass', 'unNumber', 'hasMSDS'],
+      optionalFields: ['requiresSpecialPermit'],
       specialRequirements: ['urgent']
     },
     {
@@ -255,7 +334,7 @@ export default function CreateShipment() {
       name: 'Doküman & Önemli Kargo',
       icon: Archive,
       description: 'Önemli evraklar, belgeler, resmi kargo',
-      requiredFields: ['weight', 'quantity'],
+      requiredFields: ['unitType', 'weight', 'quantity'],
       optionalFields: [],
       specialRequirements: ['urgent', 'signature']
     },
@@ -264,8 +343,8 @@ export default function CreateShipment() {
       name: 'Depo Transferi',
       icon: Warehouse,
       description: 'Depo arası transfer, stok taşıma',
-      requiredFields: ['weight', 'quantity', 'warehouseType', 'isBulkTransfer'],
-      optionalFields: ['palletCount'],
+      requiredFields: ['unitType', 'weight', 'quantity'],
+      optionalFields: ['warehouseType'],
       specialRequirements: ['urgent']
     },
     {
@@ -273,8 +352,8 @@ export default function CreateShipment() {
       name: 'Dökme Yük',
       icon: Container,
       description: 'Büyük miktarda dökme yük, toplu taşıma',
-      requiredFields: ['weight', 'bulkType', 'quantity'],
-      optionalFields: ['requiresCover'],
+      requiredFields: ['unitType', 'weight', 'quantity'],
+      optionalFields: ['bulkType', 'requiresCover'],
       specialRequirements: []
     },
     {
@@ -282,8 +361,8 @@ export default function CreateShipment() {
       name: 'Soğutmalı Yük',
       icon: Snowflake,
       description: 'Soğuk zincir gerektiren ürünler',
-      requiredFields: ['weight', 'quantity', 'coldChainRequired', 'temperature'],
-      optionalFields: ['temperatureRange'],
+      requiredFields: ['unitType', 'weight', 'quantity', 'temperatureSetpoint'],
+      optionalFields: [],
       specialRequirements: ['temperature', 'urgent']
     },
     {
@@ -291,8 +370,8 @@ export default function CreateShipment() {
       name: 'Büyük Boy Yük',
       icon: Package2,
       description: 'Büyük ebatlı yükler, makineler',
-      requiredFields: ['weight', 'dimensions', 'requiresCrane', 'requiresSpecialVehicle'],
-      optionalFields: ['isFragile'],
+      requiredFields: ['unitType', 'weight', 'dimensions', 'loadingEquipment'],
+      optionalFields: ['requiresSpecialVehicle', 'isFragile'],
       specialRequirements: ['requiresCrane', 'requiresSpecialVehicle']
     },
     {
@@ -300,8 +379,8 @@ export default function CreateShipment() {
       name: 'Ofis Ekipmanı',
       icon: Printer,
       description: 'Ofis mobilyası, ekipman, bilgisayar',
-      requiredFields: ['weight', 'dimensions', 'equipmentType', 'quantity'],
-      optionalFields: ['requiresAssembly'],
+      requiredFields: ['unitType', 'weight', 'quantity'],
+      optionalFields: ['dimensions', 'equipmentType', 'requiresAssembly'],
       specialRequirements: ['fragile', 'valuable']
     },
     {
@@ -309,8 +388,8 @@ export default function CreateShipment() {
       name: 'Makine & Ekipman',
       icon: Settings,
       description: 'Endüstriyel makineler, ağır ekipman',
-      requiredFields: ['weight', 'dimensions', 'requiresCrane', 'requiresSpecialVehicle'],
-      optionalFields: ['isFragile'],
+      requiredFields: ['unitType', 'weight', 'dimensions', 'loadingEquipment'],
+      optionalFields: ['requiresSpecialVehicle', 'isFragile'],
       specialRequirements: ['requiresCrane', 'requiresSpecialVehicle']
     },
     {
@@ -318,8 +397,8 @@ export default function CreateShipment() {
       name: 'Vitrin & Sergi Malzemesi',
       icon: Star,
       description: 'Fuarlar, sergiler, vitrin malzemeleri',
-      requiredFields: ['weight', 'dimensions', 'quantity'],
-      optionalFields: ['requiresAssembly'],
+      requiredFields: ['unitType', 'weight', 'quantity'],
+      optionalFields: ['dimensions', 'requiresAssembly'],
       specialRequirements: ['fragile', 'valuable']
     },
     {
@@ -327,7 +406,7 @@ export default function CreateShipment() {
       name: 'Diğer',
       icon: Package,
       description: 'Diğer kurumsal yükler',
-      requiredFields: ['weight', 'quantity'],
+      requiredFields: ['unitType', 'weight', 'quantity'],
       optionalFields: ['dimensions'],
       specialRequirements: []
     }
@@ -337,34 +416,50 @@ export default function CreateShipment() {
     return mainCategories.find(cat => cat.id === formData.mainCategory);
   };
 
+  const getUnitTypeOptions = (categoryId?: string) => {
+    const all = [
+      { value: 'koli', label: 'Koli' },
+      { value: 'palet', label: 'Palet' },
+      { value: 'adet', label: 'Adet' },
+      { value: 'varil', label: 'Varil' },
+      { value: 'bigbag', label: 'Bigbag' },
+      { value: 'dokme', label: 'Dökme' },
+      { value: 'askili', label: 'Askılı' },
+    ];
+
+    const allowedByCategory: Record<string, string[]> = {
+      documents_mail: ['adet'],
+      bulk_cargo: ['dokme', 'bigbag'],
+      raw_materials: ['palet', 'koli', 'adet', 'varil', 'bigbag', 'dokme'],
+      chemical_hazardous: ['varil', 'palet', 'koli', 'bigbag'],
+      refrigerated: ['palet', 'koli', 'adet'],
+      food_beverage: ['palet', 'koli', 'adet'],
+      textile_apparel: ['koli', 'askili', 'palet'],
+      oversized: ['palet', 'adet'],
+      machinery_equipment: ['palet', 'adet'],
+      warehouse_transfer: ['palet', 'koli'],
+    };
+
+    const allowed = categoryId ? allowedByCategory[categoryId] : undefined;
+    if (!allowed) return all;
+    return all.filter(o => allowed.includes(o.value));
+  };
+
   // Load nakliyeciler (favori nakliyeciler) when component mounts or when publishType changes to 'specific'
   useEffect(() => {
     const loadNakliyeciler = async () => {
       if (formData.publishType === 'specific') {
         setLoadingNakliyeciler(true);
         try {
-          const storedUser = localStorage.getItem('user');
-          const userId = storedUser ? (JSON.parse(storedUser)?.id || '') : '';
-          const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-          
           // Get favori nakliyeciler from corporate carriers endpoint
-          const response = await fetch(`${baseURL}/api/carriers/corporate`, {
-            headers: {
-              'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-              'Content-Type': 'application/json',
-              'X-User-Id': userId
-            }
-          });
-
-          if (response.ok) {
-            const data = await response.json();
-            setNakliyeciler(data.carriers || data.data || []);
+          const result = await carriersAPI.getCorporate();
+          if (result.success && result.data) {
+            const carriers = result.data.carriers || result.data || [];
+            setNakliyeciler(carriers);
           } else {
-            console.log('Favori nakliyeciler yüklenemedi');
             setNakliyeciler([]);
           }
         } catch (error) {
-          console.error('Error loading nakliyeciler:', error);
           setNakliyeciler([]);
         } finally {
           setLoadingNakliyeciler(false);
@@ -375,11 +470,11 @@ export default function CreateShipment() {
     loadNakliyeciler();
   }, [formData.publishType]);
 
-  const handleInputChange = (field: string, value: any) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value,
-    }));
+  const handleInputChange = (field: string, value: string | number | boolean) => {
+        setFormData(prev => {
+      const newData: typeof prev = { ...prev, [field]: value };
+      return newData;
+    });
     
     // Clear error when user starts typing
     if (errors[field]) {
@@ -388,84 +483,145 @@ export default function CreateShipment() {
   };
 
   const handleDimensionsChange = (field: string, value: string) => {
+    // Trim whitespace and ensure valid number input
+    const trimmedValue = value.trim();
     setFormData(prev => ({
       ...prev,
       dimensions: {
         ...prev.dimensions,
-        [field]: value,
+        [field]: trimmedValue,
       },
     }));
+    
+    // Clear error when user starts typing
+    if (errors.dimensions) {
+      setErrors(prev => ({ ...prev, dimensions: '' }));
+    }
   };
 
   const validateStep = (step: number): boolean => {
-    const newErrors: { [key: string]: string } = {};
+        const newErrors: { [key: string]: string } = {};
     const currentCategory = getCurrentCategory();
 
     if (step === 1) {
       if (!formData.mainCategory) {
         newErrors.mainCategory = 'Kategori seçimi zorunludur';
       }
-      if (!formData.productDescription || formData.productDescription.trim() === '') {
+            if (!formData.productDescription || formData.productDescription.trim() === '') {
         newErrors.productDescription = 'Yük açıklaması zorunludur';
+      }
+
+      if (!formData.unitType) {
+        newErrors.unitType = 'Birim tipi zorunludur';
       }
 
       if (currentCategory) {
         // Kategoriye özel validasyon
         currentCategory.requiredFields.forEach(field => {
-          if (field === 'weight' && (!formData.weight || formData.weight.trim() === '')) {
-            newErrors.weight = 'Ağırlık zorunludur';
+          if (field === 'weight') {
+            if (!formData.weight || formData.weight.trim() === '') {
+              newErrors.weight = 'Ağırlık zorunludur';
+            }
           }
-          if (field === 'quantity' && (!formData.quantity || formData.quantity.trim() === '')) {
-            newErrors.quantity = 'Miktar zorunludur';
+          if (field === 'quantity') {
+            if (!formData.quantity || formData.quantity.trim() === '') {
+              newErrors.quantity = 'Miktar zorunludur';
+            }
+          }
+          if (field === 'unitType') {
+            if (!formData.unitType) {
+              newErrors.unitType = 'Birim tipi zorunludur';
+            }
           }
           if (field === 'dimensions') {
             if (!formData.dimensions.length || !formData.dimensions.width || !formData.dimensions.height) {
               newErrors.dimensions = 'Boyutlar zorunludur';
             }
           }
-          if (field === 'materialType' && !formData.materialType) {
-            newErrors.materialType = 'Malzeme tipi zorunludur';
-          }
           if (field === 'hazardClass' && !formData.hazardClass) {
             newErrors.hazardClass = 'Tehlike sınıfı zorunludur';
           }
-          if (field === 'temperature' && !formData.temperature) {
-            newErrors.temperature = 'Sıcaklık bilgisi zorunludur';
+          if (field === 'unNumber' && !formData.unNumber) {
+            newErrors.unNumber = 'UN numarası zorunludur';
           }
-          if (field === 'temperatureRange' && formData.requiresColdChain && !formData.temperatureRange) {
-            newErrors.temperatureRange = 'Soğuk zincir seçildiğinde sıcaklık aralığı zorunludur';
+          if (field === 'hasMSDS' && !formData.hasMSDS) {
+            newErrors.hasMSDS = 'MSDS bilgisi zorunludur';
           }
-          // Gıda & İçecek özel validasyonlar
-          if (field === 'productType' && !formData.productType) {
-            newErrors.productType = 'Ürün tipi zorunludur';
+          if (field === 'temperatureSetpoint') {
+            if (!formData.temperatureSetpoint || String(formData.temperatureSetpoint).trim() === '') {
+              newErrors.temperatureSetpoint = 'Sıcaklık setpoint zorunludur';
+            }
           }
-          if (field === 'boxCount' && (!formData.boxCount || formData.boxCount.trim() === '')) {
-            newErrors.boxCount = 'Koli sayısı zorunludur';
-          }
-          if (field === 'totalWeight' && formData.productType === 'food' && (!formData.totalWeight || formData.totalWeight.trim() === '')) {
-            newErrors.totalWeight = 'Toplam ağırlık (kg) zorunludur';
-          }
-          if (field === 'volume' && formData.productType === 'beverage' && (!formData.volume || formData.volume.trim() === '')) {
-            newErrors.volume = 'Toplam hacim (litre) zorunludur';
+          if (field === 'loadingEquipment' && !formData.loadingEquipment) {
+            newErrors.loadingEquipment = 'Yükleme ekipmanı seçimi zorunludur';
           }
         });
+
+        // Cold-chain seçiliyse setpoint zorunlu (kategori fark etmeksizin)
+        if (currentCategory.id === 'food_beverage' && formData.requiresColdChain) {
+          if (!formData.temperatureSetpoint || String(formData.temperatureSetpoint).trim() === '') {
+            newErrors.temperatureSetpoint = 'Soğuk zincir seçildiğinde sıcaklık setpoint zorunludur';
+          }
+        }
       }
     } else if (step === 2) {
+      if (!formData.pickupCity) {
+        newErrors.pickupCity = 'Toplama ili zorunludur';
+      }
+      if (!formData.pickupDistrict) {
+        newErrors.pickupDistrict = 'Toplama ilçesi zorunludur';
+      }
       if (!formData.pickupAddress || formData.pickupAddress.trim() === '') {
         newErrors.pickupAddress = 'Toplama adresi zorunludur';
+      }
+      if (!formData.deliveryCity) {
+        newErrors.deliveryCity = 'Teslimat ili zorunludur';
+      }
+      if (!formData.deliveryDistrict) {
+        newErrors.deliveryDistrict = 'Teslimat ilçesi zorunludur';
       }
       if (!formData.deliveryAddress || formData.deliveryAddress.trim() === '') {
         newErrors.deliveryAddress = 'Teslimat adresi zorunludur';
       }
       if (!formData.pickupDate) {
         newErrors.pickupDate = 'Toplama tarihi zorunludur';
+      } else {
+        const pickupDate = new Date(formData.pickupDate);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        if (pickupDate < today) {
+          newErrors.pickupDate = 'Toplama tarihi geçmiş bir tarih olamaz. Lütfen bugün veya ileri bir tarih seçin.';
+        }
+        
+        const maxDate = new Date();
+        maxDate.setDate(today.getDate() + 20);
+        if (pickupDate > maxDate) {
+          newErrors.pickupDate = 'Toplama tarihi bugünden en fazla 20 gün sonrası için olabilir. Lütfen daha yakın bir tarih seçin.';
+        }
       }
+      
       if (!formData.deliveryDate) {
         newErrors.deliveryDate = 'Teslimat tarihi zorunludur';
+      } else {
+        const deliveryDate = new Date(formData.deliveryDate);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        if (deliveryDate < today) {
+          newErrors.deliveryDate = 'Teslimat tarihi geçmiş bir tarih olamaz. Lütfen bugün veya ileri bir tarih seçin.';
+        }
+        
+        if (formData.pickupDate) {
+          const pickupDate = new Date(formData.pickupDate);
+          if (deliveryDate < pickupDate) {
+            newErrors.deliveryDate = 'Teslimat tarihi toplama tarihinden önce olamaz.';
+          }
+        }
       }
     }
 
-    setErrors(newErrors);
+        setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
@@ -484,7 +640,8 @@ export default function CreateShipment() {
   };
 
   const handlePublish = async () => {
-    if (!validateStep(currentStep)) {
+    const isValid = validateStep(currentStep);
+    if (!isValid) {
       return;
     }
 
@@ -519,9 +676,10 @@ export default function CreateShipment() {
         ? { city: formData.deliveryCity, district: formData.deliveryDistrict || '' }
         : parseCityFromAddress(formData.deliveryAddress);
 
-      const shipmentData = {
+      const shipmentData: ShipmentData = {
         title: currentCategory?.name || 'Kurumsal Gönderi',
         description: formData.productDescription || '',
+        productDescription: formData.productDescription || '',
         category: formData.mainCategory,
         pickupCity: pickupLocation.city,
         pickupDistrict: pickupLocation.district,
@@ -531,41 +689,34 @@ export default function CreateShipment() {
         deliveryDistrict: deliveryLocation.district,
         deliveryAddress: formData.deliveryAddress,
         deliveryDate: formData.deliveryDate,
-        // Gıda & İçecek için özel hesaplama
-        weight: formData.mainCategory === 'food_beverage' 
-          ? (formData.productType === 'food' ? parseFloat(formData.totalWeight) || 0 : 0)
-          : (parseFloat(formData.weight) || 0),
-        quantity: formData.mainCategory === 'food_beverage'
-          ? parseInt(formData.boxCount) || 0
-          : (parseInt(formData.quantity) || 1),
+        weight: parseFloat(formData.weight) || 0,
+        quantity: parseInt(formData.quantity) || 1,
         dimensions: formData.dimensions.length && formData.dimensions.width && formData.dimensions.height
           ? `${formData.dimensions.length}x${formData.dimensions.width}x${formData.dimensions.height}`
-          : '',
+          : null,
         specialRequirements: formData.specialRequirements || '',
+        volume: 0,
+        value: 0,
         price: 0,
         publishType: formData.publishType,
         targetNakliyeciId: formData.publishType === 'specific' ? formData.targetNakliyeciId : null,
         
         // Kategoriye özel veriler
         categoryData: {
+          unitType: formData.unitType,
           materialType: formData.materialType,
           isPalletized: formData.isPalletized,
           palletCount: formData.palletCount,
           requiresColdChain: formData.requiresColdChain,
-          temperatureRange: formData.temperatureRange,
+          temperatureSetpoint: formData.temperatureSetpoint,
           coldChainRequired: formData.coldChainRequired,
-          temperature: formData.temperature,
           hazardClass: formData.hazardClass,
+          unNumber: formData.unNumber,
           hasMSDS: formData.hasMSDS,
-          // Gıda & İçecek özel alanlar
-          productType: formData.productType,
-          boxCount: formData.boxCount,
-          totalWeight: formData.totalWeight,
-          volume: formData.volume,
           expiryDate: formData.expiryDate,
           hasCertification: formData.hasCertification,
           requiresSpecialPermit: formData.requiresSpecialPermit,
-          requiresCrane: formData.requiresCrane,
+          loadingEquipment: formData.loadingEquipment,
           requiresSpecialVehicle: formData.requiresSpecialVehicle,
           warehouseType: formData.warehouseType,
           bulkType: formData.bulkType,
@@ -578,11 +729,12 @@ export default function CreateShipment() {
       let response;
       try {
         response = await shipmentAPI.create(shipmentData);
-      } catch (networkError: any) {
+      } catch (networkError: unknown) {
         // Network error (backend not running, CORS, etc.)
         setIsLoading(false);
-        setErrorMessage(`Backend sunucusuna bağlanılamıyor: ${networkError.message}. Lütfen backend'in çalıştığından emin olun (cd backend && node postgres-backend.js)`);
-        setErrors({ publish: networkError.message || 'Backend sunucusuna bağlanılamıyor' });
+        const errorMessage = networkError instanceof Error ? networkError.message : 'Bilinmeyen hata';
+        setErrorMessage(`Backend sunucusuna bağlanılamıyor: ${errorMessage}. Lütfen backend'in çalıştığından emin olun (cd backend && node server-modular.js)`);
+        setErrors({ publish: errorMessage || 'Backend sunucusuna bağlanılamıyor' });
         return;
       }
 
@@ -596,6 +748,7 @@ export default function CreateShipment() {
         setFormData({
           mainCategory: '',
           productDescription: '',
+          unitType: '',
           weight: '',
           quantity: '',
           dimensions: { length: '', width: '', height: '' },
@@ -616,19 +769,15 @@ export default function CreateShipment() {
           isPalletized: false,
           palletCount: '',
           requiresColdChain: false,
-          temperatureRange: '',
+          temperatureSetpoint: '',
           expiryDate: '',
           hasCertification: false,
-          productType: '',
-          boxCount: '',
-          totalWeight: '',
-          volume: '',
           hazardClass: '',
+          unNumber: '',
           hasMSDS: false,
           requiresSpecialPermit: false,
           coldChainRequired: false,
-          temperature: '',
-          requiresCrane: false,
+          loadingEquipment: '',
           requiresSpecialVehicle: false,
           isFragile: false,
           warehouseType: '',
@@ -647,14 +796,17 @@ export default function CreateShipment() {
         setCurrentStep(1);
         setErrors({});
 
+        // Redirect to shipments page after 2 seconds
         setTimeout(() => {
           setShowSuccessMessage(false);
-        }, 3000);
+          navigate('/corporate/shipments');
+        }, 2000);
       }
-    } catch (error: any) {
-      console.error('Gönderi oluşturma hatası:', error);
+    } catch (error: unknown) {
+      // Error handled and displayed to user via setErrors
+      const errorMessage = error instanceof Error ? error.message : 'Bilinmeyen hata';
       setErrorMessage(
-        'Gönderi oluşturulurken bir hata oluştu. Lütfen tekrar deneyin.'
+        `Gönderi oluşturulurken bir hata oluştu: ${errorMessage}. Lütfen tekrar deneyin.`
       );
     } finally {
       setIsLoading(false);
@@ -667,188 +819,8 @@ export default function CreateShipment() {
 
     const fields: JSX.Element[] = [];
 
-    // Endüstriyel & Ham Madde
-    if (currentCategory.id === 'raw_materials') {
-      fields.push(
-        <div key="materialType" className="space-y-2">
-          <label className="block text-sm font-semibold text-slate-700 mb-2">
-            <Factory className="w-4 h-4 inline mr-2" />
-            Malzeme Tipi *
-          </label>
-          <select
-            value={formData.materialType}
-            onChange={(e) => handleInputChange('materialType', e.target.value)}
-            className={`w-full p-4 border-2 rounded-xl focus:ring-2 focus:ring-blue-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md ${
-              errors.materialType ? 'border-red-500' : 'border-slate-200'
-            }`}
-          >
-            <option value="">Malzeme tipi seçiniz</option>
-            <option value="metal">Metal</option>
-            <option value="plastic">Plastik</option>
-            <option value="wood">Ahşap</option>
-            <option value="chemical">Kimyasal</option>
-            <option value="textile">Tekstil</option>
-            <option value="other">Diğer</option>
-          </select>
-          {errors.materialType && (
-            <p className="mt-1 text-sm text-red-600">{errors.materialType}</p>
-          )}
-        </div>
-      );
-
-      fields.push(
-        <div key="isPalletized" className="flex items-center space-x-3">
-          <input
-            type="checkbox"
-            id="isPalletized"
-            checked={formData.isPalletized}
-            onChange={(e) => handleInputChange('isPalletized', e.target.checked)}
-            className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-          />
-          <label htmlFor="isPalletized" className="text-sm font-medium text-slate-700">
-            Paletlenmiş
-          </label>
-        </div>
-      );
-
-      if (formData.isPalletized) {
-        fields.push(
-          <div key="palletCount" className="space-y-2">
-            <label className="block text-sm font-semibold text-slate-700 mb-2">
-              Palet Sayısı
-            </label>
-            <input
-              type="number"
-              value={formData.palletCount}
-              onChange={(e) => handleInputChange('palletCount', e.target.value)}
-              className="w-full p-4 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md"
-              placeholder="Örn: 10"
-            />
-          </div>
-        );
-      }
-    }
-
-    // Gıda & İçecek
+    // Gıda & İçecek (minimal)
     if (currentCategory.id === 'food_beverage') {
-      // Ürün Tipi
-      fields.push(
-        <div key="productType" className="space-y-2">
-          <label className="block text-sm font-semibold text-slate-700 mb-2">
-            <UtensilsCrossed className="w-4 h-4 inline mr-2" />
-            Ürün Tipi *
-          </label>
-          <select
-            value={formData.productType}
-            onChange={(e) => handleInputChange('productType', e.target.value)}
-            className={`w-full p-4 border-2 rounded-xl focus:ring-2 focus:ring-blue-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md ${
-              errors.productType ? 'border-red-500' : 'border-slate-200'
-            }`}
-          >
-            <option value="">Ürün tipi seçiniz</option>
-            <option value="food">Gıda Ürünü</option>
-            <option value="beverage">İçecek</option>
-          </select>
-          {errors.productType && (
-            <p className="mt-1 text-sm text-red-600">{errors.productType}</p>
-          )}
-        </div>
-      );
-
-      // Koli Sayısı
-      fields.push(
-        <div key="boxCount" className="space-y-2">
-          <label className="block text-sm font-semibold text-slate-700 mb-2">
-            <Package className="w-4 h-4 inline mr-2" />
-            Koli Sayısı *
-          </label>
-          <input
-            type="number"
-            min="1"
-            value={formData.boxCount}
-            onChange={(e) => handleInputChange('boxCount', e.target.value)}
-            className={`w-full p-4 border-2 rounded-xl focus:ring-2 focus:ring-blue-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md ${
-              errors.boxCount ? 'border-red-500' : 'border-slate-200'
-            }`}
-            placeholder="Örn: 50"
-          />
-          {errors.boxCount && (
-            <p className="mt-1 text-sm text-red-600">{errors.boxCount}</p>
-          )}
-        </div>
-      );
-
-      // Palet Sayısı (opsiyonel)
-      fields.push(
-        <div key="palletCount" className="space-y-2">
-          <label className="block text-sm font-semibold text-slate-700 mb-2">
-            <Palette className="w-4 h-4 inline mr-2" />
-            Palet Sayısı
-          </label>
-          <input
-            type="number"
-            min="0"
-            value={formData.palletCount}
-            onChange={(e) => handleInputChange('palletCount', e.target.value)}
-            className="w-full p-4 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md"
-            placeholder="Örn: 5 (opsiyonel)"
-          />
-        </div>
-      );
-
-      // Toplam Ağırlık (kg) - Gıda için
-      if (formData.productType === 'food') {
-        fields.push(
-          <div key="totalWeight" className="space-y-2">
-            <label className="block text-sm font-semibold text-slate-700 mb-2">
-              <Weight className="w-4 h-4 inline mr-2" />
-              Toplam Ağırlık (kg) *
-            </label>
-            <input
-              type="number"
-              min="0"
-              step="0.1"
-              value={formData.totalWeight}
-              onChange={(e) => handleInputChange('totalWeight', e.target.value)}
-              className={`w-full p-4 border-2 rounded-xl focus:ring-2 focus:ring-blue-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md ${
-                errors.totalWeight ? 'border-red-500' : 'border-slate-200'
-              }`}
-              placeholder="Örn: 250.5"
-            />
-            {errors.totalWeight && (
-              <p className="mt-1 text-sm text-red-600">{errors.totalWeight}</p>
-            )}
-          </div>
-        );
-      }
-
-      // Hacim (litre) - İçecek için
-      if (formData.productType === 'beverage') {
-        fields.push(
-          <div key="volume" className="space-y-2">
-            <label className="block text-sm font-semibold text-slate-700 mb-2">
-              <Package className="w-4 h-4 inline mr-2" />
-              Toplam Hacim (litre) *
-            </label>
-            <input
-              type="number"
-              min="0"
-              step="0.1"
-              value={formData.volume}
-              onChange={(e) => handleInputChange('volume', e.target.value)}
-              className={`w-full p-4 border-2 rounded-xl focus:ring-2 focus:ring-blue-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md ${
-                errors.volume ? 'border-red-500' : 'border-slate-200'
-              }`}
-              placeholder="Örn: 500"
-            />
-            {errors.volume && (
-              <p className="mt-1 text-sm text-red-600">{errors.volume}</p>
-            )}
-          </div>
-        );
-      }
-
-      // Soğuk Zincir
       fields.push(
         <div key="requiresColdChain" className="flex items-center space-x-3">
           <input
@@ -859,30 +831,34 @@ export default function CreateShipment() {
             className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
           />
           <label htmlFor="requiresColdChain" className="text-sm font-medium text-slate-700">
-            Soğuk Zincir Gerekli *
+            Soğuk Zincir Gerekli
           </label>
         </div>
       );
 
       if (formData.requiresColdChain) {
         fields.push(
-          <div key="temperatureRange" className="space-y-2">
+          <div key="temperatureSetpoint" className="space-y-2">
             <label className="block text-sm font-semibold text-slate-700 mb-2">
               <Thermometer className="w-4 h-4 inline mr-2" />
-              Sıcaklık Aralığı (℃)
+              Sıcaklık Setpoint (℃) *
             </label>
             <input
               type="text"
-              value={formData.temperatureRange}
-              onChange={(e) => handleInputChange('temperatureRange', e.target.value)}
-              className="w-full p-4 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md"
-              placeholder="Örn: 2-8°C veya -18°C"
+              value={formData.temperatureSetpoint}
+              onChange={(e) => handleInputChange('temperatureSetpoint', e.target.value)}
+              className={`w-full p-4 border-2 rounded-xl focus:ring-2 focus:ring-blue-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md ${
+                errors.temperatureSetpoint ? 'border-red-500' : 'border-slate-200'
+              }`}
+              placeholder="Örn: 2-8 veya -18"
             />
+            {errors.temperatureSetpoint && (
+              <p className="mt-1 text-sm text-red-600">{errors.temperatureSetpoint}</p>
+            )}
           </div>
         );
       }
 
-      // Sertifika
       fields.push(
         <div key="hasCertification" className="flex items-center space-x-3">
           <input
@@ -901,6 +877,26 @@ export default function CreateShipment() {
 
     // Kimyasal & Tehlikeli
     if (currentCategory.id === 'chemical_hazardous') {
+      fields.push(
+        <div key="unNumber" className="space-y-2">
+          <label className="block text-sm font-semibold text-slate-700 mb-2">
+            UN Numarası *
+          </label>
+          <input
+            type="text"
+            value={formData.unNumber}
+            onChange={(e) => handleInputChange('unNumber', e.target.value)}
+            className={`w-full p-4 border-2 rounded-xl focus:ring-2 focus:ring-blue-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md ${
+              errors.unNumber ? 'border-red-500' : 'border-slate-200'
+            }`}
+            placeholder="Örn: UN 1203"
+          />
+          {errors.unNumber && (
+            <p className="mt-1 text-sm text-red-600">{errors.unNumber}</p>
+          )}
+        </div>
+      );
+
       fields.push(
         <div key="hazardClass" className="space-y-2">
           <label className="block text-sm font-semibold text-slate-700 mb-2">
@@ -941,8 +937,11 @@ export default function CreateShipment() {
             className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
           />
           <label htmlFor="hasMSDS" className="text-sm font-medium text-slate-700">
-            MSDS (Güvenlik Bilgi Formu) Mevcut *
+            MSDS (Güvenlik Bilgi Formu) Mevcut
           </label>
+          {errors.hasMSDS && (
+            <p className="text-sm text-red-600">{errors.hasMSDS}</p>
+          )}
         </div>
       );
 
@@ -956,7 +955,7 @@ export default function CreateShipment() {
             className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
           />
           <label htmlFor="requiresSpecialPermit" className="text-sm font-medium text-slate-700">
-            Özel İzin Gerekli *
+            Özel İzin Gerekli
           </label>
         </div>
       );
@@ -965,37 +964,22 @@ export default function CreateShipment() {
     // Soğutmalı Yük
     if (currentCategory.id === 'refrigerated') {
       fields.push(
-        <div key="coldChainRequired" className="flex items-center space-x-3">
-          <input
-            type="checkbox"
-            id="coldChainRequired"
-            checked={formData.coldChainRequired}
-            onChange={(e) => handleInputChange('coldChainRequired', e.target.checked)}
-            className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-          />
-          <label htmlFor="coldChainRequired" className="text-sm font-medium text-slate-700">
-            Soğuk Zincir Gerekli *
-          </label>
-        </div>
-      );
-
-      fields.push(
-        <div key="temperature" className="space-y-2">
+        <div key="temperatureSetpoint" className="space-y-2">
           <label className="block text-sm font-semibold text-slate-700 mb-2">
             <Snowflake className="w-4 h-4 inline mr-2" />
-            Sıcaklık (℃) *
+            Sıcaklık Setpoint (℃) *
           </label>
           <input
             type="text"
-            value={formData.temperature}
-            onChange={(e) => handleInputChange('temperature', e.target.value)}
+            value={formData.temperatureSetpoint}
+            onChange={(e) => handleInputChange('temperatureSetpoint', e.target.value)}
             className={`w-full p-4 border-2 rounded-xl focus:ring-2 focus:ring-blue-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md ${
-              errors.temperature ? 'border-red-500' : 'border-slate-200'
+              errors.temperatureSetpoint ? 'border-red-500' : 'border-slate-200'
             }`}
-            placeholder="Örn: -18, 2-8, 0-4"
+            placeholder="Örn: -18, 2-8"
           />
-          {errors.temperature && (
-            <p className="mt-1 text-sm text-red-600">{errors.temperature}</p>
+          {errors.temperatureSetpoint && (
+            <p className="mt-1 text-sm text-red-600">{errors.temperatureSetpoint}</p>
           )}
         </div>
       );
@@ -1004,17 +988,25 @@ export default function CreateShipment() {
     // Büyük Boy & Makine
     if (currentCategory.id === 'oversized' || currentCategory.id === 'machinery_equipment') {
       fields.push(
-        <div key="requiresCrane" className="flex items-center space-x-3">
-          <input
-            type="checkbox"
-            id="requiresCrane"
-            checked={formData.requiresCrane}
-            onChange={(e) => handleInputChange('requiresCrane', e.target.checked)}
-            className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-          />
-          <label htmlFor="requiresCrane" className="text-sm font-medium text-slate-700">
-            Vinç Gerekli *
+        <div key="loadingEquipment" className="space-y-2">
+          <label className="block text-sm font-semibold text-slate-700 mb-2">
+            Yükleme Ekipmanı *
           </label>
+          <select
+            value={formData.loadingEquipment}
+            onChange={(e) => handleInputChange('loadingEquipment', e.target.value)}
+            className={`w-full p-4 border-2 rounded-xl focus:ring-2 focus:ring-blue-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md ${
+              errors.loadingEquipment ? 'border-red-500' : 'border-slate-200'
+            }`}
+          >
+            <option value="">Seçiniz</option>
+            <option value="manual">Manuel</option>
+            <option value="forklift">Forklift</option>
+            <option value="crane">Vinç</option>
+          </select>
+          {errors.loadingEquipment && (
+            <p className="mt-1 text-sm text-red-600">{errors.loadingEquipment}</p>
+          )}
         </div>
       );
 
@@ -1028,7 +1020,7 @@ export default function CreateShipment() {
             className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
           />
           <label htmlFor="requiresSpecialVehicle" className="text-sm font-medium text-slate-700">
-            Özel Araç Gerekli (Düşük Tavanlı, Özel Platform vb.) *
+            Özel Araç Gerekli (Düşük Tavanlı, Özel Platform vb.)
           </label>
         </div>
       );
@@ -1275,6 +1267,11 @@ export default function CreateShipment() {
                 value={formData.mainCategory}
                 onChange={(e) => {
                   handleInputChange('mainCategory', e.target.value);
+                  const nextCategoryId = e.target.value;
+                  const allowed = getUnitTypeOptions(nextCategoryId).map(o => o.value);
+                  if (formData.unitType && !allowed.includes(formData.unitType)) {
+                    handleInputChange('unitType', '');
+                  }
                   if (errors.mainCategory) {
                     setErrors(prev => ({ ...prev, mainCategory: '' }));
                   }
@@ -1284,14 +1281,11 @@ export default function CreateShipment() {
                 }`}
               >
                 <option value=''>Kategori seçiniz</option>
-                {mainCategories.map(category => {
-                  const IconComponent = category.icon;
-                  return (
+                {mainCategories.map(category => (
                   <option key={category.id} value={category.id}>
                     {category.name}
                   </option>
-                  );
-                })}
+                ))}
               </select>
               {errors.mainCategory && (
                 <p className="mt-2 text-sm text-red-600">{errors.mainCategory}</p>
@@ -1330,14 +1324,41 @@ export default function CreateShipment() {
                     )}
                   </div>
 
+                  <div className='space-y-2'>
+                    <label className='block text-sm font-semibold text-gray-700 mb-2'>
+                      Birim Tipi *
+                    </label>
+                    <select
+                      value={formData.unitType}
+                      onChange={(e) => {
+                        handleInputChange('unitType', e.target.value);
+                        if ((errors as any).unitType) {
+                          setErrors(prev => ({ ...prev, unitType: '' }));
+                        }
+                      }}
+                      className={`w-full p-4 border-2 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md ${
+                        (errors as any).unitType ? 'border-red-500' : 'border-gray-200'
+                      }`}
+                    >
+                      <option value=''>Seçiniz</option>
+                      {getUnitTypeOptions(formData.mainCategory).map(opt => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                    {(errors as any).unitType && (
+                      <p className='mt-1 text-sm text-red-600'>{(errors as any).unitType}</p>
+                    )}
+                  </div>
+
                   {/* Genel ağırlık ve miktar alanları - Gıda & İçecek hariç */}
-                  {formData.mainCategory !== 'food_beverage' && (
                   <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
                     {getCurrentCategory()?.requiredFields.includes('weight') && (
                     <div className='space-y-2'>
                       <label className='block text-sm font-semibold text-gray-700 mb-2'>
                         <Weight className='w-4 h-4 inline mr-2' />
-                          Ağırlık (ton) *
+                          Toplam Ağırlık (kg) *
                       </label>
                       <input
                         type='number'
@@ -1363,7 +1384,7 @@ export default function CreateShipment() {
                     <div className='space-y-2'>
                       <label className='block text-sm font-semibold text-gray-700 mb-2'>
                         <Package className='w-4 h-4 inline mr-2' />
-                        Miktar *
+                        Birim Sayısı *
                       </label>
                       <input
                         type='number'
@@ -1385,7 +1406,6 @@ export default function CreateShipment() {
                     </div>
                     )}
                   </div>
-                  )}
 
                   {getCurrentCategory()?.requiredFields.includes('dimensions') && (
                   <div>
@@ -1403,13 +1423,18 @@ export default function CreateShipment() {
                         </label>
                         <input
                           type='number'
+                          min='0'
+                          step='0.01'
                           value={formData.dimensions.length}
-                            onChange={(e) => {
-                              handleDimensionsChange('length', e.target.value);
-                              if (errors.dimensions) {
-                                setErrors(prev => ({ ...prev, dimensions: '' }));
-                              }
-                            }}
+                          onChange={(e) => {
+                            handleDimensionsChange('length', e.target.value);
+                          }}
+                          onBlur={(e) => {
+                            const value = e.target.value.trim();
+                            if (value && !isNaN(parseFloat(value)) && parseFloat(value) >= 0) {
+                              handleDimensionsChange('length', value);
+                            }
+                          }}
                           className='w-full p-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md'
                           placeholder='30'
                         />
@@ -1420,13 +1445,18 @@ export default function CreateShipment() {
                         </label>
                         <input
                           type='number'
+                          min='0'
+                          step='0.01'
                           value={formData.dimensions.width}
-                            onChange={(e) => {
-                              handleDimensionsChange('width', e.target.value);
-                              if (errors.dimensions) {
-                                setErrors(prev => ({ ...prev, dimensions: '' }));
-                              }
-                            }}
+                          onChange={(e) => {
+                            handleDimensionsChange('width', e.target.value);
+                          }}
+                          onBlur={(e) => {
+                            const value = e.target.value.trim();
+                            if (value && !isNaN(parseFloat(value)) && parseFloat(value) >= 0) {
+                              handleDimensionsChange('width', value);
+                            }
+                          }}
                           className='w-full p-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md'
                           placeholder='20'
                         />
@@ -1437,13 +1467,18 @@ export default function CreateShipment() {
                         </label>
                         <input
                           type='number'
+                          min='0'
+                          step='0.01'
                           value={formData.dimensions.height}
-                            onChange={(e) => {
-                              handleDimensionsChange('height', e.target.value);
-                              if (errors.dimensions) {
-                                setErrors(prev => ({ ...prev, dimensions: '' }));
-                              }
-                            }}
+                          onChange={(e) => {
+                            handleDimensionsChange('height', e.target.value);
+                          }}
+                          onBlur={(e) => {
+                            const value = e.target.value.trim();
+                            if (value && !isNaN(parseFloat(value)) && parseFloat(value) >= 0) {
+                              handleDimensionsChange('height', value);
+                            }
+                          }}
                           className='w-full p-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md'
                           placeholder='15'
                         />
@@ -1507,38 +1542,73 @@ export default function CreateShipment() {
                           }] : []),
                       ].map(req => {
                         const IconComponent = req.icon;
-                          const isSelected = formData.specialRequirements.includes(req.id);
+                        const currentRequirements = formData.specialRequirements || '';
+                        const requirementsList = currentRequirements ? currentRequirements.split(',').filter(r => r.trim()) : [];
+                        const isSelected = requirementsList.includes(req.id);
+
+                        // Color mapping for Tailwind classes
+                        const getColorClasses = (color: string, isSelected: boolean) => {
+                          const colorMap: { [key: string]: { border: string; bg: string; text: string } } = {
+                            red: { border: 'border-red-500', bg: 'bg-red-50', text: 'text-red-900' },
+                            orange: { border: 'border-orange-500', bg: 'bg-orange-50', text: 'text-orange-900' },
+                            yellow: { border: 'border-yellow-500', bg: 'bg-yellow-50', text: 'text-yellow-900' },
+                            blue: { border: 'border-blue-500', bg: 'bg-blue-50', text: 'text-blue-900' },
+                            cyan: { border: 'border-cyan-500', bg: 'bg-cyan-50', text: 'text-cyan-900' },
+                            purple: { border: 'border-purple-500', bg: 'bg-purple-50', text: 'text-purple-900' },
+                            indigo: { border: 'border-indigo-500', bg: 'bg-indigo-50', text: 'text-indigo-900' },
+                          };
+                          const colors = colorMap[color] || colorMap.blue;
+                          return isSelected 
+                            ? `${colors.border} ${colors.bg}`
+                            : 'border-slate-200 hover:border-slate-300 bg-white';
+                        };
+
+                        const getBgColorClass = (color: string, isSelected: boolean) => {
+                          const colorMap: { [key: string]: string } = {
+                            red: 'bg-red-500',
+                            orange: 'bg-orange-500',
+                            yellow: 'bg-yellow-500',
+                            blue: 'bg-blue-500',
+                            cyan: 'bg-cyan-500',
+                            purple: 'bg-purple-500',
+                            indigo: 'bg-indigo-500',
+                          };
+                          return isSelected ? (colorMap[color] || 'bg-blue-500') : 'bg-slate-100';
+                        };
+
+                        const getTextColorClass = (color: string, isSelected: boolean) => {
+                          const colorMap: { [key: string]: string } = {
+                            red: 'text-red-900',
+                            orange: 'text-orange-900',
+                            yellow: 'text-yellow-900',
+                            blue: 'text-blue-900',
+                            cyan: 'text-cyan-900',
+                            purple: 'text-purple-900',
+                            indigo: 'text-indigo-900',
+                          };
+                          return isSelected ? (colorMap[color] || 'text-blue-900') : 'text-slate-700';
+                        };
 
                         return (
                           <button
                             key={req.id}
                             type='button'
                             onClick={() => {
-                              const current = formData.specialRequirements
-                                .split(',')
-                                .filter(r => r.trim());
-                              const isSelected = current.includes(req.id);
+                              const current = (formData.specialRequirements || '').split(',').filter(r => r.trim());
+                              const isSelectedNow = current.includes(req.id);
                               let newRequirements;
-                              if (isSelected) {
+                              if (isSelectedNow) {
                                   newRequirements = current.filter(r => r !== req.id);
                               } else {
                                 newRequirements = [...current, req.id];
                               }
                                 handleInputChange('specialRequirements', newRequirements.join(','));
                             }}
-                            className={`p-4 rounded-lg border-2 transition-all duration-300 ${
-                              isSelected
-                                ? `border-${req.color}-500 bg-${req.color}-50`
-                                : 'border-slate-200 hover:border-slate-300 bg-white'
-                            }`}
+                            className={`p-4 rounded-lg border-2 transition-all duration-300 ${getColorClasses(req.color, isSelected)}`}
                           >
                             <div className='flex flex-col items-center text-center'>
                               <div
-                                className={`w-8 h-8 rounded-lg flex items-center justify-center mb-2 ${
-                                  isSelected
-                                    ? `bg-${req.color}-500`
-                                    : 'bg-slate-100'
-                                }`}
+                                className={`w-8 h-8 rounded-lg flex items-center justify-center mb-2 ${getBgColorClass(req.color, isSelected)}`}
                               >
                                 <IconComponent
                                   className={`w-4 h-4 ${
@@ -1547,11 +1617,7 @@ export default function CreateShipment() {
                                 />
                               </div>
                               <span
-                                className={`text-xs font-medium ${
-                                  isSelected
-                                    ? `text-${req.color}-900`
-                                    : 'text-slate-700'
-                                }`}
+                                className={`text-xs font-medium ${getTextColorClass(req.color, isSelected)}`}
                               >
                                 {req.name}
                               </span>
@@ -1597,6 +1663,68 @@ export default function CreateShipment() {
                 </div>
 
                 <div className='space-y-4'>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className='block text-sm font-semibold text-slate-700 mb-2'>
+                        <MapPin className='w-4 h-4 inline mr-2' />
+                        İl *
+                      </label>
+                      <select
+                        value={formData.pickupCity}
+                        onChange={(e) => {
+                          handleInputChange('pickupCity', e.target.value);
+                          handleInputChange('pickupDistrict', ''); // Reset district when city changes
+                          if (errors.pickupCity) {
+                            setErrors(prev => ({ ...prev, pickupCity: '' }));
+                          }
+                        }}
+                        className={`w-full p-4 border-2 rounded-xl focus:ring-2 focus:ring-blue-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md text-slate-700 ${
+                          errors.pickupCity ? 'border-red-500' : 'border-slate-200'
+                        }`}
+                      >
+                        <option value="">İl seçiniz</option>
+                        {turkeyCities.map((city) => (
+                          <option key={city.id} value={city.name}>
+                            {city.name}
+                          </option>
+                        ))}
+                      </select>
+                      {errors.pickupCity && (
+                        <p className="mt-1 text-sm text-red-600">{errors.pickupCity}</p>
+                      )}
+                    </div>
+                    <div>
+                      <label className='block text-sm font-semibold text-slate-700 mb-2'>
+                        <MapPin className='w-4 h-4 inline mr-2' />
+                        İlçe *
+                      </label>
+                      <select
+                        value={formData.pickupDistrict}
+                        onChange={(e) => {
+                          handleInputChange('pickupDistrict', e.target.value);
+                          if (errors.pickupDistrict) {
+                            setErrors(prev => ({ ...prev, pickupDistrict: '' }));
+                          }
+                        }}
+                        disabled={!formData.pickupCity}
+                        className={`w-full p-4 border-2 rounded-xl focus:ring-2 focus:ring-blue-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md text-slate-700 ${
+                          !formData.pickupCity ? 'bg-gray-100 cursor-not-allowed' : ''
+                        } ${
+                          errors.pickupDistrict ? 'border-red-500' : 'border-slate-200'
+                        }`}
+                      >
+                        <option value="">İlçe seçiniz</option>
+                        {formData.pickupCity && turkeyCities.find(c => c.name === formData.pickupCity)?.districts.map((district) => (
+                          <option key={district} value={district}>
+                            {district}
+                          </option>
+                        ))}
+                      </select>
+                      {errors.pickupDistrict && (
+                        <p className="mt-1 text-sm text-red-600">{errors.pickupDistrict}</p>
+                      )}
+                    </div>
+                  </div>
                   <div>
                     <label className='block text-sm font-semibold text-slate-700 mb-2'>
                       <MapPin className='w-4 h-4 inline mr-2' />
@@ -1614,7 +1742,7 @@ export default function CreateShipment() {
                       className={`w-full p-4 border-2 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md text-slate-700 resize-none ${
                         errors.pickupAddress ? 'border-red-500' : 'border-slate-200'
                       }`}
-                      placeholder='Tam adres bilgilerini girin...'
+                      placeholder='Mahalle, sokak, bina no, daire no vb. detaylı adres bilgilerini girin...'
                     />
                     {errors.pickupAddress && (
                       <p className="mt-1 text-sm text-red-600">{errors.pickupAddress}</p>
@@ -1662,6 +1790,68 @@ export default function CreateShipment() {
                 </div>
 
                 <div className='space-y-4'>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className='block text-sm font-semibold text-slate-700 mb-2'>
+                        <MapPin className='w-4 h-4 inline mr-2' />
+                        İl *
+                      </label>
+                      <select
+                        value={formData.deliveryCity}
+                        onChange={(e) => {
+                          handleInputChange('deliveryCity', e.target.value);
+                          handleInputChange('deliveryDistrict', ''); // Reset district when city changes
+                          if (errors.deliveryCity) {
+                            setErrors(prev => ({ ...prev, deliveryCity: '' }));
+                          }
+                        }}
+                        className={`w-full p-4 border-2 rounded-xl focus:ring-2 focus:ring-emerald-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md text-slate-700 ${
+                          errors.deliveryCity ? 'border-red-500' : 'border-slate-200'
+                        }`}
+                      >
+                        <option value="">İl seçiniz</option>
+                        {turkeyCities.map((city) => (
+                          <option key={city.id} value={city.name}>
+                            {city.name}
+                          </option>
+                        ))}
+                      </select>
+                      {errors.deliveryCity && (
+                        <p className="mt-1 text-sm text-red-600">{errors.deliveryCity}</p>
+                      )}
+                    </div>
+                    <div>
+                      <label className='block text-sm font-semibold text-slate-700 mb-2'>
+                        <MapPin className='w-4 h-4 inline mr-2' />
+                        İlçe *
+                      </label>
+                      <select
+                        value={formData.deliveryDistrict}
+                        onChange={(e) => {
+                          handleInputChange('deliveryDistrict', e.target.value);
+                          if (errors.deliveryDistrict) {
+                            setErrors(prev => ({ ...prev, deliveryDistrict: '' }));
+                          }
+                        }}
+                        disabled={!formData.deliveryCity}
+                        className={`w-full p-4 border-2 rounded-xl focus:ring-2 focus:ring-emerald-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md text-slate-700 ${
+                          !formData.deliveryCity ? 'bg-gray-100 cursor-not-allowed' : ''
+                        } ${
+                          errors.deliveryDistrict ? 'border-red-500' : 'border-slate-200'
+                        }`}
+                      >
+                        <option value="">İlçe seçiniz</option>
+                        {formData.deliveryCity && turkeyCities.find(c => c.name === formData.deliveryCity)?.districts.map((district) => (
+                          <option key={district} value={district}>
+                            {district}
+                          </option>
+                        ))}
+                      </select>
+                      {errors.deliveryDistrict && (
+                        <p className="mt-1 text-sm text-red-600">{errors.deliveryDistrict}</p>
+                      )}
+                    </div>
+                  </div>
                   <div>
                     <label className='block text-sm font-semibold text-slate-700 mb-2'>
                       <MapPin className='w-4 h-4 inline mr-2' />
@@ -1679,7 +1869,7 @@ export default function CreateShipment() {
                       className={`w-full p-4 border-2 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md text-slate-700 resize-none ${
                         errors.deliveryAddress ? 'border-red-500' : 'border-slate-200'
                       }`}
-                      placeholder='Tam adres bilgilerini girin...'
+                      placeholder='Mahalle, sokak, bina no, daire no vb. detaylı adres bilgilerini girin...'
                     />
                     {errors.deliveryAddress && (
                       <p className="mt-1 text-sm text-red-600">{errors.deliveryAddress}</p>
@@ -1820,7 +2010,7 @@ export default function CreateShipment() {
                     <p className='text-sm text-red-700'>{errors.publish || errorMessage}</p>
                     {(errors.publish || errorMessage)?.includes('bağlanılamıyor') || (errors.publish || errorMessage)?.includes('connection') || (errors.publish || errorMessage)?.includes('Failed to fetch') ? (
                       <p className='text-xs text-red-600 mt-2'>
-                        Backend sunucusu çalışmıyor olabilir. Lütfen backend'i başlatın: <code className='bg-red-100 px-1 rounded'>cd backend && node postgres-backend.js</code>
+                        Backend sunucusu çalışmıyor olabilir. Lütfen backend&apos;i başlatın: <code className='bg-red-100 px-1 rounded'>cd backend && node server-modular.js</code>
                       </p>
                     ) : null}
                   </div>
@@ -1828,44 +2018,31 @@ export default function CreateShipment() {
               </div>
             )}
 
-            {/* ÖNEMLİ UYARI - Sorumluluk Reddi */}
-            <div className='bg-red-50 border-2 border-red-300 rounded-xl p-6 space-y-4'>
+            {/* Önemli Bilgilendirme - Sorumluluk Reddi */}
+            <div className='bg-amber-50 border-2 border-amber-300 rounded-xl p-6 space-y-3'>
               <div className='flex items-start gap-3'>
-                <AlertTriangle className='w-6 h-6 text-red-600 flex-shrink-0 mt-0.5' />
+                <AlertTriangle className='w-6 h-6 text-amber-600 flex-shrink-0 mt-0.5' />
                 <div className='flex-1'>
-                  <h3 className='text-lg font-bold text-red-800 mb-3'>
-                    ÖNEMLİ UYARI: Sorumluluk Reddi
+                  <h3 className='text-lg font-semibold text-amber-900 mb-3'>
+                    Önemli Bilgilendirme
                   </h3>
-                  <div className='space-y-3 text-sm text-red-700'>
-                    <p className='font-semibold'>
-                      YolNext sadece bir aracı platformdur. Taşımacılık hizmetlerini bizzat sağlamaz ve hiçbir şekilde sorumluluk kabul etmez.
+                  <div className='space-y-3 text-sm text-amber-800'>
+                    <p>
+                      YolNext, göndericiler ve nakliyeciler arasında bağlantı kuran bir aracı platformdur. 
+                      Taşımacılık hizmetlerini bizzat sağlamaz ve sigorta hizmeti vermez.
                     </p>
-                    <ul className='list-disc pl-5 space-y-2'>
-                      <li>
-                        <strong>Kaza, yaralanma, ölüm:</strong> YolNext sorumlu değildir
-                      </li>
-                      <li>
-                        <strong>Hırsızlık, kayıp, hasar:</strong> YolNext sorumlu değildir
-                      </li>
-                      <li>
-                        <strong>Gecikme, yanlış teslimat:</strong> YolNext sorumlu değildir
-                      </li>
-                      <li>
-                        <strong>Mali kayıplar:</strong> YolNext sorumlu değildir
-                      </li>
-                      <li>
-                        <strong>Nakliyeci veya gönderici davranışları:</strong> YolNext sorumlu değildir
-                      </li>
-                    </ul>
-                    <p className='font-semibold mt-3'>
-                      Tüm riskler gönderici ve nakliyeci arasındadır.{' '}
+                    <p className='font-medium'>
+                      Tüm riskler gönderici ve nakliyeci arasındadır. Sigorta ihtiyacınız varsa, 
+                      kendi sigortanızı yaptırmak sizin sorumluluğunuzdadır.
+                    </p>
+                    <p>
                       <a
                         href='/terms'
                         target='_blank'
                         rel='noopener noreferrer'
-                        className='text-red-800 underline ml-1'
+                        className='text-amber-900 underline font-medium hover:text-amber-700'
                       >
-                        Detaylı bilgi için Kullanım Koşulları
+                        Detaylı bilgi için Kullanım Koşulları&apos;nı inceleyebilirsiniz
                       </a>
                     </p>
                   </div>
@@ -2004,7 +2181,7 @@ export default function CreateShipment() {
           </div>
 
           <div className='flex flex-wrap gap-2 sm:gap-4'>
-            {steps.map((step, index) => (
+            {steps.map((step) => (
               <div
                 key={step.id}
                 className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-sm sm:text-base font-medium transition-all duration-300 ${

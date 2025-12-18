@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -21,6 +21,7 @@ import {
   Globe,
 } from 'lucide-react';
 import YolNextLogo from '../components/common/yolnextLogo';
+import { analytics } from '../services/analytics';
 
 export default function Login() {
   const [formData, setFormData] = useState({
@@ -33,6 +34,14 @@ export default function Login() {
   const [error, setError] = useState('');
   const navigate = useNavigate();
   const { login, demoLogin, getPanelRoute } = useAuth();
+  const [abVariant] = useState(() => analytics.ab.getVariant('ab_landing_v1'));
+
+  useEffect(() => {
+    analytics.track('login_view', {
+      ab: abVariant,
+      userType: formData.userType,
+    });
+  }, [abVariant]);
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -53,12 +62,26 @@ export default function Login() {
       const result = await login(formData.email, formData.password);
 
       if (result.success) {
+        analytics.track('login_complete', {
+          ab: abVariant,
+          userType: formData.userType,
+        });
         const panelRoute = getPanelRoute(formData.userType);
         navigate(panelRoute);
       } else {
+        analytics.track('login_error', {
+          ab: abVariant,
+          userType: formData.userType,
+          reason: 'invalid_credentials',
+        });
         setError('Giriş bilgileri hatalı');
       }
     } catch (err) {
+      analytics.track('login_error', {
+        ab: abVariant,
+        userType: formData.userType,
+        reason: 'exception',
+      });
       setError('Giriş yapılırken bir hata oluştu. Lütfen tekrar deneyin.');
     } finally {
       setIsLoading(false);
@@ -74,11 +97,13 @@ export default function Login() {
     setError('');
 
     try {
-      console.log('handleDemoLogin called with userType:', userType);
       const result = await demoLogin(userType);
-      console.log('demoLogin result:', result);
 
       if (result.success) {
+        analytics.track('demo_login_complete', {
+          ab: abVariant,
+          userType,
+        });
         // Kullanıcı tipine göre doğru panele yönlendir
         const routes: { [key: string]: string } = {
           individual: '/individual/dashboard',
@@ -88,17 +113,27 @@ export default function Login() {
         };
         const panelRoute = routes[userType] || '/individual/dashboard';
         
-        console.log('Navigating to panel route:', panelRoute);
+        // Navigate to panel
         // Kısa bir gecikme ekleyerek state'in güncellenmesini bekle
         setTimeout(() => {
           navigate(panelRoute, { replace: true });
         }, 100);
       } else {
-        console.log('Demo login failed');
+        analytics.track('login_error', {
+          ab: abVariant,
+          userType,
+          reason: 'demo_failed',
+        });
+        // Demo login failed
         setError('Demo giriş başarısız');
       }
     } catch (err: any) {
-      console.error('handleDemoLogin error:', err);
+      analytics.track('login_error', {
+        ab: abVariant,
+        userType,
+        reason: 'demo_exception',
+      });
+      // Demo login error handled
       setError(`Demo giriş yapılırken bir hata oluştu: ${err?.message || 'Bilinmeyen bir hata oluştu'}`);
     } finally {
       setIsLoading(false);
@@ -189,7 +224,7 @@ export default function Login() {
             </div>
 
             <h1 className='text-4xl font-bold mb-6 bg-gradient-to-r from-white to-blue-200 bg-clip-text text-transparent'>
-              Türkiye'nin En Büyük Lojistik Platformu
+              Modern Lojistik Platformu
             </h1>
 
             <p className='text-xl text-slate-200 mb-8 leading-relaxed'>
@@ -398,6 +433,15 @@ export default function Login() {
                   </div>
                 )}
               </button>
+
+              <div className='text-center mt-4'>
+                <Link
+                  to='/forgot-password'
+                  className='text-sm text-blue-600 hover:text-blue-700 font-medium'
+                >
+                  Şifremi Unuttum
+                </Link>
+              </div>
             </form>
 
             <div className='mt-6 text-center'>

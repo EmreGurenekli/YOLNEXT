@@ -163,7 +163,7 @@ export const formatStatus = (status: string): string => {
     inactive: 'Pasif',
     maintenance: 'Bakımda',
     available: 'Müsait',
-    assigned: 'Atanmış',
+    assigned: 'Devam Ediyor',
     delivered: 'Teslim Edildi',
     preparing: 'Hazırlanıyor',
     waiting: 'Bekliyor',

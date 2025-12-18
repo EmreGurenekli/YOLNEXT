@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
+import { useAuth } from '../../contexts/AuthContext';
+import { createApiUrl } from '../../config/api';
 import {
   Settings,
   Bell,
@@ -22,12 +24,42 @@ import {
   BarChart3,
   CheckCircle,
   AlertCircle,
+  Copy,
 } from 'lucide-react';
 import Breadcrumb from '../../components/common/Breadcrumb';
 import EmptyState from '../../components/common/EmptyState';
 import LoadingState from '../../components/common/LoadingState';
 import Modal from '../../components/common/Modal';
 import SuccessMessage from '../../components/common/SuccessMessage';
+// Temporary workaround
+const kvkkAPI = {
+  requestDataAccess: async () => {
+    const response = await fetch(createApiUrl('/api/kvkk/data-access'), {
+      headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
+    });
+    return response.json();
+  },
+  deleteData: async () => {
+    const response = await fetch(createApiUrl('/api/kvkk/delete-data'), {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
+    });
+    return response.json();
+  }
+};
+const authAPI = {
+  deleteAccount: async (data: any) => {
+    const response = await fetch(createApiUrl('/api/users/account'), {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(data)
+    });
+    return response.json();
+  }
+};
 
 interface SettingsData {
   profile: {
@@ -67,12 +99,14 @@ interface SettingsData {
 }
 
 export default function TasiyiciSettings() {
+  const { user, updateUser } = useAuth();
   const [activeTab, setActiveTab] = useState('profile');
   const [isLoading, setIsLoading] = useState(false);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
 
   const [settings, setSettings] = useState<SettingsData>({
     profile: {
@@ -122,10 +156,6 @@ export default function TasiyiciSettings() {
 
   const tabs = [
     { id: 'profile', name: 'Profil', icon: User },
-    { id: 'notifications', name: 'Bildirimler', icon: Bell },
-    { id: 'privacy', name: 'Gizlilik', icon: Eye },
-    { id: 'security', name: 'Güvenlik', icon: Shield },
-    { id: 'preferences', name: 'Tercihler', icon: Globe },
     { id: 'vehicle', name: 'Araç', icon: Truck },
   ];
 
@@ -161,6 +191,35 @@ export default function TasiyiciSettings() {
       },
     }));
   };
+
+  // Ensure we have driverCode on the user object - fetch profile if missing
+  useEffect(() => {
+    const ensureDriverCode = async () => {
+      try {
+        const token = localStorage.getItem('authToken');
+        if (!token) return;
+
+        if (!user || !user.driverCode) {
+          const res = await fetch(createApiUrl('/api/users/profile'), {
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          });
+
+          if (res.ok) {
+            const resp = await res.json();
+            const profile = resp.data?.user || resp.user || resp.data || resp;
+            const code = profile?.driverCode || profile?.drivercode;
+            if (code) {
+              updateUser({ driverCode: code });
+            }
+          }
+        }
+      } catch (err) {
+        // silent
+      }
+    };
+
+    ensureDriverCode();
+  }, [user, updateUser]);
 
   if (isLoading) {
     return (
@@ -248,6 +307,59 @@ export default function TasiyiciSettings() {
                     <h3 className='text-lg font-semibold text-slate-900'>
                       Profil Bilgileri
                     </h3>
+
+                    {/* Taşıyıcı Kodu */}
+                    {(user?.driverCode || (user as any)?.drivercode) && (
+                      <div className='bg-gradient-to-r from-slate-800 to-blue-900 rounded-xl p-6 mb-6 border border-slate-700'>
+                        <div className='flex items-center justify-between mb-4'>
+                          <div>
+                            <h3 className='text-xl font-bold text-white flex items-center gap-2'>
+                              <Key className='w-5 h-5' />
+                              Taşıyıcı Kodunuz
+                            </h3>
+                            <p className='text-blue-200 text-sm mt-1'>
+                              Bu kodunuzu nakliyecilerle paylaşın, daha fazla iş fırsatı yakalayın!
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Code Display */}
+                        <div className='bg-white/10 backdrop-blur-sm rounded-xl p-4 mb-4 border border-white/20'>
+                          <div className='flex items-center justify-between'>
+                            <div className='flex-1'>
+                              <div className='text-xs text-blue-200 mb-1 font-medium'>Benzersiz Kodunuz</div>
+                              <div className='text-3xl font-mono font-bold text-white tracking-wider'>
+                                {user?.driverCode || (user as any)?.drivercode || 'Kod yükleniyor...'}
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => {
+                                const code = user?.driverCode || (user as any)?.drivercode;
+                                if (code) {
+                                  navigator.clipboard.writeText(code);
+                                  setCopiedCode(true);
+                                  setTimeout(() => setCopiedCode(false), 2000);
+                                }
+                              }}
+                              className='ml-4 px-4 py-2 bg-white/20 hover:bg-white/30 backdrop-blur-sm border border-white/30 rounded-lg transition-all duration-200 flex items-center gap-2 text-white font-medium shadow-lg hover:shadow-xl'
+                            >
+                              {copiedCode ? (
+                                <>
+                                  <CheckCircle className='w-5 h-5' />
+                                  <span>Kopyalandı!</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className='w-5 h-5' />
+                                  <span>Kopyala</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
                       <div>
                         <label className='block text-sm font-medium text-slate-700 mb-2'>
@@ -314,390 +426,55 @@ export default function TasiyiciSettings() {
                         />
                       </div>
                     </div>
-                  </div>
-                )}
 
-                {/* Notifications Settings */}
-                {activeTab === 'notifications' && (
-                  <div className='space-y-6'>
-                    <h3 className='text-lg font-semibold text-slate-900'>
-                      Bildirim Ayarları
-                    </h3>
-                    <div className='space-y-4'>
-                      <div className='flex items-center justify-between'>
-                        <div>
-                          <h4 className='text-sm font-medium text-slate-900'>
-                            E-posta Bildirimleri
-                          </h4>
-                          <p className='text-sm text-slate-600'>
-                            Önemli güncellemeler için e-posta alın
-                          </p>
-                        </div>
+                    {/* Account Deletion */}
+                    <div className='mt-8 pt-8 border-t border-red-200'>
+                      <h3 className='text-lg font-semibold text-red-900 mb-4 flex items-center gap-2'>
+                        <AlertCircle className='w-5 h-5' />
+                        Tehlikeli Bölge
+                      </h3>
+                      <div className='bg-red-50 border-2 border-red-200 rounded-lg p-6'>
+                        <h4 className='font-semibold text-red-900 mb-2'>Hesabı Sil</h4>
+                        <p className='text-sm text-red-800 mb-4'>
+                          Hesabınızı silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
+                          Tüm verileriniz silinecek ve hesabınıza bir daha erişemeyeceksiniz.
+                        </p>
                         <button
-                          onClick={() => handleToggle('notifications', 'email')}
-                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                            settings.notifications.email
-                              ? 'bg-slate-800'
-                              : 'bg-slate-200'
-                          }`}
-                        >
-                          <span
-                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                              settings.notifications.email
-                                ? 'translate-x-6'
-                                : 'translate-x-1'
-                            }`}
-                          />
-                        </button>
-                      </div>
-                      <div className='flex items-center justify-between'>
-                        <div>
-                          <h4 className='text-sm font-medium text-slate-900'>
-                            SMS Bildirimleri
-                          </h4>
-                          <p className='text-sm text-slate-600'>
-                            Acil durumlar için SMS alın
-                          </p>
-                        </div>
-                        <button
-                          onClick={() => handleToggle('notifications', 'sms')}
-                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                            settings.notifications.sms
-                              ? 'bg-slate-800'
-                              : 'bg-slate-200'
-                          }`}
-                        >
-                          <span
-                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                              settings.notifications.sms
-                                ? 'translate-x-6'
-                                : 'translate-x-1'
-                            }`}
-                          />
-                        </button>
-                      </div>
-                      <div className='flex items-center justify-between'>
-                        <div>
-                          <h4 className='text-sm font-medium text-slate-900'>
-                            İş Uyarıları
-                          </h4>
-                          <p className='text-sm text-slate-600'>
-                            Yeni iş fırsatları hakkında bilgilendirilme
-                          </p>
-                        </div>
-                        <button
-                          onClick={() =>
-                            handleToggle('notifications', 'jobAlerts')
-                          }
-                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                            settings.notifications.jobAlerts
-                              ? 'bg-slate-800'
-                              : 'bg-slate-200'
-                          }`}
-                        >
-                          <span
-                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                              settings.notifications.jobAlerts
-                                ? 'translate-x-6'
-                                : 'translate-x-1'
-                            }`}
-                          />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Privacy Settings */}
-                {activeTab === 'privacy' && (
-                  <div className='space-y-6'>
-                    <h3 className='text-lg font-semibold text-slate-900'>
-                      Gizlilik Ayarları
-                    </h3>
-                    <div className='space-y-4'>
-                      <div className='flex items-center justify-between'>
-                        <div>
-                          <h4 className='text-sm font-medium text-slate-900'>
-                            Profil Görünürlüğü
-                          </h4>
-                          <p className='text-sm text-slate-600'>
-                            Diğer kullanıcılar profilinizi görebilir
-                          </p>
-                        </div>
-                        <button
-                          onClick={() => handleToggle('privacy', 'showProfile')}
-                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                            settings.privacy.showProfile
-                              ? 'bg-slate-800'
-                              : 'bg-slate-200'
-                          }`}
-                        >
-                          <span
-                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                              settings.privacy.showProfile
-                                ? 'translate-x-6'
-                                : 'translate-x-1'
-                            }`}
-                          />
-                        </button>
-                      </div>
-                      
-                      {/* KVKK Veri Erişim Hakkı - Gizli yer */}
-                      <div className='mt-8 pt-6 border-t border-slate-200'>
-                        <div className='text-xs text-slate-400 space-y-2'>
-                          <p className='text-[10px] leading-tight'>
-                            KVKK m.11 gereği veri erişim ve silme haklarınız için:
-                          </p>
-                          <div className='flex gap-2'>
-                            <button
-                              onClick={async () => {
+                          onClick={async () => {
+                            const confirmed = window.confirm(
+                              'Hesabınızı silmek istediğinizden emin misiniz? Bu işlem geri alınamaz!'
+                            );
+                            if (confirmed) {
+                              const password = window.prompt('Güvenlik için şifrenizi girin:');
+                              if (password) {
                                 try {
-                                  const token = localStorage.getItem('authToken');
-                                  const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/kvkk/data-access`, {
-                                    headers: {
-                                      'Authorization': `Bearer ${token}`,
-                                      'Content-Type': 'application/json',
-                                    },
-                                  });
-                                  if (response.ok) {
-                                    const data = await response.json();
-                                    const blob = new Blob([JSON.stringify(data.data, null, 2)], { type: 'application/json' });
-                                    const url = URL.createObjectURL(blob);
-                                    const a = document.createElement('a');
-                                    a.href = url;
-                                    a.download = `yolnext-veri-export-${new Date().toISOString().split('T')[0]}.json`;
-                                    a.click();
-                                    URL.revokeObjectURL(url);
-                                    setSuccessMessage('Verileriniz indirildi');
-                                    setShowSuccessMessage(true);
+                                  setIsLoading(true);
+                                  const response = await authAPI.deleteAccount({ password, reason: 'Kullanıcı talebi' });
+                                  if (response.success) {
+                                    alert('Hesabınız başarıyla silindi. Çıkış yapılıyor...');
+                                    localStorage.clear();
+                                    window.location.href = '/';
                                   } else {
-                                    setSuccessMessage('Veri erişim hatası');
-                                    setShowSuccessMessage(true);
+                                    alert(response.message || 'Hesap silme başarısız');
                                   }
-                                } catch (error) {
-                                  setSuccessMessage('Veri erişim hatası');
-                                  setShowSuccessMessage(true);
+                                } catch (err: any) {
+                                  alert(err?.response?.data?.message || 'Hesap silme başarısız');
+                                } finally {
+                                  setIsLoading(false);
                                 }
-                              }}
-                              className='text-[10px] text-slate-400 hover:text-slate-600 underline'
-                            >
-                              Verilerimi İndir
-                            </button>
-                            <span className='text-slate-300'>|</span>
-                            <button
-                              onClick={async () => {
-                                if (!confirm('Tüm verileriniz silinecek. Bu işlem geri alınamaz. Emin misiniz?')) return;
-                                if (!confirm('Son bir kez onaylayın: Tüm verileriniz kalıcı olarak silinecek. Devam edilsin mi?')) return;
-                                try {
-                                  const token = localStorage.getItem('authToken');
-                                  const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/kvkk/delete-data`, {
-                                    method: 'DELETE',
-                                    headers: {
-                                      'Authorization': `Bearer ${token}`,
-                                      'Content-Type': 'application/json',
-                                    },
-                                  });
-                                  const data = await response.json();
-                                  if (response.ok) {
-                                    alert('Verileriniz silindi. Çıkış yapılıyor...');
-                                    localStorage.removeItem('authToken');
-                                    localStorage.removeItem('user');
-                                    window.location.href = '/login';
-                                  } else {
-                                    alert(data.message || 'Veri silme hatası');
-                                  }
-                                } catch (error) {
-                                  alert('Veri silme hatası');
-                                }
-                              }}
-                              className='text-[10px] text-slate-400 hover:text-red-600 underline'
-                            >
-                              Verilerimi Sil
-                            </button>
-                          </div>
-                        </div>
+                              }
+                            }
+                          }}
+                          disabled={isLoading}
+                          className='px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed'
+                        >
+                          {isLoading ? 'Siliniyor...' : 'Hesabımı Sil'}
+                        </button>
                       </div>
                     </div>
                   </div>
                 )}
 
-                {/* Security Settings */}
-                {activeTab === 'security' && (
-                  <div className='space-y-6'>
-                    <h3 className='text-lg font-semibold text-slate-900'>
-                      Güvenlik Ayarları
-                    </h3>
-                    <div className='space-y-4'>
-                      <div className='flex items-center justify-between'>
-                        <div>
-                          <h4 className='text-sm font-medium text-slate-900'>
-                            İki Faktörlü Kimlik Doğrulama
-                          </h4>
-                          <p className='text-sm text-slate-600'>
-                            Hesabınızı ekstra güvenlik ile koruyun
-                          </p>
-                        </div>
-                        <button
-                          onClick={() => handleToggle('security', 'twoFactor')}
-                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                            settings.security.twoFactor
-                              ? 'bg-slate-800'
-                              : 'bg-slate-200'
-                          }`}
-                        >
-                          <span
-                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                              settings.security.twoFactor
-                                ? 'translate-x-6'
-                                : 'translate-x-1'
-                            }`}
-                          />
-                        </button>
-                      </div>
-                      <div className='flex items-center justify-between'>
-                        <div>
-                          <h4 className='text-sm font-medium text-slate-900'>
-                            Biyometrik Giriş
-                          </h4>
-                          <p className='text-sm text-slate-600'>
-                            Parmak izi veya yüz tanıma ile giriş
-                          </p>
-                        </div>
-                        <button
-                          onClick={() => handleToggle('security', 'biometric')}
-                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                            settings.security.biometric
-                              ? 'bg-slate-800'
-                              : 'bg-slate-200'
-                          }`}
-                        >
-                          <span
-                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                              settings.security.biometric
-                                ? 'translate-x-6'
-                                : 'translate-x-1'
-                            }`}
-                          />
-                        </button>
-                      </div>
-                      <div>
-                        <label className='block text-sm font-medium text-slate-700 mb-2'>
-                          Oturum Zaman Aşımı (dakika)
-                        </label>
-                        <select
-                          value={settings.security.sessionTimeout}
-                          onChange={e =>
-                            handleInputChange(
-                              'security',
-                              'sessionTimeout',
-                              parseInt(e.target.value)
-                            )
-                          }
-                          className='w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500'
-                        >
-                          <option value={15}>15 dakika</option>
-                          <option value={30}>30 dakika</option>
-                          <option value={60}>1 saat</option>
-                          <option value={120}>2 saat</option>
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Preferences Settings */}
-                {activeTab === 'preferences' && (
-                  <div className='space-y-6'>
-                    <h3 className='text-lg font-semibold text-slate-900'>
-                      Uygulama Tercihleri
-                    </h3>
-                    <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-                      <div>
-                        <label className='block text-sm font-medium text-slate-700 mb-2'>
-                          Tema
-                        </label>
-                        <select
-                          value={settings.preferences.theme}
-                          onChange={e =>
-                            handleInputChange(
-                              'preferences',
-                              'theme',
-                              e.target.value
-                            )
-                          }
-                          className='w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500'
-                        >
-                          <option value='light'>Açık</option>
-                          <option value='dark'>Koyu</option>
-                          <option value='auto'>Otomatik</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className='block text-sm font-medium text-slate-700 mb-2'>
-                          Dil
-                        </label>
-                        <select
-                          value={settings.preferences.language}
-                          onChange={e =>
-                            handleInputChange(
-                              'preferences',
-                              'language',
-                              e.target.value
-                            )
-                          }
-                          className='w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500'
-                        >
-                          <option value='tr'>Türkçe</option>
-                          <option value='en'>English</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className='block text-sm font-medium text-slate-700 mb-2'>
-                          Saat Dilimi
-                        </label>
-                        <select
-                          value={settings.preferences.timezone}
-                          onChange={e =>
-                            handleInputChange(
-                              'preferences',
-                              'timezone',
-                              e.target.value
-                            )
-                          }
-                          className='w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500'
-                        >
-                          <option value='Europe/Istanbul'>
-                            İstanbul (UTC+3)
-                          </option>
-                          <option value='Europe/London'>Londra (UTC+0)</option>
-                          <option value='America/New_York'>
-                            New York (UTC-5)
-                          </option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className='block text-sm font-medium text-slate-700 mb-2'>
-                          Para Birimi
-                        </label>
-                        <select
-                          value={settings.preferences.currency}
-                          onChange={e =>
-                            handleInputChange(
-                              'preferences',
-                              'currency',
-                              e.target.value
-                            )
-                          }
-                          className='w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500'
-                        >
-                          <option value='TRY'>₺ Türk Lirası</option>
-                          <option value='USD'>$ Amerikan Doları</option>
-                          <option value='EUR'>€ Euro</option>
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-                )}
 
                 {/* Vehicle Settings */}
                 {activeTab === 'vehicle' && (
@@ -797,6 +574,52 @@ export default function TasiyiciSettings() {
                               </label>
                             )
                           )}
+                        </div>
+                      </div>
+
+                      {/* Account Deletion */}
+                      <div className='mt-8 pt-8 border-t border-red-200'>
+                        <h3 className='text-lg font-semibold text-red-900 mb-4 flex items-center gap-2'>
+                          <AlertCircle className='w-5 h-5' />
+                          Tehlikeli Bölge
+                        </h3>
+                        <div className='bg-red-50 border-2 border-red-200 rounded-lg p-6'>
+                          <h4 className='font-semibold text-red-900 mb-2'>Hesabı Sil</h4>
+                          <p className='text-sm text-red-800 mb-4'>
+                            Hesabınızı silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
+                            Tüm verileriniz silinecek ve hesabınıza bir daha erişemeyeceksiniz.
+                          </p>
+                          <button
+                            onClick={async () => {
+                              const confirmed = window.confirm(
+                                'Hesabınızı silmek istediğinizden emin misiniz? Bu işlem geri alınamaz!'
+                              );
+                              if (confirmed) {
+                                const password = window.prompt('Güvenlik için şifrenizi girin:');
+                                if (password) {
+                                  try {
+                                    setIsLoading(true);
+                                    const response = await authAPI.deleteAccount({ password, reason: 'Kullanıcı talebi' });
+                                    if (response.success) {
+                                      alert('Hesabınız başarıyla silindi. Çıkış yapılıyor...');
+                                      localStorage.clear();
+                                      window.location.href = '/';
+                                    } else {
+                                      alert(response.message || 'Hesap silme başarısız');
+                                    }
+                                  } catch (err: any) {
+                                    alert(err?.response?.data?.message || 'Hesap silme başarısız');
+                                  } finally {
+                                    setIsLoading(false);
+                                  }
+                                }
+                              }
+                            }}
+                            disabled={isLoading}
+                            className='px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed'
+                          >
+                            {isLoading ? 'Siliniyor...' : 'Hesabımı Sil'}
+                          </button>
                         </div>
                       </div>
                     </div>

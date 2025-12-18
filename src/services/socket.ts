@@ -6,6 +6,8 @@ class SocketService {
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private reconnectDelay = 1000;
+  private maxReconnectDelay = 30000; // 30 seconds max delay
+  private reconnectDelayMultiplier = 2;
 
   connect(token?: string): Promise<void> {
     return new Promise((resolve, reject) => {
@@ -50,6 +52,17 @@ class SocketService {
         this.socket.on('reconnect_error', error => {
           console.error('Socket reconnection error:', error);
           this.reconnectAttempts++;
+          
+          // Exponential backoff: increase delay with each attempt
+          const newDelay = Math.min(
+            this.reconnectDelay * Math.pow(this.reconnectDelayMultiplier, this.reconnectAttempts),
+            this.maxReconnectDelay
+          );
+          
+          // Update socket.io reconnection delay
+          if (this.socket) {
+            this.socket.io.reconnectionDelay(newDelay);
+          }
         });
 
         this.socket.on('reconnect_failed', () => {

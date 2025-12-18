@@ -79,7 +79,10 @@ const Listings: React.FC = () => {
       });
       if (!res.ok) throw new Error('İlanlar alınamadı');
       const data = await res.json();
-      setListings((Array.isArray(data) ? data : data.data || []) as Listing[]);
+      const rows = Array.isArray(data)
+        ? data
+        : (Array.isArray(data?.data) ? data.data : (data?.data?.listings || data?.listings || []));
+      setListings((Array.isArray(rows) ? rows : []) as Listing[]);
     } catch (e) {
       if (import.meta.env.DEV) console.error(e);
       setListings([]);
@@ -109,7 +112,10 @@ const Listings: React.FC = () => {
       );
       if (!res.ok) throw new Error('Teklifler alınamadı');
       const data = await res.json();
-      setBids((Array.isArray(data) ? data : data.data || []) as Bid[]);
+      const rows = Array.isArray(data)
+        ? data
+        : (Array.isArray(data?.data) ? data.data : (data?.data?.bids || data?.bids || []));
+      setBids((Array.isArray(rows) ? rows : []) as Bid[]);
     } catch (e) {
       setBids([]);
     } finally {

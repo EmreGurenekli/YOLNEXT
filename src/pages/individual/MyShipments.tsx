@@ -1,26 +1,25 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Helmet } from 'react-helmet-async';
 import {
   Package,
-  MapPin,
   Clock,
   CheckCircle,
   XCircle,
   AlertCircle,
   Truck,
-  Calendar,
-  Eye,
-  MessageCircle,
-  Plus,
   Filter,
   Search,
   Download,
+  User,
+  Building2,
+  MapPin,
+  Calendar,
+  DollarSign,
+  Info,
 } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { createApiUrl } from '../../config/api';
 import { formatCurrency, formatDate } from '../../utils/format';
-import Pagination from '../../components/common/Pagination';
-import { exportShipmentsToCSV, exportShipmentsToExcel } from '../../utils/export';
 import { useAuth } from '../../contexts/AuthContext';
 import MessagingModal from '../../components/MessagingModal';
 import RatingModal from '../../components/RatingModal';
@@ -30,12 +29,20 @@ interface Shipment {
   title: string;
   from: string;
   to: string;
-  status: 'preparing' | 'waiting' | 'in_transit' | 'delivered' | 'cancelled';
+  status: 'preparing' | 'waiting' | 'waiting_for_offers' | 'offer_accepted' | 'accepted' | 'in_transit' | 'delivered' | 'cancelled';
   createdAt: string;
   estimatedDelivery: string;
   actualDelivery?: string;
   price: number;
   carrierName?: string;
+  carrierId?: string;
+  carrierPhone?: string;
+  carrierEmail?: string;
+  carrierCompany?: string;
+  driverName?: string;
+  driverId?: string;
+  driverPhone?: string;
+  driverEmail?: string;
   trackingNumber?: string;
   description: string;
   category: string;
@@ -46,15 +53,24 @@ interface Shipment {
   subCategory: string;
   rating?: number;
   volume: string;
+  pickupDate?: string;
+  deliveryDate?: string;
+  pickupAddress?: string;
+  deliveryAddress?: string;
+  pickupCity?: string;
+  deliveryCity?: string;
 }
 
-const IndividualMyShipments: React.FC = () => {
+const MyShipments: React.FC<{ basePath?: string }> = ({ basePath = '/individual' }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  // Default to 'active' to show only active shipments (offer_accepted, in_transit, etc.)
+  // Completed shipments go to History page
+  const [statusFilter, setStatusFilter] = useState('active');
   const [sortBy, setSortBy] = useState('date');
   const [pagination, setPagination] = useState({
     page: 1,
@@ -67,10 +83,47 @@ const IndividualMyShipments: React.FC = () => {
   const [selectedShipmentId, setSelectedShipmentId] = useState<string | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null);
+  const [showProcessAssistantDetails, setShowProcessAssistantDetails] = useState(false);
   const [showRatingModal, setShowRatingModal] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [notification, setNotification] = useState<{type: 'success' | 'error', message: string} | null>(null);
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!showDetailModal) {
+      setShowProcessAssistantDetails(false);
+      return;
+    }
+    setShowProcessAssistantDetails(false);
+  }, [showDetailModal, selectedShipment?.id]);
 
   // Yeni kullanıcılar için boş veriler
   const emptyShipments: Shipment[] = [];
+
+  const isMessagingEnabledForShipment = (status: Shipment['status']) => {
+    return (
+      status === 'offer_accepted' ||
+      status === 'accepted' ||
+      (status as any) === 'in_progress' ||
+      (status as any) === 'assigned' ||
+      status === 'in_transit' ||
+      status === 'delivered'
+    );
+  };
+
+  const isProcessAssistantEnabledForShipment = (status: Shipment['status']) => {
+    const s = String(status || '').trim();
+    return (
+      s === 'offer_accepted' ||
+      s === 'accepted' ||
+      s === 'in_progress' ||
+      s === 'assigned' ||
+      s === 'in_transit' ||
+      s === 'delivered'
+    );
+  };
 
   const loadShipments = async () => {
       try {
@@ -83,11 +136,17 @@ const IndividualMyShipments: React.FC = () => {
           return;
         }
 
+        // Always include userId parameter to ensure proper filtering
+        const userId = user?.id;
         const params = new URLSearchParams({
           page: pagination.page.toString(),
           limit: pagination.limit.toString(),
+          userId: userId || '',
         });
-        if (statusFilter !== 'all') {
+        // Don't send 'active' filter to backend - filter on frontend instead
+        // Backend doesn't understand 'active' - it needs specific statuses
+        // We'll filter on frontend for 'active' status
+        if (statusFilter !== 'all' && statusFilter !== 'active') {
           params.append('status', statusFilter);
         }
         if (searchTerm && searchTerm.trim()) {
@@ -107,12 +166,57 @@ const IndividualMyShipments: React.FC = () => {
 
         if (response.ok && data.success) {
           // Backend'den dönen data structure'ı kontrol et
+          // Handle different response structures
           const shipments =
-            data.data?.shipments || (Array.isArray(data.data) ? data.data : []);
-          console.log('✅ Bireysel gönderiler yüklendi:', shipments.length);
+            data.data?.shipments || 
+            data.shipments || 
+            (Array.isArray(data.data) ? data.data : []) ||
+            []; 
 
           // Backend verilerini frontend formatına çevir
-          const formattedShipments = shipments.map((shipment: any) => ({
+          interface BackendShipment {
+            id: number | string;
+            title?: string;
+            pickupCity?: string;
+            fromCity?: string;
+            pickupDistrict?: string;
+            deliveryCity?: string;
+            toCity?: string;
+            deliveryDistrict?: string;
+            status?: string;
+            createdAt?: string;
+            created_at?: string;
+            deliveryDate?: string;
+            delivery_date?: string;
+            pickupDate?: string;
+            price?: number;
+            carrierName?: string;
+            carrier_name?: string;
+            carrierCompany?: string;
+            carrier_company?: string;
+            carrierId?: string | number;
+            carrier_id?: string | number;
+            nakliyeci_id?: string | number;
+            carrierPhone?: string;
+            carrier_phone?: string;
+            carrierEmail?: string;
+            carrier_email?: string;
+            trackingNumber?: string;
+            tracking_number?: string;
+            description?: string;
+            category?: string;
+            weight?: number | string;
+            dimensions?: string;
+            volume?: number | string;
+            specialRequirements?: string | string[];
+            subCategory?: string;
+            rating?: number;
+            actualDeliveryDate?: string;
+            displayPrice?: number;
+            offerPrice?: number;
+            value?: number;
+          }
+          const formattedShipments = shipments.map((shipment: BackendShipment) => ({
             id: shipment.id.toString(),
             title: shipment.title || 'Gönderi',
             from:
@@ -125,22 +229,25 @@ const IndividualMyShipments: React.FC = () => {
               shipment.toCity ||
               `${shipment.deliveryDistrict || ''} ${shipment.deliveryCity || ''}`.trim() ||
               'Bilinmiyor',
-            status: (shipment.status === 'open'
+            status: (shipment.status === 'open' || shipment.status === 'waiting_for_offers'
               ? 'waiting'
-              : shipment.status === 'accepted'
-                ? 'in_transit'
-                : shipment.status === 'in_progress'
+              : shipment.status === 'offer_accepted' || shipment.status === 'accepted'
+                ? 'offer_accepted'
+                : shipment.status === 'in_transit' || shipment.status === 'in_progress'
                   ? 'in_transit'
                   : shipment.status === 'delivered'
                     ? 'delivered'
                     : shipment.status === 'cancelled'
                       ? 'cancelled'
-                      : 'waiting') as
+                      : shipment.status === 'preparing'
+                        ? 'preparing'
+                        : 'waiting') as
               | 'delivered'
               | 'in_transit'
               | 'preparing'
               | 'waiting'
-              | 'cancelled',
+              | 'cancelled'
+              | 'offer_accepted',
             createdAt:
               shipment.createdAt ||
               shipment.created_at ||
@@ -154,16 +261,20 @@ const IndividualMyShipments: React.FC = () => {
               shipment.status === 'delivered'
                 ? shipment.actualDeliveryDate || shipment.deliveryDate
                 : undefined,
-            price: shipment.price || 0,
+            price: shipment.displayPrice || shipment.price || shipment.offerPrice || shipment.value || 0,
             carrierName:
               shipment.carrierName || shipment.carrier_name || undefined,
+            carrierId: shipment.carrierId || shipment.carrier_id || shipment.nakliyeci_id || undefined,
+            carrierPhone: undefined,
+            carrierEmail: undefined,
+            carrierCompany: shipment.carrierCompany || shipment.carrier_company || undefined,
             trackingNumber:
               shipment.trackingNumber || shipment.tracking_number || undefined,
             description: shipment.description || '',
             category: shipment.category || 'Genel',
-            weight: shipment.weight?.toString() || '0',
+            weight: shipment.weight ? (typeof shipment.weight === 'number' ? shipment.weight.toString() : shipment.weight) : '0',
             dimensions:
-              shipment.dimensions || shipment.volume?.toString() || '0',
+              shipment.dimensions || (shipment.volume ? (typeof shipment.volume === 'number' ? shipment.volume.toString() : shipment.volume) : '0'),
             specialRequirements: shipment.specialRequirements
               ? Array.isArray(shipment.specialRequirements)
                 ? shipment.specialRequirements
@@ -174,12 +285,12 @@ const IndividualMyShipments: React.FC = () => {
               `TRK${shipment.id.toString().padStart(6, '0')}`,
             subCategory: shipment.subCategory || shipment.category || 'Genel',
             rating: shipment.rating || undefined,
-            volume: shipment.volume?.toString() || '0',
+            volume: shipment.volume ? (typeof shipment.volume === 'number' ? shipment.volume.toString() : shipment.volume) : '0',
           }));
 
           setShipments(formattedShipments);
           if (data.pagination) {
-            setPagination(prev => ({
+            setPagination((prev: typeof pagination) => ({
               ...prev,
               page: data.pagination.page,
               pages: data.pagination.pages,
@@ -187,25 +298,58 @@ const IndividualMyShipments: React.FC = () => {
             }));
           }
         } else {
-          console.error(
-            '❌ Gönderiler yüklenemedi:',
-            data.message || data.error
-          );
           setShipments(emptyShipments);
         }
       } catch (error) {
-        console.error('❌ API hatası:', error);
         setShipments(emptyShipments);
       } finally {
         setLoading(false);
-        console.log('✅ Loading tamamlandı');
       }
   };
 
   useEffect(() => {
     loadShipments();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pagination.page, statusFilter, searchTerm]);
+
+  // Reload shipments when navigating from offer acceptance
+  useEffect(() => {
+    if (location.state?.refresh) {
+      // Small delay to ensure backend has processed the update
+      refreshTimerRef.current = setTimeout(() => {
+        loadShipments();
+        // Clear the state to prevent reloading on every render
+        navigate(location.pathname, { replace: true, state: {} });
+      }, 500);
+    }
+    
+    // Cleanup timer on unmount or when location.state changes
+    return () => {
+      if (refreshTimerRef.current) {
+        clearTimeout(refreshTimerRef.current);
+      }
+    };
+  }, [location.state]);
+
+  // Reload shipments when page becomes visible (e.g., after accepting an offer)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        loadShipments();
+      }
+    };
+    
+    const handleFocus = () => {
+      loadShipments();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, []);
 
   const getStatusInfo = (status: string) => {
     switch (status) {
@@ -216,10 +360,18 @@ const IndividualMyShipments: React.FC = () => {
           icon: AlertCircle,
         };
       case 'waiting':
+      case 'waiting_for_offers':
         return {
           text: 'Teklif Bekliyor',
           color: 'bg-blue-100 text-blue-800',
           icon: Clock,
+        };
+      case 'offer_accepted':
+      case 'accepted':
+        return {
+          text: 'Teklif Kabul Edildi',
+          color: 'bg-green-100 text-green-800',
+          icon: CheckCircle,
         };
       case 'in_transit':
         return {
@@ -263,24 +415,65 @@ const IndividualMyShipments: React.FC = () => {
     }
   };
 
-  const handleViewDetails = (shipmentId: string) => {
-    const shipment = shipments.find(s => s.id === shipmentId);
+  const handleViewDetails = async (shipmentId: string) => {
+    const shipment = shipments.find((s: Shipment) => s.id === shipmentId);
     if (shipment) {
-      setSelectedShipment(shipment);
+      // Her zaman detay endpoint'inden güncel bilgileri çek (nakliyeci ve taşıyıcı bilgileri için)
+      try {
+        const token = localStorage.getItem('authToken');
+        const response = await fetch(
+          `${createApiUrl(`/api/shipments/${shipmentId}`)}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+        
+        if (response.ok) {
+          const data = await response.json();
+          const shipmentDetail = data.shipment || data.data;
+          
+          // Tüm bilgileri güncelle
+          setSelectedShipment({
+            ...shipment,
+            carrierName: shipmentDetail.carrierName || shipment.carrierName,
+            carrierPhone: undefined,
+            carrierEmail: undefined,
+            carrierCompany: shipmentDetail.carrierCompany || shipment.carrierCompany,
+            carrierId: shipmentDetail.nakliyeci_id || shipmentDetail.carrierId || shipment.carrierId,
+            driverName: shipmentDetail.driverName || shipment.driverName,
+            driverPhone: undefined,
+            driverEmail: undefined,
+            driverId: shipmentDetail.driver_id || shipmentDetail.driverId || shipment.driverId,
+            pickupDate: shipmentDetail.pickupDate || shipmentDetail.pickup_date || shipment.pickupDate,
+            deliveryDate: shipmentDetail.deliveryDate || shipmentDetail.delivery_date || shipment.deliveryDate,
+            pickupAddress: shipmentDetail.pickupAddress || shipmentDetail.pickup_address || shipment.pickupAddress,
+            deliveryAddress: shipmentDetail.deliveryAddress || shipmentDetail.delivery_address || shipment.deliveryAddress,
+            pickupCity: shipmentDetail.pickupCity || shipmentDetail.pickup_city || shipment.pickupCity,
+            deliveryCity: shipmentDetail.deliveryCity || shipmentDetail.delivery_city || shipment.deliveryCity,
+          });
+        } else {
+          setSelectedShipment(shipment);
+        }
+      } catch (error) {
+        setSelectedShipment(shipment);
+      }
       setShowDetailModal(true);
     }
   };
 
   const handleRateCarrier = (shipment: Shipment) => {
-    if (shipment.carrierName) {
-      const carrierId = shipment.carrierName === 'Nakliyeci Demo User' 
-        ? 'demo-nakliyeci-1003' 
-        : shipment.carrierName;
+    if (shipment.carrierName || shipment.carrierId) {
+      // Use real carrierId from shipment, fallback to carrierName if ID not available
+      const carrierId = shipment.carrierId || shipment.carrierName;
+      const carrierEmail = '';
       
       setSelectedCarrier({
-        id: carrierId,
-        name: shipment.carrierName,
-        email: 'demo@nakliyeci.com',
+        id: carrierId?.toString() || '',
+        name: shipment.carrierName || 'Nakliyeci',
+        email: carrierEmail,
         type: 'nakliyeci',
       });
       setSelectedShipmentId(shipment.id);
@@ -289,48 +482,160 @@ const IndividualMyShipments: React.FC = () => {
   };
 
   const handleTrackShipment = (shipmentId: string) => {
-    navigate(`/individual/live-tracking?shipmentId=${shipmentId}`);
+    navigate(`${basePath}/live-tracking?shipmentId=${shipmentId}`);
   };
 
-  const handleMessage = async (shipment: Shipment) => {
-    if (!shipment.carrierName) {
+  const handleMessage = (shipment: Shipment) => {
+    if (!shipment.carrierId && !shipment.carrierName) {
       // Eğer nakliyeci yoksa, mesajlaşma sayfasına yönlendir
-      navigate('/individual/messages');
+      navigate(`${basePath}/messages`);
       return;
     }
 
-    // Nakliyeci bilgilerini demo verilerden oluştur
-    // Backend'de demo nakliyeci ID'si genellikle "demo-nakliyeci-1003" formatında
-    const carrierId = shipment.carrierName === 'Nakliyeci Demo User' 
-      ? 'demo-nakliyeci-1003' 
-      : shipment.carrierName;
+    // Use real carrierId from shipment, fallback to carrierName if ID not available
+    const carrierId = shipment.carrierId || shipment.carrierName;
     
-    setSelectedCarrier({
-      id: carrierId,
-      name: shipment.carrierName,
-      email: 'demo@nakliyeci.com',
-      type: 'nakliyeci',
-    });
-    setSelectedShipmentId(shipment.id);
-    setShowMessagingModal(true);
+    // Navigate to messages page with userId and shipmentId parameters
+    // This will automatically open the conversation with the carrier
+    navigate(`${basePath}/messages?userId=${carrierId}&shipmentId=${shipment.id}`);
   };
 
-  const handleExportCSV = () => {
-    exportShipmentsToCSV(filteredShipments, `gonderilerim_${new Date().toISOString().split('T')[0]}.csv`);
+  const handleCancelClick = (shipment: Shipment) => {
+    setSelectedShipment(shipment);
+    setCancelReason('');
+    setShowCancelModal(true);
   };
 
-  const handleExportExcel = async () => {
-    await exportShipmentsToExcel(filteredShipments, `gonderilerim_${new Date().toISOString().split('T')[0]}.xlsx`);
+  const handleCancelShipment = async () => {
+    if (!selectedShipment || !cancelReason.trim()) {
+      return;
+    }
+
+    try {
+      setIsCancelling(true);
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(
+        createApiUrl(`/api/shipments/${selectedShipment.id}/cancel`),
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            reason: cancelReason.trim(),
+          }),
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        setShowCancelModal(false);
+        setCancelReason('');
+        setSelectedShipment(null);
+        loadShipments(); // Reload shipments
+        
+        // Show appropriate message based on refund status
+        if (data.data?.refundDenied) {
+          setNotification({ 
+            type: 'error', 
+            message: `Gönderi iptal edildi. ${data.warning || data.data.refundReason || 'İade koşulları sağlanmadığı için komisyon iadesi yapılamadı.'}` 
+          });
+        } else if (data.data?.commissionRefunded) {
+          setNotification({ 
+            type: 'success', 
+            message: `Gönderi iptal edildi. Komisyon iadesi yapıldı (${data.data.refundAmount?.toFixed(2) || '0'} TL). İşlem ücreti kesildi.` 
+          });
+        } else {
+          setNotification({ type: 'success', message: 'Gönderi başarıyla iptal edildi' });
+        }
+        setTimeout(() => setNotification(null), 8000);
+      } else {
+        const errorData = await response.json();
+        setNotification({ type: 'error', message: errorData.message || 'Gönderi iptal edilemedi' });
+        setTimeout(() => setNotification(null), 5000);
+      }
+    } catch (error) {
+      setNotification({ type: 'error', message: 'Gönderi iptal edilirken bir hata oluştu' });
+      setTimeout(() => setNotification(null), 5000);
+    } finally {
+      setIsCancelling(false);
+    }
+  };
+
+  const handleConfirmDelivery = async (shipment: Shipment) => {
+    if (shipment.status !== 'delivered') {
+      return;
+    }
+
+    if (!window.confirm('Teslimatı onaylamak istediğinizden emin misiniz?')) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(
+        createApiUrl(`/api/shipments/${shipment.id}/confirm-delivery`),
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (response.ok) {
+        loadShipments(); // Reload shipments
+        setNotification({ type: 'success', message: 'Teslimat başarıyla onaylandı!' });
+        setTimeout(() => setNotification(null), 5000);
+      } else {
+        const errorData = await response.json();
+        setNotification({ type: 'error', message: errorData.message || 'Teslimat onaylanamadı' });
+        setTimeout(() => setNotification(null), 5000);
+      }
+    } catch (error) {
+      setNotification({ type: 'error', message: 'Teslimat onaylanırken bir hata oluştu' });
+      setTimeout(() => setNotification(null), 5000);
+    }
+  };
+
+  const canCancelShipment = (status: string) => {
+    const s = (status || '').trim().toLowerCase();
+    // Backward-compatible normalization
+    const normalized =
+      s === 'waiting' ? 'waiting_for_offers' :
+      s === 'preparing' ? 'in_progress' :
+      s === 'active' ? 'waiting_for_offers' :
+      s === 'draft' ? 'pending' :
+      s;
+
+    // Cancellable only before transit/delivery starts
+    const cancellableStatuses = ['pending', 'waiting_for_offers', 'offer_accepted', 'accepted'];
+    return cancellableStatuses.includes(normalized);
   };
 
   // Arama backend'de yapıldığı için sadece status filtresi uygulanıyor
-  const filteredShipments = shipments.filter(shipment => {
+  const filteredShipments = shipments.filter((shipment: Shipment) => {
+    // Default filter is 'active' - show only active shipments
+    // Active: offer_accepted, in_transit, accepted, preparing (with carrier assigned)
+    // Exclude: delivered (goes to History), waiting_for_offers (no offer yet), cancelled
+    const s = (shipment.status || '').trim().toLowerCase();
+    const normalized =
+      s === 'waiting' ? 'waiting_for_offers' :
+      s === 'preparing' ? 'in_progress' :
+      s === 'active' ? 'waiting_for_offers' :
+      s === 'draft' ? 'pending' :
+      s;
+
     const matchesStatus =
       statusFilter === 'all' ||
       (statusFilter === 'active' &&
-        ['in_transit', 'preparing', 'waiting'].includes(shipment.status)) ||
-      (statusFilter === 'completed' && shipment.status === 'delivered') ||
-      (statusFilter === 'pending' && shipment.status === 'waiting');
+        ['in_transit', 'in_progress', 'offer_accepted', 'accepted'].includes(normalized) &&
+        normalized !== 'delivered' &&
+        normalized !== 'cancelled') ||
+      (statusFilter === 'completed' && normalized === 'delivered') ||
+      (statusFilter === 'pending' && (normalized === 'waiting_for_offers' || normalized === 'pending'));
 
     return matchesStatus;
   });
@@ -360,6 +665,38 @@ const IndividualMyShipments: React.FC = () => {
         />
       </Helmet>
 
+      {/* Notification */}
+      {notification && (
+        <div className={`fixed top-4 right-4 z-50 max-w-md ${
+          notification.type === 'success' 
+            ? 'bg-green-50 border border-green-200' 
+            : 'bg-red-50 border border-red-200'
+        } rounded-lg shadow-lg p-4 flex items-start gap-3`}>
+          <div className={`w-5 h-5 flex-shrink-0 mt-0.5 ${
+            notification.type === 'success' ? 'text-green-600' : 'text-red-600'
+          }`}>
+            {notification.type === 'success' ? (
+              <CheckCircle className='w-5 h-5' />
+            ) : (
+              <AlertCircle className='w-5 h-5' />
+            )}
+          </div>
+          <p className={`text-sm flex-1 ${
+            notification.type === 'success' ? 'text-green-800' : 'text-red-800'
+          }`}>
+            {notification.message}
+          </p>
+          <button
+            onClick={() => setNotification(null)}
+            className={`${
+              notification.type === 'success' ? 'text-green-600 hover:text-green-800' : 'text-red-600 hover:text-red-800'
+            }`}
+          >
+            <XCircle className='w-4 h-4' />
+          </button>
+        </div>
+      )}
+
       <div className='max-w-5xl mx-auto px-4 py-6'>
         {/* Header - Match Corporate Design */}
         <div className='text-center mb-12'>
@@ -388,14 +725,14 @@ const IndividualMyShipments: React.FC = () => {
                 type='text'
                 placeholder='Gönderi ara...'
                 value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
                 className='w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
               />
             </div>
 
             <select
               value={statusFilter}
-              onChange={e => setStatusFilter(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setStatusFilter(e.target.value)}
               className='px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
             >
               <option value='all'>Tüm Durumlar</option>
@@ -406,7 +743,7 @@ const IndividualMyShipments: React.FC = () => {
 
             <select
               value={sortBy}
-              onChange={e => setSortBy(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSortBy(e.target.value)}
               className='px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
             >
               <option value='date'>Tarihe Göre</option>
@@ -421,25 +758,7 @@ const IndividualMyShipments: React.FC = () => {
             </button>
           </div>
 
-          {/* Export Buttons */}
-          {filteredShipments.length > 0 && (
-            <div className='flex items-center justify-end gap-3 pt-4 border-t border-slate-200'>
-              <button
-                onClick={handleExportCSV}
-                className='flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors'
-              >
-                <Download className='w-4 h-4' />
-                CSV İndir
-              </button>
-              <button
-                onClick={handleExportExcel}
-                className='flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors'
-              >
-                <Download className='w-4 h-4' />
-                Excel İndir
-              </button>
-            </div>
-          )}
+          {/* Export Buttons kaldırıldı */}
         </div>
 
         {/* Shipments Table */}
@@ -480,7 +799,7 @@ const IndividualMyShipments: React.FC = () => {
                           {shipment.trackingCode}
                         </div>
                         <div className='text-xs text-slate-500'>
-                          {shipment.createdAt}
+                          {formatDate(shipment.createdAt, 'long')}
                         </div>
                         <div className='text-xs text-slate-500'>
                           {shipment.title}
@@ -491,7 +810,25 @@ const IndividualMyShipments: React.FC = () => {
                           {shipment.from} → {shipment.to}
                         </div>
                         <div className='text-xs text-slate-500'>
-                          {shipment.category} - {shipment.subCategory}
+                          {(() => {
+                            const getCategoryName = (cat: string) => {
+                              const categoryMap: { [key: string]: string } = {
+                                'house_move': 'Ev Taşınması',
+                                'furniture_goods': 'Mobilya Taşıma',
+                                'special_cargo': 'Özel Yük',
+                                'other': 'Diğer'
+                              };
+                              return categoryMap[cat] || cat;
+                            };
+                            
+                            const category = getCategoryName(shipment.category || '');
+                            const subCategory = shipment.subCategory ? getCategoryName(shipment.subCategory) : '';
+                            
+                            if (!subCategory || subCategory === category) {
+                              return category;
+                            }
+                            return `${category} - ${subCategory}`;
+                          })()}
                         </div>
                       </td>
                       <td className='py-4 px-4'>
@@ -503,7 +840,9 @@ const IndividualMyShipments: React.FC = () => {
                                 ? 'bg-blue-100 text-blue-800'
                                 : shipment.status === 'preparing'
                                   ? 'bg-orange-100 text-orange-800'
-                                  : 'bg-yellow-100 text-yellow-800'
+                                  : shipment.status === 'offer_accepted' || shipment.status === 'accepted'
+                                    ? 'bg-green-100 text-green-800'
+                                    : 'bg-yellow-100 text-yellow-800'
                           }`}
                         >
                           {getStatusIcon(shipment.status)}
@@ -525,7 +864,7 @@ const IndividualMyShipments: React.FC = () => {
                           {formatCurrency(shipment.price)}
                         </div>
                         <div className='text-xs text-slate-500'>
-                          {shipment.weight} • {shipment.volume}
+                          {shipment.volume && shipment.volume !== '0' ? `${shipment.volume} m³` : 'Bilinmiyor'}
                         </div>
                         <div className='text-xs text-slate-500'>
                           {formatDate(shipment.estimatedDelivery, 'long')}
@@ -539,7 +878,7 @@ const IndividualMyShipments: React.FC = () => {
                           >
                             Detay
                           </button>
-                          {shipment.status !== 'waiting' && (
+                          {shipment.status !== 'waiting' && shipment.status !== 'waiting_for_offers' && (
                             <button
                               onClick={() => handleTrackShipment(shipment.id)}
                               className='px-3 py-1.5 bg-green-100 hover:bg-green-200 text-green-700 text-xs font-medium rounded-lg transition-colors'
@@ -549,16 +888,40 @@ const IndividualMyShipments: React.FC = () => {
                           )}
                           <button
                             onClick={() => handleMessage(shipment)}
-                            className='px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded-lg transition-colors'
+                            disabled={!isMessagingEnabledForShipment(shipment.status)}
+                            title={!isMessagingEnabledForShipment(shipment.status) ? 'Mesajlaşma teklif kabul edilince açılır' : 'Nakliyeci ile mesajlaş'}
+                            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                              isMessagingEnabledForShipment(shipment.status)
+                                ? 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                                : 'bg-gray-50 text-gray-400 cursor-not-allowed'
+                            }`}
                           >
                             Mesaj
                           </button>
-                          {shipment.status === 'delivered' && shipment.carrierName && !shipment.rating && (
+                          {shipment.status === 'delivered' && (
+                            <>
+                              <button
+                                onClick={() => handleConfirmDelivery(shipment)}
+                                className='px-3 py-1.5 bg-green-100 hover:bg-green-200 text-green-700 text-xs font-medium rounded-lg transition-colors'
+                              >
+                                Onayla
+                              </button>
+                              {shipment.carrierName && !shipment.rating && (
+                                <button
+                                  onClick={() => handleRateCarrier(shipment)}
+                                  className='px-3 py-1.5 bg-yellow-100 hover:bg-yellow-200 text-yellow-700 text-xs font-medium rounded-lg transition-colors'
+                                >
+                                  Değerlendir
+                                </button>
+                              )}
+                            </>
+                          )}
+                          {canCancelShipment(shipment.status) && (
                             <button
-                              onClick={() => handleRateCarrier(shipment)}
-                              className='px-3 py-1.5 bg-yellow-100 hover:bg-yellow-200 text-yellow-700 text-xs font-medium rounded-lg transition-colors'
+                              onClick={() => handleCancelClick(shipment)}
+                              className='px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-700 text-xs font-medium rounded-lg transition-colors'
                             >
-                              Değerlendir
+                              İptal Et
                             </button>
                           )}
                         </div>
@@ -621,65 +984,334 @@ const IndividualMyShipments: React.FC = () => {
         />
       )}
 
+      {/* Cancel Modal */}
+      {showCancelModal && selectedShipment && (
+        <div className='fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'>
+          <div className='bg-white rounded-xl shadow-2xl w-full max-w-md'>
+            <div className='p-6'>
+              <div className='flex items-center justify-between mb-4'>
+                <h2 className='text-xl font-bold text-gray-900'>Gönderiyi İptal Et</h2>
+                <button
+                  onClick={() => {
+                    setShowCancelModal(false);
+                    setCancelReason('');
+                    setSelectedShipment(null);
+                  }}
+                  className='p-2 hover:bg-gray-100 rounded-lg transition-colors'
+                >
+                  <XCircle className='w-5 h-5 text-gray-500' />
+                </button>
+              </div>
+              <p className='text-gray-600 mb-4'>
+                Gönderi #{selectedShipment.trackingCode} - {selectedShipment.title}
+              </p>
+              
+              {/* İade Politikası Uyarısı - Sadece offer_accepted durumunda */}
+              {(selectedShipment.status === 'offer_accepted' || selectedShipment.status === 'accepted') && (
+                <div className='mb-4 p-3 bg-amber-50 border border-amber-300 rounded-lg'>
+                  <div className='flex items-start gap-2'>
+                    <AlertCircle className='w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5' />
+                    <div className='text-xs text-amber-800'>
+                      <p className='font-semibold mb-1'>⚠️ İade Politikası:</p>
+                      <ul className='list-disc list-inside space-y-1 ml-2'>
+                        <li>Komisyon iadesi sadece <strong>taşıyıcı atanmadan önce</strong> ve <strong>ilk 24 saat içinde</strong> yapılır</li>
+                        <li>İade yapılırsa <strong>işlem maliyeti (min. 2 TL)</strong> kesilir</li>
+                        <li>Taşıyıcı atandıktan sonra veya 24 saat sonra <strong>iade yapılmaz</strong></li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              <div className='mb-4'>
+                <label className='block text-sm font-medium text-gray-700 mb-2'>
+                  İptal Sebebi <span className='text-red-500'>*</span>
+                </label>
+                <textarea
+                  value={cancelReason}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setCancelReason(e.target.value)}
+                  className='w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500'
+                  rows={4}
+                  placeholder='Lütfen iptal sebebinizi yazın...'
+                />
+              </div>
+              <div className='flex gap-3'>
+                <button
+                  onClick={() => {
+                    setShowCancelModal(false);
+                    setCancelReason('');
+                    setSelectedShipment(null);
+                  }}
+                  className='flex-1 px-4 py-2 bg-gradient-to-r from-slate-400 to-slate-500 hover:from-slate-500 hover:to-slate-600 text-white rounded-lg font-medium transition-all duration-200 shadow-md hover:shadow-lg'
+                >
+                  Vazgeç
+                </button>
+                <button
+                  onClick={handleCancelShipment}
+                  disabled={!cancelReason.trim() || isCancelling}
+                  className='flex-1 px-4 py-2 bg-gradient-to-r from-slate-500 to-slate-600 hover:from-slate-600 hover:to-slate-700 text-white rounded-lg font-medium transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed'
+                >
+                  {isCancelling ? 'İptal Ediliyor...' : 'İptal Et'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Detail Modal */}
       {showDetailModal && selectedShipment && (
         <div className='fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'>
-          <div className='bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto'>
-            <div className='p-6 border-b border-gray-200 flex justify-between items-center'>
-              <h2 className='text-2xl font-bold text-gray-900'>Gönderi Detayları</h2>
-              <button
-                onClick={() => {
-                  setShowDetailModal(false);
-                  setSelectedShipment(null);
-                }}
-                className='text-gray-400 hover:text-gray-600'
-              >
-                <XCircle className='w-6 h-6' />
-              </button>
-            </div>
-            <div className='p-6 space-y-4'>
-              <div>
-                <h3 className='font-semibold text-gray-700 mb-1'>Takip Kodu</h3>
-                <p className='text-gray-900'>{selectedShipment.trackingCode}</p>
-              </div>
-              <div>
-                <h3 className='font-semibold text-gray-700 mb-1'>Başlık</h3>
-                <p className='text-gray-900'>{selectedShipment.title}</p>
-              </div>
-              <div>
-                <h3 className='font-semibold text-gray-700 mb-1'>Rota</h3>
-                <p className='text-gray-900'>{selectedShipment.from} → {selectedShipment.to}</p>
-              </div>
-              <div>
-                <h3 className='font-semibold text-gray-700 mb-1'>Durum</h3>
-                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                  selectedShipment.status === 'delivered'
-                    ? 'bg-green-100 text-green-800'
-                    : selectedShipment.status === 'in_transit'
-                      ? 'bg-blue-100 text-blue-800'
-                      : 'bg-yellow-100 text-yellow-800'
-                }`}>
-                  {getStatusInfo(selectedShipment.status).text}
-                </span>
-              </div>
-              <div>
-                <h3 className='font-semibold text-gray-700 mb-1'>Nakliyeci</h3>
-                <p className='text-gray-900'>{selectedShipment.carrierName || 'Atanmamış'}</p>
-              </div>
-              <div>
-                <h3 className='font-semibold text-gray-700 mb-1'>Fiyat</h3>
-                <p className='text-gray-900'>{formatCurrency(selectedShipment.price)}</p>
-              </div>
-              {selectedShipment.status === 'delivered' && selectedShipment.carrierName && !selectedShipment.rating && (
+          <div className='bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto'>
+            {/* Header */}
+            <div className='p-6 border-b border-gray-200 bg-gradient-to-r from-slate-50 to-blue-50'>
+              <div className='flex justify-between items-start'>
+                <div>
+                  <h2 className='text-2xl font-bold text-gray-900 mb-1'>Gönderi Detayları</h2>
+                  <p className='text-gray-600 text-sm'>Takip Kodu: <span className='font-mono font-semibold'>{selectedShipment.trackingCode}</span></p>
+                </div>
                 <button
                   onClick={() => {
                     setShowDetailModal(false);
-                    handleRateCarrier(selectedShipment);
+                    setSelectedShipment(null);
                   }}
-                  className='w-full px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg font-medium transition-colors'
+                  className='text-gray-400 hover:text-gray-600 transition-colors'
                 >
-                  Nakliyeciyi Değerlendir
+                  <XCircle className='w-6 h-6' />
                 </button>
+              </div>
+            </div>
+
+            <div className='p-6 space-y-6'>
+              {isProcessAssistantEnabledForShipment(selectedShipment.status) && (
+                <div className='bg-white rounded-lg border border-slate-200 p-5 shadow-sm'>
+                  <div className='flex items-start justify-between gap-4'>
+                    <div>
+                      <div className='flex items-center gap-2'>
+                        <Info className='w-4 h-4 text-slate-700' />
+                        <h3 className='text-sm font-semibold text-slate-900'>Sıradaki Adım</h3>
+                      </div>
+                      <p className='mt-2 text-sm text-slate-700'>
+                        Ödeme (IBAN/açıklama) ve yükleme saatini yazılı olarak teyitleyin.
+                      </p>
+                    </div>
+                    <div className='flex items-center gap-2 flex-shrink-0'>
+                      <button
+                        onClick={() => {
+                          const carrierId = selectedShipment.carrierId ? String(selectedShipment.carrierId) : '';
+                          const shipmentId = selectedShipment.id ? String(selectedShipment.id) : '';
+                          const prefill = `Merhaba, ödeme (IBAN/alıcı adı/açıklama) ve yükleme saatini netleştirelim. İş No: #${selectedShipment.trackingCode || shipmentId}`;
+                          if (!carrierId) return;
+                          const params = new URLSearchParams();
+                          params.set('userId', carrierId);
+                          if (shipmentId) params.set('shipmentId', shipmentId);
+                          params.set('prefill', prefill);
+                          navigate(`${basePath}/messages?${params.toString()}`);
+                          setShowDetailModal(false);
+                        }}
+                        disabled={!selectedShipment.carrierId || !isMessagingEnabledForShipment(selectedShipment.status)}
+                        className={`px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                          selectedShipment.carrierId && isMessagingEnabledForShipment(selectedShipment.status)
+                            ? 'bg-slate-900 hover:bg-slate-800 text-white'
+                            : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        }`}
+                      >
+                        Mesajı Aç
+                      </button>
+                      <button
+                        onClick={() => handleTrackShipment(selectedShipment.id)}
+                        className='px-3 py-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 text-xs font-medium rounded-lg transition-colors'
+                      >
+                        Takip
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className='mt-3'>
+                    <button
+                      type='button'
+                      onClick={() => setShowProcessAssistantDetails(v => !v)}
+                      className='text-xs font-medium text-slate-600 hover:text-slate-900 transition-colors'
+                    >
+                      {showProcessAssistantDetails ? 'Detayları gizle' : 'Detayları göster'}
+                    </button>
+                    {showProcessAssistantDetails && (
+                      <div className='mt-3 text-xs text-slate-700 bg-slate-50 border border-slate-200 rounded-lg p-3'>
+                        <div className='space-y-2'>
+                          <div>1) IBAN / alıcı adını doğrulayın</div>
+                          <div>2) Açıklamaya iş numarasını yazın</div>
+                          <div>3) Yükleme saatini ve adresi teyit edin</div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Gönderi Bilgileri */}
+              <div className='bg-gray-50 rounded-lg p-5 border border-gray-200'>
+                <div className='flex items-center gap-2 mb-4'>
+                  <Package className='w-5 h-5 text-blue-600' />
+                  <h3 className='text-lg font-semibold text-gray-900'>Gönderi Bilgileri</h3>
+                </div>
+                <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+                  <div>
+                    <label className='text-xs font-medium text-gray-500 uppercase tracking-wide mb-1 block'>Başlık</label>
+                    <p className='text-gray-900 font-medium'>{selectedShipment.title}</p>
+                  </div>
+                  <div>
+                    <label className='text-xs font-medium text-gray-500 uppercase tracking-wide mb-1 block'>Durum</label>
+                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                      selectedShipment.status === 'delivered'
+                        ? 'bg-green-100 text-green-800'
+                        : selectedShipment.status === 'in_transit'
+                          ? 'bg-blue-100 text-blue-800'
+                          : selectedShipment.status === 'offer_accepted' || selectedShipment.status === 'accepted'
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {getStatusInfo(selectedShipment.status).text}
+                    </span>
+                  </div>
+                  <div>
+                    <label className='text-xs font-medium text-gray-500 uppercase tracking-wide mb-1 block flex items-center gap-1'>
+                      <MapPin className='w-3 h-3' />
+                      Rota
+                    </label>
+                    <p className='text-gray-900 font-medium'>
+                      {selectedShipment.pickupCity || selectedShipment.from} → {selectedShipment.deliveryCity || selectedShipment.to}
+                    </p>
+                    {selectedShipment.pickupAddress && (
+                      <p className='text-gray-600 text-sm mt-1'>{selectedShipment.pickupAddress}</p>
+                    )}
+                    {selectedShipment.deliveryAddress && (
+                      <p className='text-gray-600 text-sm mt-1'>→ {selectedShipment.deliveryAddress}</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className='text-xs font-medium text-gray-500 uppercase tracking-wide mb-1 block flex items-center gap-1'>
+                      <DollarSign className='w-3 h-3' />
+                      Fiyat
+                    </label>
+                    <p className='text-gray-900 font-semibold text-lg'>{formatCurrency(selectedShipment.price)}</p>
+                  </div>
+                  {selectedShipment.pickupDate && (
+                    <div>
+                      <label className='text-xs font-medium text-gray-500 uppercase tracking-wide mb-1 block flex items-center gap-1'>
+                        <Calendar className='w-3 h-3' />
+                        Toplama Tarihi
+                      </label>
+                      <p className='text-gray-900'>{formatDate(selectedShipment.pickupDate)}</p>
+                    </div>
+                  )}
+                  {selectedShipment.deliveryDate && (
+                    <div>
+                      <label className='text-xs font-medium text-gray-500 uppercase tracking-wide mb-1 block flex items-center gap-1'>
+                        <Calendar className='w-3 h-3' />
+                        Teslimat Tarihi
+                      </label>
+                      <p className='text-gray-900'>{formatDate(selectedShipment.deliveryDate)}</p>
+                    </div>
+                  )}
+                </div>
+                {selectedShipment.description && (
+                  <div className='mt-4 pt-4 border-t border-gray-200'>
+                    <label className='text-xs font-medium text-gray-500 uppercase tracking-wide mb-1 block'>Açıklama</label>
+                    <p className='text-gray-700'>{selectedShipment.description}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Nakliyeci Bilgileri */}
+              <div className='bg-blue-50 rounded-lg p-5 border border-blue-200'>
+                <div className='flex items-center gap-2 mb-4'>
+                  <Building2 className='w-5 h-5 text-blue-600' />
+                  <h3 className='text-lg font-semibold text-gray-900'>Nakliyeci Bilgileri</h3>
+                </div>
+                {selectedShipment.carrierName ? (
+                  <div className='space-y-3'>
+                    <div>
+                      <label className='text-xs font-medium text-gray-500 uppercase tracking-wide mb-1 block flex items-center gap-1'>
+                        <User className='w-3 h-3' />
+                        Ad Soyad
+                      </label>
+                      <p className='text-gray-900 font-semibold'>{selectedShipment.carrierName}</p>
+                    </div>
+                    {selectedShipment.carrierCompany && (
+                      <div>
+                        <label className='text-xs font-medium text-gray-500 uppercase tracking-wide mb-1 block flex items-center gap-1'>
+                          <Building2 className='w-3 h-3' />
+                          Şirket
+                        </label>
+                        <p className='text-gray-900'>{selectedShipment.carrierCompany}</p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className='flex items-center gap-2 text-amber-600 bg-amber-50 rounded-lg p-3 border border-amber-200'>
+                    <AlertCircle className='w-5 h-5' />
+                    <p className='font-medium'>Nakliyeci bekleniyor</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Taşıyıcı Bilgileri */}
+              <div className='bg-green-50 rounded-lg p-5 border border-green-200'>
+                <div className='flex items-center gap-2 mb-4'>
+                  <Truck className='w-5 h-5 text-green-600' />
+                  <h3 className='text-lg font-semibold text-gray-900'>Taşıyıcı Bilgileri</h3>
+                  {selectedShipment.driverName && (
+                    <span className='ml-auto inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800'>
+                      <CheckCircle className='w-3 h-3 mr-1' />
+                      Taşıyıcı Atandı
+                    </span>
+                  )}
+                </div>
+                {selectedShipment.driverName ? (
+                  <div className='space-y-3'>
+                    <div>
+                      <label className='text-xs font-medium text-gray-500 uppercase tracking-wide mb-1 block flex items-center gap-1'>
+                        <User className='w-3 h-3' />
+                        Ad Soyad
+                      </label>
+                      <p className='text-gray-900 font-semibold'>{selectedShipment.driverName}</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className='flex items-center gap-2 text-amber-600 bg-amber-50 rounded-lg p-3 border border-amber-200'>
+                    <AlertCircle className='w-5 h-5' />
+                    <p className='font-medium'>Taşıyıcı bekleniyor</p>
+                    {selectedShipment.carrierName && (
+                      <p className='text-sm text-gray-600 ml-2'>Nakliyeci tarafından atanacak</p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              {selectedShipment.status === 'delivered' && (
+                <div className='space-y-2 pt-4 border-t border-gray-200'>
+                  <button
+                    onClick={() => {
+                      setShowDetailModal(false);
+                      handleConfirmDelivery(selectedShipment);
+                    }}
+                    className='w-full px-4 py-3 bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 text-white rounded-lg font-medium transition-all duration-200 shadow-md hover:shadow-lg'
+                  >
+                    Teslimatı Onayla
+                  </button>
+                  {selectedShipment.carrierName && !selectedShipment.rating && (
+                    <button
+                      onClick={() => {
+                        setShowDetailModal(false);
+                        handleRateCarrier(selectedShipment);
+                      }}
+                      className='w-full px-4 py-3 bg-yellow-500 hover:bg-yellow-600 text-white rounded-lg font-medium transition-colors'
+                    >
+                      Nakliyeciyi Değerlendir
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           </div>
@@ -689,4 +1321,4 @@ const IndividualMyShipments: React.FC = () => {
   );
 };
 
-export default IndividualMyShipments;
+export default MyShipments;

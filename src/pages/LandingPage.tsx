@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import {
   Truck,
@@ -27,15 +27,9 @@ import {
   Map,
   Route,
   Award,
-  Lock,
   Eye,
   Smartphone,
-  Database,
-  Server,
   ShoppingCart,
-  Phone,
-  Mail,
-  ThumbsUp,
   TrendingDown,
   Percent,
   UserCheck,
@@ -43,6 +37,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import YolNextLogo from '../components/common/yolnextLogo';
 import Footer from '../components/common/Footer';
+import { analytics } from '../services/analytics';
 
 const personaPanels = [
     {
@@ -50,7 +45,11 @@ const personaPanels = [
       title: 'Bireysel Gönderici',
       icon: Users,
     subtitle: 'Ev, ofis, özel gönderiler',
-    promise: "Önemli ölçüde tasarruf, anlık teklif kıyaslama",
+    promise: 'Tek ekranda teklifleri kıyaslayın, süreci kayıtlı şekilde yönetin',
+    painPoint: "Geleneksel kargo ile yüksek fiyatlar, tek seçenek, şeffaflık yok. Her gönderide fazla ödüyorsunuz.",
+    withoutPlatform: 'Tek seçenek, fiyat sürprizi ve düşük şeffaflık',
+    withPlatform: 'Birden fazla teklif + karşılaştırma + kayıtlı iletişim ve süreç',
+    flow: ['Gönderi oluştur', 'Teklifleri karşılaştır', 'Kabul et ve süreci takip et'],
       features: [
       'Hızlı gönderi formu',
       'Tek ekranda teklif kıyaslama',
@@ -60,8 +59,9 @@ const personaPanels = [
       'Geçmiş siparişler',
       'Değerlendirme sistemi',
     ],
-    stats: 'Binlerce aktif kullanıcı',
-    cta: 'Bireysel Paneli Aç',
+    stats: 'Büyüyen kullanıcı topluluğu',
+    cta: 'Hemen Ücretsiz Başla',
+    urgency: 'Her gönderide fazla ödemeyi durdurun',
     pages: ['Dashboard', 'Gönderi Oluştur', 'Gönderilerim', 'Teklifler', 'Canlı Takip', 'Mesajlar', 'Cüzdan'],
     },
     {
@@ -69,7 +69,11 @@ const personaPanels = [
       title: 'Kurumsal Gönderici',
       icon: Building2,
     subtitle: 'Tedarik zinciri, üretim, e-ticaret',
-    promise: 'Merkezileştirilmiş operasyon ve verimli yönetim',
+    promise: 'Merkezi operasyon, KPI görünürlüğü ve ekip kontrolü',
+    painPoint: "Dağınık operasyonlar, maliyet kontrolü yok, merkezi yönetim yok. Her ay binlerce lira kaybediyorsunuz.",
+    withoutPlatform: 'Dağınık süreçler, raporlama zayıf, maliyet görünmüyor',
+    withPlatform: "Platform ile: Merkezi yönetim, %40'a kadar maliyet azalışı, gerçek zamanlı KPI, otomasyon",
+    flow: ['Gönderileri oluştur/planla', 'Teklifleri yönet ve onayla', 'Raporla ve optimize et'],
       features: [
       'Toplu gönderi sihirbazı',
       'Departman & yetki yönetimi',
@@ -81,6 +85,7 @@ const personaPanels = [
     ],
     stats: 'Yüzlerce şirket',
     cta: 'Kurumsal Demo Planla',
+    urgency: 'Operasyonel verimsizliği durdurun, maliyetleri düşürün',
     pages: ['Dashboard', 'Gönderi Oluştur', 'Gönderilerim', 'Analitik', 'Raporlar', 'Ekip', 'Nakliyeciler', 'Ayarlar'],
     },
     {
@@ -88,7 +93,11 @@ const personaPanels = [
       title: 'Nakliyeci',
     icon: Layers,
     subtitle: 'Filo sahipleri ve lojistik firmaları',
-    promise: 'Sürekli iş akışı + %1 komisyon',
+    promise: 'Yük pazarı üzerinden sürekli iş akışı ve şeffaf komisyon modeli',
+    painPoint: "İş bulamama, boş dönüşler, yüksek komisyonlar, verimsiz rotalar. Araçlarınız boş kalıyor, kazancınız düşüyor.",
+    withoutPlatform: 'Boş dönüşler, iş arama yükü, düşük görünürlük',
+    withPlatform: 'Yük pazarı + filtreleme + süreç yönetimi + kayıtlı iletişim',
+    flow: ['Yükleri filtrele', 'Teklif ver ve işi al', 'Taşıyıcıya ata ve süreci yönet'],
       features: [
       'Yük pazarı & anlık filtre',
       'Rota planlama aracı',
@@ -100,7 +109,8 @@ const personaPanels = [
       'Tamamlanan yükler',
     ],
     stats: 'Yüzlerce nakliyeci',
-    cta: 'Nakliyeci Hesabı Aç',
+    cta: 'Hemen İş Akışını Başlat',
+    urgency: 'Boş dönüşleri durdurun, sürekli iş akışı sağlayın',
     pages: ['Dashboard', 'Yük Pazarı', 'Aktif Yükler', 'Tamamlanan Yükler', 'İlanlarım', 'Taşıyıcılarım', 'Cüzdan'],
     },
     {
@@ -108,7 +118,11 @@ const personaPanels = [
       title: 'Taşıyıcı',
       icon: Truck,
     subtitle: 'Sürücüler, sözleşmeli ekipler',
-    promise: 'İş garantisi + haftalık ödeme',
+    promise: 'Yakınınızdaki işleri görün, süreç ve kazancı panelden takip edin',
+    painPoint: "Düzensiz iş, geciken ödemeler, iş bulamama, belirsizlik. Geliriniz düzensiz, geleceğiniz belirsiz.",
+    withoutPlatform: 'Düzensiz iş, belirsiz süreç, zayıf görünürlük',
+    withPlatform: 'Konum bazlı işler + net durum adımları + mesajlaşma + puan sistemi',
+    flow: ['İşleri incele', 'İşi kabul et', 'Durum güncelle ve tamamla'],
       features: [
         'Konum bazlı iş önerileri',
       'Anında mesajlaşma',
@@ -119,8 +133,9 @@ const personaPanels = [
       'Tamamlanan işler',
       'Tekliflerim',
     ],
-    stats: 'Binlerce taşıyıcı',
-    cta: 'Taşıyıcı Paneline Katıl',
+    stats: 'Aktif taşıyıcı ağı',
+    cta: 'Hemen Düzenli İşe Başla',
+    urgency: 'Düzensiz geliri durdurun, daha öngörülebilir iş akışına geçin',
     pages: ['Dashboard', 'İş Pazarı', 'Aktif İşler', 'Tamamlanan İşler', 'Tekliflerim', 'Mesajlar', 'Ayarlar'],
   },
 ];
@@ -139,7 +154,7 @@ const platformFeatures = [
   {
     icon: CreditCard,
     title: 'Cüzdan Sistemi',
-    description: 'Güvenli ödeme altyapısı. Ödemeler otomatik dağıtılır, cüzdanınızdan kolayca para çekebilirsiniz.',
+    description: 'Ödeme ve komisyon kayıtları tek yerde. Ödeme detayları mesajlaşmada yazılı teyitle netleşir; süreç adımları kayıt altındadır.',
   },
   {
     icon: Route,
@@ -154,7 +169,7 @@ const platformFeatures = [
   {
     icon: Bell,
     title: 'Gerçek Zamanlı Bildirimler',
-    description: 'WebSocket ile anlık bildirimler. Teklif, teslimat, ödeme ve durum güncellemeleri anında.',
+    description: 'WebSocket ile anlık bildirimler. Teklif, teslimat ve durum güncellemeleri anında.',
   },
   {
     icon: Shield,
@@ -186,7 +201,7 @@ const workflowSteps = [
   {
     step: 3,
     title: 'Teklif Kabul Et',
-    description: 'En uygun teklifi seçin, güvenli ödeme yapın. Nakliyeci gönderiyi alır ve taşıyıcıya atar.',
+    description: 'En uygun teklifi seçin. Ödeme ve yükleme detaylarını mesajlaşmada yazılı teyitle netleştirin. Nakliyeci gönderiyi alır ve taşıyıcıya atar.',
     icon: CheckCircle,
     color: 'purple',
   },
@@ -200,7 +215,7 @@ const workflowSteps = [
   {
     step: 5,
     title: 'Teslimat',
-    description: 'Teslimat tamamlanır, onay verilir, değerlendirme yapılır. Ödemeler otomatik dağıtılır.',
+    description: 'Teslimat tamamlanır, onay verilir, değerlendirme yapılır. Süreç kayıtları panelinizde saklanır.',
     icon: Award,
     color: 'emerald',
   },
@@ -231,7 +246,7 @@ const advantages = [
   {
     icon: TrendingUp,
     title: 'Önemli Tasarruf',
-    description: 'Geleneksel kargo firmalarına göre önemli ölçüde tasarruf. Şeffaf fiyatlandırma, rekabetçi teklifler.',
+    description: 'Rekabetçi fiyatlar ve şeffaf fiyatlandırma ile uygun maliyetli çözümler. Birden fazla teklif karşılaştırması.',
     stat: 'Tasarruf',
   },
   {
@@ -247,8 +262,8 @@ const caseStories = [
     title: 'Ev Taşınması',
     category: 'Bireysel',
     impact: 'Önemli Tasarruf',
-    detail: 'Bireysel gönderici birden fazla nakliyeciden teklif aldı. En uygun teklifi seçerek geleneksel yöntemlere göre önemli ölçüde tasarruf sağladı. Nakliyeci işi hızlıca taşıyıcıya atadı. Canlı takip ile tüm süreç şeffaf bir şekilde izlendi.',
-    metrics: { offers: 'Çoklu teklif', tracking: 'Canlı takip', satisfaction: 'Yüksek memnuniyet' },
+    detail: 'Bireysel gönderici birden fazla nakliyeciden teklif aldı. En uygun teklifi seçerek rekabetçi fiyat buldu. Nakliyeci işi hızlıca taşıyıcıya atadı. Takip ekranı ile süreç şeffaf bir şekilde izlendi.',
+    metrics: { offers: 'Çoklu teklif', tracking: 'Takip akışı', satisfaction: 'Yüksek memnuniyet' },
   },
   {
     title: 'Soğuk Zincir Taşımacılığı',
@@ -280,7 +295,7 @@ const faqItems = [
   {
     question: 'Ödemeler nasıl yapılıyor?',
     answer:
-      'Teklif kabul edildiğinde güvenli ödeme alınır (Iyzico entegrasyonu). Ödeme teslimat tamamlanana kadar güvende tutulur. Teslimat onaylandıktan sonra nakliyeci ve taşıyıcı payları otomatik olarak cüzdanlarına aktarılır. Para çekme işlemleri kısa sürede tamamlanır.',
+      'Teklif kabul edildiğinde ödeme ve kritik detaylar (IBAN/alıcı adı/açıklama gibi) mesajlaşma üzerinden yazılı teyitle netleştirilir. Durum adımları ve iletişim kayıt altında tutulur. Komisyon modeli şeffaftır: gönderici komisyon ödemez; nakliyeci sabit %1 komisyon öder.',
   },
   {
     question: 'Canlı takip nasıl çalışıyor?',
@@ -322,12 +337,6 @@ const trustPillars = [
   },
 ];
 
-const proofMetrics = [
-  { title: 'Binlerce', description: 'Aktif kullanıcı', accent: 'text-blue-500' },
-  { title: 'Yüzbinlerce', description: 'Tamamlanan teslimat', accent: 'text-emerald-500' },
-  { title: 'Yüksek', description: 'Memnuniyet oranı', accent: 'text-amber-500' },
-  { title: '81', description: 'İl kapsamı', accent: 'text-indigo-500' },
-];
 
 const testimonials = [
   {
@@ -335,7 +344,7 @@ const testimonials = [
     role: 'Bireysel Gönderici',
     location: 'İstanbul',
     rating: 5,
-    comment: 'Ev taşınmamda birden fazla nakliyeciden teklif aldım. En uygun fiyatı buldum ve geleneksel yöntemlere göre önemli ölçüde tasarruf sağladım. Süreç çok şeffaftı.',
+    comment: 'Ev taşınmamda birden fazla nakliyeciden teklif aldım. En uygun fiyatı buldum ve rekabetçi fiyat avantajı elde ettim. Süreç çok şeffaftı.',
     savings: 'Tasarruf sağladı',
   },
   {
@@ -343,7 +352,7 @@ const testimonials = [
     role: 'Kurumsal Gönderici',
     location: 'Ankara',
     rating: 5,
-    comment: 'Şirketimiz için toplu gönderi yönetimi çok kolaylaştı. Raporlama özellikleri sayesinde maliyetlerimizi önemli ölçüde azalttık.',
+    comment: 'Şirketimiz için toplu gönderi yönetimi çok kolaylaştı. Raporlama özellikleri sayesinde operasyonel verimliliğimizi artırdık.',
     savings: 'Maliyet azalışı',
   },
   {
@@ -359,7 +368,7 @@ const testimonials = [
     role: 'Taşıyıcı',
     location: 'Bursa',
     rating: 5,
-    comment: 'Nakliyecilerden düzenli iş alıyorum. Ödemeler haftalık ve zamanında. Kazancım önemli ölçüde arttı.',
+    comment: 'Nakliyecilerden düzenli iş alıyorum. Ödemeler haftalık ve zamanında. Düzenli kazanç akışı sağladım.',
     savings: 'Artış gösterdi',
   },
 ];
@@ -374,28 +383,28 @@ const pricingComparison = [
 
 const whyChoose = {
   individual: [
-    { icon: DollarSign, title: '₺0 Üyelik', desc: 'Hiçbir ücret ödemeden başlayın' },
-    { icon: TrendingDown, title: 'Önemli Tasarruf', desc: 'Geleneksel kargodan çok daha uygun' },
-    { icon: FileText, title: 'Çoklu Teklif', desc: 'Tek ekranda tüm teklifleri karşılaştırın' },
-    { icon: Clock, title: 'Hızlı Süreç', desc: 'Kısa sürede teklif alın' },
+    { icon: DollarSign, title: '₺0 Üyelik', desc: 'Hiçbir ücret ödemeden başlayın, her gönderide tasarruf edin' },
+    { icon: TrendingDown, title: '%30-50 Tasarruf', desc: 'Geleneksel kargodan çok daha uygun fiyatlar' },
+    { icon: FileText, title: 'Çoklu Teklif', desc: 'Tek ekranda tüm teklifleri karşılaştırın, en iyisini seçin' },
+    { icon: Clock, title: 'Anında Teklif', desc: 'Dakikalar içinde birden fazla teklif alın' },
   ],
   corporate: [
-    { icon: BarChart2, title: 'KPI Dashboard', desc: 'Gerçek zamanlı analitik ve raporlama' },
-    { icon: Users, title: 'Ekip Yönetimi', desc: 'Departman bazlı yetki ve takip' },
-    { icon: TrendingUp, title: 'Verimlilik Artışı', desc: 'Operasyonel verimlilik artışı' },
-    { icon: FileText, title: 'Toplu Gönderi', desc: 'Tek seferde yüzlerce gönderi' },
+    { icon: BarChart2, title: 'KPI Dashboard', desc: 'Gerçek zamanlı analitik ile maliyetleri kontrol edin' },
+    { icon: Users, title: 'Ekip Yönetimi', desc: 'Departman bazlı yetki ve merkezi takip sistemi' },
+    { icon: TrendingUp, title: '%40 Tasarruf', desc: 'Operasyonel maliyetlerde önemli azalış' },
+    { icon: FileText, title: 'Toplu Gönderi', desc: 'Tek seferde yüzlerce gönderi, zaman tasarrufu' },
   ],
   carrier: [
-    { icon: Target, title: 'Sürekli İş', desc: 'Yük pazarından sürekli iş fırsatları' },
-    { icon: Percent, title: '%1 Komisyon', desc: 'En düşük komisyon oranı' },
-    { icon: Route, title: 'Rota Planlama', desc: 'Verimli rota organizasyonu' },
-    { icon: CreditCard, title: 'Haftalık Ödeme', desc: 'Düzenli ve zamanında ödemeler' },
+    { icon: Target, title: 'Sürekli İş Akışı', desc: 'Yük pazarından 7/24 iş fırsatları, boş dönüş yok' },
+    { icon: Percent, title: '%1 Komisyon', desc: 'Sektörün en düşük komisyon oranı' },
+    { icon: Route, title: 'Rota Optimizasyonu', desc: 'Verimli rotalar, yakıt tasarrufu, zaman kazancı' },
+    { icon: CreditCard, title: 'Ödeme Düzeni', desc: 'Ödeme detayları yazılı teyitle netleşir, kayıtlı süreçle ilerlenir' },
   ],
   driver: [
-    { icon: Package, title: 'İş Garantisi', desc: 'Nakliyecilerden düzenli iş' },
-    { icon: MapPin, title: 'Konum Bazlı', desc: 'Yakınınızdaki iş fırsatları' },
-    { icon: Clock, title: 'Haftalık Ödeme', desc: 'Düzenli kazanç akışı' },
-    { icon: Star, title: 'Puan Sistemi', desc: 'Yüksek puan = Daha fazla iş' },
+    { icon: Package, title: 'Daha Düzenli İş', desc: 'Nakliyecilerden iş fırsatları, daha öngörülebilir akış' },
+    { icon: MapPin, title: 'Konum Bazlı İşler', desc: 'Yakınınızdaki iş fırsatları, boş kilometre yok' },
+    { icon: Clock, title: 'Süreç Takibi', desc: 'Durum adımları ve iletişim kayıt altındadır' },
+    { icon: Star, title: 'Puan Sistemi', desc: 'Yüksek puan = Daha fazla iş, daha yüksek kazanç' },
   ],
 };
 
@@ -404,17 +413,24 @@ const LandingPage: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [selectedUserType, setSelectedUserType] = useState('individual');
   const [isLoading, setIsLoading] = useState(false);
+  const [abVariant] = useState(() => analytics.ab.getVariant('ab_landing_v1'));
 
   const selectedPersona =
     personaPanels.find(persona => persona.id === selectedUserType) || personaPanels[0];
 
   const handleNavigate = async (path: string, state?: Record<string, string>) => {
     try {
+      analytics.track('landing_cta_click', {
+        ab: abVariant,
+        target: path,
+        persona: selectedUserType,
+      });
+
       setIsLoading(true);
       await new Promise(resolve => setTimeout(resolve, 600));
       navigate(path, state ? { state } : undefined);
     } catch (error) {
-      console.error('Navigasyon hatası:', error);
+      // Navigation error handled silently
     } finally {
       setIsLoading(false);
     }
@@ -429,13 +445,25 @@ const LandingPage: React.FC = () => {
     { label: 'SSS', href: '#faq' },
   ];
 
+  useEffect(() => {
+    analytics.track('landing_view', {
+      ab: abVariant,
+    });
+  }, [abVariant]);
+
+  useEffect(() => {
+    analytics.track('landing_ab_assign', {
+      ab: abVariant,
+    });
+  }, [abVariant]);
+
   return (
     <div className='min-h-screen bg-white text-gray-900'>
       <Helmet>
-        <title>YolNext | Türkiye'nin 4 Panelli Lojistik Ekosistemi</title>
+        <title>YolNext | 4 Panelli Lojistik Ekosistemi</title>
         <meta
           name='description'
-          content='Bireysel, kurumsal, nakliyeci ve taşıyıcı panellerini tek platformda buluşturan YolNext ile lojistik süreçlerinizi önemli ölçüde tasarrufla yönetin.'
+          content='Bireysel, kurumsal, nakliyeci ve taşıyıcı panellerini tek platformda buluşturan YolNext ile lojistik süreçlerinizi rekabetçi fiyatlarla yönetin.'
         />
         <link rel='canonical' href='https://yolnext.com' />
       </Helmet>
@@ -537,11 +565,11 @@ const LandingPage: React.FC = () => {
                   {/* Badge */}
                   <div className='inline-flex items-center gap-3 mb-8'>
                     <div className='px-4 py-2 bg-white/10 backdrop-blur-md text-white text-xs font-semibold uppercase tracking-[0.15em] rounded-full border border-white/20 shadow-lg'>
-                      Türkiye'nin En Büyük Lojistik Pazar Yeri
+                      Türkiye'nin Çok Panelli Lojistik Pazaryeri
                     </div>
                     <div className='flex items-center gap-2 px-3 py-1.5 bg-white/10 backdrop-blur-md rounded-full border border-white/20'>
                       <div className='w-2 h-2 bg-blue-400 rounded-full animate-pulse'></div>
-                      <span className='text-xs font-medium text-white/90'>Canlı</span>
+                      <span className='text-xs font-medium text-white/90'>Pazaryeri</span>
                     </div>
                   </div>
                   
@@ -556,7 +584,9 @@ const LandingPage: React.FC = () => {
                     <p className='text-lg md:text-xl text-white/80 leading-relaxed max-w-2xl font-normal'>
                       4 panelli ekosistem ile göndericiler, nakliyeciler ve taşıyıcılar tek platformda buluşuyor. 
                       <span className='block mt-2 text-white/90 font-medium'>
-                        Önemli ölçüde tasarruf ile geleneksel kargodan çok daha uygun.
+                        {abVariant === 'B'
+                          ? 'Teklif, mesajlaşma ve takip akışı tek yerde: daha az belirsizlik, daha çok kontrol.'
+                          : 'Rekabetçi fiyatlar ve şeffaf süreçlerle uygun maliyetli çözümler.'}
                       </span>
                     </p>
                   </div>
@@ -578,6 +608,13 @@ const LandingPage: React.FC = () => {
                     </button>
                   </div>
 
+                  <div className='pt-4'>
+                    <div className='inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 backdrop-blur-md px-4 py-2 text-xs font-medium text-white/90'>
+                      <Shield className='h-4 w-4 text-blue-200' />
+                      Ödeme detayları mesajlaşmada yazılı teyitle netleşir; süreç adımları kayıt altındadır.
+                    </div>
+                  </div>
+
                   {/* Quick Stats - Glassmorphism Cards */}
                   <div className='grid grid-cols-3 gap-4 pt-12'>
                     <div className='bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20 shadow-xl hover:bg-white/15 transition-all duration-300'>
@@ -587,8 +624,8 @@ const LandingPage: React.FC = () => {
                     </div>
                     <div className='bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20 shadow-xl hover:bg-white/15 transition-all duration-300'>
                       <div className='text-4xl font-bold text-white mb-2'>Tasarruf</div>
-                      <div className='text-sm font-semibold text-white/90'>Önemli Ölçüde</div>
-                      <div className='text-xs text-white/70 mt-1'>Geleneksel yöntemlere göre</div>
+                      <div className='text-sm font-semibold text-white/90'>Rekabetçi</div>
+                      <div className='text-xs text-white/70 mt-1'>Fiyat avantajı</div>
                     </div>
                     <div className='bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20 shadow-xl hover:bg-white/15 transition-all duration-300'>
                       <div className='text-4xl font-bold text-white mb-2'>Hızlı</div>
@@ -611,19 +648,19 @@ const LandingPage: React.FC = () => {
                         <div className='text-sm font-medium text-white/90'>Kullanıcı Sayısı</div>
                       </div>
                     </div>
-                    <div className='text-7xl font-bold text-white mb-4'>Binlerce</div>
+                    <div className='text-7xl font-bold text-white mb-4'>Büyüyen</div>
                     <div className='flex items-center gap-3 mb-4'>
                       <div className='flex items-center gap-2'>
                         <div className='w-2.5 h-2.5 bg-blue-400 rounded-full animate-pulse'></div>
-                        <span className='text-sm font-medium text-white/90'>Canlı veri</span>
+                        <span className='text-sm font-medium text-white/90'>Aktif topluluk</span>
                       </div>
                       <span className='text-white/50'>•</span>
-                      <span className='text-sm text-white/70'>Gerçek zamanlı</span>
+                      <span className='text-sm text-white/70'>Her geçen gün büyüyor</span>
                     </div>
                     <div className='pt-4 border-t border-white/20'>
                       <div className='flex items-center justify-between text-sm'>
-                        <span className='text-white/70'>Sürekli büyüyor</span>
-                        <span className='text-blue-300 font-semibold'>Yeni kullanıcılar katılıyor</span>
+                        <span className='text-white/70'>Yeni kullanıcılar</span>
+                        <span className='text-blue-300 font-semibold'>Sürekli katılıyor</span>
                       </div>
                     </div>
                   </div>
@@ -634,13 +671,13 @@ const LandingPage: React.FC = () => {
                       <div className='w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center mb-4 border border-white/30'>
                         <Package className='h-6 w-6 text-white' />
                       </div>
-                      <div className='text-3xl font-bold text-white mb-1'>Yüzbinlerce</div>
+                      <div className='text-3xl font-bold text-white mb-1'>Artıyor</div>
                       <div className='text-xs font-semibold text-white/80 uppercase tracking-wide mb-1'>Teslimat</div>
-                      <div className='text-xs text-white/60'>Tamamlanan işlem</div>
+                      <div className='text-xs text-white/60'>Başarılı işlemler</div>
                       <div className='mt-3 pt-3 border-t border-white/10'>
                         <div className='flex items-center gap-1 text-xs'>
                           <TrendingUp className='h-3 w-3 text-blue-300' />
-                          <span className='text-blue-300 font-medium'>Sürekli artış</span>
+                          <span className='text-blue-300 font-medium'>Büyüyen platform</span>
                         </div>
                       </div>
                     </div>
@@ -691,7 +728,7 @@ const LandingPage: React.FC = () => {
                           <Zap className='h-4 w-4 text-blue-300' />
                           <span className='font-medium text-white/90'>Anında İşlem</span>
                         </div>
-                        <span className='text-xs text-white/60'>Gerçek zamanlı</span>
+                        <span className='text-xs text-white/60'>Hızlı</span>
                       </div>
                     </div>
                   </div>
@@ -750,7 +787,13 @@ const LandingPage: React.FC = () => {
                 return (
                   <button
                     key={panel.id}
-                    onClick={() => setSelectedUserType(panel.id)}
+                    onClick={() => {
+                      analytics.track('landing_persona_select', {
+                        ab: abVariant,
+                        persona: panel.id,
+                      });
+                      setSelectedUserType(panel.id);
+                    }}
                     className={`rounded-3xl border p-6 text-left transition-all ${
                       isSelected
                         ? 'border-blue-600 bg-blue-50 shadow-lg scale-105'
@@ -783,27 +826,74 @@ const LandingPage: React.FC = () => {
 
             <div className='rounded-3xl border border-slate-200 bg-white p-8 shadow-xl'>
               <div className='flex flex-wrap items-start justify-between gap-6 mb-8'>
-                <div className='space-y-2'>
+                <div className='space-y-2 flex-1'>
                   <p className='text-xs font-semibold uppercase tracking-[0.2em] text-slate-500'>Seçili Panel</p>
                   <h3 className='text-3xl font-bold text-slate-900'>{selectedPersona.title}</h3>
                   <p className='text-sm text-slate-600'>{selectedPersona.stats}</p>
+                  {selectedPersona.urgency && (
+                    <p className='text-sm font-semibold text-red-600 mt-2'>{selectedPersona.urgency}</p>
+                  )}
                       </div>
                 <button
                   onClick={() => handleNavigate('/register', { userType: selectedPersona.id })}
-                  className='inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-slate-800 to-blue-900 text-white px-6 py-3 font-semibold shadow-xl hover:from-slate-700 hover:to-blue-800 transition'
+                  className='inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-slate-800 to-blue-900 text-white px-8 py-4 font-bold text-base shadow-xl hover:from-slate-700 hover:to-blue-800 hover:scale-105 transition-all'
                 >
                   {selectedPersona.cta}
                   <ArrowRight className='h-5 w-5' />
                 </button>
                 </div>
 
-              <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8'>
-                {selectedPersona.features.map((feature, idx) => (
-                  <div key={idx} className='flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 hover:bg-white hover:shadow-md transition'>
-                    <CheckCircle className='h-5 w-5 text-emerald-600 flex-shrink-0 mt-0.5' />
-                    <p className='text-sm text-slate-700 font-medium'>{feature}</p>
+              {/* Pain Point & Solution Comparison */}
+              {selectedPersona.painPoint && (
+                <div className='mb-8 grid md:grid-cols-2 gap-6'>
+                  <div className='rounded-2xl border-2 border-red-200 bg-red-50 p-6'>
+                    <div className='flex items-center gap-2 mb-3'>
+                      <XIcon className='h-5 w-5 text-red-600' />
+                      <h4 className='font-bold text-red-900'>Platform Olmadan</h4>
+                    </div>
+                    <p className='text-sm text-red-800 font-medium leading-relaxed'>{selectedPersona.withoutPlatform}</p>
+                    <p className='text-xs text-red-700 mt-3 italic'>{selectedPersona.painPoint}</p>
+                  </div>
+                  <div className='rounded-2xl border-2 border-emerald-200 bg-emerald-50 p-6'>
+                    <div className='flex items-center gap-2 mb-3'>
+                      <CheckCircle className='h-5 w-5 text-emerald-600' />
+                      <h4 className='font-bold text-emerald-900'>Platform İle</h4>
+                    </div>
+                    <p className='text-sm text-emerald-800 font-medium leading-relaxed'>{selectedPersona.withPlatform}</p>
+                    <p className='text-xs text-emerald-700 mt-3 font-semibold'>{selectedPersona.promise}</p>
+                  </div>
+                </div>
+              )}
+
+              {Array.isArray((selectedPersona as any).flow) && (selectedPersona as any).flow.length > 0 && (
+                <div className='mb-6'>
+                  <h4 className='text-lg font-bold text-slate-900 mb-4'>Bu panelde ne yaparsınız?</h4>
+                  <div className='grid gap-4 sm:grid-cols-3'>
+                    {(selectedPersona as any).flow.map((step: string, idx: number) => (
+                      <div
+                        key={idx}
+                        className='flex items-start gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm'
+                      >
+                        <div className='h-8 w-8 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center text-sm font-bold border border-blue-200'>
+                          {idx + 1}
+                        </div>
+                        <p className='text-sm text-slate-700 font-semibold leading-relaxed'>{step}</p>
                       </div>
                     ))}
+                  </div>
+                </div>
+              )}
+
+              <div className='mb-6'>
+                <h4 className='text-lg font-bold text-slate-900 mb-4'>Platform Özellikleri</h4>
+                <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-4'>
+                  {selectedPersona.features.map((feature, idx) => (
+                    <div key={idx} className='flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 hover:bg-white hover:shadow-md transition'>
+                      <CheckCircle className='h-5 w-5 text-emerald-600 flex-shrink-0 mt-0.5' />
+                      <p className='text-sm text-slate-700 font-medium'>{feature}</p>
+                        </div>
+                      ))}
+                    </div>
                   </div>
 
               <div className='pt-6 border-t border-slate-200'>
@@ -832,7 +922,7 @@ const LandingPage: React.FC = () => {
                 5 Adımda Tamamlanan Süreç
               </h2>
               <p className='text-lg text-white/70'>
-                Gönderi oluşturma'dan teslimata kadar tüm süreç tek platformda, şeffaf ve hızlı.
+                Gönderi oluşturmadan teslimata kadar tüm süreç tek platformda, şeffaf ve hızlı.
             </p>
                   </div>
 
@@ -1014,6 +1104,10 @@ const LandingPage: React.FC = () => {
               <h2 className='text-4xl md:text-5xl font-bold mb-6'>
                 Güvenilir ve Güvenli Platform
               </h2>
+              <p className='text-sm text-white/70 mt-4'>
+                YolNext bir aracı platformdur. Göndericiler ve nakliyeciler arasında bağlantı kurar. 
+                Taşımacılık hizmetlerini bizzat sağlamaz. <a href='/terms' className='text-blue-300 underline hover:text-blue-200'>Detaylı bilgi</a>
+              </p>
             </div>
 
             <div className='grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-12'>
@@ -1080,7 +1174,7 @@ const LandingPage: React.FC = () => {
                 Kullanıcılarımız Ne Diyor?
               </h2>
               <p className='text-lg text-slate-600'>
-                Türkiye'nin dört bir yanından gerçek kullanıcı deneyimleri.
+                Platform kullanıcılarının deneyimleri ve geri bildirimleri.
               </p>
             </div>
 
@@ -1118,12 +1212,18 @@ const LandingPage: React.FC = () => {
         <section className='bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 py-24 text-white'>
           <div className='max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center'>
             <h2 className='text-4xl md:text-5xl font-bold mb-6'>
-              4 Panelli Ekosisteme Katılın
+              Hayatınızı Değiştirin, Bugün Başlayın
             </h2>
-            <p className='text-xl text-slate-200 mb-8 leading-relaxed'>
+            <p className='text-xl text-slate-200 mb-4 leading-relaxed'>
+                  Platform olmadan her gün kaybediyorsunuz: Yüksek fiyatlar, iş bulamama, verimsizlik, belirsizlik.
+            </p>
+            <p className='text-lg text-blue-200 mb-8 font-semibold'>
+                  Platform ile kazanıyorsunuz: Tasarruf, sürekli iş, verimlilik, güvenli gelir.
+            </p>
+            <p className='text-base text-slate-300 mb-8'>
                   Kayıt tamamen ücretsiz, kredi kartı gerekmez, 2 dakikada kayıt olun. 
-              <br />
-                  Binlerce kullanıcı bu sistemi kullanıyor.
+                  <br />
+                  Her geçen gün daha fazla kullanıcı bize katılıyor ve hayatlarını değiştiriyor.
             </p>
             <div className='flex flex-col sm:flex-row items-center justify-center gap-4'>
                 <button

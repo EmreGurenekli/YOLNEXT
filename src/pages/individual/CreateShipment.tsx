@@ -20,6 +20,81 @@ import {
 } from 'lucide-react';
 import Breadcrumb from '../../components/common/Breadcrumb';
 import SuccessMessage from '../../components/common/SuccessMessage';
+import { turkeyCities } from '../../data/turkey-cities-districts';
+
+// Shipment data interface
+interface ShipmentData {
+  title: string;
+  description: string;
+  productDescription: string;
+  category: string;
+  pickupCity: string;
+  pickupDistrict: string;
+  pickupAddress: string;
+  pickupDate: string;
+  deliveryCity: string;
+  deliveryDistrict: string;
+  deliveryAddress: string;
+  deliveryDate: string;
+  weight: number;
+  volume: number;
+  dimensions: string | null;
+  value: number;
+  specialRequirements: string;
+}
+
+import { createApiUrl } from '../../config/api';
+
+// Temporary workaround - direct API call
+const shipmentsApi = {
+  create: async (data: ShipmentData) => {
+    const token = localStorage.getItem('authToken');
+    const apiUrl = createApiUrl('/api/shipments');
+    
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : '',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(data)
+    });
+    
+    if (!response.ok) {
+      const contentType = response.headers.get('content-type');
+      let errorMessage = `HTTP error! status: ${response.status}`;
+      
+      // Try to get error message from response
+      if (contentType && contentType.includes('application/json')) {
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorData.error || errorMessage;
+        } catch (e) {
+          // Ignore JSON parse errors
+        }
+      } else {
+        try {
+          const text = await response.text();
+          if (text) {
+            errorMessage = `${errorMessage}. Response: ${text.substring(0, 200)}`;
+          }
+        } catch (e) {
+          // Ignore text read errors
+        }
+      }
+      
+      throw new Error(errorMessage);
+    }
+    
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      const text = await response.text();
+      throw new Error(`Expected JSON but got ${contentType}. Response: ${text.substring(0, 100)}`);
+    }
+    
+    return response.json();
+  }
+};
 
 export default function CreateShipment() {
   const navigate = useNavigate();
@@ -39,7 +114,11 @@ export default function CreateShipment() {
       height: ''
     },
     specialRequirements: '',
+    pickupCity: '',
+    pickupDistrict: '',
     pickupAddress: '',
+    deliveryCity: '',
+    deliveryDistrict: '',
     deliveryAddress: '',
     pickupDate: '',
     deliveryDate: '',
@@ -124,19 +203,71 @@ export default function CreateShipment() {
           newErrors.weight = 'Ağırlık zorunludur';
         }
       }
-    } else if (step === 2) {
+    } else     if (step === 2) {
       // Step 2: Adres Bilgileri validasyonu
+      if (!formData.pickupCity) {
+        newErrors.pickupCity = 'Toplama ili zorunludur';
+      }
+      if (!formData.pickupDistrict) {
+        newErrors.pickupDistrict = 'Toplama ilçesi zorunludur';
+      }
       if (!formData.pickupAddress || formData.pickupAddress.trim() === '') {
         newErrors.pickupAddress = 'Toplama adresi zorunludur';
+      }
+      if (!formData.deliveryCity) {
+        newErrors.deliveryCity = 'Teslimat ili zorunludur';
+      }
+      if (!formData.deliveryDistrict) {
+        newErrors.deliveryDistrict = 'Teslimat ilçesi zorunludur';
       }
       if (!formData.deliveryAddress || formData.deliveryAddress.trim() === '') {
         newErrors.deliveryAddress = 'Teslimat adresi zorunludur';
       }
       if (!formData.pickupDate) {
         newErrors.pickupDate = 'Toplama tarihi zorunludur';
+      } else {
+        const pickupDate = new Date(formData.pickupDate);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        // Geçmiş tarih kontrolü
+        if (pickupDate < today) {
+          newErrors.pickupDate = 'Toplama tarihi geçmiş bir tarih olamaz. Lütfen bugün veya ileri bir tarih seçin.';
+        }
+        
+        // 20 gün sonrası kontrolü
+        const maxDate = new Date(today);
+        maxDate.setDate(maxDate.getDate() + 20);
+        if (pickupDate > maxDate) {
+          newErrors.pickupDate = 'Toplama tarihi bugünden en fazla 20 gün sonrası için olabilir. Lütfen daha yakın bir tarih seçin.';
+        }
       }
       if (!formData.deliveryDate) {
         newErrors.deliveryDate = 'Teslimat tarihi zorunludur';
+      } else {
+        const deliveryDate = new Date(formData.deliveryDate);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        // Geçmiş tarih kontrolü
+        if (deliveryDate < today) {
+          newErrors.deliveryDate = 'Teslimat tarihi geçmiş bir tarih olamaz. Lütfen bugün veya ileri bir tarih seçin.';
+        }
+        
+        // 20 gün sonrası kontrolü
+        const maxDate = new Date(today);
+        maxDate.setDate(maxDate.getDate() + 20);
+        if (deliveryDate > maxDate) {
+          newErrors.deliveryDate = 'Teslimat tarihi bugünden en fazla 20 gün sonrası için olabilir. Lütfen daha yakın bir tarih seçin.';
+        }
+      }
+      // Validate that delivery date is after pickup date
+      if (formData.pickupDate && formData.deliveryDate) {
+        const pickupDate = new Date(formData.pickupDate);
+        const deliveryDate = new Date(formData.deliveryDate);
+        if (deliveryDate <= pickupDate) {
+          newErrors.deliveryDate = 'Teslimat tarihi toplama tarihinden sonra olmalıdır';
+        }
       }
     }
 
@@ -161,7 +292,9 @@ export default function CreateShipment() {
 
   const handlePublish = async () => {
     // Tüm adımları validate et
-    if (!validateStep(1) || !validateStep(2)) {
+    const step1Valid = validateStep(1);
+    const step2Valid = validateStep(2);
+    if (!step1Valid || !step2Valid) {
       // Hatalar gösterildi, yayınlama yapma
       setCurrentStep(1); // İlk hataya geri dön
       return;
@@ -170,30 +303,15 @@ export default function CreateShipment() {
     setIsLoading(true);
     
     try {
-      const token = localStorage.getItem('authToken');
-      
-      // Prepare shipment data - match backend expectations
-      // Parse city from address - try multiple formats
-      const parseCityFromAddress = (address: string): { city: string; district: string } => {
-        if (!address) return { city: 'İstanbul', district: '' };
-        
-        // Try comma-separated format: "City, District, Address" or "City, Address"
-        const parts = address.split(',').map(p => p.trim()).filter(p => p);
-        
-        if (parts.length >= 2) {
-          // First part is usually city
-          return { city: parts[0], district: parts[1] || '' };
-        } else if (parts.length === 1) {
-          // Only one part - use it as city, address is the same
-          return { city: parts[0], district: '' };
-        }
-        
-        // Fallback
-        return { city: 'İstanbul', district: '' };
+      // Use form data directly for city and district
+      const pickupLocation = {
+        city: formData.pickupCity || 'İstanbul',
+        district: formData.pickupDistrict || ''
       };
-
-      const pickupLocation = parseCityFromAddress(formData.pickupAddress);
-      const deliveryLocation = parseCityFromAddress(formData.deliveryAddress);
+      const deliveryLocation = {
+        city: formData.deliveryCity || 'İstanbul',
+        district: formData.deliveryDistrict || ''
+      };
 
       const shipmentData = {
         title: formData.productDescription || 'Ev Taşınması',
@@ -214,47 +332,43 @@ export default function CreateShipment() {
           ? `${formData.dimensions.length}x${formData.dimensions.width}x${formData.dimensions.height}`
           : null,
         value: 0,
-        specialRequirements: [
-          formData.roomCount ? `Oda Sayısı: ${formData.roomCount}` : null,
-          formData.buildingType ? `Bina Tipi: ${formData.buildingType}` : null,
-          formData.pickupFloor ? `Toplama Katı: ${formData.pickupFloor}` : null,
-          formData.deliveryFloor ? `Teslimat Katı: ${formData.deliveryFloor}` : null,
-          formData.hasElevatorPickup ? 'Toplama adresinde asansör var' : null,
-          formData.hasElevatorDelivery ? 'Teslimat adresinde asansör var' : null,
-          formData.needsPackaging ? 'Ambalaj ve paketleme hizmeti gerekli' : null,
-          formData.specialItems || null,
-        ].filter(Boolean).join(', '),
+        specialRequirements: (() => {
+          // Combine button-selected requirements with form-specific requirements
+          const buttonRequirements = formData.specialRequirements ? formData.specialRequirements.split(',').filter(r => r.trim()) : [];
+          const formRequirements = [
+            formData.roomCount ? `Oda Sayısı: ${formData.roomCount}` : null,
+            formData.buildingType ? `Bina Tipi: ${formData.buildingType}` : null,
+            formData.pickupFloor ? `Toplama Katı: ${formData.pickupFloor}` : null,
+            formData.deliveryFloor ? `Teslimat Katı: ${formData.deliveryFloor}` : null,
+            formData.hasElevatorPickup ? 'Toplama adresinde asansör var' : null,
+            formData.hasElevatorDelivery ? 'Teslimat adresinde asansör var' : null,
+            formData.needsPackaging ? 'Ambalaj ve paketleme hizmeti gerekli' : null,
+            formData.specialItems || null,
+          ].filter(Boolean);
+          // Map button IDs to readable names
+          const reqMap: { [key: string]: string } = {
+            'fragile': 'Kırılgan',
+            'urgent': 'Acil',
+            'signature': 'İmzalı Teslimat',
+            'temperature': 'Soğuk Zincir',
+            'valuable': 'Değerli'
+          };
+          const mappedButtonReqs = buttonRequirements.map(r => reqMap[r.trim()] || r.trim()).filter(Boolean);
+          return [...mappedButtonReqs, ...formRequirements].join(', ');
+        })(),
       };
 
-      let response;
-      try {
-        response = await fetch('http://localhost:5000/api/shipments', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify(shipmentData),
-        });
-      } catch (networkError: any) {
-        // Network error (backend not running, CORS, etc.)
-        throw new Error(`Backend sunucusuna bağlanılamıyor: ${networkError.message}. Lütfen backend'in çalıştığından emin olun (cd backend && node postgres-backend.js)`);
-      }
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        const errorMessage = errorData.error || errorData.message || errorData.details || `HTTP ${response.status}: Gönderi yayınlanamadı`;
-        throw new Error(errorMessage);
-      }
-
-      const result = await response.json();
+      // Use centralized API service instead of hardcoded fetch
+      const result = await shipmentsApi.create(shipmentData);
       
       setIsLoading(false);
       
       // Verify success
       if (result.success && (result.data?.shipment || result.data?.id)) {
         const shipment = result.data?.shipment || result.data;
-        setSuccessMessage(`Gönderiniz başarıyla yayınlandı! Takip numaranız: ${shipment.trackingNumber || shipment.trackingnumber || shipment.id || 'N/A'}. Nakliyecilerden teklifler almaya başlayacaksınız.`);
+        const trackingNumber = shipment.trackingNumber || shipment.trackingnumber || shipment.id;
+        const trackingText = trackingNumber ? `Takip numaranız: ${trackingNumber}. ` : '';
+        setSuccessMessage(`Gönderiniz başarıyla yayınlandı! ${trackingText}Nakliyecilerden teklifler almaya başlayacaksınız.`);
         setShowSuccessMessage(true);
         
         // Redirect to My Shipments after 2 seconds
@@ -274,7 +388,11 @@ export default function CreateShipment() {
           quantity: '',
           dimensions: { length: '', width: '', height: '' },
           specialRequirements: '',
+          pickupCity: '',
+          pickupDistrict: '',
           pickupAddress: '',
+          deliveryCity: '',
+          deliveryDistrict: '',
           deliveryAddress: '',
           pickupDate: '',
           deliveryDate: '',
@@ -295,9 +413,18 @@ export default function CreateShipment() {
         setErrors({});
       }, 3000);
     } catch (error) {
-      console.error('Error publishing shipment:', error);
       setIsLoading(false);
-      setErrors({ publish: error instanceof Error ? error.message : 'Gönderi yayınlanamadı' });
+      let errorMessage = 'Gönderi yayınlanamadı';
+      
+      if (error instanceof Error) {
+        errorMessage = error.message;
+        // Check for network errors
+        if (error.message.includes('fetch') || error.message.includes('network') || error.message.includes('Failed to fetch')) {
+          errorMessage = 'Sunucuya bağlanılamıyor. Lütfen internet bağlantınızı kontrol edin ve tekrar deneyin. Sorun devam ederse destek ekibimizle iletişime geçebilirsiniz.';
+        }
+      }
+      
+      setErrors({ publish: errorMessage });
       setSuccessMessage('');
       setShowSuccessMessage(false);
     }
@@ -322,6 +449,10 @@ export default function CreateShipment() {
                     setErrors(prev => ({ ...prev, mainCategory: '' }));
                   }
                 }}
+                aria-label="Yük kategorisi seçin"
+                aria-required="true"
+                aria-invalid={!!errors.mainCategory}
+                aria-describedby={errors.mainCategory ? 'mainCategory-error' : undefined}
                 className={`w-full p-4 border-2 rounded-xl focus:ring-2 focus:ring-blue-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md text-slate-700 text-lg ${
                   errors.mainCategory ? 'border-red-500 focus:border-red-500' : 'border-slate-200 focus:border-blue-500'
                 }`}
@@ -334,7 +465,7 @@ export default function CreateShipment() {
                 ))}
               </select>
               {errors.mainCategory && (
-                <p className="mt-2 text-sm text-red-600">{errors.mainCategory}</p>
+                <p id="mainCategory-error" className="mt-2 text-sm text-red-600" role="alert">{errors.mainCategory}</p>
               )}
             </div>
 
@@ -356,21 +487,25 @@ export default function CreateShipment() {
                         }
                       }}
                       rows={formData.mainCategory === 'special_cargo' ? 5 : 3}
+                      aria-label="Yük açıklaması"
+                      aria-required="true"
+                      aria-invalid={!!errors.productDescription}
+                      aria-describedby={errors.productDescription ? 'productDescription-error' : undefined}
                       className={`w-full p-4 border-2 rounded-xl focus:ring-2 transition-all duration-200 bg-white shadow-sm hover:shadow-md text-slate-700 resize-none ${
                         errors.productDescription ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-slate-200 focus:ring-blue-500 focus:border-blue-500'
                       }`}
                       placeholder={
                         formData.mainCategory === 'special_cargo' 
-                          ? 'Özel yükünüzü detaylı olarak tarif edin. Ne taşınacak, özel gereksinimler neler?'
+                          ? 'Özel yükünüzü detaylı olarak tarif edin...'
                           : formData.mainCategory === 'house_move'
-                          ? 'Taşınacak eşyalar, özel durumlar, ek bilgiler (örn: Buzdolabı, çamaşır makinesi, yatak odası takımı vb.)'
+                          ? 'Taşınacak eşyalar ve özel durumlar (örn: Buzdolabı, çamaşır makinesi, yatak odası takımı)'
                           : formData.mainCategory === 'furniture_goods'
-                          ? 'Mobilya tipleri, özel durumlar...'
+                          ? 'Mobilya tipleri ve özel durumlar...'
                           : 'Yükünüzü detaylı olarak tarif edin...'
                       }
                     />
                     {errors.productDescription && (
-                      <p className="mt-2 text-sm text-red-600">{errors.productDescription}</p>
+                      <p id="productDescription-error" className="mt-2 text-sm text-red-600" role="alert">{errors.productDescription}</p>
                     )}
                   </div>
 
@@ -722,46 +857,83 @@ export default function CreateShipment() {
                     
                     if (relevantRequirements.length === 0) return null;
 
+                    // Color mapping for Tailwind classes
+                    const getColorClasses = (color: string, isSelected: boolean) => {
+                      const colorMap: { [key: string]: { border: string; bg: string; text: string } } = {
+                        red: { border: 'border-red-500', bg: 'bg-red-50', text: 'text-red-900' },
+                        orange: { border: 'border-orange-500', bg: 'bg-orange-50', text: 'text-orange-900' },
+                        yellow: { border: 'border-yellow-500', bg: 'bg-yellow-50', text: 'text-yellow-900' },
+                        blue: { border: 'border-blue-500', bg: 'bg-blue-50', text: 'text-blue-900' },
+                        cyan: { border: 'border-cyan-500', bg: 'bg-cyan-50', text: 'text-cyan-900' },
+                        purple: { border: 'border-purple-500', bg: 'bg-purple-50', text: 'text-purple-900' },
+                        indigo: { border: 'border-indigo-500', bg: 'bg-indigo-50', text: 'text-indigo-900' },
+                      };
+                      const colors = colorMap[color] || colorMap.blue;
+                      return isSelected 
+                        ? `${colors.border} ${colors.bg}`
+                        : 'border-slate-200 hover:border-slate-300 bg-white';
+                    };
+
+                    const getBgColorClass = (color: string, isSelected: boolean) => {
+                      const colorMap: { [key: string]: string } = {
+                        red: 'bg-red-500',
+                        orange: 'bg-orange-500',
+                        yellow: 'bg-yellow-500',
+                        blue: 'bg-blue-500',
+                        cyan: 'bg-cyan-500',
+                        purple: 'bg-purple-500',
+                        indigo: 'bg-indigo-500',
+                      };
+                      return isSelected ? (colorMap[color] || 'bg-blue-500') : 'bg-slate-100';
+                    };
+
+                    const getTextColorClass = (color: string, isSelected: boolean) => {
+                      const colorMap: { [key: string]: string } = {
+                        red: 'text-red-900',
+                        orange: 'text-orange-900',
+                        yellow: 'text-yellow-900',
+                        blue: 'text-blue-900',
+                        cyan: 'text-cyan-900',
+                        purple: 'text-purple-900',
+                        indigo: 'text-indigo-900',
+                      };
+                      return isSelected ? (colorMap[color] || 'text-blue-900') : 'text-slate-700';
+                    };
+
                     return (
                       <div className="space-y-4">
                         <h3 className="text-lg font-semibold text-slate-900">Özel Gereksinimler</h3>
                         <div className={`grid grid-cols-2 sm:grid-cols-3 ${relevantRequirements.length > 3 ? 'lg:grid-cols-6' : 'lg:grid-cols-3'} gap-3`}>
                           {relevantRequirements.map((req) => {
                         const IconComponent = req.icon;
-                        const isSelected = formData.specialRequirements.includes(req.id);
+                        const currentRequirements = formData.specialRequirements || '';
+                        const requirementsList = currentRequirements ? currentRequirements.split(',').filter(r => r.trim()) : [];
+                        const isSelected = requirementsList.includes(req.id);
                         
                         return (
                           <button
                             key={req.id}
                             type="button"
                             onClick={() => {
-                              const current = formData.specialRequirements.split(',').filter(r => r.trim());
-                              const isSelected = current.includes(req.id);
+                              const current = (formData.specialRequirements || '').split(',').filter(r => r.trim());
+                              const isSelectedNow = current.includes(req.id);
                               let newRequirements;
-                              if (isSelected) {
+                              if (isSelectedNow) {
                                 newRequirements = current.filter(r => r !== req.id);
                               } else {
                                 newRequirements = [...current, req.id];
                               }
                               handleInputChange('specialRequirements', newRequirements.join(','));
                             }}
-                            className={`p-4 rounded-lg border-2 transition-all duration-300 ${
-                              isSelected
-                                ? `border-${req.color}-500 bg-${req.color}-50`
-                                : 'border-slate-200 hover:border-slate-300 bg-white'
-                            }`}
+                            className={`p-4 rounded-lg border-2 transition-all duration-300 ${getColorClasses(req.color, isSelected)}`}
                           >
                             <div className="flex flex-col items-center text-center">
-                              <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-2 ${
-                                isSelected ? `bg-${req.color}-500` : 'bg-slate-100'
-                              }`}>
+                              <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-2 ${getBgColorClass(req.color, isSelected)}`}>
                                 <IconComponent className={`w-4 h-4 ${
                                   isSelected ? 'text-white' : 'text-slate-600'
                                 }`} />
                               </div>
-                              <span className={`text-xs font-medium ${
-                                isSelected ? `text-${req.color}-900` : 'text-slate-700'
-                              }`}>
+                              <span className={`text-xs font-medium ${getTextColorClass(req.color, isSelected)}`}>
                                 {req.name}
                               </span>
                             </div>
@@ -799,6 +971,74 @@ export default function CreateShipment() {
                 </div>
                 
                 <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">
+                        <MapPin className="w-4 h-4 inline mr-2" />
+                        İl *
+                      </label>
+                      <select
+                        value={formData.pickupCity}
+                        onChange={(e) => {
+                          handleInputChange('pickupCity', e.target.value);
+                          handleInputChange('pickupDistrict', ''); // Reset district when city changes
+                          if (errors.pickupCity) {
+                            setErrors(prev => ({ ...prev, pickupCity: '' }));
+                          }
+                        }}
+                        aria-label="Toplama ili"
+                        aria-required="true"
+                        aria-invalid={!!errors.pickupCity}
+                        className={`w-full p-4 border-2 rounded-xl focus:ring-2 transition-all duration-200 bg-white shadow-sm hover:shadow-md text-slate-700 ${
+                          errors.pickupCity ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-slate-200 focus:ring-blue-500 focus:border-blue-500'
+                        }`}
+                      >
+                        <option value="">İl seçiniz</option>
+                        {turkeyCities.map((city) => (
+                          <option key={city.id} value={city.name}>
+                            {city.name}
+                          </option>
+                        ))}
+                      </select>
+                      {errors.pickupCity && (
+                        <p className="mt-2 text-sm text-red-600" role="alert">{errors.pickupCity}</p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">
+                        <MapPin className="w-4 h-4 inline mr-2" />
+                        İlçe *
+                      </label>
+                      <select
+                        value={formData.pickupDistrict}
+                        onChange={(e) => {
+                          handleInputChange('pickupDistrict', e.target.value);
+                          if (errors.pickupDistrict) {
+                            setErrors(prev => ({ ...prev, pickupDistrict: '' }));
+                          }
+                        }}
+                        disabled={!formData.pickupCity}
+                        aria-label="Toplama ilçesi"
+                        aria-required="true"
+                        aria-invalid={!!errors.pickupDistrict}
+                        className={`w-full p-4 border-2 rounded-xl focus:ring-2 transition-all duration-200 bg-white shadow-sm hover:shadow-md text-slate-700 ${
+                          !formData.pickupCity ? 'bg-gray-100 cursor-not-allowed' : ''
+                        } ${
+                          errors.pickupDistrict ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-slate-200 focus:ring-blue-500 focus:border-blue-500'
+                        }`}
+                      >
+                        <option value="">İlçe seçiniz</option>
+                        {formData.pickupCity && turkeyCities.find(c => c.name === formData.pickupCity)?.districts.map((district) => (
+                          <option key={district} value={district}>
+                            {district}
+                          </option>
+                        ))}
+                      </select>
+                      {errors.pickupDistrict && (
+                        <p className="mt-2 text-sm text-red-600" role="alert">{errors.pickupDistrict}</p>
+                      )}
+                    </div>
+                  </div>
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-2">
                       <MapPin className="w-4 h-4 inline mr-2" />
@@ -813,13 +1053,17 @@ export default function CreateShipment() {
                         }
                       }}
                       rows={4}
+                      aria-label="Toplama adresi"
+                      aria-required="true"
+                      aria-invalid={!!errors.pickupAddress}
+                      aria-describedby={errors.pickupAddress ? 'pickupAddress-error' : undefined}
                       className={`w-full p-4 border-2 rounded-xl focus:ring-2 transition-all duration-200 bg-white shadow-sm hover:shadow-md text-slate-700 resize-none ${
                         errors.pickupAddress ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-slate-200 focus:ring-blue-500 focus:border-blue-500'
                       }`}
-                      placeholder="Tam adres bilgilerini girin..."
+                      placeholder="Mahalle, sokak, bina no, daire no vb. detaylı adres bilgilerini girin..."
                     />
                     {errors.pickupAddress && (
-                      <p className="mt-2 text-sm text-red-600">{errors.pickupAddress}</p>
+                      <p id="pickupAddress-error" className="mt-2 text-sm text-red-600" role="alert">{errors.pickupAddress}</p>
                     )}
                   </div>
                   
@@ -837,12 +1081,18 @@ export default function CreateShipment() {
                           setErrors(prev => ({ ...prev, pickupDate: '' }));
                         }
                       }}
+                      min={new Date().toISOString().split('T')[0]}
+                      max={new Date(Date.now() + 20 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
+                      aria-label="Toplama tarihi"
+                      aria-required="true"
+                      aria-invalid={!!errors.pickupDate}
+                      aria-describedby={errors.pickupDate ? 'pickupDate-error' : undefined}
                       className={`w-full p-4 border-2 rounded-xl focus:ring-2 transition-all duration-200 bg-white shadow-sm hover:shadow-md text-slate-700 ${
                         errors.pickupDate ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-slate-200 focus:ring-blue-500 focus:border-blue-500'
                       }`}
                     />
                     {errors.pickupDate && (
-                      <p className="mt-2 text-sm text-red-600">{errors.pickupDate}</p>
+                      <p id="pickupDate-error" className="mt-2 text-sm text-red-600" role="alert">{errors.pickupDate}</p>
                     )}
                   </div>
                 </div>
@@ -860,6 +1110,74 @@ export default function CreateShipment() {
                 </div>
                 
                 <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">
+                        <MapPin className="w-4 h-4 inline mr-2" />
+                        İl *
+                      </label>
+                      <select
+                        value={formData.deliveryCity}
+                        onChange={(e) => {
+                          handleInputChange('deliveryCity', e.target.value);
+                          handleInputChange('deliveryDistrict', ''); // Reset district when city changes
+                          if (errors.deliveryCity) {
+                            setErrors(prev => ({ ...prev, deliveryCity: '' }));
+                          }
+                        }}
+                        aria-label="Teslimat ili"
+                        aria-required="true"
+                        aria-invalid={!!errors.deliveryCity}
+                        className={`w-full p-4 border-2 rounded-xl focus:ring-2 transition-all duration-200 bg-white shadow-sm hover:shadow-md text-slate-700 ${
+                          errors.deliveryCity ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-slate-200 focus:ring-emerald-500 focus:border-emerald-500'
+                        }`}
+                      >
+                        <option value="">İl seçiniz</option>
+                        {turkeyCities.map((city) => (
+                          <option key={city.id} value={city.name}>
+                            {city.name}
+                          </option>
+                        ))}
+                      </select>
+                      {errors.deliveryCity && (
+                        <p className="mt-2 text-sm text-red-600" role="alert">{errors.deliveryCity}</p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">
+                        <MapPin className="w-4 h-4 inline mr-2" />
+                        İlçe *
+                      </label>
+                      <select
+                        value={formData.deliveryDistrict}
+                        onChange={(e) => {
+                          handleInputChange('deliveryDistrict', e.target.value);
+                          if (errors.deliveryDistrict) {
+                            setErrors(prev => ({ ...prev, deliveryDistrict: '' }));
+                          }
+                        }}
+                        disabled={!formData.deliveryCity}
+                        aria-label="Teslimat ilçesi"
+                        aria-required="true"
+                        aria-invalid={!!errors.deliveryDistrict}
+                        className={`w-full p-4 border-2 rounded-xl focus:ring-2 transition-all duration-200 bg-white shadow-sm hover:shadow-md text-slate-700 ${
+                          !formData.deliveryCity ? 'bg-gray-100 cursor-not-allowed' : ''
+                        } ${
+                          errors.deliveryDistrict ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-slate-200 focus:ring-emerald-500 focus:border-emerald-500'
+                        }`}
+                      >
+                        <option value="">İlçe seçiniz</option>
+                        {formData.deliveryCity && turkeyCities.find(c => c.name === formData.deliveryCity)?.districts.map((district) => (
+                          <option key={district} value={district}>
+                            {district}
+                          </option>
+                        ))}
+                      </select>
+                      {errors.deliveryDistrict && (
+                        <p className="mt-2 text-sm text-red-600" role="alert">{errors.deliveryDistrict}</p>
+                      )}
+                    </div>
+                  </div>
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-2">
                       <MapPin className="w-4 h-4 inline mr-2" />
@@ -877,7 +1195,7 @@ export default function CreateShipment() {
                       className={`w-full p-4 border-2 rounded-xl focus:ring-2 transition-all duration-200 bg-white shadow-sm hover:shadow-md text-slate-700 resize-none ${
                         errors.deliveryAddress ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-slate-200 focus:ring-emerald-500 focus:border-emerald-500'
                       }`}
-                      placeholder="Tam adres bilgilerini girin..."
+                      placeholder="Mahalle, sokak, bina no, daire no vb. detaylı adres bilgilerini girin..."
                     />
                     {errors.deliveryAddress && (
                       <p className="mt-2 text-sm text-red-600">{errors.deliveryAddress}</p>
@@ -898,6 +1216,8 @@ export default function CreateShipment() {
                           setErrors(prev => ({ ...prev, deliveryDate: '' }));
                         }
                       }}
+                      min={formData.pickupDate ? new Date(new Date(formData.pickupDate).getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]}
+                      max={new Date(Date.now() + 20 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
                       className={`w-full p-4 border-2 rounded-xl focus:ring-2 transition-all duration-200 bg-white shadow-sm hover:shadow-md text-slate-700 ${
                         errors.deliveryDate ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-slate-200 focus:ring-emerald-500 focus:border-emerald-500'
                       }`}
@@ -1098,7 +1418,8 @@ export default function CreateShipment() {
                     <p className="text-sm text-red-700">{errors.publish}</p>
                     {errors.publish.includes('bağlanılamıyor') || errors.publish.includes('connection') || errors.publish.includes('Failed to fetch') ? (
                       <p className="text-xs text-red-600 mt-2">
-                        Backend sunucusu çalışmıyor olabilir. Lütfen backend'i başlatın: <code className="bg-red-100 px-1 rounded">cd backend && node postgres-backend.js</code>
+                        Sunucuya bağlanılamıyor. Lütfen internet bağlantınızı kontrol edin ve tekrar deneyin. 
+                        Sorun devam ederse destek ekibimizle iletişime geçebilirsiniz.
                       </p>
                     ) : null}
                   </div>
@@ -1106,33 +1427,24 @@ export default function CreateShipment() {
               </div>
             )}
 
-            {/* KRİTİK UYARI - Sorumluluk Reddi */}
-            <div className="bg-red-100 border-4 border-red-500 rounded-xl p-8 space-y-4">
+            {/* Önemli Bilgilendirme - Sorumluluk Reddi */}
+            <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-6 space-y-3">
               <div className="flex items-start gap-3">
-                <AlertTriangle className="w-8 h-8 text-red-700 flex-shrink-0 mt-0.5" />
+                <AlertTriangle className="w-6 h-6 text-amber-600 flex-shrink-0 mt-0.5" />
                 <div className="flex-1">
-                  <h3 className="text-xl font-bold text-red-900 mb-4">KRİTİK UYARI: YolNext SADECE BİR ARACI PLATFORMUDUR</h3>
-                  <div className="space-y-4 text-sm text-red-800 font-semibold">
-                    <p className="font-bold text-base">
-                      YolNext sadece bir pazaryeri/aracı platformdur. Taşımacılık hizmetlerini BİZZAT SAĞLAMAZ, 
-                      sigorta hizmeti VERMEZ ve HİÇBİR ŞEKİLDE SORUMLULUK KABUL ETMEZ.
+                  <h3 className="text-lg font-semibold text-amber-900 mb-3">Önemli Bilgilendirme</h3>
+                  <div className="space-y-3 text-sm text-amber-800">
+                    <p>
+                      YolNext, göndericiler ve nakliyeciler arasında bağlantı kuran bir aracı platformdur. 
+                      Taşımacılık hizmetlerini bizzat sağlamaz ve sigorta hizmeti vermez.
                     </p>
-                    <ul className="list-disc pl-6 space-y-2">
-                      <li><strong>Kaza, yaralanma, ölüm:</strong> YolNext KESİNLİKLE sorumlu değildir</li>
-                      <li><strong>Hırsızlık, kayıp, çalınma, hasar, kırılma:</strong> YolNext KESİNLİKLE sorumlu değildir</li>
-                      <li><strong>Gecikme, yanlış teslimat:</strong> YolNext KESİNLİKLE sorumlu değildir</li>
-                      <li><strong>Mali kayıplar, ticari kayıplar:</strong> YolNext KESİNLİKLE sorumlu değildir</li>
-                      <li><strong>Nakliyeci veya gönderici davranışları:</strong> YolNext KESİNLİKLE sorumlu değildir</li>
-                      <li><strong>SİGORTA:</strong> YolNext hiçbir sigorta hizmeti vermez. Sigorta ihtiyacınız varsa kendi sigortanızı yaptırmak TAMAMEN sizin sorumluluğunuzdadır</li>
-                    </ul>
-                    <div className="bg-red-200 border-2 border-red-400 rounded-lg p-4 mt-4">
-                      <p className="font-bold text-base">
-                        ⚠️ TÜM RİSKLER GÖNDERİCİ VE NAKLİYECİ ARASINDADIR. YOLNEXT HİÇBİR SORUMLULUK KABUL ETMEZ.
-                      </p>
-                    </div>
-                    <p className="font-semibold mt-4">
-                      <Link to="/terms" target="_blank" className="text-red-900 underline font-bold">
-                        Detaylı bilgi için Kullanım Koşulları
+                    <p className="font-medium">
+                      Tüm riskler gönderici ve nakliyeci arasındadır. Sigorta ihtiyacınız varsa, 
+                      kendi sigortanızı yaptırmak sizin sorumluluğunuzdadır.
+                    </p>
+                    <p>
+                      <Link to="/terms" target="_blank" className="text-amber-900 underline font-medium hover:text-amber-700">
+                        Detaylı bilgi için Kullanım Koşulları&apos;nı inceleyebilirsiniz
                       </Link>
                     </p>
                   </div>
@@ -1194,7 +1506,7 @@ export default function CreateShipment() {
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-slate-800 to-blue-900">Gönderi</span>
           </h1>
           <p className="text-sm sm:text-base md:text-lg text-slate-600 max-w-2xl mx-auto leading-relaxed px-4">
-            Adım adım gönderi oluşturun. Profesyonel nakliye hizmetlerimizle güvenle taşıyın.
+            Adım adım gönderi oluşturun ve uygun fiyatlı teklifler alın.
           </p>
         </div>
 

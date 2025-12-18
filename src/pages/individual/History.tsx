@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createApiUrl } from '../../config/api';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface ShipmentHistory {
   id: string;
@@ -43,6 +44,7 @@ interface ShipmentHistory {
 }
 
 const IndividualHistory: React.FC = () => {
+  const { user } = useAuth();
   const [shipments, setShipments] = useState<ShipmentHistory[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -55,7 +57,20 @@ const IndividualHistory: React.FC = () => {
         console.log('🔄 Geçmiş gönderiler yükleniyor...');
         setLoading(true);
 
-        const response = await fetch(createApiUrl('/api/shipments/individual/history'), {
+        // Use regular shipments endpoint and filter for delivered status on frontend
+        const userId = user?.id;
+        if (!userId) {
+          setShipments([]);
+          setLoading(false);
+          return;
+        }
+
+        const params = new URLSearchParams({
+          page: '1',
+          limit: '100',
+          userId: userId.toString(),
+        });
+        const response = await fetch(createApiUrl(`/api/shipments?${params.toString()}`), {
           headers: {
             Authorization: `Bearer ${localStorage.getItem('authToken')}`,
             'Content-Type': 'application/json',
@@ -67,10 +82,35 @@ const IndividualHistory: React.FC = () => {
         }
 
         const data = await response.json();
-        setShipments(data.shipments || []);
+        // Get shipments from response
+        const allShipments = data.data?.shipments || data.shipments || (Array.isArray(data.data) ? data.data : []) || [];
+        
+        // Only show delivered shipments in history
+        const deliveredShipments = allShipments.filter(
+          (shipment: any) => shipment.status === 'delivered'
+        ).map((shipment: any) => ({
+          id: shipment.id?.toString() || '',
+          title: shipment.title || shipment.productDescription || 'Gönderi',
+          from: shipment.pickupCity || shipment.fromCity || '',
+          to: shipment.deliveryCity || shipment.toCity || '',
+          status: 'delivered' as const,
+          createdAt: shipment.createdAt || shipment.created_at || '',
+          estimatedDelivery: shipment.deliveryDate || shipment.estimatedDelivery || '',
+          actualDelivery: shipment.actualDelivery || shipment.deliveredAt || '',
+          price: typeof shipment.price === 'string' ? parseFloat(shipment.price) || 0 : (shipment.price || 0),
+          carrierName: shipment.carrierName || shipment.nakliyeciName || 'Nakliyeci',
+          rating: shipment.rating || 0,
+          trackingCode: shipment.trackingNumber || shipment.trackingCode || shipment.id?.toString() || '',
+          category: shipment.category || '',
+          weight: shipment.weight?.toString() || '',
+          dimensions: shipment.dimensions || '',
+          description: shipment.description || shipment.productDescription || '',
+        }));
+        
+        setShipments(deliveredShipments);
         console.log(
-          '✅ Geçmiş gönderiler yüklendi:',
-          data.shipments?.length || 0
+          '✅ Geçmiş gönderiler yüklendi (sadece teslim edilenler):',
+          deliveredShipments.length
         );
       } catch (error) {
         console.error('❌ Geçmiş gönderiler yüklenirken hata:', error);
@@ -137,7 +177,7 @@ const IndividualHistory: React.FC = () => {
   return (
     <div className='min-h-screen bg-gray-50'>
       <Helmet>
-        <title>Geçmiş Siparişler - YolNext Bireysel</title>
+        <title>Geçmiş Gönderiler - YolNext Bireysel</title>
         <meta
           name='description'
           content='Gönderi geçmişinizi görüntüleyin ve yönetin'
@@ -155,11 +195,11 @@ const IndividualHistory: React.FC = () => {
           <h1 className='text-4xl md:text-5xl font-bold text-slate-900 mb-3'>
             Geçmiş{' '}
             <span className='text-transparent bg-clip-text bg-gradient-to-r from-slate-800 to-blue-900'>
-              Siparişleriniz
+              Gönderileriniz
             </span>
           </h1>
           <p className='text-lg text-slate-600'>
-            Tüm gönderi geçmişinizi görüntüleyin ve analiz edin
+            Tamamlanan gönderilerinizi görüntüleyin ve analiz edin
           </p>
         </div>
 

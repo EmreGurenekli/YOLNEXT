@@ -1,4 +1,5 @@
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
+import { createApiUrl } from '../config/api';
 
 interface PerformanceMetrics {
   loadTime: number;
@@ -17,7 +18,7 @@ export const usePerformanceMonitoring = () => {
       const fcpObserver = new PerformanceObserver(list => {
         for (const entry of list.getEntries()) {
           if (entry.name === 'first-contentful-paint') {
-            console.log('FCP:', entry.startTime);
+            // FCP metric tracked (console.log removed for performance)
             // Send to analytics
             sendMetric('fcp', entry.startTime);
           }
@@ -29,7 +30,7 @@ export const usePerformanceMonitoring = () => {
       const lcpObserver = new PerformanceObserver(list => {
         const entries = list.getEntries();
         const lastEntry = entries[entries.length - 1];
-        console.log('LCP:', lastEntry.startTime);
+        // LCP metric tracked (console.log removed for performance)
         sendMetric('lcp', lastEntry.startTime);
       });
       lcpObserver.observe({ entryTypes: ['largest-contentful-paint'] });
@@ -38,7 +39,7 @@ export const usePerformanceMonitoring = () => {
       const fidObserver = new PerformanceObserver(list => {
         for (const entry of list.getEntries()) {
           const fidEntry = entry as PerformanceEventTiming;
-          console.log('FID:', fidEntry.processingStart - fidEntry.startTime);
+          // FID metric tracked (console.log removed for performance)
           sendMetric('fid', fidEntry.processingStart - fidEntry.startTime);
         }
       });
@@ -52,7 +53,7 @@ export const usePerformanceMonitoring = () => {
             clsValue += (entry as any).value;
           }
         }
-        console.log('CLS:', clsValue);
+        // CLS metric tracked (console.log removed for performance)
         sendMetric('cls', clsValue);
       });
       clsObserver.observe({ entryTypes: ['layout-shift'] });
@@ -62,7 +63,7 @@ export const usePerformanceMonitoring = () => {
     window.addEventListener('load', () => {
       const loadTime =
         performance.timing.loadEventEnd - performance.timing.navigationStart;
-      console.log('Page Load Time:', loadTime);
+      // Page Load Time tracked (console.log removed for performance)
       sendMetric('load_time', loadTime);
     });
 
@@ -71,7 +72,7 @@ export const usePerformanceMonitoring = () => {
       for (const entry of list.getEntries()) {
         if (entry.entryType === 'resource') {
           const resource = entry as PerformanceResourceTiming;
-          console.log(`Resource ${resource.name}:`, resource.duration);
+          // Resource timing tracked (console.log removed for performance)
 
           // Track slow resources
           if (resource.duration > 1000) {
@@ -89,11 +90,7 @@ export const usePerformanceMonitoring = () => {
     // Memory Usage (if available)
     if ('memory' in performance) {
       const memory = (performance as any).memory;
-      console.log('Memory Usage:', {
-        used: memory.usedJSHeapSize,
-        total: memory.totalJSHeapSize,
-        limit: memory.jsHeapSizeLimit,
-      });
+      // Memory usage tracked (console.log removed for performance)
 
       sendMetric('memory_usage', {
         used: memory.usedJSHeapSize,
@@ -131,7 +128,7 @@ export const usePerformanceMonitoring = () => {
       console.log(`Analytics: ${name}`, value);
 
       // Example: Send to your backend
-      fetch('/api/analytics/metrics', {
+      fetch(createApiUrl('/api/analytics/metrics'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

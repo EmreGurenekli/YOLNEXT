@@ -28,6 +28,8 @@ import {
   DollarSign,
   Loader2,
   X,
+  Route,
+  Star,
 } from 'lucide-react';
 import Breadcrumb from '../../components/common/Breadcrumb';
 import EmptyState from '../../components/common/EmptyState';
@@ -36,8 +38,10 @@ import Pagination from '../../components/common/Pagination';
 import Modal from '../../components/common/Modal';
 import SuccessMessage from '../../components/common/SuccessMessage';
 import MessagingModal from '../../components/MessagingModal';
+import RatingModal from '../../components/RatingModal';
 import { createApiUrl } from '../../config/api';
 import { formatCurrency, formatDate } from '../../utils/format';
+import { getStatusInfo, getStatusDescription } from '../../utils/shipmentStatus';
 
 interface ActiveShipment {
   id: string;
@@ -49,18 +53,23 @@ interface ActiveShipment {
   weight: number;
   volume: number;
   value: number;
+  price?: number;
   pickupDate: string;
   deliveryDate: string;
+  driver_id?: string | number | null;
   driver: {
     name: string;
     phone: string;
     vehicle: string;
-  };
+  } | null;
   shipper: {
+    id?: string;
     name: string;
     company: string;
-    phone: string;
+    email?: string;
+    phone?: string;
   };
+  hasRatedShipper?: boolean;
   createdAt: string;
 }
 
@@ -105,10 +114,11 @@ const ActiveShipments = () => {
   const [showMessagingModal, setShowMessagingModal] = useState(false);
   const [selectedShipper, setSelectedShipper] = useState<{id: string; name: string; email: string; type: string} | null>(null);
   const [selectedShipmentId, setSelectedShipmentId] = useState<string | null>(null);
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [selectedShipperForRating, setSelectedShipperForRating] = useState<{id: string; name: string; email: string; type: string} | null>(null);
 
   useEffect(() => {
     loadActiveShipments();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pagination.page, statusFilter]);
 
   useEffect(() => {
@@ -121,7 +131,7 @@ const ActiveShipments = () => {
     try {
       setIsLoading(true);
 
-      // Gerçek API çağrısı
+      // Tüm gönderileri getir (teklif kabul edilen, taşıyıcı atanan, devam eden, tamamlanan, iptal edilen)
       const params = new URLSearchParams({
         page: pagination.page.toString(),
         limit: pagination.limit.toString(),
@@ -130,7 +140,7 @@ const ActiveShipments = () => {
         params.append('status', statusFilter);
       }
       const response = await fetch(
-        `${createApiUrl('/api/shipments/nakliyeci/active')}?${params.toString()}`,
+        `${createApiUrl('/api/shipments/nakliyeci')}?${params.toString()}`,
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem('authToken')}`,
@@ -147,32 +157,32 @@ const ActiveShipments = () => {
         
         // Map backend data to frontend format
         const mappedShipments = rawShipments.map((shipment: any) => {
-          // Build driver object with fallback logic
-          const driver = shipment.driver ? {
-            name: shipment.driver.name || shipment.carrierName || 'Atanmadı',
-            phone: shipment.driver.phone || shipment.carrierPhone || shipment.contactPhone || shipment.phone || '',
-            vehicle: shipment.driver.vehicle || shipment.carrierVehicle || shipment.vehicle || '',
-          } : (shipment.carrierName ? {
-            name: shipment.carrierName,
-            phone: shipment.carrierPhone || shipment.contactPhone || shipment.phone || '',
-            vehicle: shipment.carrierVehicle || shipment.vehicle || '',
-          } : {
-            name: 'Atanmadı',
-            phone: '',
-            vehicle: '',
-          });
+          // Build driver object - only if driver is actually assigned
+          // Check if driver_id exists in shipment data
+          const hasDriver = shipment.driver_id || shipment.driverId || (shipment.driver && shipment.driver.id);
+          const driver = hasDriver && shipment.driver ? {
+            name: shipment.driver.name || shipment.driverName || 'Atanmadı',
+            phone: shipment.driver.phone || shipment.driverPhone || '',
+            vehicle: shipment.driver.vehicle || shipment.driverVehicle || '',
+          } : null;
           
-          console.log(`🔍 [DEBUG] ActiveShipments - Shipment ID: ${shipment.id}, driver.vehicle: '${driver.vehicle}'`);
+          console.log(`🔍 [DEBUG] ActiveShipments - Shipment ID: ${shipment.id}, hasDriver: ${hasDriver}, driver:`, driver);
 
           // Build shipper object with fallback logic
           // PRIVACY: Gönderici telefon numarası gizlenmeli - nakliyeci sadece mesaj yoluyla ulaşabilir
+          // IMPORTANT: Include userId for messaging - this is the shipper's user ID
+          const shipperUserId = shipment.userId || shipment.user_id || shipment.shipper?.id || shipment.shipper?.userId;
           const shipper = shipment.shipper ? {
-            name: shipment.shipper.name || shipment.shipperName || shipment.senderName || shipment.sender || shipment.contactPerson || '',
-            company: shipment.shipper.company || shipment.shipperCompany || shipment.companyName || '',
+            id: shipperUserId || shipment.shipper.id || shipment.shipper.userId,
+            name: shipment.shipper.name || shipment.ownerName || shipment.shipperName || shipment.senderName || shipment.sender || shipment.contactPerson || '',
+            company: shipment.shipper.company || shipment.ownerCompany || shipment.shipperCompany || shipment.companyName || '',
+            email: shipment.shipper.email || shipment.ownerEmail || shipment.senderEmail || '',
             // phone: HIDDEN - Gizlilik nedeniyle gönderici telefon numarası gösterilmemektedir
           } : {
-            name: shipment.shipperName || shipment.senderName || shipment.sender || shipment.contactPerson || '',
-            company: shipment.shipperCompany || shipment.companyName || '',
+            id: shipperUserId,
+            name: shipment.ownerName || shipment.shipperName || shipment.senderName || shipment.sender || shipment.contactPerson || '',
+            company: shipment.ownerCompany || shipment.shipperCompany || shipment.companyName || '',
+            email: shipment.ownerEmail || shipment.senderEmail || '',
             // phone: HIDDEN - Gizlilik nedeniyle gönderici telefon numarası gösterilmemektedir
           };
 
@@ -183,11 +193,12 @@ const ActiveShipments = () => {
             to: shipment.deliveryCity || shipment.toCity || `${shipment.deliveryDistrict || ''} ${shipment.deliveryCity || ''}`.trim() || 'Bilinmiyor',
             status: shipment.status || 'pending',
             priority: shipment.priority || 'normal',
-            weight: shipment.weight || 0,
-            volume: shipment.volume || 0,
-            value: shipment.value || shipment.price || 0,
+            weight: shipment.weight ? (typeof shipment.weight === 'number' ? shipment.weight : parseFloat(shipment.weight) || 0) : 0,
+            volume: shipment.volume ? (typeof shipment.volume === 'number' ? shipment.volume : parseFloat(shipment.volume) || 0) : 0,
+            value: shipment.displayPrice || shipment.price || shipment.value || shipment.offerPrice || 0,
             pickupDate: shipment.pickupDate || shipment.pickup_date || '',
             deliveryDate: shipment.deliveryDate || shipment.delivery_date || '',
+            driver_id: shipment.driver_id || shipment.driverId || null,
             driver,
             shipper,
             createdAt: shipment.createdAt || shipment.created_at || new Date().toISOString(),
@@ -220,6 +231,7 @@ const ActiveShipments = () => {
       setLoadingDrivers(true);
       const storedUser = localStorage.getItem('user');
       const userId = storedUser ? (JSON.parse(storedUser)?.id || '') : '';
+      console.log('[DEBUG] ActiveShipments - Loading drivers for userId:', userId);
       const response = await fetch(createApiUrl('/api/drivers/nakliyeci'), {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
@@ -228,14 +240,21 @@ const ActiveShipments = () => {
         }
       });
       
+      console.log('[DEBUG] ActiveShipments - Drivers API response status:', response.status);
       if (response.ok) {
         const data = await response.json();
-        setDrivers((data.drivers || []).filter((d: Driver) => d.status === 'available'));
+        console.log('[DEBUG] ActiveShipments - Drivers API response data:', data);
+        // Show all drivers for now (available and busy)
+        // TODO: Add filter option in UI to show only available drivers
+        setDrivers(data.drivers || []);
+        console.log('[DEBUG] ActiveShipments - Set drivers count:', (data.drivers || []).length);
       } else {
+        const errorText = await response.text();
+        console.error('[DEBUG] ActiveShipments - Drivers API error:', response.status, errorText);
         setDrivers([]);
       }
     } catch (error) {
-      console.error('Error loading drivers:', error);
+      console.error('[DEBUG] ActiveShipments - Error loading drivers:', error);
       setDrivers([]);
     } finally {
       setLoadingDrivers(false);
@@ -246,6 +265,7 @@ const ActiveShipments = () => {
     setSelectedShipment(shipment);
     setAssignMode('direct');
     setShowAssignModal(true);
+    loadDrivers(); // Load drivers when modal opens
   };
 
   const handleMessageClick = (shipment: ActiveShipment) => {
@@ -344,10 +364,16 @@ const ActiveShipments = () => {
     }
   };
 
+  // Use utility function for status info
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending':
         return 'text-yellow-600 bg-yellow-100';
+      case 'offer_accepted':
+      case 'accepted':
+        return 'text-blue-600 bg-blue-100';
+      case 'in_progress':
+        return 'text-indigo-600 bg-indigo-100';
       case 'in_transit':
         return 'text-blue-600 bg-blue-100';
       case 'delivered':
@@ -363,6 +389,11 @@ const ActiveShipments = () => {
     switch (status) {
       case 'pending':
         return 'Bekliyor';
+      case 'offer_accepted':
+      case 'accepted':
+        return 'Teklif Kabul Edildi';
+      case 'in_progress':
+        return 'Hazırlanıyor';
       case 'in_transit':
         return 'Yolda';
       case 'delivered':
@@ -410,8 +441,30 @@ const ActiveShipments = () => {
       ((shipment.driver?.name || '').toLowerCase().includes(searchTerm.toLowerCase()))
     );
 
-    const matchesStatus =
-      statusFilter === 'all' || shipment.status === statusFilter;
+    // Gelişmiş durum filtreleme
+    let matchesStatus = true;
+    if (statusFilter !== 'all') {
+      switch (statusFilter) {
+        case 'waiting_driver':
+          // Taşıyıcı bekliyor: offer_accepted veya accepted durumunda ama driver yok
+          matchesStatus = (shipment.status === 'offer_accepted' || shipment.status === 'accepted') && 
+                         (!shipment.driver || !shipment.driver_id || (shipment.driver && shipment.driver.name === 'Atanmadı'));
+          break;
+        case 'active':
+          // Aktif: in_progress/in_transit/delivered (driver varsa)
+          matchesStatus = (shipment.status === 'in_progress' || shipment.status === 'in_transit' || shipment.status === 'delivered') &&
+                         !!(shipment.driver && shipment.driver_id && shipment.driver.name !== 'Atanmadı');
+          break;
+        case 'delivered':
+          matchesStatus = shipment.status === 'delivered';
+          break;
+        case 'cancelled':
+          matchesStatus = shipment.status === 'cancelled';
+          break;
+        default:
+          matchesStatus = shipment.status === statusFilter;
+      }
+    }
 
     return matchesSearch && matchesStatus;
   });
@@ -448,8 +501,15 @@ const ActiveShipments = () => {
             Aktif Yükler
           </h1>
           <p className='text-sm sm:text-base md:text-lg text-slate-600 px-4'>
-            Devam eden taşımalarınızı takip edin
+            Tüm gönderilerinizi tek ekranda görüntüleyin ve yönetin
           </p>
+          {/* Bilgilendirme */}
+          <div className='mt-4 max-w-2xl mx-auto'>
+            <div className='bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800'>
+              <p className='font-semibold mb-1'>💡 Bilgi:</p>
+              <p>Bu sayfada teklif kabul edilen tüm gönderilerinizi görebilirsiniz. Taşıyıcı atama, takip ve rota optimizasyonu işlemlerini buradan yapabilirsiniz.</p>
+            </div>
+          </div>
         </div>
 
         {/* Action Buttons */}
@@ -483,11 +543,11 @@ const ActiveShipments = () => {
                 onChange={e => setStatusFilter(e.target.value)}
                 className='px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
               >
-                <option value='all'>Tüm Durumlar</option>
-                <option value='pending'>Bekliyor</option>
-                <option value='in_transit'>Yolda</option>
-                <option value='delivered'>Teslim Edildi</option>
-                <option value='cancelled'>İptal Edildi</option>
+                <option value='all'>Tümü</option>
+                <option value='waiting_driver'>Taşıyıcı Bekliyor</option>
+                <option value='active'>Aktif</option>
+                <option value='delivered'>Tamamlanan</option>
+                <option value='cancelled'>İptal Edilen</option>
               </select>
             </div>
           </div>
@@ -508,9 +568,10 @@ const ActiveShipments = () => {
                         #{shipment.trackingNumber}
                       </span>
                       <span
-                        className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(shipment.status)}`}
+                        className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusInfo(shipment.status).color}`}
+                        title={getStatusDescription(shipment.status)}
                       >
-                        {getStatusText(shipment.status)}
+                        {getStatusInfo(shipment.status).text}
                       </span>
                       <span
                         className={`px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(shipment.priority)}`}
@@ -537,14 +598,15 @@ const ActiveShipments = () => {
                           Yük Bilgileri
                         </h3>
                         <div className='flex items-center gap-4 text-sm text-gray-600'>
-                          <div className='flex items-center gap-1'>
-                            <Weight className='w-4 h-4' />
-                            <span>{shipment.weight} kg</span>
-                          </div>
+                          {shipment.volume && shipment.volume > 0 && (
                           <div className='flex items-center gap-1'>
                             <Ruler className='w-4 h-4' />
-                            <span>{shipment.volume} m³</span>
+                              <span>{typeof shipment.volume === 'number' ? shipment.volume.toFixed(2) : shipment.volume} m³</span>
                           </div>
+                          )}
+                          {(!shipment.volume || shipment.volume === 0) && (
+                            <span className='text-gray-400'>Hacim bilgisi yok</span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -554,17 +616,28 @@ const ActiveShipments = () => {
                         <h4 className='font-semibold text-gray-900 mb-2'>
                           Şoför Bilgileri
                         </h4>
-                        <div className='text-sm text-gray-600'>
-                          <p>
-                            <strong>Ad:</strong> {shipment.driver.name}
-                          </p>
-                          <p>
-                            <strong>Araç:</strong> {shipment.driver.vehicle}
-                          </p>
-                          <p>
-                            <strong>Tel:</strong> {shipment.driver.phone}
-                          </p>
-                        </div>
+                        {shipment.driver && shipment.driver.name !== 'Atanmadı' ? (
+                          <div className='text-sm text-gray-600'>
+                            <p>
+                              <strong>Ad:</strong> {shipment.driver.name}
+                            </p>
+                            {shipment.driver.vehicle && (
+                              <p>
+                                <strong>Araç:</strong> {shipment.driver.vehicle}
+                              </p>
+                            )}
+                            {shipment.driver.phone && (
+                              <p>
+                                <strong>Tel:</strong> {shipment.driver.phone}
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <div className='text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-lg p-3'>
+                            <p className='font-medium'>⏳ Taşıyıcı Bekleniyor</p>
+                            <p className='text-xs mt-1 text-amber-700'>Taşıyıcı ataması yapılmadı</p>
+                          </div>
+                        )}
                       </div>
 
                       <div>
@@ -573,7 +646,7 @@ const ActiveShipments = () => {
                         </h4>
                         <div className='text-sm text-gray-600'>
                           <p>
-                            <strong>Ad:</strong> {shipment.shipper.name}
+                            <strong>Ad:</strong> {shipment.shipper.name || 'Bilinmiyor'}
                           </p>
                           {shipment.shipper.company && (
                           <p>
@@ -591,13 +664,13 @@ const ActiveShipments = () => {
                   <div className='flex flex-col gap-2'>
                     <div className='text-right mb-4'>
                       <div className='text-2xl font-bold text-gray-900'>
-                        {formatCurrency(shipment.value)}
+                        {formatCurrency(shipment.value || shipment.price || 0)}
                       </div>
                       <div className='text-sm text-gray-500'>Toplam Tutar</div>
                     </div>
 
                     <div className='flex flex-col gap-2'>
-                      {!shipment.driver ? (
+                      {!shipment.driver || !shipment.driver_id || (shipment.driver && shipment.driver.name === 'Atanmadı') ? (
                         <button
                           onClick={() => handleAssignClick(shipment)}
                           className='w-full bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center gap-2'
@@ -606,24 +679,52 @@ const ActiveShipments = () => {
                           Taşıyıcıya Ata
                         </button>
                       ) : (
-                        <div className='text-sm text-slate-600 mb-2 text-center'>
-                          <CheckCircle2 className='w-4 h-4 inline mr-1 text-green-600' />
+                        <div className='text-sm text-green-600 mb-2 text-center bg-green-50 border border-green-200 rounded-lg p-2'>
+                          <CheckCircle2 className='w-4 h-4 inline mr-1' />
                           Taşıyıcı Atandı
                         </div>
                       )}
                     <div className='flex gap-2'>
-                      <button className='flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center justify-center gap-2'>
+                      <button className='flex-1 bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 text-white px-4 py-2 rounded-lg font-medium transition-all duration-200 shadow-md hover:shadow-lg flex items-center justify-center gap-2'>
                         <Eye className='w-4 h-4' />
                         Detay
                       </button>
                       <button 
                         onClick={() => handleMessageClick(shipment)}
-                        className='flex-1 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center justify-center gap-2'
+                        className='flex-1 bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 text-white px-4 py-2 rounded-lg font-medium transition-all duration-200 shadow-md hover:shadow-lg flex items-center justify-center gap-2'
                       >
                         <MessageSquare className='w-4 h-4' />
                         Mesaj
                       </button>
-                      </div>
+                    </div>
+                    {shipment.driver && shipment.driver_id && shipment.driver.name !== 'Atanmadı' && (
+                      <button
+                        onClick={() => navigate(`/nakliyeci/route-planner?shipmentId=${shipment.id}`)}
+                        className='w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white px-4 py-2 rounded-lg font-medium transition-all duration-200 shadow-md hover:shadow-lg flex items-center justify-center gap-2'
+                        title='Rota üzerinde ek gönderiler bul ve optimize et'
+                      >
+                        <Route className='w-4 h-4' />
+                        Rota Optimize Et
+                      </button>
+                    )}
+                    {shipment.status === 'delivered' && shipment.shipper.id && !shipment.hasRatedShipper && (
+                      <button
+                        onClick={() => {
+                          setSelectedShipperForRating({
+                            id: shipment.shipper.id || '',
+                            name: shipment.shipper.name,
+                            email: shipment.shipper.email || '',
+                            type: shipment.shipper.company ? 'corporate' : 'individual',
+                          });
+                          setSelectedShipmentId(shipment.id);
+                          setShowRatingModal(true);
+                        }}
+                        className='w-full bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white px-4 py-2 rounded-lg font-medium transition-all duration-200 shadow-md hover:shadow-lg flex items-center justify-center gap-2'
+                      >
+                        <Star className='w-4 h-4' />
+                        Göndericiyi Değerlendir
+                      </button>
+                    )}
                     </div>
                   </div>
                 </div>
@@ -676,7 +777,6 @@ const ActiveShipments = () => {
                 <div className="text-sm text-slate-600 space-y-1">
                   <p><strong>Takip No:</strong> #{selectedShipment.trackingNumber}</p>
                   <p><strong>Güzergah:</strong> {selectedShipment.from} → {selectedShipment.to}</p>
-                  <p><strong>Ağırlık:</strong> {selectedShipment.weight} kg</p>
                 </div>
               </div>
 
@@ -737,7 +837,7 @@ const ActiveShipments = () => {
                         <option value="">Taşıyıcı seçiniz</option>
                         {drivers.map((driver) => (
                           <option key={driver.id} value={driver.id}>
-                            {driver.name} - {driver.vehicle.plate} ({driver.vehicle.type})
+                            {driver.name} {driver.vehicle?.plate ? `- ${driver.vehicle.plate}` : ''} {driver.vehicle?.type ? `(${driver.vehicle.type})` : ''}
                           </option>
                         ))}
                       </select>
@@ -837,6 +937,25 @@ const ActiveShipments = () => {
               setSelectedShipmentId(null);
             }}
             otherUser={selectedShipper}
+            currentUser={{
+              id: user.id || '',
+              name: user.fullName || 'Kullanıcı',
+            }}
+            shipmentId={selectedShipmentId || undefined}
+          />
+        )}
+
+        {/* Rating Modal */}
+        {showRatingModal && selectedShipperForRating && user && (
+          <RatingModal
+            isOpen={showRatingModal}
+            onClose={() => {
+              setShowRatingModal(false);
+              setSelectedShipperForRating(null);
+              setSelectedShipmentId(null);
+              loadActiveShipments(); // Reload to show updated rating
+            }}
+            ratedUser={selectedShipperForRating}
             currentUser={{
               id: user.id || '',
               name: user.fullName || 'Kullanıcı',

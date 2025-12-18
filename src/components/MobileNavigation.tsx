@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Menu, X, Home, Package, Truck, Building, User } from 'lucide-react';
+import { Menu, X, Home, Package, Truck } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 
 interface MobileNavigationProps {
@@ -30,7 +30,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({
           },
           {
             name: 'Gönderilerim',
-            href: '/individual/shipments',
+            href: '/individual/my-shipments',
             icon: Package,
           },
           { name: 'Teklifler', href: '/individual/offers', icon: Package },
@@ -65,11 +65,11 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({
         return [
           ...baseItems,
           {
-            name: 'Taşıyıcı Kaydı',
-            href: '/tasiyici/carrier-registration',
-            icon: User,
+            name: 'İş Pazarı',
+            href: '/tasiyici/market',
+            icon: Truck,
           },
-          { name: 'Atamalar', href: '/tasiyici/assignments', icon: Package },
+          { name: 'Tekliflerim', href: '/tasiyici/my-offers', icon: Package },
           { name: 'Aktif İşler', href: '/tasiyici/active-jobs', icon: Package },
         ];
       default:

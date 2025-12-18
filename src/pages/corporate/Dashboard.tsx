@@ -2,14 +2,14 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useAuth } from '../../contexts/AuthContext';
-import { dashboardAPI, notificationAPI, shipmentAPI } from '../../services/api';
+import { dashboardAPI, shipmentAPI } from '../../services/api';
+import { formatDate, formatCurrency } from '../../utils/format';
 import { 
   Package, 
   CheckCircle2, 
   Clock, 
   DollarSign, 
   Plus, 
-  Bell, 
   MessageSquare,
   TrendingUp,
   Truck,
@@ -43,16 +43,28 @@ import CommissionManager from '../../components/CommissionManager';
 import StatusManager from '../../components/StatusManager';
 
 interface Shipment {
-  id: number;
-  trackingNumber: string;
-  date: string;
-  description: string;
-  status: string;
+  id: string;
+  trackingCode: string;
+  title: string;
   from: string;
   to: string;
-  weight: string;
-  value: string;
-  priority: string;
+  status:
+    | 'preparing'
+    | 'waiting'
+    | 'waiting_for_offers'
+    | 'offer_accepted'
+    | 'accepted'
+    | 'in_transit'
+    | 'delivered'
+    | 'cancelled'
+    | string;
+  createdAt: string;
+  estimatedDelivery: string;
+  price: number;
+  carrierName?: string;
+  category?: string;
+  subCategory?: string;
+  volume?: string;
 }
 
 interface Offer {
@@ -77,10 +89,51 @@ const Dashboard = () => {
   });
   const [recentShipments, setRecentShipments] = useState<Shipment[]>([]);
   const [recentOffers, setRecentOffers] = useState<Offer[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+
+  const getStatusInfo = (status: string) => {
+    switch (status) {
+      case 'preparing':
+        return {
+          text: 'Hazırlanıyor',
+          color: 'bg-yellow-100 text-yellow-800',
+        };
+      case 'waiting':
+      case 'waiting_for_offers':
+        return {
+          text: 'Teklif Bekliyor',
+          color: 'bg-blue-100 text-blue-800',
+        };
+      case 'offer_accepted':
+      case 'accepted':
+        return {
+          text: 'Teklif Kabul Edildi',
+          color: 'bg-green-100 text-green-800',
+        };
+      case 'in_transit':
+        return {
+          text: 'Yolda',
+          color: 'bg-green-100 text-green-800',
+        };
+      case 'delivered':
+        return {
+          text: 'Teslim Edildi',
+          color: 'bg-emerald-100 text-emerald-800',
+        };
+      case 'cancelled':
+        return {
+          text: 'İptal Edildi',
+          color: 'bg-red-100 text-red-800',
+        };
+      default:
+        return {
+          text: 'Bilinmiyor',
+          color: 'bg-gray-100 text-gray-800',
+        };
+    }
+  };
 
   // Yeni kullanıcılar için boş veriler
   const emptyData = {
@@ -123,18 +176,80 @@ const Dashboard = () => {
         // Load recent shipments from real API
         const shipmentsResponse = await shipmentAPI.getAll();
         if (shipmentsResponse?.success) {
-          const shipments = (shipmentsResponse as any).shipments || shipmentsResponse.data?.shipments || [];
-          setRecentShipments(shipments);
+          let shipments: any[] = [];
+          if (Array.isArray(shipmentsResponse.data)) {
+            shipments = shipmentsResponse.data;
+          } else if (Array.isArray((shipmentsResponse as any).shipments)) {
+            shipments = (shipmentsResponse as any).shipments;
+          } else if (
+            shipmentsResponse.data?.shipments &&
+            Array.isArray(shipmentsResponse.data.shipments)
+          ) {
+            shipments = shipmentsResponse.data.shipments;
+          } else if (
+            shipmentsResponse.data?.data &&
+            Array.isArray(shipmentsResponse.data.data)
+          ) {
+            shipments = shipmentsResponse.data.data;
+          }
+
+          const formattedShipments: Shipment[] = shipments.map(
+            (s: any): Shipment => ({
+              id: s.id?.toString() || String(s.id),
+              trackingCode:
+                s.trackingCode ||
+                s.trackingNumber ||
+                s.tracking_number ||
+                `TRK${(s.id || '').toString().padStart(6, '0')}`,
+              title: s.title || 'Gönderi',
+              from:
+                s.pickupCity ||
+                s.fromCity ||
+                s.from ||
+                s.pickupAddress ||
+                'Bilinmiyor',
+              to:
+                s.deliveryCity ||
+                s.toCity ||
+                s.to ||
+                s.deliveryAddress ||
+                'Bilinmiyor',
+              status:
+                s.status === 'open' || s.status === 'waiting_for_offers'
+                  ? 'waiting'
+                  : s.status === 'offer_accepted' || s.status === 'accepted'
+                    ? 'offer_accepted'
+                    : s.status === 'in_transit' || s.status === 'in_progress'
+                      ? 'in_transit'
+                      : s.status === 'delivered'
+                        ? 'delivered'
+                        : s.status === 'cancelled'
+                          ? 'cancelled'
+                          : s.status === 'preparing'
+                            ? 'preparing'
+                            : s.status || 'waiting',
+              createdAt: s.createdAt || s.created_at || new Date().toISOString(),
+              estimatedDelivery:
+                s.deliveryDate ||
+                s.delivery_date ||
+                s.estimatedDelivery ||
+                '',
+              price:
+                s.displayPrice || s.price || s.offerPrice || s.value || 0,
+              carrierName: s.carrierName || s.carrier_name || undefined,
+              category: s.category || s.cargoType || '',
+              subCategory: s.subCategory || s.cargoSubType || '',
+              volume: s.volume
+                ? typeof s.volume === 'number'
+                  ? s.volume.toString()
+                  : s.volume
+                : '0',
+            })
+          );
+
+          setRecentShipments(formattedShipments);
         } else {
           setRecentShipments(emptyData.recentShipments);
-        }
-        
-        // Load unread notifications count from real API
-        const notificationsResponse = await notificationAPI.getUnreadCount();
-        if (notificationsResponse?.success && notificationsResponse?.data) {
-          setUnreadCount(notificationsResponse.data.count || 0);
-        } else {
-          setUnreadCount(0);
         }
         
       } catch (error) {
@@ -143,7 +258,6 @@ const Dashboard = () => {
         setStats(emptyData.stats);
         setRecentShipments(emptyData.recentShipments);
         setRecentOffers(emptyData.recentOffers);
-        setUnreadCount(0);
       } finally {
         setIsLoading(false);
       }
@@ -227,16 +341,16 @@ const Dashboard = () => {
     return (
       <div className="min-h-screen bg-gray-50">
         <Helmet>
-          <title>Dashboard - YolNext</title>
+          <title>Ana Sayfa - YolNext</title>
         </Helmet>
         <div className="p-6">
           <Breadcrumb
             items={[
               { label: 'Ana Sayfa' },
-              { label: 'Dashboard' }
+              { label: 'Ana Sayfa' }
             ]}
           />
-          <LoadingState message="Dashboard yükleniyor..." />
+          <LoadingState message="Ana Sayfa yükleniyor..." />
         </div>
       </div>
     );
@@ -245,7 +359,7 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
       <Helmet>
-        <title>Dashboard - YolNext Kurumsal</title>
+        <title>Ana Sayfa - YolNext Kurumsal</title>
       </Helmet>
 
       <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
@@ -286,17 +400,7 @@ const Dashboard = () => {
               </div>
               
               <div className="flex items-center gap-3">
-                <Link to="/corporate/notifications" className="relative group">
-                  <button className="min-w-[44px] min-h-[44px] w-12 h-12 bg-white/10 backdrop-blur-sm rounded-2xl flex items-center justify-center hover:bg-white/20 transition-all duration-300 border border-white/20 group-hover:scale-110">
-                    <Bell size={20} className="text-white" />
-                    {unreadCount > 0 && (
-                      <span className="absolute -top-1 -right-1 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center font-bold shadow-lg">
-                        {unreadCount}
-                      </span>
-                    )}
-                  </button>
-                </Link>
-                <Link to="/corporate/shipments/new">
+                <Link to="/corporate/create-shipment">
                   <button className="bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 text-white px-6 py-3 rounded-lg font-medium transition-all duration-300 flex items-center gap-2 text-base shadow-lg hover:shadow-xl">
                     <Plus size={20} />
                     Gönderi Oluştur
@@ -450,7 +554,7 @@ const Dashboard = () => {
         </div>
 
 
-        {/* Recent Shipments Table - Ana Tasarım */}
+        {/* Son Gönderiler - Kurumsal Gönderilerim tablosu ile aynı yapı */}
         <div className="bg-white rounded-2xl p-8 shadow-xl border border-slate-200 mb-8">
           <div className="flex items-center justify-between mb-6">
             <div>
@@ -468,62 +572,108 @@ const Dashboard = () => {
               <thead>
                 <tr className="border-b border-slate-200 bg-gradient-to-r from-slate-50 to-blue-50">
                   <th className="text-left py-3 px-4 font-semibold text-slate-800">Gönderi No</th>
+                  <th className="text-left py-3 px-4 font-semibold text-slate-800">Rota</th>
                   <th className="text-left py-3 px-4 font-semibold text-slate-800">Durum</th>
-                  <th className="text-left py-3 px-4 font-semibold text-slate-800">Güzergah</th>
-                  <th className="text-left py-3 px-4 font-semibold text-slate-800">Ağırlık</th>
-                  <th className="text-left py-3 px-4 font-semibold text-slate-800">Tutar</th>
-                  <th className="text-left py-3 px-4 font-semibold text-slate-800">Öncelik</th>
-                  <th className="text-left py-3 px-4 font-semibold text-slate-800">Tarih</th>
+                  <th className="text-left py-3 px-4 font-semibold text-slate-800">Nakliyeci</th>
+                  <th className="text-left py-3 px-4 font-semibold text-slate-800">Fiyat</th>
                   <th className="text-left py-3 px-4 font-semibold text-slate-800">İşlemler</th>
                 </tr>
               </thead>
               <tbody>
                 {recentShipments.map((shipment) => (
-                  <tr key={shipment.id} className="border-b border-slate-100 hover:bg-blue-50 transition-colors">
+                  <tr
+                    key={shipment.id}
+                    className="border-b border-slate-100 hover:bg-slate-50 transition-colors"
+                  >
+                    {/* Gönderi No */}
                     <td className="py-4 px-4">
-                      <div className="font-mono text-sm font-semibold text-slate-800">{shipment.trackingNumber}</div>
-                      <div className="text-xs text-slate-500">{shipment.date}</div>
-                      <div className="text-xs text-slate-500">{shipment.description}</div>
+                      <div className="font-mono text-sm font-semibold text-slate-900">
+                        {shipment.trackingCode}
+                      </div>
+                      <div className="text-xs text-slate-500">
+                        {formatDate(shipment.createdAt, 'long')}
+                      </div>
+                      <div className="text-xs text-slate-500">
+                        {shipment.title}
+                      </div>
                     </td>
+
+                    {/* Rota */}
                     <td className="py-4 px-4">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        shipment.status === 'delivered' ? 'bg-green-100 text-green-800' :
-                        shipment.status === 'in_transit' ? 'bg-blue-100 text-blue-800' :
-                        shipment.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-red-100 text-red-800'
-                      }`}>
-                        {shipment.status === 'in_transit' ? <Truck className="w-3 h-3 mr-1" /> :
-                         shipment.status === 'pending' ? <Clock className="w-3 h-3 mr-1" /> :
-                         shipment.status === 'delivered' ? <CheckCircle2 className="w-3 h-3 mr-1" /> :
-                         <X className="w-3 h-3 mr-1" />}
-                        {getStatusText(shipment.status)}
-                      </span>
+                      <div className="text-sm font-medium text-slate-900">
+                        {shipment.from} → {shipment.to}
+                      </div>
+                      {shipment.category && (
+                        <div className="text-xs text-slate-500">
+                          {shipment.category}
+                          {shipment.subCategory
+                            ? ` - ${shipment.subCategory}`
+                            : ''}
+                        </div>
+                      )}
                     </td>
+
+                    {/* Durum */}
                     <td className="py-4 px-4">
-                      <div className="text-sm font-medium text-slate-900">{shipment.from} → {shipment.to}</div>
+                      {(() => {
+                        const info = getStatusInfo(shipment.status);
+                        return (
+                          <span
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${info.color}`}
+                          >
+                            {shipment.status === 'in_transit' && (
+                              <Truck className="w-3 h-3 mr-1" />
+                            )}
+                            {shipment.status === 'preparing' && (
+                              <Package className="w-3 h-3 mr-1" />
+                            )}
+                            {shipment.status === 'delivered' && (
+                              <CheckCircle2 className="w-3 h-3 mr-1" />
+                            )}
+                            {(shipment.status === 'waiting' ||
+                              shipment.status === 'waiting_for_offers') && (
+                              <Clock className="w-3 h-3 mr-1" />
+                            )}
+                            {info.text}
+                          </span>
+                        );
+                      })()}
                     </td>
+
+                    {/* Nakliyeci */}
                     <td className="py-4 px-4">
-                      <div className="text-sm font-medium text-slate-900">{shipment.weight}</div>
+                      <div className="text-sm font-medium text-slate-900">
+                        {shipment.carrierName || 'Atanmamış'}
+                      </div>
                     </td>
+
+                    {/* Fiyat */}
                     <td className="py-4 px-4">
-                      <div className="text-sm font-bold text-blue-700">{shipment.value}</div>
+                      <div className="text-sm font-bold text-slate-900">
+                        {formatCurrency(shipment.price)}
+                      </div>
+                      {shipment.estimatedDelivery && (
+                        <div className="text-xs text-slate-500">
+                          {formatDate(shipment.estimatedDelivery, 'long')}
+                        </div>
+                      )}
                     </td>
-                    <td className="py-4 px-4">
-                      <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getPriorityColor(shipment.priority)}`}>
-                        {getPriorityText(shipment.priority)}
-                      </span>
-                    </td>
-                    <td className="py-4 px-4">
-                      <div className="text-sm text-slate-500">{shipment.date}</div>
-                    </td>
+
+                    {/* İşlemler */}
                     <td className="py-4 px-4">
                       <div className="flex items-center gap-2">
-                        <button className="px-3 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs font-medium rounded-lg transition-colors">
+                        <Link
+                          to={`/corporate/shipments?highlight=${shipment.id}`}
+                          className="px-3 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs font-medium rounded-lg transition-colors"
+                        >
                           Detay
-                        </button>
-                        <button className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded-lg transition-colors">
+                        </Link>
+                        <Link
+                          to="/corporate/messages"
+                          className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded-lg transition-colors"
+                        >
                           Mesaj
-                        </button>
+                        </Link>
                       </div>
                     </td>
                   </tr>

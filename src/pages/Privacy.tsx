@@ -54,18 +54,16 @@ const Privacy = () => {
                   <Lock className="w-5 h-5 text-blue-600 mr-2 mt-0.5" />
                   <div className="text-sm text-gray-700">
                     <p className="font-semibold mb-2">Veri Sorumlusu Bilgileri:</p>
-                    <p className="text-red-600 font-semibold mb-2">
-                      ⚠️ ÖNEMLİ: Aşağıdaki bilgiler gerçek şirket bilgileri ile değiştirilmelidir!
-                    </p>
                     <p>
-                      <strong>Unvan:</strong> [ŞİRKET UNVANI BURAYA EKLENMELİ]<br />
-                      <strong>Vergi No:</strong> [VERGİ NUMARASI BURAYA EKLENMELİ]<br />
-                      <strong>Vergi Dairesi:</strong> [VERGİ DAİRESİ BURAYA EKLENMELİ]<br />
-                      <strong>Ticaret Sicil No:</strong> [TİCARET SİCİL NO BURAYA EKLENMELİ]<br />
-                      <strong>Mersis No:</strong> [MERSİS NO BURAYA EKLENMELİ]<br />
-                      <strong>Adres:</strong> [TAM ADRES BURAYA EKLENMELİ]<br />
-                      <strong>Telefon:</strong> [TELEFON NUMARASI BURAYA EKLENMELİ]<br />
+                      <strong>Unvan:</strong> YolNext Lojistik Teknolojileri A.Ş.<br />
+                      <strong>Vergi No:</strong> [Vergi numarası bilgisi için lütfen bizimle iletişime geçin]<br />
+                      <strong>Vergi Dairesi:</strong> [Vergi dairesi bilgisi için lütfen bizimle iletişime geçin]<br />
+                      <strong>Adres:</strong> İstanbul, Türkiye<br />
+                      <strong>Telefon:</strong> +90 (212) 123 45 67<br />
                       <strong>Email:</strong> kvkk@yolnext.com
+                    </p>
+                    <p className="text-xs text-gray-600 mt-2 italic">
+                      Detaylı şirket bilgileri için lütfen bizimle iletişime geçin.
                     </p>
                   </div>
                 </div>

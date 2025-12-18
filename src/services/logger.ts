@@ -5,6 +5,8 @@ export enum LogLevel {
   DEBUG = 'debug',
 }
 
+import { createApiUrl } from '../config/api';
+
 export interface LogEntry {
   level: LogLevel;
   message: string;
@@ -93,7 +95,7 @@ class Logger {
     };
 
     try {
-      await fetch('/api/logs', {
+      await fetch(createApiUrl('/api/logs'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -4,8 +4,8 @@ export interface User {
   fullName: string;
   firstName?: string;
   lastName?: string;
-  role: 'individual' | 'corporate' | 'nakliyeci' | 'tasiyici';
-  panel_type?: 'individual' | 'corporate' | 'nakliyeci' | 'tasiyici';
+  role: 'individual' | 'corporate' | 'nakliyeci' | 'tasiyici' | 'admin';
+  panel_type?: 'individual' | 'corporate' | 'nakliyeci' | 'tasiyici' | 'admin';
   avatar?: string;
   phone?: string;
   address?: string;
@@ -25,6 +25,7 @@ export interface User {
   createdAt?: string;
   updatedAt?: string;
   driverCode?: string; // For tasiyici users
+  nakliyeciCode?: string; // For nakliyeci users
 }
 
 export interface LoginCredentials {

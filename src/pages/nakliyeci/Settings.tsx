@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 import {
   Settings,
@@ -24,12 +24,54 @@ import {
   AlertCircle,
   Building2,
   DollarSign,
+  Copy,
+  Share2,
+  Facebook,
+  Twitter,
+  Linkedin,
+  MessageCircle,
+  Star,
+  TrendingUp,
+  Users,
+  Award,
+  Sparkles,
 } from 'lucide-react';
 import Breadcrumb from '../../components/common/Breadcrumb';
 import EmptyState from '../../components/common/EmptyState';
 import LoadingState from '../../components/common/LoadingState';
 import Modal from '../../components/common/Modal';
 import SuccessMessage from '../../components/common/SuccessMessage';
+import { useAuth } from '../../contexts/AuthContext';
+import { createApiUrl } from '../../config/api';
+// Temporary workaround
+const kvkkAPI = {
+  requestDataAccess: async () => {
+    const response = await fetch(createApiUrl('/api/kvkk/data-access'), {
+      headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
+    });
+    return response.json();
+  },
+  deleteData: async () => {
+    const response = await fetch(createApiUrl('/api/kvkk/delete-data'), {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
+    });
+    return response.json();
+  }
+};
+const authAPI = {
+  deleteAccount: async (data: any) => {
+    const response = await fetch(createApiUrl('/api/users/account'), {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(data)
+    });
+    return response.json();
+  }
+};
 
 interface SettingsData {
   company: {
@@ -80,13 +122,23 @@ interface SettingsData {
   };
 }
 
+interface NakliyeciStats {
+  favoriteCount: number;
+  badge: string;
+  message: string;
+}
+
 export default function NakliyeciSettings() {
+  const { user, updateUser } = useAuth();
   const [activeTab, setActiveTab] = useState('company');
   const [isLoading, setIsLoading] = useState(false);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
+  const [stats, setStats] = useState<NakliyeciStats | null>(null);
+  const [loadingStats, setLoadingStats] = useState(true);
 
   const [settings, setSettings] = useState<SettingsData>({
     company: {
@@ -148,11 +200,7 @@ export default function NakliyeciSettings() {
 
   const tabs = [
     { id: 'company', name: 'Şirket Bilgileri', icon: Building2 },
-    { id: 'notifications', name: 'Bildirimler', icon: Bell },
-    { id: 'privacy', name: 'Gizlilik', icon: Eye },
-    { id: 'security', name: 'Güvenlik', icon: Shield },
-    { id: 'preferences', name: 'Tercihler', icon: Globe },
-    { id: 'business', name: 'İş Ayarları', icon: DollarSign },
+    { id: 'account', name: 'Hesap', icon: Shield },
   ];
 
   const handleSave = () => {
@@ -186,6 +234,100 @@ export default function NakliyeciSettings() {
         [field]: !(prev[section] as any)[field],
       },
     }));
+  };
+
+  // Load nakliyeci stats
+  useEffect(() => {
+    const loadStats = async () => {
+      if (!user || user.role !== 'nakliyeci') {
+        setLoadingStats(false);
+        return;
+      }
+
+      try {
+        setLoadingStats(true);
+        const token = localStorage.getItem('authToken');
+        const response = await fetch(createApiUrl('/api/carriers/nakliyeci/stats'), {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success) {
+            setStats(data.data);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading stats:', error);
+      } finally {
+        setLoadingStats(false);
+      }
+    };
+
+    loadStats();
+  }, [user]);
+
+  // Ensure we have nakliyeciCode on the user object - fetch profile if missing
+  useEffect(() => {
+    const ensureNakliyeciCode = async () => {
+      try {
+        const token = localStorage.getItem('authToken');
+        if (!token) return;
+
+        if (!user || !user.nakliyeciCode) {
+          const res = await fetch(createApiUrl('/api/users/profile'), {
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          });
+
+          if (res.ok) {
+            const resp = await res.json();
+            const profile = resp.data?.user || resp.user || resp.data || resp;
+            const code = profile?.nakliyeciCode || profile?.nakliyecicode;
+            if (code) {
+              updateUser({ nakliyeciCode: code });
+            }
+          }
+        }
+      } catch (err) {
+        // silent
+      }
+    };
+
+    ensureNakliyeciCode();
+  }, [user, updateUser]);
+
+  // Social media share functions
+  const shareToSocial = (platform: string) => {
+    if (!user?.nakliyeciCode) return;
+
+    const shareText = `YolNext platformunda nakliyeciyim! Kodum: ${user.nakliyeciCode} - Beni favorilerinize ekleyin ve birlikte çalışalım! 🚚✨`;
+    const shareUrl = window.location.origin;
+    
+    const urls: Record<string, string> = {
+      facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}&quote=${encodeURIComponent(shareText)}`,
+      twitter: `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`,
+      linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}&summary=${encodeURIComponent(shareText)}`,
+      whatsapp: `https://wa.me/?text=${encodeURIComponent(shareText + ' ' + shareUrl)}`,
+    };
+
+    if (urls[platform]) {
+      window.open(urls[platform], '_blank', 'width=600,height=400');
+    }
+  };
+
+  const copyShareLink = () => {
+    if (!user?.nakliyeciCode) return;
+    
+    const shareText = `YolNext platformunda nakliyeciyim! Kodum: ${user.nakliyeciCode} - Beni favorilerinize ekleyin ve birlikte çalışalım! 🚚✨`;
+    const shareUrl = window.location.origin;
+    const fullText = `${shareText}\n\n${shareUrl}`;
+    
+    navigator.clipboard.writeText(fullText);
+    setCopiedCode(true);
+    setTimeout(() => setCopiedCode(false), 2000);
   };
 
   if (isLoading) {
@@ -373,506 +515,194 @@ export default function NakliyeciSettings() {
                           className='w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500'
                         />
                       </div>
+                      {/* Nakliyeci Kodu - Premium Section */}
+                      <div className='md:col-span-2'>
+                        <div className='bg-gradient-to-br from-slate-800 via-blue-900 to-slate-800 rounded-xl p-6 shadow-2xl border-2 border-blue-500/30 relative overflow-hidden'>
+                          {/* Decorative elements */}
+                          <div className='absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl'></div>
+                          <div className='absolute bottom-0 left-0 w-24 h-24 bg-purple-500/10 rounded-full blur-2xl'></div>
+                          
+                          <div className='relative z-10'>
+                            {/* Header with badge */}
+                            <div className='flex items-center justify-between mb-4'>
+                              <div className='flex items-center gap-3'>
+                                <div className='w-12 h-12 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-xl flex items-center justify-center shadow-lg'>
+                                  <Sparkles className='w-6 h-6 text-white' />
+                                </div>
+                                <div>
+                                  <h3 className='text-xl font-bold text-white flex items-center gap-2'>
+                                    Nakliyeci Kodunuz
+                                    {stats && stats.favoriteCount > 0 && (
+                                      <span className='px-2 py-1 bg-emerald-500/20 border border-emerald-400/50 rounded-lg text-emerald-300 text-sm font-semibold flex items-center gap-1'>
+                                        <Star className='w-3 h-3 fill-emerald-400' />
+                                        {stats.badge}
+                                      </span>
+                                    )}
+                                  </h3>
+                                  <p className='text-blue-200 text-sm mt-1'>
+                                    Bu kodunuzu paylaşın, daha fazla iş fırsatı yakalayın!
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Code Display */}
+                            <div className='bg-white/10 backdrop-blur-sm rounded-xl p-4 mb-4 border border-white/20'>
+                              <div className='flex items-center justify-between'>
+                                <div className='flex-1'>
+                                  <div className='text-xs text-blue-200 mb-1 font-medium'>Benzersiz Kodunuz</div>
+                                  <div className='text-3xl font-mono font-bold text-white tracking-wider'>
+                                    {user?.nakliyeciCode || 'Kod yükleniyor...'}
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={() => {
+                                    if (user?.nakliyeciCode) {
+                                      navigator.clipboard.writeText(user.nakliyeciCode);
+                                      setCopiedCode(true);
+                                      setTimeout(() => setCopiedCode(false), 2000);
+                                    }
+                                  }}
+                                  className='ml-4 px-4 py-2 bg-white/20 hover:bg-white/30 backdrop-blur-sm border border-white/30 rounded-lg transition-all duration-200 flex items-center gap-2 text-white font-medium shadow-lg hover:shadow-xl'
+                                >
+                                  {copiedCode ? (
+                                    <>
+                                      <CheckCircle className='w-5 h-5' />
+                                      <span>Kopyalandı!</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Copy className='w-5 h-5' />
+                                      <span>Kopyala</span>
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Stats Card */}
+                            {stats && (
+                              <div className='bg-white/10 backdrop-blur-sm rounded-xl p-4 mb-4 border border-white/20'>
+                                <div className='flex items-center justify-between'>
+                                  <div className='flex items-center gap-3'>
+                                    <div className='w-10 h-10 bg-gradient-to-br from-emerald-400 to-green-500 rounded-lg flex items-center justify-center'>
+                                      <Users className='w-5 h-5 text-white' />
+                                    </div>
+                                    <div>
+                                      <div className='text-2xl font-bold text-white'>{stats.favoriteCount}</div>
+                                      <div className='text-xs text-blue-200'>Kurumsal Kullanıcı</div>
+                                    </div>
+                                  </div>
+                                  <div className='text-right'>
+                                    <div className='text-sm text-blue-200 font-medium'>{stats.message}</div>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Social Share Buttons */}
+                            <div className='space-y-3'>
+                              <div className='text-sm font-semibold text-white mb-2 flex items-center gap-2'>
+                                <Share2 className='w-4 h-4' />
+                                Sosyal Medyada Paylaş
+                              </div>
+                              <div className='grid grid-cols-2 sm:grid-cols-4 gap-2'>
+                                <button
+                                  onClick={() => shareToSocial('facebook')}
+                                  className='flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all duration-200 shadow-md hover:shadow-lg font-medium text-sm'
+                                >
+                                  <Facebook className='w-4 h-4' />
+                                  <span className='hidden sm:inline'>Facebook</span>
+                                </button>
+                                <button
+                                  onClick={() => shareToSocial('twitter')}
+                                  className='flex items-center justify-center gap-2 px-3 py-2 bg-sky-500 hover:bg-sky-600 text-white rounded-lg transition-all duration-200 shadow-md hover:shadow-lg font-medium text-sm'
+                                >
+                                  <Twitter className='w-4 h-4' />
+                                  <span className='hidden sm:inline'>Twitter</span>
+                                </button>
+                                <button
+                                  onClick={() => shareToSocial('linkedin')}
+                                  className='flex items-center justify-center gap-2 px-3 py-2 bg-blue-700 hover:bg-blue-800 text-white rounded-lg transition-all duration-200 shadow-md hover:shadow-lg font-medium text-sm'
+                                >
+                                  <Linkedin className='w-4 h-4' />
+                                  <span className='hidden sm:inline'>LinkedIn</span>
+                                </button>
+                                <button
+                                  onClick={() => shareToSocial('whatsapp')}
+                                  className='flex items-center justify-center gap-2 px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-all duration-200 shadow-md hover:shadow-lg font-medium text-sm'
+                                >
+                                  <MessageCircle className='w-4 h-4' />
+                                  <span className='hidden sm:inline'>WhatsApp</span>
+                                </button>
+                              </div>
+                              <button
+                                onClick={copyShareLink}
+                                className='w-full flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-slate-700 to-slate-800 hover:from-slate-600 hover:to-slate-700 text-white rounded-lg transition-all duration-200 shadow-md hover:shadow-lg font-medium'
+                              >
+                                <Copy className='w-4 h-4' />
+                                Paylaşım Metnini Kopyala
+                              </button>
+                            </div>
+
+                          </div>
+                        </div>
+                      </div>
                     </div>
+
                   </div>
                 )}
 
-                {/* Notifications Settings */}
-                {activeTab === 'notifications' && (
+                {/* Account Settings */}
+                {activeTab === 'account' && (
                   <div className='space-y-6'>
                     <h3 className='text-lg font-semibold text-slate-900'>
-                      Bildirim Ayarları
+                      Hesap
                     </h3>
-                    <div className='space-y-4'>
-                      <div className='flex items-center justify-between'>
-                        <div>
-                          <h4 className='text-sm font-medium text-slate-900'>
-                            E-posta Bildirimleri
-                          </h4>
-                          <p className='text-sm text-slate-600'>
-                            Önemli güncellemeler için e-posta alın
-                          </p>
-                        </div>
-                        <button
-                          onClick={() => handleToggle('notifications', 'email')}
-                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                            settings.notifications.email
-                              ? 'bg-slate-800'
-                              : 'bg-slate-200'
-                          }`}
-                        >
-                          <span
-                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                              settings.notifications.email
-                                ? 'translate-x-6'
-                                : 'translate-x-1'
-                            }`}
-                          />
-                        </button>
-                      </div>
-                      <div className='flex items-center justify-between'>
-                        <div>
-                          <h4 className='text-sm font-medium text-slate-900'>
-                            SMS Bildirimleri
-                          </h4>
-                          <p className='text-sm text-slate-600'>
-                            Acil durumlar için SMS alın
-                          </p>
-                        </div>
-                        <button
-                          onClick={() => handleToggle('notifications', 'sms')}
-                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                            settings.notifications.sms
-                              ? 'bg-slate-800'
-                              : 'bg-slate-200'
-                          }`}
-                        >
-                          <span
-                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                              settings.notifications.sms
-                                ? 'translate-x-6'
-                                : 'translate-x-1'
-                            }`}
-                          />
-                        </button>
-                      </div>
-                      <div className='flex items-center justify-between'>
-                        <div>
-                          <h4 className='text-sm font-medium text-slate-900'>
-                            İş Uyarıları
-                          </h4>
-                          <p className='text-sm text-slate-600'>
-                            Yeni iş fırsatları hakkında bilgilendirilme
-                          </p>
-                        </div>
-                        <button
-                          onClick={() =>
-                            handleToggle('notifications', 'jobAlerts')
-                          }
-                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                            settings.notifications.jobAlerts
-                              ? 'bg-slate-800'
-                              : 'bg-slate-200'
-                          }`}
-                        >
-                          <span
-                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                              settings.notifications.jobAlerts
-                                ? 'translate-x-6'
-                                : 'translate-x-1'
-                            }`}
-                          />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
 
-                {/* Privacy Settings */}
-                {activeTab === 'privacy' && (
-                  <div className='space-y-6'>
-                    <h3 className='text-lg font-semibold text-slate-900'>
-                      Gizlilik Ayarları
-                    </h3>
-                    <div className='space-y-4'>
-                      <div className='flex items-center justify-between'>
-                        <div>
-                          <h4 className='text-sm font-medium text-slate-900'>
-                            Profil Görünürlüğü
-                          </h4>
-                          <p className='text-sm text-slate-600'>
-                            Diğer kullanıcılar profilinizi görebilir
-                          </p>
-                        </div>
+                    {/* Account Deletion */}
+                    <div className='pt-2'>
+                      <h3 className='text-lg font-semibold text-red-900 mb-4 flex items-center gap-2'>
+                        <AlertCircle className='w-5 h-5' />
+                        Tehlikeli Bölge
+                      </h3>
+                      <div className='bg-red-50 border-2 border-red-200 rounded-lg p-6'>
+                        <h4 className='font-semibold text-red-900 mb-2'>Hesabı Sil</h4>
+                        <p className='text-sm text-red-800 mb-4'>
+                          Hesabınızı silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
+                          Tüm verileriniz silinecek ve hesabınıza bir daha erişemeyeceksiniz.
+                        </p>
                         <button
-                          onClick={() => handleToggle('privacy', 'showProfile')}
-                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                            settings.privacy.showProfile
-                              ? 'bg-slate-800'
-                              : 'bg-slate-200'
-                          }`}
-                        >
-                          <span
-                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                              settings.privacy.showProfile
-                                ? 'translate-x-6'
-                                : 'translate-x-1'
-                            }`}
-                          />
-                        </button>
-                      </div>
-                      <div className='flex items-center justify-between'>
-                        <div>
-                          <h4 className='text-sm font-medium text-slate-900'>
-                            Konum Paylaşımı
-                          </h4>
-                          <p className='text-sm text-slate-600'>
-                            Gerçek zamanlı konumunuzu paylaşın
-                          </p>
-                        </div>
-                        <button
-                          onClick={() =>
-                            handleToggle('privacy', 'showLocation')
-                          }
-                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                            settings.privacy.showLocation
-                              ? 'bg-slate-800'
-                              : 'bg-slate-200'
-                          }`}
-                        >
-                          <span
-                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                              settings.privacy.showLocation
-                                ? 'translate-x-6'
-                                : 'translate-x-1'
-                            }`}
-                          />
-                        </button>
-                      </div>
-                      
-                      {/* KVKK Veri Erişim Hakkı - Gizli yer */}
-                      <div className='mt-8 pt-6 border-t border-slate-200'>
-                        <div className='text-xs text-slate-400 space-y-2'>
-                          <p className='text-[10px] leading-tight'>
-                            KVKK m.11 gereği veri erişim ve silme haklarınız için:
-                          </p>
-                          <div className='flex gap-2'>
-                            <button
-                              onClick={async () => {
+                          onClick={async () => {
+                            const confirmed = window.confirm(
+                              'Hesabınızı silmek istediğinizden emin misiniz? Bu işlem geri alınamaz!'
+                            );
+                            if (confirmed) {
+                              const password = window.prompt('Güvenlik için şifrenizi girin:');
+                              if (password) {
                                 try {
-                                  const token = localStorage.getItem('authToken');
-                                  const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/kvkk/data-access`, {
-                                    headers: {
-                                      'Authorization': `Bearer ${token}`,
-                                      'Content-Type': 'application/json',
-                                    },
-                                  });
-                                  if (response.ok) {
-                                    const data = await response.json();
-                                    const blob = new Blob([JSON.stringify(data.data, null, 2)], { type: 'application/json' });
-                                    const url = URL.createObjectURL(blob);
-                                    const a = document.createElement('a');
-                                    a.href = url;
-                                    a.download = `yolnext-veri-export-${new Date().toISOString().split('T')[0]}.json`;
-                                    a.click();
-                                    URL.revokeObjectURL(url);
-                                    setSuccessMessage('Verileriniz indirildi');
-                                    setShowSuccessMessage(true);
+                                  setIsLoading(true);
+                                  const response = await authAPI.deleteAccount({ password, reason: 'Kullanıcı talebi' });
+                                  if (response.success) {
+                                    alert('Hesabınız başarıyla silindi. Çıkış yapılıyor...');
+                                    localStorage.clear();
+                                    window.location.href = '/';
                                   } else {
-                                    setSuccessMessage('Veri erişim hatası');
-                                    setShowSuccessMessage(true);
+                                    alert(response.message || 'Hesap silme başarısız');
                                   }
-                                } catch (error) {
-                                  setSuccessMessage('Veri erişim hatası');
-                                  setShowSuccessMessage(true);
+                                } catch (err: any) {
+                                  alert(err?.response?.data?.message || 'Hesap silme başarısız');
+                                } finally {
+                                  setIsLoading(false);
                                 }
-                              }}
-                              className='text-[10px] text-slate-400 hover:text-slate-600 underline'
-                            >
-                              Verilerimi İndir
-                            </button>
-                            <span className='text-slate-300'>|</span>
-                            <button
-                              onClick={async () => {
-                                if (!confirm('Tüm verileriniz silinecek. Bu işlem geri alınamaz. Emin misiniz?')) return;
-                                if (!confirm('Son bir kez onaylayın: Tüm verileriniz kalıcı olarak silinecek. Devam edilsin mi?')) return;
-                                try {
-                                  const token = localStorage.getItem('authToken');
-                                  const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/kvkk/delete-data`, {
-                                    method: 'DELETE',
-                                    headers: {
-                                      'Authorization': `Bearer ${token}`,
-                                      'Content-Type': 'application/json',
-                                    },
-                                  });
-                                  const data = await response.json();
-                                  if (response.ok) {
-                                    alert('Verileriniz silindi. Çıkış yapılıyor...');
-                                    localStorage.removeItem('authToken');
-                                    localStorage.removeItem('user');
-                                    window.location.href = '/login';
-                                  } else {
-                                    alert(data.message || 'Veri silme hatası');
-                                  }
-                                } catch (error) {
-                                  alert('Veri silme hatası');
-                                }
-                              }}
-                              className='text-[10px] text-slate-400 hover:text-red-600 underline'
-                            >
-                              Verilerimi Sil
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Security Settings */}
-                {activeTab === 'security' && (
-                  <div className='space-y-6'>
-                    <h3 className='text-lg font-semibold text-slate-900'>
-                      Güvenlik Ayarları
-                    </h3>
-                    <div className='space-y-4'>
-                      <div className='flex items-center justify-between'>
-                        <div>
-                          <h4 className='text-sm font-medium text-slate-900'>
-                            İki Faktörlü Kimlik Doğrulama
-                          </h4>
-                          <p className='text-sm text-slate-600'>
-                            Hesabınızı ekstra güvenlik ile koruyun
-                          </p>
-                        </div>
-                        <button
-                          onClick={() => handleToggle('security', 'twoFactor')}
-                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                            settings.security.twoFactor
-                              ? 'bg-slate-800'
-                              : 'bg-slate-200'
-                          }`}
-                        >
-                          <span
-                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                              settings.security.twoFactor
-                                ? 'translate-x-6'
-                                : 'translate-x-1'
-                            }`}
-                          />
-                        </button>
-                      </div>
-                      <div>
-                        <label className='block text-sm font-medium text-slate-700 mb-2'>
-                          Oturum Zaman Aşımı (dakika)
-                        </label>
-                        <select
-                          value={settings.security.sessionTimeout}
-                          onChange={e =>
-                            handleInputChange(
-                              'security',
-                              'sessionTimeout',
-                              parseInt(e.target.value)
-                            )
-                          }
-                          className='w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500'
-                        >
-                          <option value={15}>15 dakika</option>
-                          <option value={30}>30 dakika</option>
-                          <option value={60}>1 saat</option>
-                          <option value={120}>2 saat</option>
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Preferences Settings */}
-                {activeTab === 'preferences' && (
-                  <div className='space-y-6'>
-                    <h3 className='text-lg font-semibold text-slate-900'>
-                      Uygulama Tercihleri
-                    </h3>
-                    <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-                      <div>
-                        <label className='block text-sm font-medium text-slate-700 mb-2'>
-                          Tema
-                        </label>
-                        <select
-                          value={settings.preferences.theme}
-                          onChange={e =>
-                            handleInputChange(
-                              'preferences',
-                              'theme',
-                              e.target.value
-                            )
-                          }
-                          className='w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500'
-                        >
-                          <option value='light'>Açık</option>
-                          <option value='dark'>Koyu</option>
-                          <option value='auto'>Otomatik</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className='block text-sm font-medium text-slate-700 mb-2'>
-                          Dil
-                        </label>
-                        <select
-                          value={settings.preferences.language}
-                          onChange={e =>
-                            handleInputChange(
-                              'preferences',
-                              'language',
-                              e.target.value
-                            )
-                          }
-                          className='w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500'
-                        >
-                          <option value='tr'>Türkçe</option>
-                          <option value='en'>English</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className='block text-sm font-medium text-slate-700 mb-2'>
-                          Saat Dilimi
-                        </label>
-                        <select
-                          value={settings.preferences.timezone}
-                          onChange={e =>
-                            handleInputChange(
-                              'preferences',
-                              'timezone',
-                              e.target.value
-                            )
-                          }
-                          className='w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500'
-                        >
-                          <option value='Europe/Istanbul'>
-                            İstanbul (UTC+3)
-                          </option>
-                          <option value='Europe/London'>Londra (UTC+0)</option>
-                          <option value='America/New_York'>
-                            New York (UTC-5)
-                          </option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className='block text-sm font-medium text-slate-700 mb-2'>
-                          Para Birimi
-                        </label>
-                        <select
-                          value={settings.preferences.currency}
-                          onChange={e =>
-                            handleInputChange(
-                              'preferences',
-                              'currency',
-                              e.target.value
-                            )
-                          }
-                          className='w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500'
-                        >
-                          <option value='TRY'>₺ Türk Lirası</option>
-                          <option value='USD'>$ Amerikan Doları</option>
-                          <option value='EUR'>€ Euro</option>
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Business Settings */}
-                {activeTab === 'business' && (
-                  <div className='space-y-6'>
-                    <h3 className='text-lg font-semibold text-slate-900'>
-                      İş Ayarları
-                    </h3>
-                    <div className='space-y-4'>
-                      <div>
-                        <label className='block text-sm font-medium text-slate-700 mb-2'>
-                          Komisyon Oranı (%)
-                        </label>
-                        <input
-                          type='number'
-                          min='0'
-                          max='10'
-                          step='0.1'
-                          value={settings.business.commissionRate}
-                          onChange={e =>
-                            handleInputChange(
-                              'business',
-                              'commissionRate',
-                              parseFloat(e.target.value)
-                            )
-                          }
-                          className='w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500'
-                        />
-                      </div>
-                      <div className='flex items-center justify-between'>
-                        <div>
-                          <h4 className='text-sm font-medium text-slate-900'>
-                            Otomatik İş Kabul
-                          </h4>
-                          <p className='text-sm text-slate-600'>
-                            Uygun işleri otomatik olarak kabul et
-                          </p>
-                        </div>
-                        <button
-                          onClick={() =>
-                            handleToggle('business', 'autoAcceptJobs')
-                          }
-                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                            settings.business.autoAcceptJobs
-                              ? 'bg-slate-800'
-                              : 'bg-slate-200'
-                          }`}
-                        >
-                          <span
-                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                              settings.business.autoAcceptJobs
-                                ? 'translate-x-6'
-                                : 'translate-x-1'
-                            }`}
-                          />
-                        </button>
-                      </div>
-                      <div>
-                        <label className='block text-sm font-medium text-slate-700 mb-2'>
-                          Maksimum Mesafe (km)
-                        </label>
-                        <input
-                          type='number'
-                          min='10'
-                          max='500'
-                          value={settings.business.maxDistance}
-                          onChange={e =>
-                            handleInputChange(
-                              'business',
-                              'maxDistance',
-                              parseInt(e.target.value)
-                            )
-                          }
-                          className='w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500'
-                        />
-                      </div>
-                      <div>
-                        <label className='block text-sm font-medium text-slate-700 mb-2'>
-                          Çalışma Saatleri
-                        </label>
-                        <div className='grid grid-cols-2 gap-4'>
-                          <div>
-                            <label className='block text-xs text-slate-500 mb-1'>
-                              Başlangıç
-                            </label>
-                            <input
-                              type='time'
-                              value={settings.business.workingHours.start}
-                              onChange={e =>
-                                handleInputChange('business', 'workingHours', {
-                                  ...settings.business.workingHours,
-                                  start: e.target.value,
-                                })
                               }
-                              className='w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500'
-                            />
-                          </div>
-                          <div>
-                            <label className='block text-xs text-slate-500 mb-1'>
-                              Bitiş
-                            </label>
-                            <input
-                              type='time'
-                              value={settings.business.workingHours.end}
-                              onChange={e =>
-                                handleInputChange('business', 'workingHours', {
-                                  ...settings.business.workingHours,
-                                  end: e.target.value,
-                                })
-                              }
-                              className='w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500'
-                            />
-                          </div>
-                        </div>
+                            }
+                          }}
+                          disabled={isLoading}
+                          className='px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed'
+                        >
+                          {isLoading ? 'Siliniyor...' : 'Hesabımı Sil'}
+                        </button>
                       </div>
                     </div>
                   </div>

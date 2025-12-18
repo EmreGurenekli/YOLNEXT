@@ -137,9 +137,11 @@ const TrackingModal: React.FC<TrackingModalProps> = ({
     switch (status) {
       case 'pending':
         return <AlertCircle className='w-5 h-5 text-yellow-500' />;
+      case 'offer_accepted':
       case 'accepted':
         return <CheckCircle className='w-5 h-5 text-blue-500' />;
       case 'picked_up':
+      case 'in_progress':
         return <Package className='w-5 h-5 text-orange-500' />;
       case 'in_transit':
         return <Truck className='w-5 h-5 text-blue-600' />;
@@ -156,9 +158,11 @@ const TrackingModal: React.FC<TrackingModalProps> = ({
     switch (status) {
       case 'pending':
         return 'bg-yellow-100 text-yellow-800';
+      case 'offer_accepted':
       case 'accepted':
         return 'bg-blue-100 text-blue-800';
       case 'picked_up':
+      case 'in_progress':
         return 'bg-orange-100 text-orange-800';
       case 'in_transit':
         return 'bg-blue-100 text-blue-800';
@@ -175,9 +179,11 @@ const TrackingModal: React.FC<TrackingModalProps> = ({
     switch (status) {
       case 'pending':
         return 'Beklemede';
+      case 'offer_accepted':
       case 'accepted':
         return 'Kabul Edildi';
       case 'picked_up':
+      case 'in_progress':
         return 'Alındı';
       case 'in_transit':
         return 'Yolda';

@@ -1,12 +1,27 @@
-// Determine API base URL: prefer Vite env root (e.g., http://localhost:5000)
-// Endpoints in this file already include '/api/...'
-const API_BASE_URL =
+// Determine API base URL.
+// Endpoints in this file are defined WITHOUT the '/api' prefix (e.g. '/auth/login').
+// - In dev, use relative '/api' so Vite proxy can forward to backend.
+// - If VITE_API_URL is provided, use it as absolute origin and append '/api'.
+// - If VITE_API_URL already ends with '/api', don't append it again.
+const getApiBaseUrl = () => {
+  if (
   typeof import.meta !== 'undefined' &&
   import.meta &&
   import.meta.env &&
   import.meta.env.VITE_API_URL
-    ? `${import.meta.env.VITE_API_URL}`
-    : '';
+  ) {
+    const baseUrl = String(import.meta.env.VITE_API_URL).replace(/\/$/, '');
+    // If baseUrl already ends with '/api', return it as is
+    if (baseUrl.endsWith('/api')) {
+      return baseUrl;
+    }
+    // Otherwise, append '/api'
+    return `${baseUrl}/api`;
+  }
+  return '/api';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 // Request interceptor
 const requestInterceptor = config => {
@@ -22,21 +37,20 @@ const requestInterceptor = config => {
 
 // Response interceptor
 const responseInterceptor = response => {
-  console.log('Response interceptor called with status:', response.status);
+  // Response interceptor - log removed for performance
+  // Only log errors in development
+  if (import.meta.env.DEV && response.status >= 400) {
+    console.error('Response interceptor error status:', response.status);
+  }
   if (response.status === 401) {
-    console.log('401 error detected');
     // Check if we have a demo token
     const token = localStorage.getItem('authToken');
-    console.log('Token from localStorage:', token);
     // Only redirect to login for real auth tokens, not demo tokens
     if (!token || !token.startsWith('demo-token-')) {
-      console.log('Real token expired, logging out');
       // Token expired, redirect to login
       // localStorage.removeItem('authToken');
       // localStorage.removeItem('user');
       // window.location.href = '/login';
-    } else {
-      console.log('Demo token, not logging out');
     }
   }
   return response;
@@ -44,12 +58,29 @@ const responseInterceptor = response => {
 
 // Generic API call function with enhanced error handling
 async function apiCall(endpoint, options = {}) {
-  const url = `${API_BASE_URL}${endpoint}`;
+  // Normalize endpoint to avoid double '/api/api' when API_BASE_URL already includes '/api'
+  // Some call sites still pass '/api/...' prefixed endpoints.
+  let normalizedEndpoint = typeof endpoint === 'string' ? endpoint : String(endpoint);
+  
+  // Remove /api prefix if present (API_BASE_URL already includes /api)
+  if (normalizedEndpoint.startsWith('/api/')) {
+    normalizedEndpoint = normalizedEndpoint.substring(4); // Remove '/api'
+  } else if (normalizedEndpoint.startsWith('/api')) {
+    normalizedEndpoint = normalizedEndpoint.substring(4); // Remove '/api'
+  }
+  
+  // Ensure endpoint starts with /
+  if (!normalizedEndpoint.startsWith('/')) {
+    normalizedEndpoint = `/${normalizedEndpoint}`;
+  }
+
+  const url = `${API_BASE_URL}${normalizedEndpoint}`;
 
   // Apply request interceptor
   const config = requestInterceptor({
     headers: {
-      'Content-Type': 'application/json',
+      'Content-Type': 'application/json; charset=utf-8',
+      'Accept': 'application/json; charset=utf-8',
       ...options.headers,
     },
     ...options,
@@ -62,13 +93,43 @@ async function apiCall(endpoint, options = {}) {
     responseInterceptor(response);
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
+      const errorText = await response.text();
+      let errorData = null;
+      try {
+        errorData = JSON.parse(errorText);
+      } catch {
+        errorData = null;
+      }
+
+      const pickMessage = () => {
+        if (errorData && typeof errorData === 'object') {
+          return (
+            errorData.details ||
+            errorData.detail ||
+            errorData.error ||
+            errorData.message ||
+            errorData.msg ||
+            null
+          );
+        }
+        return null;
+      };
+
+      const apiMessage = pickMessage();
+      const bodySnippet =
+        typeof errorText === 'string' && errorText.trim()
+          ? errorText.trim().slice(0, 500)
+          : '';
+
       throw new Error(
-        errorData.message || `HTTP error! status: ${response.status}`
+        apiMessage ||
+          (bodySnippet ? `${bodySnippet}` : `HTTP error! status: ${response.status}`)
       );
     }
 
-    return await response.json();
+    // Ensure proper UTF-8 decoding
+    const responseText = await response.text();
+    return JSON.parse(responseText);
   } catch (error) {
     // Enhanced error handling
     if (error.name === 'TypeError' && error.message.includes('fetch')) {
@@ -235,7 +296,10 @@ export const api = {
 
   // Analytics API
   analytics: {
-    getDashboardStats: userType => apiCall(`/analytics/dashboard/${userType}`),
+    getDashboardStats: (userType, options = {}) => {
+      const period = options?.period ? `?period=${encodeURIComponent(options.period)}` : '';
+      return apiCall(`/analytics/dashboard/${userType}${period}`);
+    },
     getShipmentStats: period =>
       apiCall(`/analytics/shipments?period=${period}`),
     getRevenueStats: period => apiCall(`/analytics/revenue?period=${period}`),

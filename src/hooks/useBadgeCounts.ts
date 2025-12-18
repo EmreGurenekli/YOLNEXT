@@ -48,13 +48,20 @@ export const useBadgeCounts = () => {
 
         const messagePromise = isDemoToken
           ? Promise.resolve({ data: [] })
-          : fetchJson('/api/messages');
+          : fetchJson('/messages');
+
+        // Use correct endpoint based on user role
+        // tasiyici and nakliyeci should not call /offers/individual
+        const offersEndpoint =
+          user.role === 'nakliyeci' || user.role === 'tasiyici'
+            ? '/offers'
+            : '/offers/individual';
 
         const [offersResult, messagesResult, shipmentsResult] =
           await Promise.allSettled([
-            fetchJson('/api/offers/individual'),
+            fetchJson(offersEndpoint),
             messagePromise,
-            fetchJson('/api/shipments'),
+            fetchJson('/shipments'),
           ]);
 
         let newOffers = 0;
@@ -127,7 +134,11 @@ export const useBadgeCounts = () => {
           pendingShipments,
         });
       } catch (error) {
-        console.error('Error building badge counts:', error);
+        // Error building badge counts - log removed for performance
+        // Only log critical errors in development
+        if (import.meta.env.DEV && error instanceof Error && error.message.includes('500')) {
+          console.error('Critical error building badge counts:', error);
+        }
         setBadgeCounts({ newOffers: 0, newMessages: 0, pendingShipments: 0 });
       } finally {
         setIsLoading(false);

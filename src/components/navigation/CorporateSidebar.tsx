@@ -21,7 +21,6 @@ import {
   X,
   CheckCircle,
 } from 'lucide-react';
-import GlobalSearch from '../common/GlobalSearch';
 import YolNextLogo from '../common/yolnextLogo';
 import { useBadgeCounts } from '../../hooks/useBadgeCounts';
 import { useAuth } from '../../contexts/AuthContext';
@@ -151,11 +150,6 @@ const CorporateSidebar: React.FC<CorporateSidebarProps> = ({ onLogout }) => {
             </div>
             <div className='w-2 h-2 bg-emerald-500 rounded-full flex-shrink-0'></div>
           </div>
-        </div>
-
-        {/* Global Search */}
-        <div className='p-3 lg:p-4 border-b border-slate-200'>
-          <GlobalSearch placeholder='Ara...' />
         </div>
 
         {/* Navigation */}

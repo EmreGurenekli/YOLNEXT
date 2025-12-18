@@ -32,12 +32,22 @@ interface StatusManagerProps {
 }
 
 const statusConfig = {
-  waiting: {
+  pending: {
     label: 'Beklemede',
     color: 'bg-gray-100 text-gray-800',
     icon: Clock,
   },
-  preparing: {
+  waiting_for_offers: {
+    label: 'Teklif Bekliyor',
+    color: 'bg-yellow-100 text-yellow-800',
+    icon: Clock,
+  },
+  offer_accepted: {
+    label: 'Teklif Kabul Edildi',
+    color: 'bg-blue-100 text-blue-800',
+    icon: CheckCircle,
+  },
+  in_progress: {
     label: 'Hazırlanıyor',
     color: 'bg-yellow-100 text-yellow-800',
     icon: Package,
@@ -52,10 +62,26 @@ const statusConfig = {
     color: 'bg-green-100 text-green-800',
     icon: CheckCircle,
   },
+  completed: {
+    label: 'Tamamlandı',
+    color: 'bg-emerald-100 text-emerald-800',
+    icon: CheckCircle,
+  },
   cancelled: {
     label: 'İptal Edildi',
     color: 'bg-red-100 text-red-800',
     icon: X,
+  },
+  // Backward-compatible aliases
+  waiting: {
+    label: 'Beklemede',
+    color: 'bg-gray-100 text-gray-800',
+    icon: Clock,
+  },
+  preparing: {
+    label: 'Hazırlanıyor',
+    color: 'bg-yellow-100 text-yellow-800',
+    icon: Package,
   },
 };
 
@@ -137,8 +163,9 @@ export default function StatusManager({
   };
 
   const getStatusConfig = (status: string) => {
+    const normalized = typeof status === 'string' ? status.trim().toLowerCase() : String(status);
     return (
-      statusConfig[status as keyof typeof statusConfig] || {
+      statusConfig[normalized as keyof typeof statusConfig] || {
         label: status,
         color: 'bg-gray-100 text-gray-800',
         icon: AlertCircle,
@@ -157,13 +184,28 @@ export default function StatusManager({
   };
 
   const getStatusTransitionIcon = (oldStatus: string, newStatus: string) => {
-    if (oldStatus === 'waiting' && newStatus === 'preparing') {
+    const oldS = typeof oldStatus === 'string' ? oldStatus.trim().toLowerCase() : String(oldStatus);
+    const newS = typeof newStatus === 'string' ? newStatus.trim().toLowerCase() : String(newStatus);
+
+    if (oldS === 'waiting_for_offers' && newS === 'offer_accepted') {
+      return <CheckCircle className='w-4 h-4 text-blue-500' />;
+    } else if (oldS === 'offer_accepted' && newS === 'in_progress') {
       return <Package className='w-4 h-4 text-yellow-500' />;
-    } else if (oldStatus === 'preparing' && newStatus === 'in_transit') {
+    } else if (oldS === 'in_progress' && newS === 'in_transit') {
       return <Truck className='w-4 h-4 text-blue-500' />;
-    } else if (oldStatus === 'in_transit' && newStatus === 'delivered') {
+    } else if (oldS === 'in_transit' && newS === 'delivered') {
       return <CheckCircle className='w-4 h-4 text-green-500' />;
-    } else if (newStatus === 'cancelled') {
+    } else if (oldS === 'delivered' && newS === 'completed') {
+      return <CheckCircle className='w-4 h-4 text-emerald-500' />;
+    }
+
+    if (oldS === 'waiting' && newS === 'preparing') {
+      return <Package className='w-4 h-4 text-yellow-500' />;
+    } else if (oldS === 'preparing' && newS === 'in_transit') {
+      return <Truck className='w-4 h-4 text-blue-500' />;
+    } else if (oldS === 'in_transit' && newS === 'delivered') {
+      return <CheckCircle className='w-4 h-4 text-green-500' />;
+    } else if (newS === 'cancelled') {
       return <X className='w-4 h-4 text-red-500' />;
     }
     return <Clock className='w-4 h-4 text-gray-500' />;

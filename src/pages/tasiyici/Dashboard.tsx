@@ -25,14 +25,41 @@ import {
   Trash2,
   X,
   Briefcase,
+  Copy,
 } from 'lucide-react';
 import Breadcrumb from '../../components/common/Breadcrumb';
 import LoadingState from '../../components/common/LoadingState';
 import { formatDate } from '../../utils/format';
 import EmptyState from '../../components/common/EmptyState';
 
+type RecentJob = {
+  id: string;
+  title: string;
+  status?: string;
+  pickup: string;
+  delivery: string;
+  price: number;
+  date?: string;
+};
+
 const TasiyiciDashboard: React.FC = () => {
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
+
+  const toNumber = (value: any, fallback = 0) => {
+    if (typeof value === 'number') return Number.isFinite(value) ? value : fallback;
+    if (typeof value === 'string') {
+      const n = parseFloat(value.replace(/[^0-9.,-]/g, '').replace(',', '.'));
+      return Number.isFinite(n) ? n : fallback;
+    }
+    return fallback;
+  };
+
+  const safeFormatDate = (value: any, mode: 'short' | 'long' | 'time' = 'short') => {
+    if (!value) return '';
+    const d = value instanceof Date ? value : new Date(value);
+    if (!Number.isFinite(d.getTime())) return '';
+    return formatDate(d, mode);
+  };
   const [stats, setStats] = useState({
     totalJobs: 0,
     completedJobs: 0,
@@ -43,10 +70,11 @@ const TasiyiciDashboard: React.FC = () => {
     documentsCount: 0,
   });
 
-  const [recentJobs, setRecentJobs] = useState([]);
+  const [recentJobs, setRecentJobs] = useState<RecentJob[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [copiedCode, setCopiedCode] = useState(false);
 
   const breadcrumbItems = [{ label: 'Ana Sayfa', href: '/tasiyici/dashboard' }];
 
@@ -71,6 +99,26 @@ const TasiyiciDashboard: React.FC = () => {
         (localStorage.getItem('user')
           ? JSON.parse(localStorage.getItem('user') || '{}').id
           : null);
+      
+      // Fetch user profile to get driverCode
+      const profileResponse = await fetch(createApiUrl('/api/users/profile'), {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (profileResponse.ok) {
+        const profileData = await profileResponse.json();
+        const profile = profileData.data?.user || profileData.user || profileData.data || profileData;
+        if (profile && updateUser) {
+          updateUser({
+            ...profile,
+            driverCode: profile.driverCode || profile.drivercode || undefined
+          });
+        }
+      }
+      
       const [statsResponse, jobsResponse] = await Promise.all([
         fetch(createApiUrl('/api/dashboard/stats/tasiyici'), {
           headers: {
@@ -103,25 +151,26 @@ const TasiyiciDashboard: React.FC = () => {
       if (jobsResponse.ok) {
         const jobsData = await jobsResponse.json();
         // API'den dönen veri yapısını kontrol et
-        const jobs =
+        const jobsRaw =
           jobsData.data ||
           jobsData.shipments ||
           (Array.isArray(jobsData) ? jobsData : []);
+        const jobs = Array.isArray(jobsRaw) ? jobsRaw : [];
         setRecentJobs(
           jobs.slice(0, 5).map((job: any) => ({
-            id: job.id.toString(),
-            title: job.title || job.productDescription || 'Gönderi',
-            status: job.status,
-            pickup: `${job.pickupCity || job.fromCity || ''}, ${job.pickupAddress || job.pickupDistrict || ''}`,
-            delivery: `${job.deliveryCity || job.toCity || ''}, ${job.deliveryAddress || job.deliveryDistrict || ''}`,
-            price: job.price || 0,
-            date: job.createdAt || job.created_at,
+            id: String(job?.id ?? ''),
+            title: job?.title || job?.productDescription || 'Gönderi',
+            status: job?.status,
+            pickup: `${job?.pickupCity || job?.fromCity || ''}, ${job?.pickupAddress || job?.pickupDistrict || ''}`,
+            delivery: `${job?.deliveryCity || job?.toCity || ''}, ${job?.deliveryAddress || job?.deliveryDistrict || ''}`,
+            price: toNumber(job?.price ?? job?.displayPrice ?? job?.value, 0),
+            date: job?.createdAt || job?.created_at || job?.updatedAt || job?.updated_at,
           }))
         );
       }
     } catch (error) {
       console.error('Error loading dashboard data:', error);
-      setError('Dashboard verileri yüklenemedi');
+      setError('Ana Sayfa verileri yüklenemedi');
       // Fallback to empty data
       setStats({
         totalJobs: 0,
@@ -173,7 +222,7 @@ const TasiyiciDashboard: React.FC = () => {
     return (
       <div className='min-h-screen bg-gray-50 flex items-center justify-center'>
         <LoadingState
-          message='Dashboard yükleniyor...'
+          message='Ana Sayfa yükleniyor...'
           size='lg'
           className='py-12'
         />
@@ -238,6 +287,30 @@ const TasiyiciDashboard: React.FC = () => {
                       {stats.totalJobs} İş
                     </span>
                   </div>
+                  {(user?.driverCode || (user as any)?.drivercode) && (
+                    <div className='bg-gradient-to-r from-slate-800/30 to-blue-900/30 backdrop-blur-sm rounded-2xl px-4 py-2 border border-slate-400/30 flex items-center gap-2'>
+                      <span className='text-slate-200 font-medium text-sm'>Kodum:</span>
+                      <span className='text-white font-mono font-bold text-base'>{user?.driverCode || (user as any)?.drivercode}</span>
+                      <button
+                        onClick={() => {
+                          const code = user?.driverCode || (user as any)?.drivercode;
+                          if (code) {
+                            navigator.clipboard.writeText(code);
+                            setCopiedCode(true);
+                            setTimeout(() => setCopiedCode(false), 2000);
+                          }
+                        }}
+                        className='ml-1 p-1.5 hover:bg-white/10 rounded-lg transition-colors'
+                        title='Kodu Kopyala'
+                      >
+                        {copiedCode ? (
+                          <CheckCircle className='w-4 h-4 text-emerald-300' />
+                        ) : (
+                          <Copy className='w-4 h-4 text-slate-300' />
+                        )}
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
 

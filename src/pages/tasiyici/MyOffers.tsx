@@ -18,7 +18,7 @@ interface CarrierOffer {
   id: number;
   shipmentId: number;
   price: number;
-  status: 'pending' | 'accepted' | 'rejected';
+  status: 'pending' | 'accepted' | 'rejected' | 'cancelled';
   createdAt: string;
   shipmentTitle?: string;
   pickupAddress?: string;
@@ -34,27 +34,35 @@ const MyOffers: React.FC = () => {
     const loadOffers = async () => {
       try {
         setLoading(true);
+        const token = localStorage.getItem('authToken');
         const userRaw = localStorage.getItem('user');
         const userId = userRaw ? JSON.parse(userRaw || '{}').id : undefined;
-        const token = localStorage.getItem('authToken');
-        const url = userId ? `/api/offers?carrierId=${userId}` : '/api/offers';
-        const res = await fetch(url, {
-          headers: {
-            Authorization: `Bearer ${token || ''}`,
-            'X-User-Id': userId || '',
-            'Content-Type': 'application/json',
-          },
-        });
+        const url = '/api/carrier-market/bids?mine=1';
+        const headers = {
+          Authorization: `Bearer ${token || ''}`,
+          'X-User-Id': userId || '',
+          'Content-Type': 'application/json',
+        };
+
+        const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+        let res = await fetch(url, { headers });
+        if (res.status === 429) {
+          await sleep(800);
+          res = await fetch(url, { headers });
+        }
         if (!res.ok) throw new Error('Teklifler alınamadı');
         const data = await res.json();
         const rows = (
           Array.isArray(data) ? data : data.data || data.offers || []
         ) as any[];
+
+        const filteredRows = rows;
         setOffers(
-          rows.map(row => ({
+          filteredRows.map(row => ({
             id: row.id,
             shipmentId: row.shipmentId,
-            price: row.price || 0,
+            price: row.bidPrice || row.price || 0,
             status: row.status || 'pending',
             createdAt: row.createdAt || '',
             shipmentTitle: row.shipmentTitle || row.title,

@@ -24,7 +24,6 @@ import {
   Wallet,
   HelpCircle,
 } from 'lucide-react';
-import GlobalSearch from '../common/GlobalSearch';
 import YolNextLogo from '../common/yolnextLogo';
 import { useBadgeCounts } from '../../hooks/useBadgeCounts';
 import { useAuth } from '../../contexts/AuthContext';
@@ -51,10 +50,8 @@ const NakliyeciSidebar: React.FC<NakliyeciSidebarProps> = ({ onLogout }) => {
           badge: badgeCounts.pendingShipments > 0 ? badgeCounts.pendingShipments : undefined,
         },
         { name: 'Aktif Yükler', href: '/nakliyeci/active-shipments', icon: Activity },
-        { name: 'Gönderilerim', href: '/nakliyeci/shipments', icon: Package },
         { name: 'Tekliflerim', href: '/nakliyeci/offers', icon: FileText },
         { name: 'Taşıyıcılarım', href: '/nakliyeci/drivers', icon: Users },
-        { name: 'İlanlarım', href: '/nakliyeci/listings', icon: FileText },
         { name: 'Akıllı Rota', href: '/nakliyeci/route-planner', icon: Map },
       ],
     },
@@ -155,11 +152,6 @@ const NakliyeciSidebar: React.FC<NakliyeciSidebarProps> = ({ onLogout }) => {
             </div>
             <div className='w-2 h-2 bg-emerald-500 rounded-full flex-shrink-0'></div>
           </div>
-        </div>
-
-        {/* Global Search */}
-        <div className='p-3 lg:p-4 border-b border-slate-200'>
-          <GlobalSearch placeholder='Ara...' />
         </div>
 
         {/* Navigation */}

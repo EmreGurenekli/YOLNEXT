@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createApiUrl } from '../../config/api';
 import { useNavigate, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
@@ -16,8 +16,6 @@ import {
   DollarSign,
   Eye,
   MessageCircle,
-  Phone,
-  Mail,
   FileText,
   Package,
   User,
@@ -49,6 +47,8 @@ interface Offer {
   id: string;
   shipmentTitle: string;
   carrierName: string;
+  carrierId?: string;
+  shipmentId?: string;
   carrierRating: number;
   carrierVerified: boolean;
   carrierReviews: number;
@@ -66,8 +66,6 @@ interface Offer {
   tracking: boolean;
   priority: 'low' | 'medium' | 'high';
   trackingCode: string;
-  carrierPhone: string;
-  carrierEmail: string;
   carrierLogo: string;
   recentComments: string[];
   responseTime: string;
@@ -77,13 +75,16 @@ interface Offer {
 export default function Offers() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [filterStatus, setFilterStatus] = useState('all');
+  const [filterStatus, setFilterStatus] = useState('pending');
   const [searchTerm, setSearchTerm] = useState('');
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showAcceptConfirmModal, setShowAcceptConfirmModal] = useState(false);
   const [showContactModal, setShowContactModal] = useState(false);
-  const [contactCarrier, setContactCarrier] = useState<{ phone: string; email: string } | null>(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentCarrierId, setPaymentCarrierId] = useState<string | null>(null);
+  const [paymentShipmentId, setPaymentShipmentId] = useState<string | null>(null);
+  const [paymentPrefill, setPaymentPrefill] = useState('');
   const [selectedOffer, setSelectedOffer] = useState<Offer | null>(null);
   const [offerToReject, setOfferToReject] = useState<string | null>(null);
   const [offerToAccept, setOfferToAccept] = useState<string | null>(null);
@@ -99,10 +100,24 @@ export default function Offers() {
     averagePrice: 0,
     unreadCount: 0,
   });
+  const navigateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const paymentModalOpenRef = useRef(false);
+
+  useEffect(() => {
+    paymentModalOpenRef.current = showPaymentModal;
+  }, [showPaymentModal]);
 
   useEffect(() => {
     loadOffers();
   }, [filterStatus, searchTerm]);
+
+  useEffect(() => {
+    return () => {
+      if (navigateTimerRef.current) {
+        clearTimeout(navigateTimerRef.current);
+      }
+    };
+  }, []);
 
   const loadOffers = async () => {
     setIsLoading(true);
@@ -136,11 +151,19 @@ export default function Offers() {
       const rawOffers =
         data.data || data.offers || (Array.isArray(data) ? data : []);
 
-      // Map backend format to frontend format
+      const normalizeOfferStatus = (raw: any): 'pending' | 'accepted' | 'rejected' => {
+        const s = String(raw || '').toLowerCase();
+        if (s === 'accepted' || s === 'offer_accepted') return 'accepted';
+        if (s === 'rejected' || s === 'cancelled' || s === 'canceled') return 'rejected';
+        return 'pending';
+      };
+
       const mappedOffers: Offer[] = rawOffers.map((row: any) => ({
         id: String(row.id),
+        shipmentId: row.shipmentId ? String(row.shipmentId) : (row.shipment_id ? String(row.shipment_id) : undefined),
         shipmentTitle: row.shipmentTitle || row.title || 'Gönderi',
         carrierName: row.carrierName || row.carrier?.name || 'Nakliyeci',
+        carrierId: row.carrierId ? String(row.carrierId) : (row.carrier?.id ? String(row.carrier.id) : undefined),
         carrierRating: row.carrierRating || row.carrier?.rating || 4.5,
         carrierVerified: row.carrierVerified || row.carrier?.verified || false,
         carrierReviews: row.carrierReviews || row.carrier?.reviews || 0,
@@ -148,47 +171,49 @@ export default function Offers() {
         price: row.price || row.offerPrice || 0,
         estimatedDelivery: row.estimatedDelivery || row.deliveryDate || '',
         message: row.message || row.notes || '',
-        status: row.status || 'pending',
-        createdAt: row.createdAt || new Date().toISOString(),
-        pickupAddress: row.pickupAddress || row.pickupCity || '',
-        deliveryAddress: row.deliveryAddress || row.deliveryCity || '',
-        weight: row.weight ? `${row.weight}kg` : '0kg',
-        dimensions: row.dimensions || '',
-        specialFeatures: row.specialFeatures || [],
+        status: normalizeOfferStatus(row.status),
+        createdAt: row.createdAt || row.created_at || new Date().toISOString(),
+        pickupAddress: row.pickupAddress || row.pickup_address || '',
+        deliveryAddress: row.deliveryAddress || row.delivery_address || '',
+        weight: row.weight || '',
+        dimensions: row.dimensions || row.size || '',
+        specialFeatures: row.specialFeatures || row.special_features || [],
         tracking: row.tracking || false,
         priority: row.priority || 'medium',
         trackingCode: row.trackingCode || `SHP-${row.id}`,
-        carrierPhone: row.carrierPhone || row.carrier?.phone || '',
-        carrierEmail: row.carrierEmail || row.carrier?.email || '',
         carrierLogo:
           row.carrierLogo ||
           (row.carrierName ? row.carrierName.charAt(0).toUpperCase() : 'N'),
         recentComments: row.recentComments || [],
-        responseTime: row.responseTime || '1 saat',
+        responseTime: row.responseTime || '2 saat',
         successRate: row.successRate || 95,
       }));
 
       setOffers(mappedOffers);
 
-      // Calculate stats from offers
-      const statsData = {
-        totalOffers: mappedOffers.length,
-        pendingOffers: mappedOffers.filter(o => o.status === 'pending').length,
-        acceptedOffers: mappedOffers.filter(o => o.status === 'accepted')
-          .length,
-        rejectedOffers: mappedOffers.filter(o => o.status === 'rejected')
-          .length,
-        averagePrice:
-          mappedOffers.length > 0
-            ? mappedOffers.reduce((sum: number, o) => sum + (o.price || 0), 0) /
-              mappedOffers.length
-            : 0,
-        unreadCount: 0,
-      };
-      setStats(data.stats || statsData);
+      const totalOffers = mappedOffers.length;
+      const pendingOffers = mappedOffers.filter(o => o.status === 'pending').length;
+      const acceptedOffers = mappedOffers.filter(o => o.status === 'accepted').length;
+      const rejectedOffers = mappedOffers.filter(o => o.status === 'rejected').length;
+      const averagePrice =
+        totalOffers > 0
+          ? mappedOffers.reduce((sum: number, o) => sum + (o.price || 0), 0) /
+            totalOffers
+          : 0;
+
+      setStats(
+        data.stats || {
+          totalOffers,
+          pendingOffers,
+          acceptedOffers,
+          rejectedOffers,
+          averagePrice,
+          unreadCount: 0,
+        }
+      );
     } catch (error) {
       if (import.meta.env.DEV) {
-        console.error('Error loading offers:', error);
+        // Error loading offers
       }
       // Set empty arrays and zero stats when there's an error
       setOffers([]);
@@ -207,11 +232,12 @@ export default function Offers() {
 
   const filteredOffers = offers.filter(offer => {
     const matchesStatus =
-      filterStatus === 'all' || offer.status === filterStatus;
-    const matchesSearch =
-      offer.shipmentTitle.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      offer.carrierName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      offer.trackingCode.toLowerCase().includes(searchTerm.toLowerCase());
+      filterStatus === 'all' ? true : offer.status === filterStatus;
+    const matchesSearch = !searchTerm || searchTerm.trim() === '' || (
+      (offer.shipmentTitle || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (offer.carrierName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (offer.trackingCode || '').toLowerCase().includes(searchTerm.toLowerCase())
+    );
     return matchesStatus && matchesSearch;
   });
 
@@ -253,52 +279,53 @@ export default function Offers() {
     setShowAcceptConfirmModal(false);
     
     try {
-      const user = localStorage.getItem('user')
-        ? (() => {
-            try {
-              return JSON.parse(localStorage.getItem('user') || '{}');
-            } catch {
-              return {};
-            }
-          })()
-        : null;
-      const userId = user?.id;
       const token = localStorage.getItem('authToken');
-      const response = await fetch(`/api/offers/${offerToAccept}/accept`, {
+      const response = await fetch(createApiUrl(`/api/offers/${offerToAccept}/accept`), {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token || ''}`,
-          'X-User-Id': userId || '',
           'Content-Type': 'application/json',
         },
       });
 
+      const payload = await response.json().catch(() => null);
+
       if (!response.ok) {
-        throw new Error('Failed to accept offer');
+        throw new Error(payload?.message || 'Failed to accept offer');
       }
+
+      const localOffer = offers.find(o => String(o.id) === String(offerToAccept)) || null;
+      const carrierId = payload?.data?.carrierId
+        ? String(payload.data.carrierId)
+        : (localOffer?.carrierId ? String(localOffer.carrierId) : null);
+      const shipmentId = payload?.data?.shipmentId
+        ? String(payload.data.shipmentId)
+        : (localOffer?.shipmentId ? String(localOffer.shipmentId) : null);
+      setPaymentCarrierId(carrierId);
+      setPaymentShipmentId(shipmentId);
+      setPaymentPrefill(`Merhaba, ödeme detaylarını netleştirelim. İş No: #${shipmentId || ''}`.trim());
+      setShowPaymentModal(true);
 
       setSuccessMessage(
         'Teklif başarıyla kabul edildi! Gönderilerim sayfasına yönlendiriliyorsunuz...'
       );
       setShowSuccessMessage(true);
-      setOffers(prev =>
-        prev.map(offer =>
-          offer.id === offerToAccept
-            ? { ...offer, status: 'accepted' as const }
-            : offer
-        )
-      );
+      setOffers(prev => prev.filter(offer => offer.id !== offerToAccept));
       setStats(prev => ({
         ...prev,
-        pendingOffers: prev.pendingOffers - 1,
+        pendingOffers: Math.max(0, prev.pendingOffers - 1),
         acceptedOffers: prev.acceptedOffers + 1,
       }));
-      setTimeout(() => {
-        setShowSuccessMessage(false);
-        navigate('/corporate/shipments');
+
+      await loadOffers();
+      navigateTimerRef.current = setTimeout(() => {
+        if (!paymentModalOpenRef.current) {
+          setShowSuccessMessage(false);
+          navigate('/corporate/shipments', { state: { refresh: true } });
+        }
       }, 2000);
     } catch (error) {
-      console.error('Error accepting offer:', error);
+      // Error accepting offer
       setSuccessMessage('Teklif kabul edilirken bir hata oluştu.');
       setShowSuccessMessage(true);
     } finally {
@@ -310,22 +337,11 @@ export default function Offers() {
   const handleRejectOffer = async (offerId: string) => {
     setIsLoading(true);
     try {
-      const user = localStorage.getItem('user')
-        ? (() => {
-            try {
-              return JSON.parse(localStorage.getItem('user') || '{}');
-            } catch {
-              return {};
-            }
-          })()
-        : null;
-      const userId = user?.id;
       const token = localStorage.getItem('authToken');
-      const response = await fetch(`/api/offers/${offerId}/reject`, {
+      const response = await fetch(createApiUrl(`/api/offers/${offerId}/reject`), {
         method: 'PUT',
         headers: {
           Authorization: `Bearer ${token || ''}`,
-          'X-User-Id': userId || '',
           'Content-Type': 'application/json',
         },
       });
@@ -336,21 +352,17 @@ export default function Offers() {
 
       setSuccessMessage('Teklif başarıyla reddedildi!');
       setShowSuccessMessage(true);
-      setOffers(prev =>
-        prev.map(offer =>
-          offer.id === offerId
-            ? { ...offer, status: 'rejected' as const }
-            : offer
-        )
-      );
+      setOffers(prev => prev.filter(offer => offer.id !== offerId));
       setStats(prev => ({
         ...prev,
-        pendingOffers: prev.pendingOffers - 1,
+        pendingOffers: Math.max(0, prev.pendingOffers - 1),
         rejectedOffers: prev.rejectedOffers + 1,
       }));
+      // Reload offers to ensure sync with backend
+      await loadOffers();
       setTimeout(() => setShowSuccessMessage(false), 2000);
     } catch (error) {
-      console.error('Error rejecting offer:', error);
+      // Error rejecting offer
       setSuccessMessage('Teklif reddedilirken bir hata oluştu.');
       setShowSuccessMessage(true);
     } finally {
@@ -368,25 +380,14 @@ export default function Offers() {
     }
   };
 
-  const handleContactCarrier = (carrierPhone: string, carrierEmail: string) => {
-    setContactCarrier({ phone: carrierPhone, email: carrierEmail });
+  const isMessagingEnabledForOffer = (status?: any) => {
+    const s = String(status || '').trim();
+    return s === 'accepted';
+  };
+
+  const handleContactCarrier = (status?: any) => {
+    if (!isMessagingEnabledForOffer(status)) return;
     setShowContactModal(true);
-  };
-
-  const handleContactPhone = () => {
-    if (contactCarrier) {
-      window.location.href = `tel:${contactCarrier.phone}`;
-      setShowContactModal(false);
-      setContactCarrier(null);
-    }
-  };
-
-  const handleContactEmail = () => {
-    if (contactCarrier) {
-      window.location.href = `mailto:${contactCarrier.email}`;
-      setShowContactModal(false);
-      setContactCarrier(null);
-    }
   };
 
   if (isLoading) {
@@ -708,7 +709,7 @@ export default function Offers() {
                         <>
                           <button
                             onClick={() => handleAcceptOffer(offer.id)}
-                            className='px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-1'
+                            className='px-4 py-2 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white text-sm font-medium rounded-lg transition-all duration-200 shadow-md hover:shadow-lg flex items-center gap-1'
                           >
                             <CheckCircle className='w-4 h-4' />
                             Kabul Et
@@ -718,7 +719,7 @@ export default function Offers() {
                               setOfferToReject(offer.id);
                               setShowRejectModal(true);
                             }}
-                            className='px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-1'
+                            className='px-4 py-2 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white text-sm font-medium rounded-lg transition-all duration-200 shadow-md hover:shadow-lg flex items-center gap-1'
                           >
                             <XCircle className='w-4 h-4' />
                             Reddet
@@ -732,17 +733,19 @@ export default function Offers() {
                         <Eye className='w-4 h-4' />
                         Detay
                       </button>
+                      {/* Gizlilik Kuralı: Sadece mesajlaşma butonu göster, telefon/email gizli */}
                       <button
-                        onClick={() =>
-                          handleContactCarrier(
-                            offer.carrierPhone,
-                            offer.carrierEmail
-                          )
-                        }
-                        className='px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition-colors flex items-center gap-1'
+                        onClick={() => handleContactCarrier(offer.status)}
+                        disabled={!isMessagingEnabledForOffer(offer.status)}
+                        title={!isMessagingEnabledForOffer(offer.status) ? 'Mesajlaşma teklif kabul edilince açılır' : 'Nakliyeci ile mesajlaş'}
+                        className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-1 ${
+                          isMessagingEnabledForOffer(offer.status)
+                            ? 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                            : 'bg-gray-50 text-gray-400 cursor-not-allowed'
+                        }`}
                       >
                         <MessageCircle className='w-4 h-4' />
-                        İletişim
+                        Mesajlaş
                       </button>
                     </div>
                   </div>
@@ -883,43 +886,6 @@ export default function Offers() {
                     </div>
                   </div>
 
-                  {/* Contact Info - Only show after acceptance */}
-                  {selectedOffer.status === 'accepted' && (
-                    <div className='bg-white rounded-xl p-6 border border-slate-200'>
-                      <h5 className='text-lg font-bold text-slate-900 mb-4 flex items-center gap-2'>
-                        <MessageCircle className='w-5 h-5 text-blue-600' />
-                        İletişim Bilgileri
-                      </h5>
-                      <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-                        <div className='flex items-center gap-3 p-3 bg-slate-50 rounded-lg'>
-                          <div className='w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center'>
-                            <Phone className='w-5 h-5 text-green-600' />
-                          </div>
-                          <div>
-                            <div className='text-sm text-slate-500'>
-                              Telefon
-                            </div>
-                            <div className='font-semibold text-slate-900'>
-                              {selectedOffer.carrierPhone}
-                            </div>
-                          </div>
-                        </div>
-                        <div className='flex items-center gap-3 p-3 bg-slate-50 rounded-lg'>
-                          <div className='w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center'>
-                            <Mail className='w-5 h-5 text-blue-600' />
-                          </div>
-                          <div>
-                            <div className='text-sm text-slate-500'>
-                              E-posta
-                            </div>
-                            <div className='font-semibold text-slate-900'>
-                              {selectedOffer.carrierEmail}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
                 </div>
 
                 {/* Reviews Section */}
@@ -1025,30 +991,57 @@ export default function Offers() {
           title='Teklifi Kabul Et'
         >
           <div className='p-6 space-y-6'>
-            {/* ÖNEMLİ UYARI */}
-            <div className='bg-red-50 border-2 border-red-300 rounded-xl p-4 space-y-3'>
+            {(() => {
+              const offer = offers.find(o => String(o.id) === String(offerToAccept)) || null;
+              if (!offer) return null;
+              return (
+                <div className='bg-slate-50 border border-slate-200 rounded-xl p-4'>
+                  <div className='text-sm font-semibold text-slate-900 mb-2'>Özet</div>
+                  <div className='grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm'>
+                    <div>
+                      <div className='text-xs text-slate-500'>Nakliyeci</div>
+                      <div className='font-medium text-slate-900'>{offer.carrierName || 'Nakliyeci'}</div>
+                    </div>
+                    <div>
+                      <div className='text-xs text-slate-500'>Fiyat</div>
+                      <div className='font-medium text-slate-900'>₺{Number(offer.price || 0).toLocaleString('tr-TR')}</div>
+                    </div>
+                    <div>
+                      <div className='text-xs text-slate-500'>Tahmini Teslimat</div>
+                      <div className='font-medium text-slate-900'>{offer.estimatedDelivery || '-'}</div>
+                    </div>
+                  </div>
+                  <div className='mt-3 text-xs text-slate-600'>
+                    Kabul sonrası gönderi pazaryerinden kaldırılır ve nakliyeci bu işe atanır.
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Önemli Bilgilendirme */}
+            <div className='bg-amber-50 border-2 border-amber-300 rounded-xl p-4 space-y-2'>
               <div className='flex items-start gap-3'>
-                <AlertTriangle className='w-5 h-5 text-red-600 flex-shrink-0 mt-0.5' />
+                <AlertTriangle className='w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5' />
                 <div className='flex-1'>
-                  <h4 className='font-bold text-red-800 mb-2'>ÖNEMLİ UYARI: Sorumluluk Reddi</h4>
-                  <p className='text-sm text-red-700 font-semibold mb-2'>
-                    YolNext sadece bir aracı platformdur. Taşımacılık hizmetlerini bizzat sağlamaz ve hiçbir şekilde sorumluluk kabul etmez.
+                  <h4 className='font-semibold text-amber-900 mb-2'>Önemli Bilgilendirme</h4>
+                  <p className='text-sm text-amber-800'>
+                    YolNext bir aracı platformdur. Tüm riskler gönderici ve nakliyeci arasındadır. 
+                    Sigorta ihtiyacınız varsa, kendi sigortanızı yaptırmak sizin sorumluluğunuzdadır.
                   </p>
-                  <ul className='text-xs text-red-700 space-y-1 list-disc pl-4'>
-                    <li>Kaza, yaralanma, ölüm: YolNext sorumlu değildir</li>
-                    <li>Hırsızlık, kayıp, hasar: YolNext sorumlu değildir</li>
-                    <li>Gecikme, yanlış teslimat: YolNext sorumlu değildir</li>
-                    <li>Mali kayıplar: YolNext sorumlu değildir</li>
-                  </ul>
-                  <p className='text-xs text-red-700 font-semibold mt-2'>
-                    Tüm riskler gönderici ve nakliyeci arasındadır.
+                  <p className='text-sm text-amber-800 mt-2'>
+                    Ödeme öncesi IBAN, alıcı adı ve açıklamayı mesajlaşma üzerinden yazılı teyitleyin.
+                  </p>
+                  <p className='text-xs text-amber-700 mt-2'>
+                    <a href='/terms' target='_blank' rel='noopener noreferrer' className='underline hover:text-amber-900'>
+                      Detaylı bilgi için Kullanım Koşulları
+                    </a>
                   </p>
                 </div>
               </div>
             </div>
 
             <p className='text-slate-600'>
-              Bu teklifi kabul ederek, yukarıdaki sorumluluk reddini okuduğunuzu ve kabul ettiğinizi onaylıyorsunuz. 
+              Bu teklifi kabul ederek, yukarıdaki bilgilendirmeyi okuduğunuzu ve kabul ettiğinizi onaylıyorsunuz. 
               Teklifi kabul etmek istediğinizden emin misiniz?
             </p>
             
@@ -1064,99 +1057,57 @@ export default function Offers() {
               </button>
               <button
                 onClick={confirmAcceptOffer}
-                className='px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors'
+                className='px-6 py-2 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-lg transition-all duration-200 shadow-md hover:shadow-lg'
               >
-                Kabul Et ve Onayla
+                Kabul Et
               </button>
             </div>
           </div>
         </Modal>
 
-        {/* Reject Confirmation Modal */}
         <Modal
-          isOpen={showRejectModal}
-          onClose={() => setShowRejectModal(false)}
-          title='Teklifi Reddet'
-        >
-          <div className='p-6'>
-            <p className='text-slate-600 mb-6'>
-              Bu teklifi reddetmek istediğinizden emin misiniz? Bu işlem geri
-              alınamaz.
-            </p>
-            <div className='flex justify-end gap-3'>
-              <button
-                onClick={() => setShowRejectModal(false)}
-                className='px-4 py-2 text-slate-600 hover:text-slate-800 transition-colors'
-              >
-                İptal
-              </button>
-              <button
-                onClick={() =>
-                  offerToReject && handleRejectOffer(offerToReject)
-                }
-                className='px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors'
-              >
-                Reddet
-              </button>
-            </div>
-          </div>
-        </Modal>
-
-        {/* Contact Carrier Modal */}
-        <Modal
-          isOpen={showContactModal}
+          isOpen={showPaymentModal}
           onClose={() => {
-            setShowContactModal(false);
-            setContactCarrier(null);
+            setShowPaymentModal(false);
+            setPaymentCarrierId(null);
+            setPaymentShipmentId(null);
+            setPaymentPrefill('');
           }}
-          title='Nakliyeci ile İletişim'
-          size='md'
+          title='Ödeme ve Süreç'
         >
-          <div className='p-6 space-y-4'>
-            <p className='text-slate-600 mb-4'>
-              Nakliyeci ile iletişim kurmak için bir yöntem seçin:
-            </p>
-            <div className='space-y-3'>
-              <button
-                onClick={handleContactPhone}
-                className='w-full flex items-center gap-3 p-4 bg-gradient-to-r from-green-50 to-emerald-50 hover:from-green-100 hover:to-emerald-100 border border-green-200 rounded-xl transition-all duration-300 group'
-              >
-                <div className='w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform'>
-                  <Phone className='w-6 h-6 text-white' />
-                </div>
-                <div className='flex-1 text-left'>
-                  <div className='font-semibold text-slate-900'>Telefon ile Ara</div>
-                  <div className='text-sm text-slate-600'>{contactCarrier?.phone}</div>
-                </div>
-                <ArrowRight className='w-5 h-5 text-green-600 group-hover:translate-x-1 transition-transform' />
-              </button>
-              <button
-                onClick={handleContactEmail}
-                className='w-full flex items-center gap-3 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 border border-blue-200 rounded-xl transition-all duration-300 group'
-              >
-                <div className='w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform'>
-                  <Mail className='w-6 h-6 text-white' />
-                </div>
-                <div className='flex-1 text-left'>
-                  <div className='font-semibold text-slate-900'>E-posta Gönder</div>
-                  <div className='text-sm text-slate-600'>{contactCarrier?.email}</div>
-                </div>
-                <ArrowRight className='w-5 h-5 text-blue-600 group-hover:translate-x-1 transition-transform' />
-              </button>
+          <div className='space-y-4'>
+            <div className='text-sm text-slate-700'>
+              Ödemenizi anlaştığınız nakliyeci ile mesajlaşma üzerinden konuşabilirsiniz. Tutar, yöntem ve açıklama bilgisini netleştirmeniz önerilir.
             </div>
-            <div className='pt-4 border-t border-slate-200'>
+            <div className='p-3 rounded-lg bg-slate-50 border border-slate-200 text-sm text-slate-700'>
+              Hazır mesaj: <span className='font-semibold'>{paymentPrefill || 'Merhaba, ödeme detaylarını netleştirelim.'}</span>
+            </div>
+            <div className='flex gap-2 justify-end'>
               <button
+                className='btn-secondary'
                 onClick={() => {
-                  setShowContactModal(false);
-                  setContactCarrier(null);
+                  setShowPaymentModal(false);
+                  navigate('/corporate/shipments', { state: { refresh: true } });
                 }}
-                className='w-full px-4 py-2 text-slate-600 hover:text-slate-800 transition-colors font-medium'
               >
-                İptal
+                Sonra
+              </button>
+              <button
+                className='btn-primary'
+                disabled={!paymentCarrierId}
+                onClick={() => {
+                  const params = new URLSearchParams();
+                  if (paymentCarrierId) params.set('userId', String(paymentCarrierId));
+                  if (paymentPrefill) params.set('prefill', paymentPrefill);
+                  navigate(`/corporate/messages?${params.toString()}`);
+                }}
+              >
+                Mesajı Aç
               </button>
             </div>
           </div>
         </Modal>
+
       </div>
     </div>
   );

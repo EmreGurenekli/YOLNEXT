@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -8,26 +8,22 @@ import {
   Truck,
   UserCheck,
   ArrowRight,
-  Mail,
-  Lock,
-  User,
-  Phone,
   CheckCircle,
   Shield,
   Clock,
   Globe,
-  Star,
-  AlertTriangle,
   Loader2,
   XCircle,
 } from 'lucide-react';
 import YolNextLogo from '../components/common/yolnextLogo';
 import { createApiUrl } from '../config/api';
+import { analytics } from '../services/analytics';
 
 const Register = () => {
   const navigate = useNavigate();
   const { register } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const [abVariant] = useState(() => analytics.ab.getVariant('ab_landing_v1'));
   const [error, setError] = useState('');
   const [verificationStatus, setVerificationStatus] = useState<
     'pending' | 'verifying' | 'verified' | 'rejected'
@@ -74,6 +70,13 @@ const Register = () => {
     acceptKVKK: false, // KVKK Aydınlatma Metni onayı
   });
 
+  useEffect(() => {
+    analytics.track('register_view', {
+      ab: abVariant,
+      userType: formData.userType,
+    });
+  }, [abVariant]);
+
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
@@ -84,46 +87,38 @@ const Register = () => {
       [name]: type === 'checkbox' ? checked : value,
     }));
 
-    // Gerçek zamanlı doğrulama
+    // Sadece format kontrolü yap, API çağrısını blur veya submit'te yap
     if (name === 'email' && value) {
-      verifyEmail(value).then(isValid => {
-        if (!isValid) {
-          setError('Geçersiz e-posta formatı');
-        } else {
-          setError('');
-        }
-      });
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(value)) {
+        setError('Geçersiz e-posta formatı');
+      } else {
+        setError(''); // Format doğruysa hatayı temizle
+      }
     }
 
     if (name === 'phone' && value) {
-      verifyPhoneNumber(value).then(isValid => {
-        if (!isValid) {
-          setError('Geçersiz telefon numarası formatı');
-        } else {
-          setError('');
-        }
-      });
+      const cleanPhone = value.replace(/\D/g, '');
+      if (!/^(\+90|0)?[5][0-9]{9}$/.test(cleanPhone)) {
+        setError('Geçersiz telefon numarası formatı');
+      } else {
+        setError(''); // Format doğruysa hatayı temizle
+      }
     }
 
     if (name === 'taxNumber' && value) {
-      verifyTaxNumber(value).then(isValid => {
-        if (!isValid) {
-          setError('Geçersiz vergi numarası');
-        } else {
-          setError('');
-        }
-      });
+      if (value.length !== 10 || !/^\d{10}$/.test(value)) {
+        setError('Geçersiz vergi numarası formatı');
+      } else {
+        setError(''); // Format doğruysa hatayı temizle
+      }
     }
+  };
 
-    // Kaldırıldı: driverLicenseNumber validation
-    if (false && name === 'driverLicenseNumber' && value) {
-      verifyDriverLicense(value).then(isValid => {
-        if (!isValid) {
-          setError('Geçersiz ehliyet numarası (11 haneli olmalı)');
-        } else {
-          setError('');
-        }
-      });
+  // E-posta blur (odaktan çıkma) işlemi
+  const handleEmailBlur = async () => {
+    if (formData.email) {
+      await verifyEmail(formData.email);
     }
   };
 
@@ -216,50 +211,15 @@ const Register = () => {
     }
   };
 
-  const verifyDriverLicense = async (licenseNumber: string) => {
-    // 1. Format kontrolü
-    if (!/^\d{11}$/.test(licenseNumber)) return false;
-
-    // 2. GERÇEK DOĞRULAMA - API çağrısı (ad-soyad ile)
-    try {
-      const response = await fetch(createApiUrl('/api/verify/driver-license'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          licenseNumber,
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-        }),
-      });
-
-      const result = await response.json();
-
-      if (result.isValid && result.driverInfo) {
-        // Gerçek sürücü bilgilerini göster
-        setVerificationMessage(
-          `✅ Doğrulandı: ${result.driverInfo.ad} ${result.driverInfo.soyad} - ${result.driverInfo.ehliyetSinifi}`
-        );
-      } else if (result.verificationDetails) {
-        // Doğrulama detaylarını göster
-        const { icisleri, nvi } = result.verificationDetails;
-        if (icisleri && nvi) {
-          setVerificationMessage(
-            `❌ Doğrulama başarısız: İçişleri: ${icisleri.found ? '✅' : '❌'}, NVI: ${nvi.found ? '✅' : '❌'}`
-          );
-        }
-      }
-
-      return result.isValid; // API'den gelen gerçek sonuç
-    } catch (error) {
-      console.error('Ehliyet doğrulama hatası:', error);
-      return false;
-    }
-  };
+  // verifyDriverLicense removed - not used
 
   const verifyPhoneNumber = async (phone: string) => {
     // 1. Format kontrolü
     const cleanPhone = phone.replace(/\D/g, '');
-    if (!/^(\+90|0)?[5][0-9]{9}$/.test(cleanPhone)) return false;
+    if (!/^(\+90|0)?[5][0-9]{9}$/.test(cleanPhone)) {
+      setError('Geçersiz telefon numarası formatı');
+      return false;
+    }
 
     // 2. GERÇEK DOĞRULAMA - SMS doğrulama
     try {
@@ -269,7 +229,24 @@ const Register = () => {
         body: JSON.stringify({ phone: cleanPhone }),
       });
 
+      if (!response.ok) {
+        console.error('Phone verification failed:', response.status);
+        setError('Telefon doğrulama hatası');
+        return false;
+      }
+
       const result = await response.json();
+
+      // Backend'den gelen mesajı kontrol et
+      if (result.message && (result.message.includes('daha önce kayıt olunmuş') || result.message.includes('already registered'))) {
+        setError('Bu telefon numarası ile daha önce kayıt olunmuş. Lütfen farklı bir telefon numarası kullanın.');
+        return false;
+      }
+
+      if (result.message && (result.message.includes('Geçersiz telefon numarası formatı') || result.message.includes('Invalid phone format'))) {
+        setError('Geçersiz telefon numarası formatı');
+        return false;
+      }
 
       if (result.requiresCode) {
         setShowCodeInput(true);
@@ -280,9 +257,16 @@ const Register = () => {
         return false; // Kod gerekli, henüz doğrulanmadı
       }
 
-      return result.isValid; // SMS doğrulama sonucu
+      if (result.isValid === true) {
+        setError(''); // Başarılı olduğunda hatayı temizle
+        return true;
+      }
+
+      setError(result.message || 'Telefon doğrulama başarısız');
+      return false;
     } catch (error) {
       console.error('Telefon doğrulama hatası:', error);
+      setError('Telefon doğrulama hatası');
       return false;
     }
   };
@@ -290,7 +274,10 @@ const Register = () => {
   const verifyEmail = async (email: string) => {
     // 1. Format kontrolü
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) return false;
+    if (!emailRegex.test(email)) {
+      setError('Geçersiz e-posta formatı');
+      return false;
+    }
 
     // 2. GERÇEK DOĞRULAMA - E-posta doğrulama
     try {
@@ -300,7 +287,26 @@ const Register = () => {
         body: JSON.stringify({ email }),
       });
 
+      if (!response.ok) {
+        // API hatası durumunda sadece format kontrolü yapıldıysa devam et
+        console.warn('Email verification API failed:', response.status);
+        // Format doğruysa devam et, backend çalışmıyor olabilir
+        setError('');
+        return true;
+      }
+
       const result = await response.json();
+
+      // Backend'den gelen mesajı kontrol et
+      if (result.message && (result.message.includes('daha önce kayıt olunmuş') || result.message.includes('already registered'))) {
+        setError('Bu e-posta adresi ile daha önce kayıt olunmuş. Lütfen farklı bir e-posta adresi kullanın.');
+        return false;
+      }
+
+      if (result.message && (result.message.includes('Geçersiz e-posta formatı') || result.message.includes('Invalid email format'))) {
+        setError('Geçersiz e-posta formatı');
+        return false;
+      }
 
       if (result.requiresCode) {
         setShowCodeInput(true);
@@ -309,10 +315,24 @@ const Register = () => {
         return false; // Kod gerekli, henüz doğrulanmadı
       }
 
-      return result.isValid; // E-posta doğrulama sonucu
-    } catch (error) {
-      console.error('E-posta doğrulama hatası:', error);
+      if (result.isValid === true || result.success === true) {
+        setError(''); // Başarılı olduğunda hatayı temizle
+        return true;
+      }
+
+      // Eğer isValid false ama mesaj yoksa, format kontrolü geçtiyse devam et
+      if (!result.message) {
+        setError('');
+        return true;
+      }
+
+      setError(result.message || 'E-posta doğrulama başarısız');
       return false;
+    } catch (error) {
+      console.warn('E-posta doğrulama API hatası (devam ediliyor):', error);
+      // API hatası durumunda format kontrolü geçtiyse devam et
+      setError('');
+      return true;
     }
   };
 
@@ -494,6 +514,15 @@ const Register = () => {
       setFormData(prev => ({ ...prev, district: districtInput.value }));
     }
 
+    // E-posta doğrulaması (submit sırasında)
+    if (formData.email) {
+      const emailValid = await verifyEmail(formData.email);
+      if (!emailValid) {
+        setIsLoading(false);
+        return;
+      }
+    }
+
     // Form validasyonu
     if (!validateForm()) {
       setIsLoading(false);
@@ -508,9 +537,19 @@ const Register = () => {
     }
 
     try {
-      const result = await register(formData);
+      // Type assertion for userType to match RegisterUserData interface
+      const registerData = {
+        ...formData,
+        userType: formData.userType as 'individual' | 'corporate' | 'nakliyeci' | 'tasiyici'
+      };
+      const result = await register(registerData);
 
       if (result.success && result.user) {
+        analytics.track('signup_complete', {
+          ab: abVariant,
+          userType: formData.userType,
+          userId: result.user?.id,
+        });
         // If user is tasiyici and has driverCode, show modal
         if (formData.userType === 'tasiyici' && result.user.driverCode) {
           setDriverCode(result.user.driverCode);
@@ -535,9 +574,19 @@ const Register = () => {
           }
         }
       } else {
+        analytics.track('signup_error', {
+          ab: abVariant,
+          userType: formData.userType,
+          reason: result.error || 'register_failed',
+        });
         setError(result.error || 'Kayıt başarısız');
       }
-    } catch (error: any) {
+    } catch (error) {
+      analytics.track('signup_error', {
+        ab: abVariant,
+        userType: formData.userType,
+        reason: 'exception',
+      });
       setError('Kayıt başarısız. Lütfen tekrar deneyin.');
       console.error('Registration error:', error);
     } finally {
@@ -828,6 +877,7 @@ const Register = () => {
                   name='email'
                   value={formData.email}
                   onChange={handleInputChange}
+                  onBlur={handleEmailBlur}
                   className='w-full mt-1 px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
                   placeholder='ornek@email.com'
                   required
@@ -1193,7 +1243,7 @@ const Register = () => {
                     <Link to='/terms' target='_blank' className='text-blue-600 hover:text-blue-700 underline font-medium'>
                       Kullanım Koşulları
                     </Link>
-                    'nı okudum ve kabul ediyorum
+                    &apos;nı okudum ve kabul ediyorum
                   </span>
                 </label>
 
@@ -1210,7 +1260,7 @@ const Register = () => {
                     <Link to='/privacy' target='_blank' className='text-blue-600 hover:text-blue-700 underline font-medium'>
                       Gizlilik Politikası
                     </Link>
-                    'nı okudum ve kabul ediyorum
+                    &apos;nı okudum ve kabul ediyorum
                   </span>
                 </label>
 
@@ -1227,7 +1277,7 @@ const Register = () => {
                     <Link to='/cookie-policy' target='_blank' className='text-blue-600 hover:text-blue-700 underline font-medium'>
                       Çerez Politikası
                     </Link>
-                    'nı okudum ve kabul ediyorum
+                    &apos;nı okudum ve kabul ediyorum
                   </span>
                 </label>
 
@@ -1241,10 +1291,10 @@ const Register = () => {
                     required
                   />
                   <span className='text-sm text-gray-700 group-hover:text-gray-900'>
-                    <Link to='/kvkk' target='_blank' className='text-blue-600 hover:text-blue-700 underline font-medium'>
+                    <Link to='/kvkk-aydinlatma' target='_blank' className='text-blue-600 hover:text-blue-700 underline font-medium'>
                       KVKK Aydınlatma Metni
                     </Link>
-                    'ni okudum ve anladım
+                    &apos;ni okudum ve anladım
                   </span>
                 </label>
 

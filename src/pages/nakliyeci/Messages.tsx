@@ -5,7 +5,6 @@ import {
   Search,
   Send,
   MoreVertical,
-  Phone,
   Video,
   Paperclip,
   Smile,
@@ -98,11 +97,9 @@ export default function NakliyeciMessages() {
 
       if (response.ok) {
         const responseData = await response.json();
-        const messagesData = responseData.success
-          ? responseData.data || (Array.isArray(responseData.data) ? responseData.data : [])
-          : Array.isArray(responseData) 
-            ? responseData 
-            : (responseData.data || responseData.messages || []);
+        const messagesData = Array.isArray(responseData)
+          ? responseData
+          : (responseData.data || responseData.messages || []);
         
         if (responseData.pagination) {
           setPagination(prev => ({
@@ -116,7 +113,7 @@ export default function NakliyeciMessages() {
         // Group messages by conversation
         const conversationMap = new Map();
 
-        messagesData.forEach((msg: any) => {
+        messagesData.forEach((msg: any, idx: number) => {
           const senderId = msg.sender_id || msg.senderId;
           const receiverId = msg.receiver_id || msg.receiverId;
           const otherUserId = senderId === currentUserId ? receiverId : senderId;
@@ -130,7 +127,11 @@ export default function NakliyeciMessages() {
             ? (msg.receiverName || msg.receiver_name) 
             : (msg.senderName || msg.sender_name);
           
-          const conversationId = msg.conversation_id || otherUserId || msg.other_user_id;
+          const conversationIdRaw = msg.conversation_id || otherUserId || msg.other_user_id;
+          const conversationId =
+            conversationIdRaw != null && String(conversationIdRaw).trim() !== ''
+              ? String(conversationIdRaw)
+              : `conv_${String(otherUserId || 'unknown')}_${idx}`;
           if (!conversationMap.has(conversationId)) {
             conversationMap.set(conversationId, {
               id: conversationId,
@@ -401,41 +402,6 @@ export default function NakliyeciMessages() {
                   description='Bir konuşma seçerek mesajlaşmaya başlayın.'
                 />
               </div>
-            ) : selectedConversation.participantType === 'tasiyici' && selectedConversation.participantPhone ? (
-              <div className='bg-white rounded-xl sm:rounded-2xl shadow-lg border border-slate-200 flex flex-col h-96 items-center justify-center p-8'>
-                <div className='text-center max-w-md'>
-                  <div className='w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4'>
-                    <Phone className='w-8 h-8 text-blue-600' />
-                  </div>
-                  <h3 className='text-xl font-bold text-slate-900 mb-2'>
-                    {selectedConversation.participant}
-                  </h3>
-                  <p className='text-slate-600 mb-6'>
-                    Taşıyıcı ile mesajlaşma yapılamaz. Lütfen telefon numarası üzerinden iletişime geçin.
-                  </p>
-                  <div className='flex items-center justify-between p-4 bg-blue-50 rounded-lg border border-blue-200 mb-4'>
-                    <div className='flex items-center gap-3 flex-1'>
-                      <Phone className='w-5 h-5 text-blue-600' />
-                      <div>
-                        <div className='text-xs text-slate-500 mb-1'>Telefon</div>
-                        <a
-                          href={`tel:${selectedConversation.participantPhone}`}
-                          className='font-bold text-blue-600 hover:text-blue-700 text-lg'
-                        >
-                          {selectedConversation.participantPhone}
-                        </a>
-                      </div>
-                    </div>
-                    <a
-                      href={`tel:${selectedConversation.participantPhone}`}
-                      className='px-6 py-3 bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 text-white rounded-lg font-medium transition-all duration-300 flex items-center gap-2 shadow-md hover:shadow-lg whitespace-nowrap'
-                    >
-                      <Phone className='w-5 h-5' />
-                      Ara
-                    </a>
-                  </div>
-                </div>
-              </div>
             ) : (
               <div className='bg-white rounded-xl sm:rounded-2xl shadow-lg border border-slate-200 flex flex-col h-96'>
                 {/* Chat Header */}
@@ -456,15 +422,6 @@ export default function NakliyeciMessages() {
                     </div>
                   </div>
                   <div className='flex items-center gap-2'>
-                    {selectedConversation.participantPhone && (
-                      <a
-                        href={`tel:${selectedConversation.participantPhone}`}
-                        className='p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors'
-                        title='Telefon ara'
-                      >
-                        <Phone className='w-4 h-4' />
-                      </a>
-                    )}
                     <button className='p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors'>
                       <Video className='w-4 h-4' />
                     </button>

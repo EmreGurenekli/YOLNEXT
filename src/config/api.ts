@@ -41,7 +41,10 @@ export const API_ENDPOINTS = {
   LOGIN: '/api/auth/login',
   REGISTER: '/api/auth/register',
   DEMO_LOGIN: '/api/auth/demo-login',
+  FORGOT_PASSWORD: '/api/auth/forgot-password',
+  RESET_PASSWORD: '/api/auth/reset-password',
   PROFILE: '/api/users/profile',
+  DELETE_ACCOUNT: '/api/users/account',
 
   // Shipments
   SHIPMENTS: '/api/shipments',
@@ -53,6 +56,17 @@ export const API_ENDPOINTS = {
   OFFERS: '/api/offers',
   OFFERS_ACCEPT: '/api/offers/:id/accept',
 
+  // KVKK (GDPR)
+  KVKK_DATA_ACCESS: '/api/kvkk/data-access',
+  KVKK_DELETE_DATA: '/api/kvkk/delete-data',
+
+  // Carriers
+  CARRIERS_CORPORATE: '/api/carriers/corporate',
+  CARRIERS_CORPORATE_LINK: '/api/carriers/corporate/link',
+
+  // Drivers
+  DRIVERS_LINK: '/api/drivers/link',
+
   // Health
   HEALTH: '/health',
 };
@@ -61,13 +75,24 @@ export const API_ENDPOINTS = {
 export const createApiUrl = (endpoint: string): string => {
   const config = getApiConfig();
   // Remove trailing slash from baseURL
-  const base = config.baseURL.replace(/\/$/, '');
-  // Ensure endpoint starts with /
-  const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  let base = config.baseURL.replace(/\/$/, '');
   
-  // If baseURL ends with /api and endpoint starts with /api, remove /api from base
-  if (base.endsWith('/api') && path.startsWith('/api')) {
-    return `${base.replace(/\/api$/, '')}${path}`;
+  // If baseURL already ends with /api, remove it to avoid double /api/api/
+  if (base.endsWith('/api')) {
+    base = base.substring(0, base.length - 4);
+  }
+  
+  // Ensure endpoint starts with /
+  let path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  
+  // If endpoint already starts with /api/, use it directly with baseURL
+  if (path.startsWith('/api/')) {
+    return `${base}${path}`;
+  }
+  
+  // If endpoint doesn't start with /api, add it
+  if (!path.startsWith('/api')) {
+    path = `/api${path}`;
   }
   
   return `${base}${path}`;

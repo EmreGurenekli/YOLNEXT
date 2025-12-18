@@ -271,13 +271,13 @@ class RealApiService {
     notificationId: number
   ): Promise<ApiResponse<void>> {
     return this.request<void>(`/notifications/${notificationId}/read`, {
-      method: 'POST',
+      method: 'PUT',
     });
   }
 
   async markAllNotificationsAsRead(): Promise<ApiResponse<void>> {
     return this.request<void>('/notifications/mark-all-read', {
-      method: 'POST',
+      method: 'PUT',
     });
   }
 

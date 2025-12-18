@@ -72,21 +72,21 @@ export const SecurityProvider: React.FC<SecurityProviderProps> = ({
       const token = localStorage.getItem('authToken');
 
       // Skip verification for demo tokens
-      if (token && token.startsWith('demo-jwt-token-')) {
+      if (token && token.startsWith('demo-token-')) {
         console.log('🔐 Demo token detected, skipping verification');
         setIsAuthenticated(true);
         return;
       }
 
       const response = await userAPI.getProfile();
-      setUser(response.data.data);
+      setUser(response.data?.user || response.data);
       setIsAuthenticated(true);
     } catch (error) {
       console.error('Token verification failed:', error);
 
       // Don't remove demo tokens
       const token = localStorage.getItem('authToken');
-      if (token && token.startsWith('demo-jwt-token-')) {
+      if (token && token.startsWith('demo-token-')) {
         console.log('🔐 Demo token verification failed, but keeping token');
         setIsAuthenticated(true);
         return;
@@ -112,8 +112,10 @@ export const SecurityProvider: React.FC<SecurityProviderProps> = ({
       }
 
       const response = await authAPI.login(credentials);
-      localStorage.setItem('authToken', response.data.token);
-      setUser(response.data.data);
+      if (response?.data?.token) {
+        localStorage.setItem('authToken', response.data.token);
+      }
+      setUser(response?.data?.user || null);
       setIsAuthenticated(true);
 
       // Log security event

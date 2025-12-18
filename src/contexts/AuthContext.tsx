@@ -5,10 +5,76 @@ import React, {
   useEffect,
   ReactNode,
 } from 'react';
-import { authAPI, userAPI } from '../services/api';
+import { createApiUrl } from '../config/api';
+// Temporary workaround
+const authAPI = {
+  login: async (credentials: { email: string; password: string }) => {
+    const response = await fetch(createApiUrl('/api/auth/login'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(credentials)
+    });
+    return response.json();
+  },
+  register: async (userData: RegisterUserData) => {
+    const response = await fetch(createApiUrl('/api/auth/register'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(userData)
+    });
+    return response.json();
+  },
+  demoLogin: async (userType: string) => {
+    const response = await fetch(createApiUrl('/api/auth/demo-login'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userType })
+    });
+    return response.json();
+  },
+  getProfile: async () => {
+    const response = await fetch(createApiUrl('/api/users/profile'), {
+      headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken') || localStorage.getItem('token')}` }
+    });
+    return response.json();
+  }
+};
 import { User } from '../types/auth';
 import socketService from '../services/socket';
-import { createApiUrl, API_ENDPOINTS } from '../config/api';
+
+// Register user data interface
+interface RegisterUserData {
+  email: string;
+  password: string;
+  firstName?: string;
+  lastName?: string;
+  fullName?: string;
+  phone?: string;
+  userType: 'individual' | 'corporate' | 'nakliyeci' | 'tasiyici';
+  companyName?: string;
+  taxId?: string;
+  [key: string]: unknown;
+}
+
+// API Response interface
+interface ApiResponse<T = unknown> {
+  success: boolean;
+  data?: T;
+  message?: string;
+  user?: User;
+  token?: string;
+  error?: string;
+}
+
+// Error interface
+interface ApiError {
+  response?: {
+    data?: {
+      message?: string;
+    };
+  };
+  message?: string;
+}
 
 interface AuthContextType {
   user: User | null;
@@ -20,7 +86,7 @@ interface AuthContextType {
     password: string
   ) => Promise<{ success: boolean; user?: User }>;
   register: (
-    userData: any
+    userData: RegisterUserData
   ) => Promise<{ success: boolean; user?: User; error?: string }>;
   logout: () => void;
   updateUser: (userData: Partial<User>) => void;
@@ -57,34 +123,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     getItem: (key: string): string | null => {
       try {
         if (typeof window !== 'undefined' && window.localStorage) {
-          const value = window.localStorage.getItem(key);
-          console.log(`localStorage.getItem('${key}') =`, value);
-          return value;
+          return window.localStorage.getItem(key);
         }
         return null;
       } catch (error) {
-        console.error('localStorage getItem error:', error);
         return null;
       }
     },
     setItem: (key: string, value: string): void => {
       try {
-        console.log(`localStorage.setItem('${key}', '${value}')`);
         if (typeof window !== 'undefined' && window.localStorage) {
           window.localStorage.setItem(key, value);
         }
       } catch (error) {
-        console.error('localStorage setItem error:', error);
+        // Silently fail in production
       }
     },
     removeItem: (key: string): void => {
       try {
-        console.log(`localStorage.removeItem('${key}')`);
         if (typeof window !== 'undefined' && window.localStorage) {
           window.localStorage.removeItem(key);
         }
       } catch (error) {
-        console.error('localStorage removeItem error:', error);
+        // Silently fail in production
       }
     }
   };
@@ -92,39 +153,36 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   useEffect(() => {
     const initAuth = async () => {
       try {
-        console.log('Auth init started');
         const storedToken = safeLocalStorage.getItem('authToken');
         const storedUser = safeLocalStorage.getItem('user');
-        
-        console.log('Stored token:', storedToken);
-        console.log('Stored user:', storedUser);
 
         // Check if we have valid token and user data
         if (storedToken && storedUser) {
           try {
             const parsedUser = JSON.parse(storedUser);
-            console.log('Parsed user:', parsedUser);
             
             if (parsedUser && storedToken) {
-              setUser(parsedUser);
+              // Handle potential case sensitivity issues with nakliyeciCode and driverCode
+              const userWithFixedCase = {
+                ...parsedUser,
+                nakliyeciCode: parsedUser.nakliyeciCode || parsedUser.nakliyecicode || undefined,
+                driverCode: parsedUser.driverCode || parsedUser.drivercode || undefined
+              };
+              setUser(userWithFixedCase);
               setToken(storedToken);
-              console.log('Auth state restored from localStorage');
+              // Update localStorage with the corrected user data
+              safeLocalStorage.setItem('user', JSON.stringify(userWithFixedCase));
               // isAuthenticated will be true now because we check localStorage
             }
           } catch (parseError) {
-            console.error('Parse error:', parseError);
             // If parsing fails, clear storage
             safeLocalStorage.removeItem('authToken');
             safeLocalStorage.removeItem('user');
           }
-        } else {
-          console.log('No stored auth data found');
         }
       } catch (error) {
-        // Auth initialization error
-        console.error('Auth init error:', error);
+        // Silently fail in production
       } finally {
-        console.log('Auth init complete');
         setIsLoading(false);
       }
     };
@@ -135,26 +193,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const login = async (email: string, password: string) => {
     try {
       setIsLoading(true);
-      console.log('=== FRONTEND LOGIN ===');
-      console.log('email:', email);
       const response = await authAPI.login({ email, password });
-      console.log('Backend login response:', JSON.stringify(response, null, 2));
 
       if (response.success || response.data?.success) {
         // Backend response format: { success: true, data: { user: {...}, token: "..." } }
         // OR: { success: true, message: "...", data: { user: {...}, token: "..." } }
-        const userData = (response.data as any)?.user || (response as any).user;
-        const token = (response.data as any)?.token || (response as any).token;
+        const apiResponse = response as ApiResponse<{ user: User; token: string }>;
+        const userData = apiResponse.data?.user || apiResponse.user;
+        const token = apiResponse.data?.token || apiResponse.token;
 
         if (!userData || !token) {
           throw new Error('Invalid response format');
         }
 
-        console.log('=== LOGIN USER DATA ===');
-        console.log('userData:', JSON.stringify(userData, null, 2));
-        console.log('userData.firstName:', userData.firstName);
-        console.log('userData.lastName:', userData.lastName);
-        console.log('userData.fullName:', userData.fullName);
 
         // Build fullName from firstName and lastName if not provided
         let fullName = userData.fullName;
@@ -168,13 +219,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           } else if (lastName) {
             fullName = lastName;
           } else {
-            fullName = userData.name || 'Kullanıcı';
+            fullName = userData.fullName || 'Kullanıcı';
           }
         }
         
-        const firstName = userData.firstName || userData.name?.split(' ')[0] || '';
-        const lastName = userData.lastName || userData.name?.split(' ').slice(1).join(' ') || '';
-        const role = userData.role || userData.panel_type || userData.userType || 'individual';
+        const firstName = userData.firstName || userData.fullName?.split(' ')[0] || '';
+        const lastName = userData.lastName || userData.fullName?.split(' ').slice(1).join(' ') || '';
+        const role = userData.role || userData.panel_type || (userData as unknown as RegisterUserData).userType || 'individual';
         
         // If firstName/lastName are still empty, try to extract from fullName
         let finalFirstName = firstName;
@@ -199,14 +250,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           lastName: finalLastName,
           phone: userData.phone,
           companyName: userData.companyName,
+          nakliyeciCode: userData.nakliyeciCode || (userData as any).nakliyecicode || undefined,
+          driverCode: userData.driverCode || (userData as any).drivercode || undefined,
           createdAt: userData.createdAt || new Date().toISOString(),
           updatedAt: userData.updatedAt || new Date().toISOString(),
         };
         
-        console.log('=== FINAL LOGIN USER DATA ===');
-        console.log('finalUserData.fullName:', finalUserData.fullName);
-        console.log('finalUserData.firstName:', finalUserData.firstName);
-        console.log('finalUserData.lastName:', finalUserData.lastName);
 
         safeLocalStorage.setItem('authToken', token);
         safeLocalStorage.setItem('user', JSON.stringify(finalUserData));
@@ -224,11 +273,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           response.data?.message || response.message || 'Login failed'
         );
       }
-    } catch (error: any) {
+    } catch (error) {
       // Login error handled by error boundary
+      const apiError = error as ApiError;
       return {
         success: false,
-        error: error.response?.data?.message || 'Login failed',
+        error: apiError.response?.data?.message || apiError.message || 'Login failed',
       };
     } finally {
       setIsLoading(false);
@@ -236,16 +286,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const register = async (
-    userData: any
+    userData: RegisterUserData
   ): Promise<{ success: boolean; user?: User; error?: string }> => {
     try {
       setIsLoading(true);
-      console.log('=== FRONTEND REGISTER ===');
-      console.log('userData.firstName:', userData.firstName);
-      console.log('userData.lastName:', userData.lastName);
-      console.log('Full userData:', JSON.stringify(userData, null, 2));
       const response = await authAPI.register(userData);
-      console.log('Backend response:', JSON.stringify(response, null, 2));
 
       if (response.success || response.data?.success) {
         // Backend response format: { success: true, data: { user: {...}, token: "..." } }
@@ -253,11 +298,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const backendUserData = responseData.data?.user || responseData.user;
         const token = responseData.data?.token || responseData.token;
 
-        console.log('=== BACKEND USER DATA ===');
-        console.log('backendUserData:', JSON.stringify(backendUserData, null, 2));
-        console.log('backendUserData.firstName:', backendUserData?.firstName);
-        console.log('backendUserData.lastName:', backendUserData?.lastName);
-        console.log('backendUserData.fullName:', backendUserData?.fullName);
 
         if (!backendUserData || !token) {
           throw new Error('Invalid response format');
@@ -265,7 +305,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         
         // If backend doesn't return firstName/lastName, use the original userData
         if (!backendUserData.firstName && !backendUserData.lastName && userData.firstName && userData.lastName) {
-          console.log('Backend missing firstName/lastName, using original userData');
           backendUserData.firstName = userData.firstName;
           backendUserData.lastName = userData.lastName;
         }
@@ -283,13 +322,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           } else if (lastName) {
             fullName = lastName;
           } else {
-            fullName = backendUserData.name || 'Kullanıcı';
+            fullName = backendUserData.fullName || 'Kullanıcı';
           }
         }
         
-        const firstName = backendUserData.firstName || backendUserData.name?.split(' ')[0] || '';
-        const lastName = backendUserData.lastName || backendUserData.name?.split(' ').slice(1).join(' ') || '';
-        const role = backendUserData.role || backendUserData.panel_type || backendUserData.userType || 'individual';
+        const firstName = backendUserData.firstName || backendUserData.fullName?.split(' ')[0] || '';
+        const lastName = backendUserData.lastName || backendUserData.fullName?.split(' ').slice(1).join(' ') || '';
+        const role = backendUserData.role || backendUserData.panel_type || (backendUserData as unknown as RegisterUserData).userType || 'individual';
         
         // Create final user object with all required fields
         const finalUserData: User = {
@@ -301,6 +340,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           lastName: lastName,
           phone: backendUserData.phone,
           companyName: backendUserData.companyName,
+          nakliyeciCode: backendUserData.nakliyeciCode || (backendUserData as any).nakliyecicode || undefined,
+          driverCode: backendUserData.driverCode || (backendUserData as any).drivercode || undefined,
           createdAt: backendUserData.createdAt || new Date().toISOString(),
           updatedAt: backendUserData.updatedAt || new Date().toISOString(),
         };
@@ -316,17 +357,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           socketService.connect();
         }
 
-        return { success: true, user: userData };
+        return { success: true, user: finalUserData };
       } else {
         throw new Error(
           response.data?.message || response.message || 'Registration failed'
         );
       }
-    } catch (error: any) {
+    } catch (error) {
       // Register error handled by error boundary
+      const apiError = error as ApiError;
       return {
         success: false,
-        error: error.response?.data?.message || 'Registration failed',
+        error: apiError.response?.data?.message || apiError.message || 'Registration failed',
       };
     } finally {
       setIsLoading(false);
@@ -336,15 +378,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const logout = () => {
     try {
       // No API call needed for logout
-      console.log('Logout function called');
-      // Print stack trace to see where it's called from
-      console.trace('Logout call stack');
+      // Debug trace removed for production
+      // console.trace('Logout call stack');
     } catch (error) {
       // Logout error handled by error boundary
-      console.error('Logout error:', error);
+      // Silently fail in production
     } finally {
       // Clear local state and storage
-      console.log('Logging out - clearing auth state');
       setUser(null);
       setToken(null);
       safeLocalStorage.removeItem('authToken');
@@ -357,28 +397,32 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const updateUser = (userData: Partial<User>) => {
-    setUser(prev => (prev ? { ...prev, ...userData } : null));
+    setUser(prev => {
+      const updated = prev ? { ...prev, ...userData } : null;
+      if (updated) {
+        safeLocalStorage.setItem('user', JSON.stringify(updated));
+      }
+      return updated;
+    });
   };
 
   const demoLogin = async (userType: string) => {
     try {
       setIsLoading(true);
-      console.log('Demo login started for userType:', userType);
 
-      // Use fixed demo user IDs for consistency across sessions
-      const demoUserIds: Record<string, string> = {
-        individual: 'individual-1001',
-        corporate: 'corporate-1002',
-        nakliyeci: 'nakliyeci-1003',
-        tasiyici: 'tasiyici-1004',
+      // Use fixed demo user IDs that match database IDs (1001, 1002, 1003, 1004)
+      const demoUserIds: Record<string, number> = {
+        individual: 1001,
+        corporate: 1002,
+        nakliyeci: 1003,
+        tasiyici: 1004,
       };
       
-      // Get or create fixed demo user ID
-      const fallbackId = `${userType}-${Date.now() % 100000}`;
-      const demoUserId = demoUserIds[userType] || fallbackId;
-      const mockToken = `demo-token-${demoUserId}`;
+      const demoUserId = demoUserIds[userType] || 1001;
+      // Token format: demo-token-{role}-{id} (e.g., demo-token-individual-1001)
+      const mockToken = `demo-token-${userType}-${demoUserId}`;
       const mockUser: User = {
-        id: `demo-${demoUserId}`,
+        id: demoUserId.toString(),
         fullName: `${userType.charAt(0).toUpperCase() + userType.slice(1)} Demo User`,
         email: `demo@${userType}.com`,
         role: userType as 'individual' | 'corporate' | 'nakliyeci' | 'tasiyici',
@@ -386,34 +430,33 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         lastName: userType.charAt(0).toUpperCase() + userType.slice(1),
         phone: '05001112233',
         address: 'Demo Address',
-        companyName: userType === 'corporate' ? 'Demo Company' : undefined,
-        taxNumber: userType === 'corporate' ? '1234567890' : undefined,
+        companyName: userType === 'corporate' ? 'Demo A.Ş.' : userType === 'nakliyeci' ? 'Demo Nakliyat A.Ş.' : undefined,
+        taxNumber: userType === 'corporate' ? '1234567890' : userType === 'nakliyeci' ? '0987654321' : undefined,
+        nakliyeciCode: userType === 'nakliyeci' ? 'YN-10003' : undefined, // Demo nakliyeci için sabit kod
+        driverCode: userType === 'tasiyici' ? 'YD-01004' : undefined, // Demo taşıyıcı için sabit kod
         isVerified: true,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
 
-      console.log('Storing auth data to localStorage');
       // Store in localStorage
       safeLocalStorage.setItem('authToken', mockToken);
       safeLocalStorage.setItem('user', JSON.stringify(mockUser));
       
       // Verify storage
-      console.log('Stored token:', safeLocalStorage.getItem('authToken'));
-      console.log('Stored user:', safeLocalStorage.getItem('user'));
       
       // Update state
       setToken(mockToken);
       setUser(mockUser);
       
-      console.log('Demo login completed successfully');
 
       return { success: true, user: mockUser };
-    } catch (error: any) {
-      console.error('Demo login error:', error);
+    } catch (error) {
+      // Silently fail in production
+      const apiError = error as ApiError;
       return { 
         success: false, 
-        error: error?.message || 'Demo login failed'
+        error: apiError.message || 'Demo login failed'
       };
     } finally {
       setIsLoading(false);

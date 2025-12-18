@@ -16,6 +16,7 @@ import {
 import Breadcrumb from '../../components/common/Breadcrumb';
 import LoadingState from '../../components/common/LoadingState';
 import SuccessMessage from '../../components/common/SuccessMessage';
+import { createApiUrl } from '../../config/api';
 
 export default function Profile() {
   const { user } = useAuth();
@@ -44,7 +45,7 @@ export default function Profile() {
   const handleSave = async () => {
     setLoading(true);
     try {
-      const response = await fetch('/api/users/profile', {
+      const response = await fetch(createApiUrl('/api/users/profile'), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

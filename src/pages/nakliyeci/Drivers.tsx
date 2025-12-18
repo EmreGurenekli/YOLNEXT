@@ -1,39 +1,131 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { useAuth } from '../../contexts/AuthContext';
 import { 
   Users, 
-  Plus, 
   Search, 
-  Filter,
   Eye,
-  Edit,
   Trash2,
   Phone,
   Mail,
   MapPin,
-  Calendar,
   Star,
-  Award,
   Truck,
-  UserPlus,
-  RefreshCw,
-  MoreHorizontal,
   CheckCircle2,
   Clock,
-  AlertCircle,
-  TrendingUp,
-  Activity
+  Activity,
+  MessageSquare
 } from 'lucide-react';
 import Breadcrumb from '../../components/common/Breadcrumb';
-import EmptyState from '../../components/common/EmptyState';
+import Modal from '../../components/common/Modal';
+// Driver link data interface
+interface DriverLinkData {
+  code?: string | null;
+  email?: string | null;
+  driverId?: number;
+}
+
+// Temporary workaround
+const driversAPI = {
+  link: async (data: DriverLinkData) => {
+    const response = await fetch(createApiUrl('/api/drivers/link'), {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(data)
+    });
+    return response.json();
+  },
+  lookup: async (code: string) => {
+    const response = await fetch(createApiUrl(`/api/drivers/lookup/${encodeURIComponent(code)}`), {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+        'Content-Type': 'application/json',
+      }
+    });
+    return response.json();
+  },
+  delete: async (driverId: string) => {
+    const response = await fetch(createApiUrl(`/api/drivers/${driverId}`), {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    return response.json();
+  }
+};
 import { createApiUrl } from '../../config/api';
 import LoadingState from '../../components/common/LoadingState';
 
+const normalizeDriverIdentifier = (raw: string) => {
+  const input = (raw || '').trim();
+  if (!input) return '';
+
+  // Email
+  if (input.includes('@')) return input.toLowerCase();
+
+  const upper = input.replace(/[ıİ]/g, 'I').toUpperCase();
+  const cleaned = upper.replace(/[^A-Z0-9]/g, '');
+
+  // Accept YD-12345, YD12345, 12345
+  const m = cleaned.match(/^(?:YD)?(\d{4,6})$/);
+  if (m) {
+    const num = m[1].padStart(5, '0');
+    return `YD-${num}`;
+  }
+
+  if (cleaned.startsWith('YD') && cleaned.length >= 4) {
+    const num = cleaned.slice(2).padStart(5, '0');
+    return `YD-${num}`;
+  }
+
+  return upper;
+};
+
+// Backend driver response interface
+interface BackendDriver {
+  id: number | string;
+  name?: string;
+  fullName?: string;
+  full_name?: string;
+  code?: string;
+  driverCode?: string;
+  driver_code?: string;
+  phone?: string;
+  email?: string;
+  licenseNumber?: string;
+  licenseExpiry?: string;
+  vehicle?: {
+    plate?: string;
+    type?: string;
+    capacity?: number;
+    volume?: number;
+  };
+  status?: string;
+  rating?: number | string;
+  totalJobs?: number | string;
+  completedJobs?: number | string;
+  successRate?: number | string;
+  activeJobs?: number;
+  joinDate?: string;
+  createdAt?: string;
+  lastActive?: string;
+  updatedAt?: string;
+  location?: string;
+  city?: string;
+  district?: string;
+  specialties?: string[];
+}
+
+// Frontend driver interface
 interface Driver {
   id: string;
   name: string;
+  code?: string;
   phone: string;
   email: string;
   licenseNumber: string;
@@ -56,7 +148,7 @@ interface Driver {
 }
 
 const Drivers = () => {
-  const { user } = useAuth();
+  const navigate = useNavigate();
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -64,13 +156,27 @@ const Drivers = () => {
   const [sortBy, setSortBy] = useState<'new' | 'rating' | 'jobs'>('new');
   // Kod ile ekleme
   const [driverCode, setDriverCode] = useState('');
+  const normalizedDriverIdentifier = normalizeDriverIdentifier(driverCode);
   const [linking, setLinking] = useState(false);
   const [codeMsg, setCodeMsg] = useState<string | null>(null);
-  const [showCodeInline, setShowCodeInline] = useState(false);
   const codeInputRef = useRef<HTMLInputElement | null>(null);
   const [lookupLoading, setLookupLoading] = useState(false);
-  const [lookupData, setLookupData] = useState<any | null>(null);
+  interface LookupData {
+    driver?: BackendDriver;
+    name?: string;
+    fullName?: string;
+    vehicleType?: string;
+    vehicle?: { type?: string };
+    location?: string;
+    city?: string;
+    message?: string;
+  }
+  const [lookupData, setLookupData] = useState<LookupData | null>(null);
   const [lookupError, setLookupError] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [deletingDriverId, setDeletingDriverId] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [driverToDelete, setDriverToDelete] = useState<string | null>(null);
 
   useEffect(() => {
     loadDrivers();
@@ -79,27 +185,47 @@ const Drivers = () => {
   const loadDrivers = async () => {
     try {
       setIsLoading(true);
+      const token = localStorage.getItem('authToken');
+      const userRaw = localStorage.getItem('user');
+      const userId = userRaw ? JSON.parse(userRaw || '{}').id : '';
       
       // Gerçek API çağrısı
-      const storedUser = localStorage.getItem('user');
-      const userId = storedUser ? (JSON.parse(storedUser)?.id || '') : '';
       const response = await fetch(createApiUrl('/api/drivers/nakliyeci'), {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
-          'X-User-Id': userId
+          'X-User-Id': String(userId || '')
         }
       });
       
       if (response.ok) {
         const data = await response.json();
-        setDrivers(data.drivers || []);
+        // Backend driver response interface (defined before component)
+        setDrivers((data.drivers || []).map((d: BackendDriver) => ({
+          id: String(d.id),
+          name: d.name || d.fullName || d.full_name || '-',
+          code: d.code || d.driverCode || d.driver_code || undefined,
+          phone: d.phone || '-',
+          email: d.email || '-',
+          licenseNumber: d.licenseNumber || '-',
+          licenseExpiry: d.licenseExpiry || '-',
+          vehicle: d.vehicle || { plate: '-', type: '-', capacity: 0, volume: 0 },
+          status: (d.status as 'available' | 'busy' | 'offline') || ((d.activeJobs && d.activeJobs > 0) ? 'busy' : 'available'),
+          rating: typeof d.rating === 'number' ? d.rating : parseFloat(String(d.rating || 0)) || 0,
+          totalJobs: typeof d.totalJobs === 'number' ? d.totalJobs : parseInt(String(d.totalJobs || 0)) || 0,
+          completedJobs: typeof d.completedJobs === 'number' ? d.completedJobs : parseInt(String(d.completedJobs || 0)) || 0,
+          successRate: typeof d.successRate === 'number' ? d.successRate : parseFloat(String(d.successRate || 0)) || 0,
+          joinDate: d.joinDate || d.createdAt || new Date().toISOString(),
+          lastActive: d.lastActive || d.updatedAt || new Date().toISOString(),
+          location: d.location || [d.city, d.district].filter(Boolean).join(' / ') || '-',
+          specialties: d.specialties || [],
+        })));
       } else {
-        console.error('Failed to load drivers');
+        // Failed to load drivers
         setDrivers([]);
       }
     } catch (error) {
-      console.error('Error loading drivers:', error);
+      // Error loading drivers
     } finally {
       setIsLoading(false);
     }
@@ -112,35 +238,45 @@ const Drivers = () => {
       setLinking(true);
       setCodeMsg(null);
       setLookupError(null);
-      const storedUser = localStorage.getItem('user');
-      const userId = storedUser ? (JSON.parse(storedUser)?.id || '') : '';
-      const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-      const response = await fetch(`${baseURL}/api/drivers/link`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-          'Content-Type': 'application/json',
-          'X-User-Id': userId
-        },
-        body: JSON.stringify({ code: driverCode })
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok || data.success === false) {
-        setCodeMsg(data.message || 'Kod doğrulanamadı');
-        setLookupError(data.message || 'Kod doğrulanamadı');
-        return;
+      const result = await driversAPI.link({ code: normalizedDriverIdentifier || driverCode });
+      
+      if (result.success) {
+        setCodeMsg(result.message || 'Taşıyıcı başarıyla eklendi');
+        setLookupData(null);
+        setLookupError(null);
+        setDriverCode('');
+        loadDrivers();
+      } else {
+        setCodeMsg(result.message || 'Kod doğrulanamadı');
+        setLookupError(result.message || 'Kod doğrulanamadı');
       }
-      setCodeMsg(data.message || 'Taşıyıcı başarıyla eklendi');
-      setLookupData(null);
-      setLookupError(null);
-      setDriverCode('');
-      loadDrivers();
-      setShowCodeInline(false);
     } catch (e) {
-      setCodeMsg('Beklenmeyen bir hata oluştu');
-      setLookupError('Beklenmeyen bir hata oluştu');
+      const errorMessage = e instanceof Error ? e.message : 'Beklenmeyen bir hata oluştu';
+      setCodeMsg(errorMessage);
+      setLookupError(errorMessage);
     } finally {
       setLinking(false);
+    }
+  };
+
+  const handleDeleteDriver = async (driverId: string) => {
+    setDeletingDriverId(driverId);
+    try {
+      const result = await driversAPI.delete(driverId);
+      
+      if (result.success) {
+        setCodeMsg('Taşıyıcı başarıyla kaldırıldı');
+        loadDrivers();
+        setShowDeleteConfirm(false);
+        setDriverToDelete(null);
+      } else {
+        setCodeMsg(result.message || 'Taşıyıcı kaldırılamadı');
+      }
+    } catch (e) {
+      const errorMessage = e instanceof Error ? e.message : 'Beklenmeyen bir hata oluştu';
+      setCodeMsg(errorMessage);
+    } finally {
+      setDeletingDriverId(null);
     }
   };
 
@@ -149,14 +285,17 @@ const Drivers = () => {
     setLookupData(null);
     setLookupError(null);
     const code = driverCode.trim();
-    // Accept both DRV-XXX-XXX format and email format
-    const pattern = /^DRV-[A-Z]{3}-[0-9]{3,}$/;
-    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!pattern.test(code) && !emailPattern.test(code)) return;
+    const normalized = normalizeDriverIdentifier(code);
+    if (!normalized) return;
     const t = setTimeout(async () => {
       try {
         setLookupLoading(true);
-        const res = await fetch(createApiUrl(`/api/drivers/lookup/${encodeURIComponent(code)}`));
+        const res = await fetch(createApiUrl(`/api/drivers/lookup/${encodeURIComponent(normalized)}`), {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('authToken')}`,
+            'Content-Type': 'application/json',
+          },
+        });
         const json = await res.json().catch(() => ({}));
         if (!res.ok || json.success === false) {
           setLookupData(null);
@@ -228,6 +367,22 @@ const Drivers = () => {
     return <LoadingState />;
   }
 
+  const isMeaningful = (v: unknown) => {
+    if (v === null || v === undefined) return false;
+    if (typeof v === 'number') return Number.isFinite(v) && v !== 0;
+    const s = String(v).trim();
+    if (!s) return false;
+    return s !== '-' && s !== '0' && s.toLowerCase() !== 'null' && s.toLowerCase() !== 'undefined';
+  };
+
+  const formatShortDate = (iso: string) => {
+    try {
+      return new Date(iso).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' });
+    } catch {
+      return '';
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
       <Helmet>
@@ -279,22 +434,30 @@ const Drivers = () => {
                     type="text"
                     value={driverCode}
                     onChange={(e) => {
-                      const raw = e.target.value;
-                      const normalized = raw.replace(/[ıİi]/g, 'I').toUpperCase();
-                      setDriverCode(normalized);
+                      setDriverCode(e.target.value);
                     }}
-                    placeholder="Örn: DRV-IST-001"
+                    placeholder="Örn: YD-12345 veya mehmet.kaya@example.com"
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
             <button 
                   onClick={linkDriverByCode}
-                  disabled={linking || !driverCode}
+                  disabled={linking || !driverCode.trim()}
                   className={`px-5 py-2 rounded-lg text-white md:self-end ${linking || !driverCode ? 'bg-slate-300 cursor-not-allowed' : 'bg-gradient-to-r from-slate-900 to-blue-900 hover:from-slate-800 hover:to-blue-800'}`}
             >
                   {linking ? 'Ekleniyor…' : 'Ekle'}
             </button>
               </div>
+              {!!driverCode.trim() && (
+                <div className="mt-2 text-xs text-slate-600">
+                  Algılanan: <span className="font-semibold text-slate-900">{normalizedDriverIdentifier || driverCode.trim()}</span>
+                </div>
+              )}
+            {codeMsg && (
+              <div className={`mt-3 rounded-xl border p-4 ${codeMsg.includes('Zaten') ? 'bg-yellow-50 border-yellow-200' : 'bg-green-50 border-green-200'}`}>
+                <div className={`text-sm ${codeMsg.includes('Zaten') ? 'text-yellow-800' : 'text-green-800'}`}>{codeMsg}</div>
+                </div>
+              )}
             {(lookupLoading || lookupData || lookupError) && (
               <div className="mt-3 rounded-xl border border-slate-200 bg-white p-4">
                 {lookupLoading && <div className="text-slate-600 text-sm">Kod kontrol ediliyor…</div>}
@@ -306,11 +469,11 @@ const Drivers = () => {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <h4 className="text-base font-semibold text-slate-900 truncate">{lookupData.name}</h4>
+                        <h4 className="text-base font-semibold text-slate-900 truncate">{lookupData.name || lookupData.fullName || 'Taşıyıcı'}</h4>
                         <span className="px-2 py-0.5 text-[11px] rounded-full bg-slate-100 text-slate-700 border border-slate-200">Yeni</span>
                       </div>
                       <div className="text-sm text-slate-600">
-                        {(lookupData.vehicleType || (lookupData.vehicle && lookupData.vehicle.type) || 'Araç')} • {(lookupData.location || 'Konum')}
+                        {(lookupData.vehicleType || (lookupData.vehicle && lookupData.vehicle.type) || 'Araç')} • {(lookupData.location || lookupData.city || 'Konum')}
                       </div>
                     </div>
                     <button
@@ -397,7 +560,7 @@ const Drivers = () => {
               </div>
               <div className="flex items-center gap-2">
                 <label className="text-sm text-slate-600">Sırala:</label>
-                <select value={sortBy} onChange={(e)=>setSortBy(e.target.value as any)} className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm">
+                <select value={sortBy} onChange={(e)=>setSortBy(e.target.value as 'new' | 'rating' | 'jobs')} className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm">
                   <option value="new">En Yeni</option>
                   <option value="rating">Puan Yüksek</option>
                   <option value="jobs">İş Sayısı</option>
@@ -420,135 +583,188 @@ const Drivers = () => {
 
         {/* Drivers List */}
         {filteredDrivers.length > 0 ? (
-          <div className="grid gap-6">
-            {filteredDrivers.map((driver) => (
-              <div key={driver.id} className="bg-white rounded-xl p-6 shadow-lg border border-gray-200 hover:shadow-xl transition-shadow">
-                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-800 rounded-lg flex items-center justify-center">
-                        <Users className="w-6 h-6 text-white" />
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
+            {filteredDrivers.map((driver) => {
+              const showDetailsToggle =
+                isMeaningful(driver.email) ||
+                isMeaningful(driver.location) ||
+                isMeaningful(driver.totalJobs) ||
+                isMeaningful(driver.completedJobs) ||
+                isMeaningful(driver.successRate) ||
+                isMeaningful(driver.vehicle?.plate) ||
+                isMeaningful(driver.vehicle?.type);
+
+              return (
+                <div key={driver.id} className="bg-white rounded-2xl shadow-lg border border-slate-200 hover:shadow-xl transition-shadow overflow-hidden">
+                  <div className="p-4 sm:p-5">
+                    <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3 min-w-0">
+                      <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-slate-800 to-blue-900 flex items-center justify-center shrink-0">
+                        <Users className="w-5 h-5 text-white" />
                       </div>
-                      <div>
-                        <h3 className="text-xl font-bold text-gray-900">{driver.name}</h3>
-                        <div className="flex items-center gap-2">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="text-base sm:text-lg font-bold text-slate-900 truncate max-w-[180px] sm:max-w-[240px]">{driver.name}</h3>
+                          {isMeaningful(driver.code) && (
+                            <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-800 border border-slate-200">
+                              {driver.code}
+                            </span>
+                          )}
+                        </div>
+                        <div className="mt-1 flex items-center gap-2">
                           <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(driver.status)}`}>
                             {getStatusText(driver.status)}
                           </span>
-                          <div className="flex items-center gap-1">
-                            <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                            <span className="text-sm text-gray-600">{driver.rating}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                      <div>
-                        <h4 className="font-semibold text-gray-900 mb-2">İletişim Bilgileri</h4>
-                        <div className="text-sm text-gray-600 space-y-1">
-                          <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-200">
-                            <div className="flex items-center gap-2">
-                              <Phone className="w-4 h-4 text-blue-600" />
-                              <div>
-                                <div className="text-xs text-slate-500 mb-1">Telefon</div>
-                                <a
-                                  href={`tel:${driver.phone}`}
-                                  className="font-bold text-blue-600 hover:text-blue-700 text-base"
-                                >
-                                  {driver.phone}
-                                </a>
-                              </div>
+                          {isMeaningful(driver.rating) && (
+                            <div className="flex items-center gap-1 text-xs text-slate-600">
+                              <Star className="w-4 h-4 text-yellow-400 fill-current" />
+                              <span>{driver.rating}</span>
                             </div>
-                            <a
-                              href={`tel:${driver.phone}`}
-                              className="px-4 py-2 bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 text-white rounded-lg font-medium transition-all duration-300 flex items-center gap-2 shadow-md hover:shadow-lg whitespace-nowrap"
-                            >
-                              <Phone className="w-4 h-4" />
-                              Ara
-                            </a>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Mail className="w-4 h-4" />
-                            <span>{driver.email}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <MapPin className="w-4 h-4" />
-                            <span>{driver.location}</span>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div>
-                        <h4 className="font-semibold text-gray-900 mb-2">Araç Bilgileri</h4>
-                        <div className="text-sm text-gray-600 space-y-1">
-                          <div className="flex items-center gap-2">
-                            <Truck className="w-4 h-4" />
-                            <span>{driver.vehicle.plate} - {driver.vehicle.type}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Activity className="w-4 h-4" />
-                            <span>{driver.vehicle.capacity}kg / {driver.vehicle.volume}m³</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Award className="w-4 h-4" />
-                            <span>Ehliyet: {driver.licenseNumber}</span>
-                          </div>
+                          )}
                         </div>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                      <div className="bg-gray-50 rounded-lg p-3">
-                        <h5 className="font-semibold text-gray-900 mb-1">Toplam İş</h5>
-                        <p className="text-2xl font-bold text-blue-600">{driver.totalJobs}</p>
-                      </div>
-                      <div className="bg-gray-50 rounded-lg p-3">
-                        <h5 className="font-semibold text-gray-900 mb-1">Tamamlanan</h5>
-                        <p className="text-2xl font-bold text-green-600">{driver.completedJobs}</p>
-                      </div>
-                      <div className="bg-gray-50 rounded-lg p-3">
-                        <h5 className="font-semibold text-gray-900 mb-1">Başarı Oranı</h5>
-                        <p className="text-2xl font-bold text-purple-600">{driver.successRate}%</p>
-                      </div>
-                    </div>
-
-                    <div className="mb-4">
-                      <h5 className="font-semibold text-gray-900 mb-2">Uzmanlık Alanları</h5>
-                      <div className="flex flex-wrap gap-2">
-                        {driver.specialties.map((specialty, index) => (
-                          <span key={index} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
-                            {specialty}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="text-sm text-gray-500">
-                      <p>Katılım: {new Date(driver.joinDate).toLocaleDateString('tr-TR')}</p>
-                      <p>Son Aktif: {new Date(driver.lastActive).toLocaleDateString('tr-TR')}</p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex flex-col gap-2">
-                    <div className="flex gap-2">
-                      <button className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center justify-center gap-2">
-                        <Eye className="w-4 h-4" />
-                        Detay
+                    <div className="flex items-center gap-2">
+                    {showDetailsToggle && (
+                      <button
+                        onClick={() => setExpandedId(prev => (prev === driver.id ? null : driver.id))}
+                        className="px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-sm font-medium"
+                      >
+                        {expandedId === driver.id ? 'Kapat' : 'Detay'}
                       </button>
-                      <button className="flex-1 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center justify-center gap-2">
-                        <Edit className="w-4 h-4" />
-                        Düzenle
+                    )}
+                      <button
+                        onClick={() => {
+                          setDriverToDelete(driver.id);
+                          setShowDeleteConfirm(true);
+                        }}
+                        className="px-3 py-2 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 text-sm font-medium"
+                        title="Taşıyıcıyı Kaldır"
+                      >
+                        <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
-                    <button className="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center justify-center gap-2">
-                      <Trash2 className="w-4 h-4" />
-                      Kaldır
-                    </button>
                   </div>
+
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    {isMeaningful(driver.location) && (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-slate-50 border border-slate-200 text-slate-700">
+                        <MapPin className="w-3.5 h-3.5 text-slate-500" />
+                        {driver.location}
+                      </span>
+                    )}
+                    {(isMeaningful(driver.vehicle?.type) || isMeaningful(driver.vehicle?.plate)) && (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-slate-50 border border-slate-200 text-slate-700">
+                        <Truck className="w-3.5 h-3.5 text-slate-500" />
+                        {driver.vehicle?.type || 'Araç'}{driver.vehicle?.plate ? ` • ${driver.vehicle.plate}` : ''}
+                      </span>
+                    )}
+                    {isMeaningful(driver.lastActive) && (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs bg-slate-50 border border-slate-200 text-slate-700">
+                        <Activity className="w-3.5 h-3.5 text-slate-500" />
+                        Son aktif: {formatShortDate(driver.lastActive)}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="mt-4 flex items-center justify-between gap-3">
+                    <div className="text-sm text-slate-700">
+                      <div className="text-xs text-slate-500">Telefon</div>
+                      <div className="font-semibold">{driver.phone}</div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => navigate(`/nakliyeci/messages?userId=${driver.id}`)}
+                        className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-white bg-gradient-to-r from-slate-700 to-slate-800 hover:from-slate-600 hover:to-slate-700 shadow-md hover:shadow-lg"
+                        title="Mesajlaş"
+                      >
+                        <MessageSquare className="w-4 h-4" />
+                      </button>
+                    <a
+                      href={`tel:${driver.phone}`}
+                      className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-white bg-gradient-to-r from-slate-900 to-blue-900 hover:from-slate-800 hover:to-blue-800 shadow-md hover:shadow-lg"
+                        title="Ara"
+                    >
+                      <Phone className="w-4 h-4" />
+                      Ara
+                    </a>
+                    </div>
+                  </div>
+
+                  {expandedId === driver.id && (
+                    <div className="mt-4 pt-4 border-t border-slate-200 space-y-3">
+                      {(isMeaningful(driver.email) || isMeaningful(driver.location)) && (
+                        <div className="grid grid-cols-1 gap-2 text-sm text-slate-700">
+                          {isMeaningful(driver.email) && (
+                            <div className="flex items-center gap-2">
+                              <Mail className="w-4 h-4 text-slate-500" />
+                              <span className="truncate">{driver.email}</span>
+                            </div>
+                          )}
+                          {isMeaningful(driver.location) && (
+                            <div className="flex items-center gap-2">
+                              <MapPin className="w-4 h-4 text-slate-500" />
+                              <span className="truncate">{driver.location}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {(isMeaningful(driver.totalJobs) || isMeaningful(driver.successRate) || isMeaningful(driver.completedJobs)) && (
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                            <div className="text-[11px] text-slate-500">Toplam İş</div>
+                            <div className="text-sm font-bold text-slate-900">{driver.totalJobs}</div>
+                          </div>
+                          <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                            <div className="text-[11px] text-slate-500">Tamamlanan</div>
+                            <div className="text-sm font-bold text-slate-900">{driver.completedJobs}</div>
+                          </div>
+                          <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+                            <div className="text-[11px] text-slate-500">Başarı Oranı</div>
+                            <div className="text-sm font-bold text-slate-900">{driver.successRate}%</div>
+                          </div>
+                        </div>
+                      )}
+
+                      {isMeaningful(driver.rating) && (
+                        <div className="bg-gradient-to-br from-yellow-50 to-orange-50 border border-yellow-200 rounded-lg p-3">
+                          <div className="flex items-center gap-2">
+                            <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
+                            <div>
+                              <div className="text-xs text-slate-600">Ortalama Puan</div>
+                              <div className="text-lg font-bold text-slate-900">{driver.rating.toFixed(1)}</div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {(isMeaningful(driver.vehicle?.plate) || isMeaningful(driver.vehicle?.type)) && (
+                        <div className="text-sm text-slate-700">
+                          <div className="text-xs text-slate-500 mb-1">Araç Bilgileri</div>
+                          <div className="flex items-center gap-2">
+                            <Truck className="w-4 h-4 text-slate-500" />
+                            <span className="truncate">{driver.vehicle?.plate || '-'} {driver.vehicle?.type ? `• ${driver.vehicle.type}` : ''}</span>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="pt-2 border-t border-slate-200">
+                        <Link
+                          to={`/nakliyeci/drivers/${driver.id}`}
+                          className="inline-flex items-center justify-center gap-2 w-full px-4 py-2 rounded-lg text-white bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 shadow-md hover:shadow-lg transition-all"
+                        >
+                          <Eye className="w-4 h-4" />
+                          Detaylı Görüntüle
+                        </Link>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <div className="py-14 text-center">
@@ -563,6 +779,40 @@ const Drivers = () => {
             </button>
           </div>
         )}
+
+        {/* Delete Confirmation Modal */}
+        <Modal
+          isOpen={showDeleteConfirm}
+          onClose={() => {
+            setShowDeleteConfirm(false);
+            setDriverToDelete(null);
+          }}
+          title="Taşıyıcıyı Kaldır"
+        >
+          <div className="space-y-4">
+            <p className="text-sm text-slate-600">
+              Bu taşıyıcıyı listeden kaldırmak istediğinizden emin misiniz? Bu işlem geri alınamaz.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => {
+                  setShowDeleteConfirm(false);
+                  setDriverToDelete(null);
+                }}
+                className="px-4 py-2 bg-gradient-to-r from-slate-500 to-slate-600 hover:from-slate-600 hover:to-slate-700 text-white rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
+              >
+                İptal
+              </button>
+              <button
+                onClick={() => driverToDelete && handleDeleteDriver(driverToDelete)}
+                disabled={deletingDriverId !== null}
+                className="px-4 py-2 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white rounded-lg transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {deletingDriverId !== null ? 'Kaldırılıyor...' : 'Kaldır'}
+              </button>
+            </div>
+          </div>
+        </Modal>
       </div>
     </div>
   );

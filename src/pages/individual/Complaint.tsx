@@ -11,6 +11,7 @@ import {
   CheckCircle,
   XCircle,
 } from 'lucide-react';
+import { createApiUrl } from '../../config/api';
 
 interface ComplaintData {
   type: string;
@@ -82,7 +83,7 @@ const Complaint: React.FC = () => {
         formData.append(`attachment_${index}`, file);
       });
 
-      const response = await fetch('/api/complaints', {
+      const response = await fetch(createApiUrl('/api/complaints'), {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${localStorage.getItem('authToken')}`,

@@ -14,7 +14,6 @@ import {
   ArrowLeft,
   AlertCircle,
   Building2,
-  MessageSquare,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import Breadcrumb from '../../components/common/Breadcrumb';
@@ -36,9 +35,6 @@ interface Job {
   volume?: number;
   status: string;
   createdAt: string;
-  shipperName?: string;
-  shipperEmail?: string;
-  shipperPhone?: string;
   carrierName?: string;
   nakliyeciName?: string;
   nakliyeciEmail?: string;
@@ -130,36 +126,36 @@ const TasiyiciJobs: React.FC = () => {
 
       if (response.ok && responseData.success) {
         if (newStatus === 'picked_up') {
-          toast.success('✅ Testimi aldım! Durum güncellendi.', {
+          toast.success('✅ Yük alındı. Takip ekranı güncellendi.', {
             duration: 3000,
           });
           await loadJob();
         } else if (newStatus === 'in_transit') {
-          toast.success('🚚 Yoldayım! Durum güncellendi.', {
+          toast.success('🚚 Yola çıkıldı. Göndericiye bildirim gitti.', {
             duration: 3000,
           });
           await loadJob();
         } else if (newStatus === 'delivered') {
-          toast.success('📦 Teslim ettim! Gönderici onayı bekleniyor.', {
+          toast.success('📦 Teslimat tamamlandı. Gönderici onayı bekleniyor.', {
             duration: 4000,
           });
           await loadJob();
         } else {
-          toast.success('İş durumu başarıyla güncellendi');
+          toast.success('İş durumu güncellendi');
           await loadJob();
         }
       } else {
-        const errorMsg = responseData.message || 'Durum güncellenemedi';
+        const errorMsg = responseData.message || 'Bu işlem şu an yapılamıyor.';
         if (import.meta.env.DEV) {
           console.error('❌ Status güncelleme hatası:', errorMsg);
         }
-        toast.error(errorMsg);
+        toast.error(`${errorMsg} Lütfen sayfayı yenileyip tekrar deneyin.`);
       }
     } catch (error: any) {
       if (import.meta.env.DEV) {
         console.error('❌ Status güncelleme exception:', error);
       }
-      toast.error(error?.message || 'Durum güncellenemedi. Lütfen tekrar deneyin.');
+      toast.error((error?.message && String(error.message).slice(0, 140)) || 'Bağlantı sorunu oluştu. Lütfen tekrar deneyin.');
     } finally {
       setUpdatingStatus(false);
     }
@@ -304,7 +300,7 @@ const TasiyiciJobs: React.FC = () => {
                 <div className='flex items-start gap-4'>
                   <div className='w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center'>
                     <MapPin className='w-6 h-6 text-white' />
-          </div>
+                  </div>
                   <div className='flex-1'>
                     <div className='text-xs text-slate-500 mb-1'>Varış Noktası</div>
                     <div className='font-semibold text-slate-900'>{job.deliveryCity}</div>
@@ -353,13 +349,13 @@ const TasiyiciJobs: React.FC = () => {
                 {job.weight && (
                   <div className='flex items-center gap-3'>
                     <div className='w-10 h-10 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center'>
-                        <Truck className='w-5 h-5 text-white' />
-                      </div>
-                      <div>
-                        <div className='text-xs text-slate-500'>Ağırlık</div>
-                        <div className='font-semibold text-slate-900'>{job.weight} kg</div>
-                      </div>
+                      <Truck className='w-5 h-5 text-white' />
                     </div>
+                    <div>
+                      <div className='text-xs text-slate-500'>Ağırlık</div>
+                      <div className='font-semibold text-slate-900'>{job.weight} kg</div>
+                    </div>
+                  </div>
                 )}
                 {job.volume && (
                   <div className='flex items-center gap-3'>
@@ -451,38 +447,7 @@ const TasiyiciJobs: React.FC = () => {
               </div>
             )}
 
-            {/* Shipper Contact - Phone number hidden for privacy */}
-            {job.shipperName && (
-              <div className='bg-white rounded-xl p-6 shadow-lg border border-gray-100'>
-                <h2 className='text-xl font-bold text-slate-900 mb-6 flex items-center gap-2'>
-                  <User className='w-5 h-5 text-blue-600' />
-                  Gönderici Bilgileri
-                </h2>
-                <div className='space-y-3'>
-                  <div className='flex items-center gap-3'>
-                    <User className='w-5 h-5 text-gray-400' />
-                    <div>
-                      <div className='text-xs text-slate-500'>Ad Soyad</div>
-                      <div className='font-semibold text-slate-900'>{job.shipperName}</div>
-                    </div>
-                  </div>
-                  <div className='bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4'>
-                    <div className='flex items-center gap-3'>
-                      <MessageSquare className='w-5 h-5 text-blue-600' />
-                      <div className='flex-1'>
-                        <div className='text-sm font-medium text-slate-900 mb-1'>
-                          İletişim
-                      </div>
-                        <div className='text-xs text-slate-600'>
-                          Gönderici ile iletişim için mesaj sistemi kullanılmalıdır. Telefon numarası gizlilik nedeniyle gösterilmemektedir.
-                    </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-                </div>
+          </div>
 
           {/* Sidebar */}
           <div className='space-y-6'>
@@ -501,7 +466,7 @@ const TasiyiciJobs: React.FC = () => {
                     className='w-full px-4 py-4 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg font-bold text-base transition-all duration-300 flex items-center justify-center gap-3 shadow-lg hover:shadow-xl disabled:opacity-50'
                   >
                     <CheckCircle className='w-6 h-6' />
-                    ✅ Testimi Aldım
+                    ✅ Yükü Aldım
                   </button>
                 )}
                 
@@ -513,19 +478,19 @@ const TasiyiciJobs: React.FC = () => {
                     className='w-full px-4 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg font-bold text-base transition-all duration-300 flex items-center justify-center gap-3 shadow-lg hover:shadow-xl disabled:opacity-50'
                   >
                     <Truck className='w-6 h-6' />
-                    🚚 Yoldayım
+                    🚚 Yola Çıktım
                   </button>
                 )}
                 
                 {/* Teslim Ettim - in_transit durumunda */}
-                {(job.status === 'in_transit' || job.status === 'in_progress') && (
+                {job.status === 'in_transit' && (
                   <button
                     onClick={() => updateStatus('delivered')}
                     disabled={updatingStatus}
                     className='w-full px-4 py-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-lg font-bold text-base transition-all duration-300 flex items-center justify-center gap-3 shadow-lg hover:shadow-xl disabled:opacity-50'
                   >
                     <Package className='w-6 h-6' />
-                    📦 Teslim Ettim
+                    📦 Teslimatı Tamamladım
                   </button>
                 )}
                 
@@ -559,7 +524,7 @@ const TasiyiciJobs: React.FC = () => {
               </div>
             </div>
           </div>
-          </div>
+        </div>
       </div>
     </div>
   );

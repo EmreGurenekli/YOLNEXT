@@ -36,13 +36,12 @@ import LoadingState from '../../components/common/LoadingState';
 import Modal from '../../components/common/Modal';
 import SuccessMessage from '../../components/common/SuccessMessage';
 import Pagination from '../../components/common/Pagination';
-import api from '../../services/api';
-import { API_ENDPOINTS } from '../../config/api';
+import { createApiUrl } from '../../config/api';
 
 export default function NakliyeciOffers() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState('accepted');
+  const [filterStatus, setFilterStatus] = useState('pending');
   const [sortBy, setSortBy] = useState('date');
   const [sortOrder, setSortOrder] = useState('desc');
   const [viewMode, setViewMode] = useState('grid');
@@ -60,6 +59,11 @@ export default function NakliyeciOffers() {
   
   const [selectedOffer, setSelectedOffer] = useState<OfferDetail | null>(null);
   const [showOfferModal, setShowOfferModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [editingOffer, setEditingOffer] = useState<any>(null);
+  const [editPrice, setEditPrice] = useState('');
+  const [editMessage, setEditMessage] = useState('');
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -99,26 +103,35 @@ export default function NakliyeciOffers() {
       setIsLoading(true);
       setLoadError(null);
       
-      // Check if api is available
-      if (!api || typeof api.get !== 'function') {
-        console.error('API service not available');
-        setLoadError('API servisi kullanılamıyor');
-        setOffers([]);
-        setIsLoading(false);
-        return;
-      }
+      const userRaw = localStorage.getItem('user');
+      const userId = userRaw ? JSON.parse(userRaw || '{}').id : undefined;
+      const token = localStorage.getItem('authToken');
       
       const statusParam =
         filterStatus && filterStatus !== 'all'
           ? `?status=${encodeURIComponent(filterStatus)}`
           : '';
-      const res = await api.get<any>(`${API_ENDPOINTS.OFFERS}${statusParam}`);
+      
+      const url = createApiUrl(`/api/offers${statusParam}`);
+      const response = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${token || ''}`,
+          'X-User-Id': userId || '',
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
       const list = (
-        res?.data && Array.isArray(res.data)
-          ? res.data
-          : Array.isArray(res)
-            ? res
-            : res?.data?.offers || []
+        data?.data && Array.isArray(data.data)
+          ? data.data
+          : Array.isArray(data)
+            ? data
+            : data?.offers || []
       ) as any[];
       setOffers(list.map(mapOffer));
     } catch (err: any) {
@@ -238,33 +251,74 @@ export default function NakliyeciOffers() {
   // Auto-assign or open broadcast
   const handleAutoAssign = async (offer: any) => {
     try {
+      const token = localStorage.getItem('authToken');
+      const userRaw = localStorage.getItem('user');
+      const userId = userRaw ? JSON.parse(userRaw || '{}').id : undefined;
+      
       // Try assign with preferred (no body) - backend will read user settings
-      await api.post(`/api/shipments/${offer.shipmentId}/assign-carrier`, {});
-      setSuccessMessage('Tercihli taşıyıcı atandı');
-      setShowSuccessMessage(true);
-      setTimeout(() => setShowSuccessMessage(false), 3000);
-      await loadOffers();
-    } catch (e: any) {
+      const response1 = await fetch(createApiUrl(`/api/shipments/${offer.shipmentId}/assign-carrier`), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token || ''}`,
+          'X-User-Id': userId || '',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({}),
+      });
+      
+      if (response1.ok) {
+        setSuccessMessage('Tercihli taşıyıcı atandı');
+        setShowSuccessMessage(true);
+        setTimeout(() => setShowSuccessMessage(false), 3000);
+        await loadOffers();
+        return;
+      }
+      
       // If no preferred, open broadcast
-      try {
-        await api.post(`/api/shipments/${offer.shipmentId}/open-broadcast`, {
-          target: 'my-network',
-        });
+      const response2 = await fetch(createApiUrl(`/api/shipments/${offer.shipmentId}/open-broadcast`), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token || ''}`,
+          'X-User-Id': userId || '',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ target: 'my-network' }),
+      });
+      
+      if (response2.ok) {
         setSuccessMessage('Taşıyıcılar için ilan açıldı');
         setShowSuccessMessage(true);
         setTimeout(() => setShowSuccessMessage(false), 3000);
         await loadOffers();
-      } catch (err: any) {
-        setSuccessMessage(err?.message || 'İşlem başarısız');
-        setShowSuccessMessage(true);
-        setTimeout(() => setShowSuccessMessage(false), 3000);
+      } else {
+        throw new Error('İşlem başarısız');
       }
+    } catch (err: any) {
+      setSuccessMessage(err?.message || 'İşlem başarısız');
+      setShowSuccessMessage(true);
+      setTimeout(() => setShowSuccessMessage(false), 3000);
     }
   };
 
   const handleAccept = async (id: number) => {
     try {
-      await api.post(API_ENDPOINTS.OFFERS_ACCEPT.replace(':id', String(id)));
+      const token = localStorage.getItem('authToken');
+      const userRaw = localStorage.getItem('user');
+      const userId = userRaw ? JSON.parse(userRaw || '{}').id : undefined;
+      
+      const response = await fetch(createApiUrl(`/api/offers/${id}/accept`), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token || ''}`,
+          'X-User-Id': userId || '',
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Teklif kabul edilemedi');
+      }
+
       setSuccessMessage('Teklif başarıyla kabul edildi');
       setShowSuccessMessage(true);
       setTimeout(() => setShowSuccessMessage(false), 3000);
@@ -278,7 +332,22 @@ export default function NakliyeciOffers() {
 
   const handleReject = async (id: number) => {
     try {
-      await api.post(`${API_ENDPOINTS.OFFERS}/${id}/reject`);
+      const token = localStorage.getItem('authToken');
+      const userRaw = localStorage.getItem('user');
+      const userId = userRaw ? JSON.parse(userRaw || '{}').id : undefined;
+      
+      const response = await fetch(createApiUrl(`/api/offers/${id}/reject`), {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token || ''}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Teklif reddedilemedi');
+      }
+
       setSuccessMessage('Teklif reddedildi');
       setShowSuccessMessage(true);
       setTimeout(() => setShowSuccessMessage(false), 3000);
@@ -287,6 +356,108 @@ export default function NakliyeciOffers() {
       setSuccessMessage('Teklif reddedilemedi');
       setShowSuccessMessage(true);
       setTimeout(() => setShowSuccessMessage(false), 3000);
+    }
+  };
+
+  const handleEditClick = (offer: any) => {
+    setEditingOffer(offer);
+    setEditPrice(offer.price.toString());
+    setEditMessage(offer.description || '');
+    setShowEditModal(true);
+  };
+
+  const handleEditSubmit = async () => {
+    if (!editingOffer) return;
+
+    try {
+      const token = localStorage.getItem('authToken');
+      const userRaw = localStorage.getItem('user');
+      const userId = userRaw ? JSON.parse(userRaw || '{}').id : undefined;
+      
+      const response = await fetch(createApiUrl(`/api/offers/${editingOffer.id}`), {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token || ''}`,
+          'X-User-Id': userId || '',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          price: parseFloat(editPrice),
+          message: editMessage,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Teklif güncellenemedi');
+      }
+
+      setSuccessMessage('Teklif başarıyla güncellendi');
+      setShowSuccessMessage(true);
+      setTimeout(() => setShowSuccessMessage(false), 3000);
+      setShowEditModal(false);
+      setEditingOffer(null);
+      await loadOffers();
+    } catch (e: any) {
+      setSuccessMessage(e?.message || 'Teklif güncellenemedi');
+      setShowSuccessMessage(true);
+      setTimeout(() => setShowSuccessMessage(false), 3000);
+    }
+  };
+
+  const handleCancelClick = (offer: any) => {
+    setEditingOffer(offer);
+    setShowCancelModal(true);
+  };
+
+  const [cancelReason, setCancelReason] = useState('');
+
+  const handleCancelSubmit = async () => {
+    if (!editingOffer) return;
+
+    try {
+      const token = localStorage.getItem('authToken');
+      const userRaw = localStorage.getItem('user');
+      const userId = userRaw ? JSON.parse(userRaw || '{}').id : undefined;
+      
+      // Determine endpoint based on offer status
+      const endpoint = editingOffer.status === 'accepted' 
+        ? `/api/offers/${editingOffer.id}/cancel-accepted`
+        : `/api/offers/${editingOffer.id}/cancel`;
+      
+      const response = await fetch(createApiUrl(endpoint), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token || ''}`,
+          'X-User-Id': userId || '',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          reason: cancelReason.trim() || undefined,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Teklif iptal edilemedi');
+      }
+
+      const data = await response.json();
+      let message = 'Teklif başarıyla iptal edildi';
+      if (editingOffer.status === 'accepted' && data.data?.commissionRefunded) {
+        message = `Teklif iptal edildi. Komisyon iadesi yapıldı (${data.data.commissionRefunded.toFixed(2)} TL).`;
+      }
+
+      setSuccessMessage(message);
+      setShowSuccessMessage(true);
+      setTimeout(() => setShowSuccessMessage(false), 5000);
+      setShowCancelModal(false);
+      setEditingOffer(null);
+      setCancelReason('');
+      await loadOffers();
+    } catch (e: any) {
+      setSuccessMessage(e?.message || 'Teklif iptal edilemedi');
+      setShowSuccessMessage(true);
+      setTimeout(() => setShowSuccessMessage(false), 5000);
     }
   };
 
@@ -331,6 +502,30 @@ export default function NakliyeciOffers() {
           <p className='text-sm sm:text-base md:text-lg text-slate-600 px-4'>
             Gönderilen ve alınan tüm tekliflerinizi yönetin
           </p>
+          {/* Bilgilendirme */}
+          <div className='mt-4 max-w-2xl mx-auto space-y-3'>
+            <div className='bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800'>
+              <p className='font-semibold mb-1'>💡 Bilgi:</p>
+              <p>Beklemede olan tekliflerinizi düzenleyebilir veya iptal edebilirsiniz. Kabul edilen teklifler "Aktif Yükler" sayfasına otomatik olarak aktarılır.</p>
+            </div>
+            <div className='bg-amber-50 border border-amber-300 rounded-lg p-4 text-sm'>
+              <div className='flex items-start gap-2'>
+                <AlertCircle className='w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5' />
+                <div>
+                  <p className='font-bold text-amber-900 mb-2'>⚠️ Komisyon İade Politikası</p>
+                  <ul className='space-y-1 text-amber-800 text-xs'>
+                    <li>• Teklifiniz kabul edildiğinde %1 komisyon cüzdanınızdan kesilir.</li>
+                    <li>• <strong>İade sadece şu koşullarda yapılır:</strong></li>
+                    <li className='ml-4'>- Taşıyıcı atanmadan önce iptal edilirse</li>
+                    <li className='ml-4'>- İlk 24 saat içinde iptal edilirse</li>
+                    <li>• İade yapılırsa işlem maliyeti (min. 2 TL) kesilir.</li>
+                    <li>• <strong>Taşıyıcı atandıktan sonra iade yapılmaz.</strong></li>
+                    <li>• <strong>24 saat sonra iade yapılmaz.</strong></li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
         <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6'>
           <div className='flex items-center gap-3 mb-4 sm:mb-0'>
@@ -351,10 +546,6 @@ export default function NakliyeciOffers() {
             <button className='flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-3 bg-gradient-to-r from-slate-800 to-blue-900 text-white rounded-lg sm:rounded-xl hover:shadow-lg transition-all duration-200 text-sm font-medium'>
               <Plus className='w-4 h-4 sm:w-5 sm:h-5' />
               <span className='hidden sm:inline'>Yeni Teklif</span>
-            </button>
-            <button className='flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-3 bg-white border border-slate-200 text-slate-700 rounded-lg sm:rounded-xl hover:bg-slate-50 transition-all duration-200 text-sm font-medium'>
-              <Download className='w-4 h-4 sm:w-5 sm:h-5' />
-              <span className='hidden sm:inline'>Dışa Aktar</span>
             </button>
           </div>
         </div>
@@ -536,12 +727,6 @@ export default function NakliyeciOffers() {
                           ₺{offer.price.toLocaleString()}
                         </p>
                       </div>
-                      <div>
-                        <p className='text-xs text-slate-500 mb-1'>Ağırlık</p>
-                        <p className='text-sm font-medium text-slate-900'>
-                          {offer.weight}
-                        </p>
-                      </div>
                     </div>
 
                     <div className='flex items-center gap-4 text-xs text-slate-500'>
@@ -571,30 +756,45 @@ export default function NakliyeciOffers() {
                     {offer.status === 'pending' && (
                       <>
                         <button
-                          onClick={() => handleAccept(offer.id)}
-                          className='px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors'
+                          onClick={() => handleEditClick(offer)}
+                          className='px-3 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-lg text-sm font-medium transition-all duration-200 shadow-md hover:shadow-lg flex items-center gap-1'
+                          title='Teklifi düzenle'
                         >
-                          Kabul Et
+                          <Edit className='w-4 h-4' />
+                          <span className='hidden sm:inline'>Düzenle</span>
                         </button>
                         <button
-                          onClick={() => handleReject(offer.id)}
-                          className='px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors'
+                          onClick={() => handleCancelClick(offer)}
+                          className='px-3 py-2 bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white rounded-lg text-sm font-medium transition-all duration-200 shadow-md hover:shadow-lg flex items-center gap-1'
+                          title='Teklifi iptal et'
                         >
-                          Reddet
+                          <XCircle className='w-4 h-4' />
+                          <span className='hidden sm:inline'>İptal Et</span>
                         </button>
                       </>
                     )}
                     {offer.status === 'accepted' && (
-                      <button
-                        onClick={() => handleAutoAssign(offer)}
-                        className='px-3 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-medium transition-colors'
-                      >
-                        Otomatik Ata
-                      </button>
+                      <>
+                        <button
+                          onClick={() => handleAutoAssign(offer)}
+                          className='px-3 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-medium transition-colors'
+                        >
+                          Otomatik Ata
+                        </button>
+                        <button
+                          onClick={() => handleCancelClick(offer)}
+                          className='px-3 py-2 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white rounded-lg text-sm font-medium transition-all duration-200 shadow-md hover:shadow-lg flex items-center gap-1'
+                          title='Kabul edilen teklifi iptal et'
+                        >
+                          <XCircle className='w-4 h-4' />
+                          <span className='hidden sm:inline'>Teklifi İptal Et</span>
+                        </button>
+                      </>
                     )}
                     <button
                       onClick={() => handleViewDetails(offer)}
                       className='p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors'
+                      title='Detayları görüntüle'
                     >
                       <Eye className='w-4 h-4' />
                     </button>
@@ -668,6 +868,138 @@ export default function NakliyeciOffers() {
             <div>
               <p className='text-sm text-slate-500'>Açıklama</p>
               <p className='font-medium'>{selectedOffer.description}</p>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Edit Offer Modal */}
+      {showEditModal && editingOffer && (
+        <Modal
+          isOpen={showEditModal}
+          onClose={() => {
+            setShowEditModal(false);
+            setEditingOffer(null);
+            setEditPrice('');
+            setEditMessage('');
+          }}
+          title='Teklifi Düzenle'
+        >
+          <div className='space-y-4'>
+            <div>
+              <label className='block text-sm font-medium text-slate-700 mb-2'>
+                Fiyat (₺)
+              </label>
+              <input
+                type='number'
+                value={editPrice}
+                onChange={e => setEditPrice(e.target.value)}
+                className='w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                placeholder='Fiyat girin'
+                min='0'
+                step='0.01'
+              />
+            </div>
+            <div>
+              <label className='block text-sm font-medium text-slate-700 mb-2'>
+                Mesaj
+              </label>
+              <textarea
+                value={editMessage}
+                onChange={e => setEditMessage(e.target.value)}
+                className='w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                placeholder='Teklif mesajınızı yazın'
+                rows={4}
+              />
+            </div>
+            <div className='flex gap-3 justify-end'>
+              <button
+                onClick={() => {
+                  setShowEditModal(false);
+                  setEditingOffer(null);
+                  setEditPrice('');
+                  setEditMessage('');
+                }}
+                className='px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 transition-colors'
+              >
+                İptal
+              </button>
+              <button
+                onClick={handleEditSubmit}
+                className='px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors'
+              >
+                Kaydet
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Cancel Offer Modal */}
+      {showCancelModal && editingOffer && (
+        <Modal
+          isOpen={showCancelModal}
+          onClose={() => {
+            setShowCancelModal(false);
+            setEditingOffer(null);
+            setCancelReason('');
+          }}
+          title={editingOffer.status === 'accepted' ? 'Kabul Edilen Teklifi İptal Et' : 'Teklifi İptal Et'}
+        >
+          <div className='p-6'>
+            {editingOffer.status === 'accepted' && (
+              <div className='mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800'>
+                <p className='font-semibold mb-1'>⚠️ Önemli Bilgi:</p>
+                <ul className='list-disc list-inside space-y-0.5'>
+                  <li>Kabul edilen teklifi iptal ederseniz, komisyonunuz tam olarak iade edilecektir.</li>
+                  <li>Gönderi durumu "Teklif Bekliyor" olarak değişecek ve gönderici tekrar teklif alabilecektir.</li>
+                  <li>Eğer taşıyıcı atandıysa, teklif iptal edilemez.</li>
+                  <li>Gönderi yolda veya teslim edildiyse, teklif iptal edilemez.</li>
+                </ul>
+              </div>
+            )}
+            <p className='text-slate-600 mb-4'>
+              Bu teklifi iptal etmek istediğinizden emin misiniz?
+            </p>
+            <div className='bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4'>
+              <p className='text-sm text-yellow-800'>
+                <strong>Gönderi:</strong> #{editingOffer.shipmentId}
+              </p>
+              <p className='text-sm text-yellow-800'>
+                <strong>Fiyat:</strong> ₺{editingOffer.price.toLocaleString()}
+              </p>
+            </div>
+            {editingOffer.status === 'accepted' && (
+              <div className='mb-4'>
+                <label className='block text-sm font-medium text-gray-700 mb-2'>
+                  İptal Sebebi (Opsiyonel)
+                </label>
+                <textarea
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  className='w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500'
+                  rows={3}
+                  placeholder='İptal sebebinizi açıklayın...'
+                />
+              </div>
+            )}
+            <div className='flex justify-end gap-3'>
+              <button
+                onClick={() => {
+                  setShowCancelModal(false);
+                  setEditingOffer(null);
+                  setCancelReason('');
+                }}
+                className='px-4 py-2 bg-gradient-to-r from-slate-500 to-slate-600 hover:from-slate-600 hover:to-slate-700 text-white rounded-lg transition-all duration-200 shadow-md hover:shadow-lg'
+              >
+                Vazgeç
+              </button>
+              <button
+                onClick={handleCancelSubmit}
+                className='px-6 py-2 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white rounded-lg transition-all duration-200 shadow-md hover:shadow-lg'
+              >
+                {editingOffer.status === 'accepted' ? 'Teklifi İptal Et ve Komisyon İadesi Al' : 'Teklifi İptal Et'}
+              </button>
             </div>
           </div>
         </Modal>

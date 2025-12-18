@@ -6,7 +6,6 @@ import {
   Search,
   Send,
   MoreVertical,
-  Phone,
   Video,
   Paperclip,
   Smile,
@@ -25,6 +24,7 @@ import SuccessMessage from '../../components/common/SuccessMessage';
 import Pagination from '../../components/common/Pagination';
 import { createApiUrl } from '../../config/api';
 import { formatDateTime, formatDate } from '../../utils/format';
+import { handleApiError } from '../../utils/errorHandling';
 
 interface Message {
   id: number;
@@ -149,11 +149,14 @@ export default function TasiyiciMessages() {
         });
 
         const conversationsList = Array.from(conversationMap.values());
-        setConversations(conversationsList);
+        const allowedConversations = conversationsList.filter(
+          (c: any) => (c.participantType || 'client') === 'nakliyeci'
+        );
+        setConversations(allowedConversations);
 
         // If userId param exists, auto-select that conversation
-        if (userIdParam && conversationsList.length > 0) {
-          const targetConv = conversationsList.find(
+        if (userIdParam && allowedConversations.length > 0) {
+          const targetConv = allowedConversations.find(
             (conv: any) => conv.id === userIdParam || conv.participantId === userIdParam
           );
           if (targetConv) {
@@ -164,7 +167,9 @@ export default function TasiyiciMessages() {
         throw new Error('Failed to fetch conversations');
       }
     } catch (error) {
-      console.error('Error loading conversations:', error);
+      // Use centralized error handling
+      const apiError = handleApiError(error);
+      console.error('Error loading conversations:', apiError);
       setConversations([]);
     } finally {
       setIsLoading(false);
@@ -173,7 +178,6 @@ export default function TasiyiciMessages() {
 
   useEffect(() => {
     loadConversations();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pagination.page]);
 
   useEffect(() => {
@@ -183,12 +187,11 @@ export default function TasiyiciMessages() {
         const conversation = conversations.find(
           (c) => c.participantId?.toString() === userIdParam
         );
-        if (conversation) {
+        if (conversation && (conversation.participantType || 'client') === 'nakliyeci') {
           setSelectedConversation(conversation);
         }
       });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userIdParam]);
 
   useEffect(() => {
@@ -213,14 +216,14 @@ export default function TasiyiciMessages() {
     { label: 'Mesajlar', icon: <MessageSquare className='w-4 h-4' /> },
   ];
 
-  const filteredConversations = conversations.filter(conv =>
-    conv.participant.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredConversations = conversations
+    .filter(conv => (conv.participantType || 'client') === 'nakliyeci')
+    .filter(conv => conv.participant.toLowerCase().includes(searchTerm.toLowerCase()));
 
   const handleSendMessage = async () => {
-    // Block messaging to nakliyeci
-    if (selectedConversation?.participantType === 'nakliyeci') {
-      setSuccessMessage('Nakliyeci ile mesajlaşma yapılamaz. Lütfen telefon numarası üzerinden iletişime geçin.');
+    // Allow messaging only to nakliyeci
+    if ((selectedConversation?.participantType || 'client') !== 'nakliyeci') {
+      setSuccessMessage('Taşıyıcı panelinde sadece nakliyeci ile mesajlaşabilirsiniz.');
       setShowSuccessMessage(true);
       return;
     }
@@ -273,7 +276,10 @@ export default function TasiyiciMessages() {
         throw new Error(errorData.message || 'Mesaj gönderilemedi');
       }
     } catch (error: any) {
-      if (import.meta.env.DEV) console.error('Error sending message:', error);
+      // Use centralized error handling
+      const apiError = handleApiError(error);
+      console.error('Error sending message:', apiError);
+      setNewMessage('');
       setSuccessMessage(error?.message || 'Mesaj gönderilemedi. Lütfen tekrar deneyin.');
       setShowSuccessMessage(true);
     }
@@ -440,41 +446,6 @@ export default function TasiyiciMessages() {
                   description='Bir konuşma seçerek mesajlaşmaya başlayın.'
                 />
               </div>
-            ) : selectedConversation.participantType === 'nakliyeci' && selectedConversation.participantPhone ? (
-              <div className='bg-white rounded-xl sm:rounded-2xl shadow-lg border border-slate-200 flex flex-col h-96 items-center justify-center p-8'>
-                <div className='text-center max-w-md'>
-                  <div className='w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4'>
-                    <Phone className='w-8 h-8 text-blue-600' />
-                  </div>
-                  <h3 className='text-xl font-bold text-slate-900 mb-2'>
-                    {selectedConversation.participant}
-                  </h3>
-                  <p className='text-slate-600 mb-6'>
-                    Nakliyeci ile mesajlaşma yapılamaz. Lütfen telefon numarası üzerinden iletişime geçin.
-                  </p>
-                  <div className='flex items-center justify-between p-4 bg-blue-50 rounded-lg border border-blue-200 mb-4'>
-                    <div className='flex items-center gap-3 flex-1'>
-                      <Phone className='w-5 h-5 text-blue-600' />
-                      <div>
-                        <div className='text-xs text-slate-500 mb-1'>Telefon</div>
-                        <a
-                          href={`tel:${selectedConversation.participantPhone}`}
-                          className='font-bold text-blue-600 hover:text-blue-700 text-lg'
-                        >
-                          {selectedConversation.participantPhone}
-                        </a>
-                      </div>
-                    </div>
-                    <a
-                      href={`tel:${selectedConversation.participantPhone}`}
-                      className='px-6 py-3 bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 text-white rounded-lg font-medium transition-all duration-300 flex items-center gap-2 shadow-md hover:shadow-lg whitespace-nowrap'
-                    >
-                      <Phone className='w-5 h-5' />
-                      Ara
-                    </a>
-                  </div>
-                </div>
-              </div>
             ) : (
               <div className='bg-white rounded-xl sm:rounded-2xl shadow-lg border border-slate-200 flex flex-col h-96'>
                 {/* Chat Header */}
@@ -495,15 +466,6 @@ export default function TasiyiciMessages() {
                     </div>
                   </div>
                   <div className='flex items-center gap-2'>
-                    {selectedConversation.participantPhone && (
-                      <a
-                        href={`tel:${selectedConversation.participantPhone}`}
-                        className='p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors'
-                        title='Telefon ara'
-                      >
-                        <Phone className='w-4 h-4' />
-                      </a>
-                    )}
                     <button className='p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors'>
                       <Video className='w-4 h-4' />
                     </button>

@@ -31,6 +31,36 @@ import {
   Image as ImageIcon,
   Trash2,
 } from 'lucide-react';
+import { createApiUrl } from '../../config/api';
+// Temporary workaround
+const kvkkAPI = {
+  requestDataAccess: async () => {
+    const response = await fetch(createApiUrl('/api/kvkk/data-access'), {
+      headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
+    });
+    return response.json();
+  },
+  deleteData: async () => {
+    const response = await fetch(createApiUrl('/api/kvkk/delete-data'), {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
+    });
+    return response.json();
+  }
+};
+const authAPI = {
+  deleteAccount: async (data: any) => {
+    const response = await fetch(createApiUrl('/api/users/account'), {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data)
+    });
+    return response.json();
+  }
+};
 
 export default function CorporateSettings() {
   const [activeTab, setActiveTab] = useState('profile');
@@ -93,17 +123,6 @@ export default function CorporateSettings() {
 
   const tabs = [
     { id: 'profile', name: 'Profil', icon: <User className='w-5 h-5' /> },
-    {
-      id: 'notifications',
-      name: 'Bildirimler',
-      icon: <Bell className='w-5 h-5' />,
-    },
-    { id: 'security', name: 'Güvenlik', icon: <Shield className='w-5 h-5' /> },
-    {
-      id: 'preferences',
-      name: 'Tercihler',
-      icon: <Globe className='w-5 h-5' />,
-    },
     { id: 'shipment', name: 'Gönderi', icon: <Truck className='w-5 h-5' /> },
     { id: 'invoice', name: 'Fatura', icon: <FileText className='w-5 h-5' /> },
   ];
@@ -354,463 +373,66 @@ export default function CorporateSettings() {
           </div>
         </div>
       </div>
-    </div>
-  );
 
-  const renderNotificationsTab = () => (
-    <div className='space-y-8'>
-      <div className='bg-gradient-to-br from-white to-slate-50 rounded-2xl p-8 border border-slate-200'>
+      {/* Account Deletion */}
+      <div className='bg-gradient-to-br from-red-50 to-red-100 rounded-2xl p-8 border-2 border-red-200 mt-8'>
         <div className='flex items-center gap-4 mb-6'>
-          <div className='w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-xl flex items-center justify-center'>
-            <Bell className='w-6 h-6 text-white' />
+          <div className='w-12 h-12 bg-gradient-to-br from-red-600 to-red-800 rounded-xl flex items-center justify-center'>
+            <AlertCircle className='w-6 h-6 text-white' />
           </div>
           <div>
-            <h3 className='text-xl font-bold text-slate-900'>
-              Bildirim Tercihleri
+            <h3 className='text-xl font-bold text-red-900'>
+              Tehlikeli Bölge
             </h3>
-            <p className='text-slate-600'>
-              Hangi bildirimleri almak istediğinizi seçin
+            <p className='text-red-700'>
+              Hesap silme işlemi geri alınamaz
             </p>
           </div>
         </div>
 
-        <div className='space-y-6'>
-          {[
-            {
-              key: 'emailNotifications',
-              label: 'E-posta Bildirimleri',
-              description: 'Önemli güncellemeler ve sistem bildirimleri',
-            },
-            {
-              key: 'smsNotifications',
-              label: 'SMS Bildirimleri',
-              description: 'Acil durumlar ve kritik güncellemeler',
-            },
-            {
-              key: 'pushNotifications',
-              label: 'Push Bildirimleri',
-              description: 'Tarayıcı ve mobil uygulama bildirimleri',
-            },
-            {
-              key: 'shipmentUpdates',
-              label: 'Gönderi Güncellemeleri',
-              description: 'Gönderi durumu değişiklikleri',
-            },
-            {
-              key: 'carrierMessages',
-              label: 'Nakliyeci Mesajları',
-              description: 'Nakliyecilerden gelen mesajlar',
-            },
-            {
-              key: 'systemAlerts',
-              label: 'Sistem Uyarıları',
-              description: 'Sistem bakımı ve güvenlik uyarıları',
-            },
-            {
-              key: 'marketingEmails',
-              label: 'Pazarlama E-postaları',
-              description: 'Yeni özellikler ve kampanyalar',
-            },
-          ].map(item => (
-            <div
-              key={item.key}
-              className='flex items-center justify-between p-4 bg-white rounded-xl border border-slate-200'
-            >
-              <div className='flex-1'>
-                <h4 className='font-semibold text-slate-900'>{item.label}</h4>
-                <p className='text-sm text-slate-600'>{item.description}</p>
-              </div>
-              <label className='relative inline-flex items-center cursor-pointer'>
-                <input
-                  type='checkbox'
-                  checked={
-                    settings[item.key as keyof typeof settings] as boolean
-                  }
-                  onChange={e => handleInputChange(item.key, e.target.checked)}
-                  className='sr-only peer'
-                />
-                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gradient-to-r peer-checked:from-slate-800 peer-checked:to-blue-900"></div>
-              </label>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderSecurityTab = () => (
-    <div className='space-y-8'>
-      {/* Password Settings */}
-      <div className='bg-gradient-to-br from-white to-slate-50 rounded-2xl p-8 border border-slate-200'>
-        <div className='flex items-center gap-4 mb-6'>
-          <div className='w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-xl flex items-center justify-center'>
-            <Key className='w-6 h-6 text-white' />
-          </div>
-          <div>
-            <h3 className='text-xl font-bold text-slate-900'>
-              Şifre Güvenliği
-            </h3>
-            <p className='text-slate-600'>Hesap güvenliğinizi yönetin</p>
-          </div>
-        </div>
-
-        <div className='space-y-6'>
-          <div className='space-y-2'>
-            <label className='block text-sm font-semibold text-slate-700'>
-              Mevcut Şifre
-            </label>
-            <div className='relative'>
-              <input
-                type={showPassword ? 'text' : 'password'}
-                className='w-full p-4 pr-12 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md text-slate-700'
-                placeholder='Mevcut şifrenizi girin'
-              />
-              <button
-                type='button'
-                onClick={() => setShowPassword(!showPassword)}
-                className='absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600'
-              >
-                {showPassword ? (
-                  <EyeOff className='w-5 h-5' />
-                ) : (
-                  <Eye className='w-5 h-5' />
-                )}
-              </button>
-            </div>
-          </div>
-
-          <div className='space-y-2'>
-            <label className='block text-sm font-semibold text-slate-700'>
-              Yeni Şifre
-            </label>
-            <input
-              type='password'
-              className='w-full p-4 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md text-slate-700'
-              placeholder='Yeni şifrenizi girin'
-            />
-          </div>
-
-          <div className='space-y-2'>
-            <label className='block text-sm font-semibold text-slate-700'>
-              Şifre Onayı
-            </label>
-            <input
-              type='password'
-              className='w-full p-4 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md text-slate-700'
-              placeholder='Yeni şifrenizi tekrar girin'
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Security Settings */}
-      <div className='bg-gradient-to-br from-white to-slate-50 rounded-2xl p-8 border border-slate-200'>
-        <div className='flex items-center gap-4 mb-6'>
-          <div className='w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-xl flex items-center justify-center'>
-            <Shield className='w-6 h-6 text-white' />
-          </div>
-          <div>
-            <h3 className='text-xl font-bold text-slate-900'>
-              Güvenlik Ayarları
-            </h3>
-            <p className='text-slate-600'>
-              Hesap güvenlik seçeneklerinizi yönetin
-            </p>
-          </div>
-        </div>
-
-        <div className='space-y-6'>
-          {[
-            {
-              key: 'twoFactorAuth',
-              label: 'İki Faktörlü Kimlik Doğrulama',
-              description: 'Hesabınızı ekstra güvenlik katmanı ile koruyun',
-            },
-            {
-              key: 'loginAlerts',
-              label: 'Giriş Uyarıları',
-              description: 'Yeni cihazlardan giriş yapıldığında bildirim alın',
-            },
-          ].map(item => (
-            <div
-              key={item.key}
-              className='flex items-center justify-between p-4 bg-white rounded-xl border border-slate-200'
-            >
-              <div className='flex-1'>
-                <h4 className='font-semibold text-slate-900'>{item.label}</h4>
-                <p className='text-sm text-slate-600'>{item.description}</p>
-              </div>
-              <label className='relative inline-flex items-center cursor-pointer'>
-                <input
-                  type='checkbox'
-                  checked={
-                    settings[item.key as keyof typeof settings] as boolean
-                  }
-                  onChange={e => handleInputChange(item.key, e.target.checked)}
-                  className='sr-only peer'
-                />
-                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gradient-to-r peer-checked:from-slate-800 peer-checked:to-blue-900"></div>
-              </label>
-            </div>
-          ))}
-
-          <div className='space-y-2'>
-            <label className='block text-sm font-semibold text-slate-700'>
-              Oturum Zaman Aşımı
-            </label>
-            <select
-              value={settings.sessionTimeout}
-              onChange={e =>
-                handleInputChange('sessionTimeout', e.target.value)
-              }
-              className='w-full p-4 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md text-slate-700'
-            >
-              <option value='15'>15 dakika</option>
-              <option value='30'>30 dakika</option>
-              <option value='60'>1 saat</option>
-              <option value='120'>2 saat</option>
-            </select>
-          </div>
-          
-          {/* KVKK Veri Erişim Hakkı - Gizli yer */}
-          <div className='mt-8 pt-6 border-t border-slate-200'>
-            <div className='text-xs text-slate-400 space-y-2'>
-              <p className='text-[10px] leading-tight'>
-                KVKK m.11 gereği veri erişim ve silme haklarınız için:
+        <div className='bg-white rounded-xl p-6 border-2 border-red-200'>
+          <h4 className='font-semibold text-red-900 mb-2 text-lg'>Hesabı Sil</h4>
+              <p className='text-sm text-red-800 mb-4'>
+                Hesabınızı silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
+                Tüm verileriniz silinecek ve hesabınıza bir daha erişemeyeceksiniz.
               </p>
-              <div className='flex gap-2'>
-                <button
-                  onClick={async () => {
-                    try {
-                      const token = localStorage.getItem('authToken');
-                      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/kvkk/data-access`, {
-                        headers: {
-                          'Authorization': `Bearer ${token}`,
-                          'Content-Type': 'application/json',
-                        },
-                      });
-                      if (response.ok) {
-                        const data = await response.json();
-                        const blob = new Blob([JSON.stringify(data.data, null, 2)], { type: 'application/json' });
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = `yolnext-veri-export-${new Date().toISOString().split('T')[0]}.json`;
-                        a.click();
-                        URL.revokeObjectURL(url);
-                        alert('Verileriniz indirildi');
-                      } else {
-                        alert('Veri erişim hatası');
+              <button
+                onClick={async () => {
+                  const confirmed = window.confirm(
+                    'Hesabınızı silmek istediğinizden emin misiniz? Bu işlem geri alınamaz!'
+                  );
+                  if (confirmed) {
+                    const password = window.prompt('Güvenlik için şifrenizi girin:');
+                    if (password) {
+                      try {
+                        setIsSaving(true);
+                        const response = await authAPI.deleteAccount({ password, reason: 'Kullanıcı talebi' });
+                        if (response.success) {
+                          alert('Hesabınız başarıyla silindi. Çıkış yapılıyor...');
+                          localStorage.clear();
+                          window.location.href = '/';
+                        } else {
+                          alert(response.message || 'Hesap silme başarısız');
+                        }
+                      } catch (err: any) {
+                        alert(err?.response?.data?.message || 'Hesap silme başarısız');
+                      } finally {
+                        setIsSaving(false);
                       }
-                    } catch (error) {
-                      alert('Veri erişim hatası');
                     }
-                  }}
-                  className='text-[10px] text-slate-400 hover:text-slate-600 underline'
-                >
-                  Verilerimi İndir
-                </button>
-                <span className='text-slate-300'>|</span>
-                <button
-                  onClick={async () => {
-                    if (!confirm('Tüm verileriniz silinecek. Bu işlem geri alınamaz. Emin misiniz?')) return;
-                    if (!confirm('Son bir kez onaylayın: Tüm verileriniz kalıcı olarak silinecek. Devam edilsin mi?')) return;
-                    try {
-                      const token = localStorage.getItem('authToken');
-                      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/kvkk/delete-data`, {
-                        method: 'DELETE',
-                        headers: {
-                          'Authorization': `Bearer ${token}`,
-                          'Content-Type': 'application/json',
-                        },
-                      });
-                      const data = await response.json();
-                      if (response.ok) {
-                        alert('Verileriniz silindi. Çıkış yapılıyor...');
-                        localStorage.removeItem('authToken');
-                        localStorage.removeItem('user');
-                        window.location.href = '/login';
-                      } else {
-                        alert(data.message || 'Veri silme hatası');
-                      }
-                    } catch (error) {
-                      alert('Veri silme hatası');
-                    }
-                  }}
-                  className='text-[10px] text-slate-400 hover:text-red-600 underline'
-                >
-                  Verilerimi Sil
-                </button>
-              </div>
-            </div>
-          </div>
+                  }
+                }}
+                disabled={isSaving}
+            className='px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed shadow-lg'
+              >
+                {isSaving ? 'Siliniyor...' : 'Hesabımı Sil'}
+              </button>
         </div>
       </div>
     </div>
   );
 
-  const renderPreferencesTab = () => (
-    <div className='space-y-8'>
-      {/* General Preferences */}
-      <div className='bg-gradient-to-br from-white to-slate-50 rounded-2xl p-8 border border-slate-200'>
-        <div className='flex items-center gap-4 mb-6'>
-          <div className='w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-xl flex items-center justify-center'>
-            <Globe className='w-6 h-6 text-white' />
-          </div>
-          <div>
-            <h3 className='text-xl font-bold text-slate-900'>
-              Genel Tercihler
-            </h3>
-            <p className='text-slate-600'>
-              Platform kullanım tercihlerinizi ayarlayın
-            </p>
-          </div>
-        </div>
-
-        <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
-          <div className='space-y-2'>
-            <label className='block text-sm font-semibold text-slate-700'>
-              Dil
-            </label>
-            <select
-              value={settings.language}
-              onChange={e => handleInputChange('language', e.target.value)}
-              className='w-full p-4 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md text-slate-700'
-            >
-              <option value='tr'>Türkçe</option>
-              <option value='en'>English</option>
-            </select>
-          </div>
-
-          <div className='space-y-2'>
-            <label className='block text-sm font-semibold text-slate-700'>
-              Saat Dilimi
-            </label>
-            <select
-              value={settings.timezone}
-              onChange={e => handleInputChange('timezone', e.target.value)}
-              className='w-full p-4 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md text-slate-700'
-            >
-              <option value='Europe/Istanbul'>İstanbul (UTC+3)</option>
-              <option value='Europe/London'>Londra (UTC+0)</option>
-              <option value='America/New_York'>New York (UTC-5)</option>
-            </select>
-          </div>
-
-          <div className='space-y-2'>
-            <label className='block text-sm font-semibold text-slate-700'>
-              Tarih Formatı
-            </label>
-            <select
-              value={settings.dateFormat}
-              onChange={e => handleInputChange('dateFormat', e.target.value)}
-              className='w-full p-4 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md text-slate-700'
-            >
-              <option value='DD/MM/YYYY'>GG/AA/YYYY</option>
-              <option value='MM/DD/YYYY'>AA/GG/YYYY</option>
-              <option value='YYYY-MM-DD'>YYYY-AA-GG</option>
-            </select>
-          </div>
-
-          <div className='space-y-2'>
-            <label className='block text-sm font-semibold text-slate-700'>
-              Para Birimi
-            </label>
-            <select
-              value={settings.currency}
-              onChange={e => handleInputChange('currency', e.target.value)}
-              className='w-full p-4 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md text-slate-700'
-            >
-              <option value='TRY'>Türk Lirası (₺)</option>
-              <option value='USD'>Amerikan Doları ($)</option>
-              <option value='EUR'>Euro (€)</option>
-            </select>
-          </div>
-
-          <div className='space-y-2'>
-            <label className='block text-sm font-semibold text-slate-700'>
-              Tema
-            </label>
-            <select
-              value={settings.theme}
-              onChange={e => handleInputChange('theme', e.target.value)}
-              className='w-full p-4 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md text-slate-700'
-            >
-              <option value='light'>Açık Tema</option>
-              <option value='dark'>Koyu Tema</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      {/* Contact Preferences */}
-      <div className='bg-gradient-to-br from-white to-slate-50 rounded-2xl p-8 border border-slate-200'>
-        <div className='flex items-center gap-4 mb-6'>
-          <div className='w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-xl flex items-center justify-center'>
-            <Phone className='w-6 h-6 text-white' />
-          </div>
-          <div>
-            <h3 className='text-xl font-bold text-slate-900'>
-              İletişim Tercihleri
-            </h3>
-            <p className='text-slate-600'>
-              Müşteri hizmetleri iletişim tercihlerinizi belirleyin
-            </p>
-          </div>
-        </div>
-
-        <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
-          <div className='space-y-2'>
-            <label className='block text-sm font-semibold text-slate-700'>
-              Tercih Edilen İletişim Saatleri
-            </label>
-            <select
-              value={settings.preferredContactTime}
-              onChange={e =>
-                handleInputChange('preferredContactTime', e.target.value)
-              }
-              className='w-full p-4 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md text-slate-700'
-            >
-              <option value='09:00-18:00'>09:00 - 18:00</option>
-              <option value='08:00-17:00'>08:00 - 17:00</option>
-              <option value='10:00-19:00'>10:00 - 19:00</option>
-              <option value='24/7'>7/24</option>
-            </select>
-          </div>
-
-          <div className='space-y-2'>
-            <label className='block text-sm font-semibold text-slate-700'>
-              Tercih Edilen İletişim Yöntemi
-            </label>
-            <select
-              value={settings.contactMethod}
-              onChange={e => handleInputChange('contactMethod', e.target.value)}
-              className='w-full p-4 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md text-slate-700'
-            >
-              <option value='email'>E-posta</option>
-              <option value='phone'>Telefon</option>
-              <option value='sms'>SMS</option>
-            </select>
-          </div>
-
-          <div className='space-y-2 md:col-span-2'>
-            <label className='block text-sm font-semibold text-slate-700'>
-              Acil Durum İletişim Numarası
-            </label>
-            <input
-              type='tel'
-              value={settings.emergencyContact}
-              onChange={e =>
-                handleInputChange('emergencyContact', e.target.value)
-              }
-              className='w-full p-4 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md text-slate-700'
-              placeholder='+90 212 555 9999'
-            />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  // Removed renderNotificationsTab, renderSecurityTab, and renderPreferencesTab functions
 
   const renderShipmentTab = () => (
     <div className='space-y-8'>
@@ -852,7 +474,7 @@ export default function CorporateSettings() {
 
           <div className='space-y-2'>
             <label className='block text-sm font-semibold text-slate-700'>
-              Varsayılan Ağırlık (kg)
+              Varsayılan Ağırlık
             </label>
             <input
               type='number'
@@ -895,6 +517,62 @@ export default function CorporateSettings() {
               </span>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Account Deletion */}
+      <div className='bg-gradient-to-br from-red-50 to-red-100 rounded-2xl p-8 border-2 border-red-200 mt-8'>
+        <div className='flex items-center gap-4 mb-6'>
+          <div className='w-12 h-12 bg-gradient-to-br from-red-600 to-red-800 rounded-xl flex items-center justify-center'>
+            <AlertCircle className='w-6 h-6 text-white' />
+          </div>
+          <div>
+            <h3 className='text-xl font-bold text-red-900'>
+              Tehlikeli Bölge
+            </h3>
+            <p className='text-red-700'>
+              Hesap silme işlemi geri alınamaz
+            </p>
+          </div>
+        </div>
+
+        <div className='bg-white rounded-xl p-6 border-2 border-red-200'>
+          <h4 className='font-semibold text-red-900 mb-2 text-lg'>Hesabı Sil</h4>
+          <p className='text-sm text-red-800 mb-4'>
+            Hesabınızı silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
+            Tüm verileriniz silinecek ve hesabınıza bir daha erişemeyeceksiniz.
+          </p>
+          <button
+            onClick={async () => {
+              const confirmed = window.confirm(
+                'Hesabınızı silmek istediğinizden emin misiniz? Bu işlem geri alınamaz!'
+              );
+              if (confirmed) {
+                const password = window.prompt('Güvenlik için şifrenizi girin:');
+                if (password) {
+                  try {
+                    setIsSaving(true);
+                    const response = await authAPI.deleteAccount({ password, reason: 'Kullanıcı talebi' });
+                    if (response.success) {
+                      alert('Hesabınız başarıyla silindi. Çıkış yapılıyor...');
+                      localStorage.clear();
+                      window.location.href = '/';
+                    } else {
+                      alert(response.message || 'Hesap silme başarısız');
+                    }
+                  } catch (err: any) {
+                    alert(err?.response?.data?.message || 'Hesap silme başarısız');
+                  } finally {
+                    setIsSaving(false);
+                  }
+                }
+              }
+            }}
+            disabled={isSaving}
+            className='px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed shadow-lg'
+          >
+            {isSaving ? 'Siliniyor...' : 'Hesabımı Sil'}
+          </button>
         </div>
       </div>
     </div>
@@ -986,6 +664,62 @@ export default function CorporateSettings() {
               </span>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Account Deletion */}
+      <div className='bg-gradient-to-br from-red-50 to-red-100 rounded-2xl p-8 border-2 border-red-200 mt-8'>
+        <div className='flex items-center gap-4 mb-6'>
+          <div className='w-12 h-12 bg-gradient-to-br from-red-600 to-red-800 rounded-xl flex items-center justify-center'>
+            <AlertCircle className='w-6 h-6 text-white' />
+          </div>
+          <div>
+            <h3 className='text-xl font-bold text-red-900'>
+              Tehlikeli Bölge
+            </h3>
+            <p className='text-red-700'>
+              Hesap silme işlemi geri alınamaz
+            </p>
+          </div>
+        </div>
+
+        <div className='bg-white rounded-xl p-6 border-2 border-red-200'>
+          <h4 className='font-semibold text-red-900 mb-2 text-lg'>Hesabı Sil</h4>
+          <p className='text-sm text-red-800 mb-4'>
+            Hesabınızı silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
+            Tüm verileriniz silinecek ve hesabınıza bir daha erişemeyeceksiniz.
+          </p>
+          <button
+            onClick={async () => {
+              const confirmed = window.confirm(
+                'Hesabınızı silmek istediğinizden emin misiniz? Bu işlem geri alınamaz!'
+              );
+              if (confirmed) {
+                const password = window.prompt('Güvenlik için şifrenizi girin:');
+                if (password) {
+                  try {
+                    setIsSaving(true);
+                    const response = await authAPI.deleteAccount({ password, reason: 'Kullanıcı talebi' });
+                    if (response.success) {
+                      alert('Hesabınız başarıyla silindi. Çıkış yapılıyor...');
+                      localStorage.clear();
+                      window.location.href = '/';
+                    } else {
+                      alert(response.message || 'Hesap silme başarısız');
+                    }
+                  } catch (err: any) {
+                    alert(err?.response?.data?.message || 'Hesap silme başarısız');
+                  } finally {
+                    setIsSaving(false);
+                  }
+                }
+              }
+            }}
+            disabled={isSaving}
+            className='px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed shadow-lg'
+          >
+            {isSaving ? 'Siliniyor...' : 'Hesabımı Sil'}
+          </button>
         </div>
       </div>
     </div>
@@ -1094,9 +828,6 @@ export default function CorporateSettings() {
               {/* Content */}
               <div className='flex-1 p-8'>
                 {activeTab === 'profile' && renderProfileTab()}
-                {activeTab === 'notifications' && renderNotificationsTab()}
-                {activeTab === 'security' && renderSecurityTab()}
-                {activeTab === 'preferences' && renderPreferencesTab()}
                 {activeTab === 'shipment' && renderShipmentTab()}
                 {activeTab === 'invoice' && renderInvoiceTab()}
               </div>

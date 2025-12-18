@@ -2,10 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { createApiUrl } from '../../config/api';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
-import { Clock, MapPin, DollarSign, Truck, CheckCircle, ArrowRight, Package, Search, CheckCircle2, Navigation, Wifi, WifiOff } from 'lucide-react';
+import { Clock, MapPin, DollarSign, Truck, CheckCircle, ArrowRight, Package, Search, CheckCircle2, Navigation, Wifi, WifiOff, XCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import Breadcrumb from '../../components/common/Breadcrumb';
 import LoadingState from '../../components/common/LoadingState';
+import Modal from '../../components/common/Modal';
 
 const ActiveJobs: React.FC = () => {
   const [jobs, setJobs] = useState<any[]>([]);
@@ -13,6 +14,25 @@ const ActiveJobs: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [updatingStatus, setUpdatingStatus] = useState<Record<number, boolean>>({});
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [selectedJobToReject, setSelectedJobToReject] = useState<number | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
+  const [isRejecting, setIsRejecting] = useState(false);
+
+  const getCategoryData = (row: any) => {
+    if (!row) return undefined;
+    if (row.categoryData && typeof row.categoryData === 'object') return row.categoryData;
+    if (row.category_data && typeof row.category_data === 'object') return row.category_data;
+    const md = row.metadata;
+    if (!md) return undefined;
+    try {
+      const parsed = typeof md === 'string' ? JSON.parse(md) : md;
+      if (parsed && typeof parsed === 'object') return parsed.categoryData || parsed.category_data;
+    } catch {
+      // ignore
+    }
+    return undefined;
+  };
 
   // Offline/Online durumu takibi
   useEffect(() => {
@@ -59,24 +79,38 @@ const ActiveJobs: React.FC = () => {
         if (!response.ok) throw new Error('Aktif işler alınamadı');
         const data = await response.json();
         const rows = (Array.isArray(data) ? data : data.data || []) as any[];
-        const mapped = rows.map(row => ({
-          id: row.id,
-          title:
-            row.title || `${row.pickupCity || ''} → ${row.deliveryCity || ''}`,
-          from: row.pickupAddress || row.pickupCity || '-',
-          to: row.deliveryAddress || row.deliveryCity || '-',
-          pickupCity: row.pickupCity || '',
-          deliveryCity: row.deliveryCity || '',
-          price:
-            typeof row.price === 'number'
-              ? row.price
-              : parseFloat(row.price?.replace(/[^0-9.,]/g, '').replace(',', '.')) || 0,
-          status: row.status || 'accepted',
-          estimatedTime: row.deliveryDate || '-',
-          pickupDate: row.pickupDate,
-          weight: row.weight,
-          volume: row.volume,
-        }));
+        const mapped = rows.map(row => {
+          const categoryData = getCategoryData(row);
+          return {
+            id: row.id,
+            title: row.title || `${row.pickupCity || ''} → ${row.deliveryCity || ''}`,
+            from: row.pickupAddress || row.pickupCity || '-',
+            to: row.deliveryAddress || row.deliveryCity || '-',
+            pickupCity: row.pickupCity || '',
+            deliveryCity: row.deliveryCity || '',
+            price:
+              typeof row.price === 'number'
+                ? row.price
+                : parseFloat(row.price?.replace(/[^0-9.,]/g, '').replace(',', '.')) || 0,
+            status: row.status === 'offer_accepted' ? 'accepted' : (row.status || 'accepted'),
+            estimatedTime: row.deliveryDate || '-',
+            pickupDate: row.pickupDate,
+            weight: row.weight,
+            volume: row.volume,
+            unitType: row.unitType || row.unit_type || categoryData?.unitType || categoryData?.unit_type,
+            temperatureSetpoint:
+              row.temperatureSetpoint ||
+              row.temperature_setpoint ||
+              categoryData?.temperatureSetpoint ||
+              categoryData?.temperature_setpoint,
+            unNumber: row.unNumber || row.un_number || categoryData?.unNumber || categoryData?.un_number,
+            loadingEquipment:
+              row.loadingEquipment ||
+              row.loading_equipment ||
+              categoryData?.loadingEquipment ||
+              categoryData?.loading_equipment,
+          };
+        });
         setJobs(mapped);
       } catch (e) {
         if (import.meta.env.DEV) console.error(e);
@@ -117,8 +151,9 @@ const ActiveJobs: React.FC = () => {
         const responseData = await response.json();
         if (responseData.success) {
           // Başarılı - iş listesini güncelle
+          const uiStatus = newStatus === 'picked_up' ? 'in_progress' : newStatus;
           setJobs(prev => prev.map(job => 
-            job.id === jobId ? { ...job, status: newStatus } : job
+            job.id === jobId ? { ...job, status: uiStatus } : job
           ));
           
           if (!isRetry) {
@@ -135,6 +170,141 @@ const ActiveJobs: React.FC = () => {
       return false;
     } catch (error) {
       return false;
+    }
+  };
+
+  // Teslimat onaylama
+  const handleConfirmDelivery = async (jobId: number) => {
+    if (!window.confirm('Teslimatı onaylamak istediğinizden emin misiniz? Bu işlem geri alınamaz.')) {
+      return;
+    }
+
+    try {
+      setUpdatingStatus(prev => ({ ...prev, [jobId]: true }));
+      const token = localStorage.getItem('authToken');
+      const userRaw = localStorage.getItem('user');
+      const userId = userRaw ? JSON.parse(userRaw || '{}').id : undefined;
+
+      const response = await fetch(createApiUrl(`/api/shipments/${jobId}/confirm-delivery`), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token || ''}`,
+          'X-User-Id': userId || '',
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          toast.success('✅ Teslimat başarıyla onaylandı!');
+          // İş listesini yeniden yükle
+          const loadResponse = await fetch(createApiUrl('/api/shipments/tasiyici'), {
+            headers: {
+              Authorization: `Bearer ${token || ''}`,
+              'X-User-Id': userId || '',
+              'Content-Type': 'application/json',
+            },
+          });
+          if (loadResponse.ok) {
+            const loadData = await loadResponse.json();
+            const rows = (Array.isArray(loadData) ? loadData : loadData.data || []) as any[];
+            const mapped = rows.map(row => {
+              const categoryData = getCategoryData(row);
+              return {
+                id: row.id,
+                title: row.title || `${row.pickupCity || ''} → ${row.deliveryCity || ''}`,
+                from: row.pickupAddress || row.pickupCity || '-',
+                to: row.deliveryAddress || row.deliveryCity || '-',
+                pickupCity: row.pickupCity || '',
+                deliveryCity: row.deliveryCity || '',
+                price:
+                  typeof row.price === 'number'
+                    ? row.price
+                    : parseFloat(row.price?.replace(/[^0-9.,]/g, '').replace(',', '.')) || 0,
+                status: row.status || 'accepted',
+                estimatedTime: row.deliveryDate || '-',
+                pickupDate: row.pickupDate,
+                weight: row.weight,
+                volume: row.volume,
+                unitType: row.unitType || row.unit_type || categoryData?.unitType || categoryData?.unit_type,
+                temperatureSetpoint:
+                  row.temperatureSetpoint ||
+                  row.temperature_setpoint ||
+                  categoryData?.temperatureSetpoint ||
+                  categoryData?.temperature_setpoint,
+                unNumber: row.unNumber || row.un_number || categoryData?.unNumber || categoryData?.un_number,
+                loadingEquipment:
+                  row.loadingEquipment ||
+                  row.loading_equipment ||
+                  categoryData?.loadingEquipment ||
+                  categoryData?.loading_equipment,
+              };
+            });
+            setJobs(mapped);
+          }
+        } else {
+          toast.error(data.message || 'Teslimat onaylanamadı');
+        }
+      } else {
+        const errorData = await response.json();
+        toast.error(errorData.message || 'Teslimat onaylanamadı');
+      }
+    } catch (error) {
+      toast.error('Teslimat onaylanırken bir hata oluştu');
+    } finally {
+      setUpdatingStatus(prev => ({ ...prev, [jobId]: false }));
+    }
+  };
+
+  // İş reddetme
+  const handleRejectClick = (jobId: number) => {
+    setSelectedJobToReject(jobId);
+    setRejectReason('');
+    setShowRejectModal(true);
+  };
+
+  const handleConfirmReject = async () => {
+    if (!selectedJobToReject) return;
+
+    setIsRejecting(true);
+    try {
+      const token = localStorage.getItem('authToken');
+      const userRaw = localStorage.getItem('user');
+      const userId = userRaw ? JSON.parse(userRaw || '{}').id : undefined;
+
+      const response = await fetch(createApiUrl(`/api/shipments/${selectedJobToReject}/reject-assignment`), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token || ''}`,
+          'X-User-Id': userId || '',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          reason: rejectReason.trim() || undefined,
+        }),
+      });
+
+      if (response.ok) {
+        toast.success('İş başarıyla reddedildi');
+        setShowRejectModal(false);
+        setSelectedJobToReject(null);
+        setRejectReason('');
+        // Reload jobs
+        window.location.reload();
+      } else {
+        const errorData = await response.json().catch(() => ({ message: 'İş reddedilemedi' }));
+        toast.error(errorData.message || 'İş reddedilemedi');
+      }
+    } catch (error: any) {
+      const errorMessage = error?.message || 'İş reddedilirken bir hata oluştu';
+      if (errorMessage.includes('Network') || errorMessage.includes('fetch')) {
+        toast.error('İnternet bağlantısı yok. Lütfen bağlantınızı kontrol edin.');
+      } else {
+        toast.error(errorMessage);
+      }
+    } finally {
+      setIsRejecting(false);
     }
   };
 
@@ -346,12 +516,6 @@ const ActiveJobs: React.FC = () => {
                   </span>
                 </div>
                     )}
-                    {typeof job.weight === 'number' && (
-                      <div className='flex items-center gap-1'>
-                        <Truck className='w-3 h-3' />
-                        <span>{job.weight}kg</span>
-                      </div>
-                    )}
                     {typeof job.volume === 'number' && job.volume > 0 && (
                       <div className='flex items-center gap-1'>
                         <Package className='w-3 h-3' />
@@ -359,6 +523,31 @@ const ActiveJobs: React.FC = () => {
                       </div>
                     )}
                   </div>
+
+                  {(job.unitType || job.temperatureSetpoint || job.unNumber || job.loadingEquipment) && (
+                    <div className='flex flex-wrap gap-1.5 mb-2.5'>
+                      {job.unitType && (
+                        <span className='px-2 py-0.5 bg-gray-100 text-gray-700 rounded-full border border-gray-200 text-[10px]'>
+                          {job.unitType}
+                        </span>
+                      )}
+                      {job.temperatureSetpoint && (
+                        <span className='px-2 py-0.5 bg-cyan-50 text-cyan-700 rounded-full border border-cyan-200 text-[10px]'>
+                          {job.temperatureSetpoint}℃
+                        </span>
+                      )}
+                      {job.unNumber && (
+                        <span className='px-2 py-0.5 bg-red-50 text-red-700 rounded-full border border-red-200 text-[10px]'>
+                          {job.unNumber}
+                        </span>
+                      )}
+                      {job.loadingEquipment && (
+                        <span className='px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-full border border-indigo-200 text-[10px]'>
+                          {job.loadingEquipment}
+                        </span>
+                      )}
+                    </div>
+                  )}
 
                   {/* Price - Prominent */}
                   <div className='mb-2.5 pb-2.5 border-b border-gray-200'>
@@ -379,6 +568,18 @@ const ActiveJobs: React.FC = () => {
 
                   {/* Durum Butonları - Basit ve Büyük */}
                   <div className='space-y-2'>
+                    {/* İşi Reddet - sadece accepted/assigned durumunda */}
+                    {(job.status === 'accepted' || job.status === 'in_progress' || job.status === 'assigned' || job.status === 'pending' || !job.status) && (
+                      <button
+                        onClick={() => handleRejectClick(job.id)}
+                        disabled={updatingStatus[job.id] || isRejecting}
+                        className='w-full px-3 py-2 bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white rounded-lg font-bold text-xs transition-all duration-300 flex items-center justify-center gap-2 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed'
+                      >
+                        <XCircle className='w-4 h-4' />
+                        İşi Reddet
+                      </button>
+                    )}
+                    
                     {/* Testimi Aldım - sadece accepted/pending durumunda */}
                     {(job.status === 'accepted' || job.status === 'pending' || !job.status || job.status === 'test') && (
                       <button
@@ -415,6 +616,18 @@ const ActiveJobs: React.FC = () => {
                       </button>
                     )}
                     
+                    {/* Teslimatı Onayla - delivered durumunda */}
+                    {job.status === 'delivered' && (
+                      <button
+                        onClick={() => handleConfirmDelivery(job.id)}
+                        disabled={updatingStatus[job.id]}
+                        className='w-full px-3 py-3 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-lg font-bold text-sm transition-all duration-300 flex items-center justify-center gap-2 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed'
+                      >
+                        <CheckCircle2 className='w-5 h-5' />
+                        ✅ Teslimatı Onayla
+                      </button>
+                    )}
+                    
                     {/* Detayları Gör - her zaman görünür */}
                     <Link
                       to={`/tasiyici/jobs/${job.id}`}
@@ -437,6 +650,56 @@ const ActiveJobs: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Reject Job Modal */}
+      <Modal
+        isOpen={showRejectModal}
+        onClose={() => {
+          setShowRejectModal(false);
+          setSelectedJobToReject(null);
+          setRejectReason('');
+        }}
+        title='İşi Reddet'
+        size='md'
+      >
+        <div className='space-y-4'>
+          <p className='text-slate-700'>
+            Bu işi reddetmek istediğinizden emin misiniz? Bu işlem geri alınamaz ve nakliyeciye bildirilecektir.
+          </p>
+          <div>
+            <label className='block text-sm font-medium text-slate-700 mb-2'>
+              Reddetme Sebebi (İsteğe Bağlı)
+            </label>
+            <textarea
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              placeholder='İşi neden reddettiğinizi açıklayın...'
+              className='w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none'
+              rows={3}
+            />
+          </div>
+          <div className='flex justify-end gap-3'>
+            <button
+              onClick={() => {
+                setShowRejectModal(false);
+                setSelectedJobToReject(null);
+                setRejectReason('');
+              }}
+              className='px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition-colors'
+              disabled={isRejecting}
+            >
+              Vazgeç
+            </button>
+            <button
+              onClick={handleConfirmReject}
+              className='px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
+              disabled={isRejecting}
+            >
+              {isRejecting ? 'Reddediliyor...' : 'İşi Reddet'}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

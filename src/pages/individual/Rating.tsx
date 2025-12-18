@@ -11,6 +11,7 @@ import {
   XCircle,
   ArrowLeft,
 } from 'lucide-react';
+import { createApiUrl } from '../../config/api';
 
 interface RatingData {
   rating: number;
@@ -63,7 +64,7 @@ const Rating: React.FC = () => {
 
     try {
       // API call to submit rating
-      const response = await fetch(`/api/ratings`, {
+      const response = await fetch(createApiUrl('/api/ratings'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

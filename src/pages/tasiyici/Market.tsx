@@ -18,6 +18,10 @@ interface Listing {
   deliveryAddress?: string;
   weight?: number;
   volume?: number;
+  unitType?: string;
+  temperatureSetpoint?: string;
+  unNumber?: string;
+  loadingEquipment?: string;
   price?: number;
   pickupDate?: string;
 }
@@ -42,7 +46,7 @@ const Market: React.FC = () => {
       try {
         setLoading(true);
         const token = localStorage.getItem('authToken');
-        const res = await fetch(createApiUrl('/api/carrier-market/listings'), {
+        const res = await fetch(createApiUrl('/api/carrier-market/available'), {
           headers: {
             Authorization: `Bearer ${token || ''}`,
             'Content-Type': 'application/json',
@@ -54,9 +58,29 @@ const Market: React.FC = () => {
         console.log('🔍 [Market] Loaded listings:', JSON.stringify(listingsData, null, 2));
         console.log('🔍 [Market] Listings count:', listingsData.length);
         
+        const getShipmentCategoryData = (shipment: any) => {
+          if (!shipment || typeof shipment !== 'object') return {};
+          if (shipment.categoryData || shipment.category_data) {
+            return shipment.categoryData || shipment.category_data;
+          }
+          let meta = shipment.metadata;
+          if (typeof meta === 'string') {
+            try {
+              meta = JSON.parse(meta);
+            } catch {
+              meta = null;
+            }
+          }
+          if (meta && typeof meta === 'object' && meta.categoryData) {
+            return meta.categoryData;
+          }
+          return {};
+        };
+
         // Map carrier-market listings to Market component format
         const mappedListings = listingsData.map((listing: any) => {
           const shipment = listing.shipment || {};
+          const categoryData = getShipmentCategoryData(shipment);
           return {
             id: listing.id,
             shipmentId: listing.shipmentId,
@@ -66,6 +90,25 @@ const Market: React.FC = () => {
             deliveryAddress: shipment.deliveryAddress || shipment.to || shipment.deliveryCity || '',
             weight: shipment.weight || 0,
             volume: shipment.volume || 0,
+            unitType: categoryData.unitType || shipment.unitType,
+            temperatureSetpoint:
+              categoryData.temperatureSetpoint ||
+              categoryData.temperature_setpoint ||
+              shipment.temperatureSetpoint ||
+              shipment.temperature_setpoint ||
+              undefined,
+            unNumber:
+              categoryData.unNumber ||
+              categoryData.un_number ||
+              shipment.unNumber ||
+              shipment.un_number ||
+              undefined,
+            loadingEquipment:
+              categoryData.loadingEquipment ||
+              categoryData.loading_equipment ||
+              shipment.loadingEquipment ||
+              shipment.loading_equipment ||
+              undefined,
             price: listing.minPrice || 0,
             pickupDate: shipment.pickupDate || '',
             createdAt: listing.createdAt || '',
@@ -132,7 +175,7 @@ const Market: React.FC = () => {
       closeBidModal();
       
       // Reload listings
-      const reloadRes = await fetch(createApiUrl('/api/carrier-market/listings'), {
+      const reloadRes = await fetch(createApiUrl('/api/carrier-market/available'), {
         headers: {
           Authorization: `Bearer ${token || ''}`,
           'Content-Type': 'application/json',
@@ -143,6 +186,20 @@ const Market: React.FC = () => {
         const listingsData = (Array.isArray(reloadData) ? reloadData : reloadData.data || []) as any[];
         const mappedListings = listingsData.map((listing: any) => {
           const shipment = listing.shipment || {};
+          const categoryData =
+            shipment.categoryData ||
+            shipment.category_data ||
+            (() => {
+              let meta = shipment.metadata;
+              if (typeof meta === 'string') {
+                try {
+                  meta = JSON.parse(meta);
+                } catch {
+                  meta = null;
+                }
+              }
+              return meta && typeof meta === 'object' ? meta.categoryData || {} : {};
+            })();
           return {
             id: listing.id,
             shipmentId: listing.shipmentId,
@@ -152,6 +209,25 @@ const Market: React.FC = () => {
             deliveryAddress: shipment.deliveryAddress || shipment.to || shipment.deliveryCity || '',
             weight: shipment.weight || 0,
             volume: shipment.volume || 0,
+            unitType: categoryData.unitType || shipment.unitType,
+            temperatureSetpoint:
+              categoryData.temperatureSetpoint ||
+              categoryData.temperature_setpoint ||
+              shipment.temperatureSetpoint ||
+              shipment.temperature_setpoint ||
+              undefined,
+            unNumber:
+              categoryData.unNumber ||
+              categoryData.un_number ||
+              shipment.unNumber ||
+              shipment.un_number ||
+              undefined,
+            loadingEquipment:
+              categoryData.loadingEquipment ||
+              categoryData.loading_equipment ||
+              shipment.loadingEquipment ||
+              shipment.loading_equipment ||
+              undefined,
             price: listing.minPrice || 0,
             pickupDate: shipment.pickupDate || '',
             createdAt: listing.createdAt || '',
@@ -405,72 +481,77 @@ const Market: React.FC = () => {
                   </div>
                 )}
                 <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3'>
-                  {filteredListings.map(l => {
-                    // Extract city names from addresses
-                    const getCity = (address?: string) => {
-                      if (!address) return '';
-                      const parts = address.split(',');
-                      return parts[parts.length - 1]?.trim() || address;
-                    };
-                    
-                    const pickupCity = getCity(l.pickupAddress);
-                    const deliveryCity = getCity(l.deliveryAddress);
+                  {filteredListings.map(l => (
+                    <div
+                      key={l.id}
+                      className='bg-white rounded-lg p-3 shadow-md border border-gray-100 hover:shadow-lg hover:border-blue-300 transition-all duration-300 flex flex-col'
+                    >
+                      <h3 className='text-sm font-bold text-slate-900 mb-2 line-clamp-1'>
+                        {l.title || `Gönderi #${l.shipmentId}`}
+                      </h3>
 
-                    return (
-                      <div
-                        key={l.id}
-                        className='bg-white rounded-lg p-3 shadow-md border border-gray-100 hover:shadow-lg hover:border-blue-300 transition-all duration-300 flex flex-col'
-                      >
-                        {/* Title */}
-                        <h3 className='text-sm font-bold text-slate-900 mb-2 line-clamp-1'>
-                          {l.title || `Gönderi #${l.shipmentId}`}
-                        </h3>
-                        
-                        {/* Route - Compact */}
-                        <div className='mb-2.5'>
-                          <div className='flex items-center gap-1 mb-1'>
-                            <MapPin className='w-3 h-3 text-blue-600 flex-shrink-0' />
-                            <span className='text-xs font-medium text-slate-900 truncate'>
-                              {pickupCity || 'Belirtilmemiş'}
-                            </span>
-                          </div>
-                          <div className='flex items-center gap-1'>
-                            <ArrowRight className='w-2.5 h-2.5 text-slate-400 mx-1.5' />
-                            <MapPin className='w-3 h-3 text-blue-600 flex-shrink-0' />
-                            <span className='text-xs font-medium text-slate-900 truncate'>
-                              {deliveryCity || 'Belirtilmemiş'}
-                            </span>
-                          </div>
+                      <div className='mb-2.5'>
+                        <div className='flex items-center gap-1 mb-1'>
+                          <MapPin className='w-3 h-3 text-blue-600 flex-shrink-0' />
+                          <span className='text-xs font-medium text-slate-900 truncate'>
+                            {l.pickupAddress || 'Belirtilmemiş'}
+                          </span>
                         </div>
+                        <div className='flex items-center gap-1'>
+                          <ArrowRight className='w-2.5 h-2.5 text-slate-400 mx-1.5' />
+                          <MapPin className='w-3 h-3 text-green-600 flex-shrink-0' />
+                          <span className='text-xs font-medium text-slate-900 truncate'>
+                            {l.deliveryAddress || 'Belirtilmemiş'}
+                          </span>
+                        </div>
+                      </div>
 
-                        {/* Details - Inline */}
-                        <div className='flex flex-wrap items-center gap-2 mb-2.5 text-xs text-slate-600'>
-                          {typeof l.weight === 'number' && (
-                            <div className='flex items-center gap-1'>
-                              <Truck className='w-3 h-3' />
-                              <span>{l.weight}kg</span>
-                            </div>
+                      <div className='flex items-center justify-between text-xs text-slate-600 mb-2.5'>
+                        <div className='flex items-center gap-1'>
+                          <Package className='w-3 h-3 text-blue-600' />
+                          <span>{(l.weight || 0).toLocaleString('tr-TR')} kg</span>
+                        </div>
+                        <div className='flex items-center gap-1'>
+                          <Package className='w-3 h-3 text-purple-600' />
+                          <span>{(l.volume || 0).toLocaleString('tr-TR')} m³</span>
+                        </div>
+                      </div>
+
+                      {(l.unitType || l.temperatureSetpoint || l.unNumber || l.loadingEquipment) && (
+                        <div className='flex flex-wrap gap-1.5 mb-2.5'>
+                          {l.unitType && (
+                            <span className='px-2 py-0.5 bg-gray-100 text-gray-700 rounded-full border border-gray-200 text-[10px]'>
+                              {l.unitType}
+                            </span>
                           )}
-                          {typeof l.volume === 'number' && l.volume > 0 && (
-                            <div className='flex items-center gap-1'>
-                              <Package className='w-3 h-3' />
-                              <span>{l.volume}m³</span>
-                            </div>
+                          {l.temperatureSetpoint && (
+                            <span className='px-2 py-0.5 bg-cyan-50 text-cyan-700 rounded-full border border-cyan-200 text-[10px]'>
+                              {l.temperatureSetpoint}℃
+                            </span>
+                          )}
+                          {l.unNumber && (
+                            <span className='px-2 py-0.5 bg-red-50 text-red-700 rounded-full border border-red-200 text-[10px]'>
+                              {l.unNumber}
+                            </span>
+                          )}
+                          {l.loadingEquipment && (
+                            <span className='px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-full border border-indigo-200 text-[10px]'>
+                              {l.loadingEquipment}
+                            </span>
                           )}
                         </div>
+                      )}
 
-                        {/* Listing Age removed as requested */}
-
-                        {/* Price - Prominent */}
+                      <div className='mt-auto'>
                         <div className='mb-2.5 pb-2.5 border-b border-gray-200'>
-                          {typeof l.price === 'number' ? (
+                          {typeof l.price === 'number' && l.price > 0 ? (
                             <div>
                               <div className='text-lg font-bold text-green-600'>
-                                ₺{l.price.toLocaleString()}
+                                ₺{l.price.toLocaleString('tr-TR')}
                               </div>
                               {l.minPrice && l.minPrice < l.price && (
                                 <div className='text-[10px] text-slate-500 mt-0.5'>
-                                  Min: ₺{l.minPrice.toLocaleString()}
+                                  Min: ₺{l.minPrice.toLocaleString('tr-TR')}
                                 </div>
                               )}
                             </div>
@@ -478,7 +559,7 @@ const Market: React.FC = () => {
                             <div>
                               <div className='text-[10px] text-slate-500 mb-0.5'>Min. Teklif</div>
                               <div className='text-lg font-bold text-slate-900'>
-                                ₺{l.minPrice.toLocaleString()}
+                                ₺{l.minPrice.toLocaleString('tr-TR')}
                               </div>
                             </div>
                           ) : (
@@ -486,17 +567,16 @@ const Market: React.FC = () => {
                           )}
                         </div>
 
-                        {/* Action Button */}
                         <button
                           onClick={() => openBidModal(l)}
-                          className='w-full px-2.5 py-1.5 bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 text-white rounded-lg text-xs font-medium transition-all duration-300 flex items-center justify-center gap-1.5 shadow-md hover:shadow-lg'
+                          className='w-full px-2.5 py-2 bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 text-white rounded-lg text-xs font-medium transition-all duration-300 flex items-center justify-center gap-1.5 shadow-md hover:shadow-lg'
                         >
                           <DollarSign className='w-3 h-3' />
                           Teklif Ver
                         </button>
                       </div>
-                    );
-                  })}
+                    </div>
+                  ))}
                 </div>
               </>
             )}

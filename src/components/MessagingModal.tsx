@@ -41,6 +41,30 @@ const MessagingModal: React.FC<MessagingModalProps> = ({
   const [isSending, setIsSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  const shipmentRef = shipmentId ? `#${shipmentId}` : '';
+
+  const ibanRegex = /\bTR\d{2}(?:\s?\d{4}){1,5}\s?\d{0,2}\b/i;
+  const hasIbanInConversation = messages.some(m => ibanRegex.test(String(m.message || '')));
+
+  const templates = [
+    {
+      label: 'IBAN iste',
+      text: `Merhaba, ödeme için IBAN bilgilerinizi paylaşır mısınız? İş No: ${shipmentRef}`.trim(),
+    },
+    {
+      label: 'Ödeme teyidi',
+      text: `Ödeme ile ilgili teyit rica ederim. İş No: ${shipmentRef}`.trim(),
+    },
+    {
+      label: 'Dekont iste',
+      text: `Ödeme dekontunu paylaşabilir misiniz? İş No: ${shipmentRef}`.trim(),
+    },
+    {
+      label: 'Açıklama öner',
+      text: `Ödeme açıklamasına lütfen "${shipmentRef}" yazalım. Tutar ve alıcı adı teyit edelim.`.trim(),
+    },
+  ];
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -60,8 +84,14 @@ const MessagingModal: React.FC<MessagingModalProps> = ({
       setIsLoading(true);
       const token = localStorage.getItem('authToken');
 
+      // Use shipmentId if available, otherwise get all messages and filter
+      let endpoint = '/api/messages';
+      if (shipmentId) {
+        endpoint = `/api/messages/shipment/${shipmentId}`;
+      }
+
       const response = await fetch(
-        createApiUrl(`/api/messages/conversation/${otherUser?.id}`),
+        createApiUrl(endpoint),
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -72,13 +102,28 @@ const MessagingModal: React.FC<MessagingModalProps> = ({
 
       if (response.ok) {
         const data = await response.json();
-        setMessages(data.data || data || []);
+        let messagesData = data.data || data.messages || data || [];
+        
+        // If we got all messages and have otherUser, filter by otherUser
+        if (!shipmentId && otherUser?.id && Array.isArray(messagesData)) {
+          const otherId = String(parseInt(otherUser.id));
+          messagesData = messagesData.filter(
+            (msg: any) => msg.sender_id === otherId || msg.receiver_id === otherId
+          );
+        }
+        
+        setMessages(messagesData);
       } else {
-        console.error('Failed to load conversation');
+        // Failed to load conversation - log removed for performance
         setMessages([]);
       }
     } catch (error) {
-      console.error('Error loading conversation:', error);
+      // Error loading conversation - log removed for performance
+      // Only log critical errors in development
+      if (import.meta.env.DEV && error instanceof Error && error.message.includes('500')) {
+        console.error('Critical error loading conversation:', error);
+      }
+      setMessages([]);
     } finally {
       setIsLoading(false);
     }
@@ -99,9 +144,9 @@ const MessagingModal: React.FC<MessagingModalProps> = ({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          receiver_id: otherUser?.id,
+          receiverId: parseInt(otherUser?.id) || otherUser?.id,
           message: newMessage.trim(),
-          shipment_id: shipmentId,
+          shipmentId: shipmentId ? parseInt(shipmentId) : null,
         }),
       });
 
@@ -124,21 +169,35 @@ const MessagingModal: React.FC<MessagingModalProps> = ({
         loadConversation();
       } else {
         const errorData = await response.json().catch(() => ({}));
-        console.error('Failed to send message:', errorData.message || 'Unknown error');
+        // Failed to send message - log removed for performance
+        // Only log critical errors in development
+        if (import.meta.env.DEV && errorData.message?.includes('500')) {
+          console.error('Critical error sending message:', errorData.message);
+        }
       }
     } catch (error) {
-      console.error('Error sending message:', error);
+      // Error sending message - log removed for performance
+      // Only log critical errors in development
+      if (import.meta.env.DEV && error instanceof Error && error.message.includes('500')) {
+        console.error('Critical error sending message:', error);
+      }
     } finally {
       setIsSending(false);
     }
   };
 
   const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleTimeString('tr-TR', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    if (!dateString) return '';
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return '';
+      return date.toLocaleTimeString('tr-TR', {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    } catch {
+      return '';
+    }
   };
 
   if (!isOpen) return null;
@@ -156,9 +215,16 @@ const MessagingModal: React.FC<MessagingModalProps> = ({
               <h2 className='text-lg font-bold text-gray-900'>
                 {otherUser?.name}
               </h2>
-              <p className='text-sm text-gray-600'>
-                {otherUser?.type} • {otherUser?.email}
-              </p>
+              <div className='flex flex-wrap items-center gap-2'>
+                <p className='text-sm text-gray-600'>
+                  {otherUser?.type} • {otherUser?.email}
+                </p>
+                {shipmentId && (
+                  <span className='inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200'>
+                    İş No: #{shipmentId}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
           <button
@@ -167,6 +233,17 @@ const MessagingModal: React.FC<MessagingModalProps> = ({
           >
             <X className='w-5 h-5 text-gray-500' />
           </button>
+        </div>
+
+        <div className='px-6 pt-4'>
+          <div className='bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-900'>
+            Bu kanal ödeme ve süreç koordinasyonu içindir. IBAN/ödeme paylaşırken alıcı adını doğrulayın ve açıklamaya {shipmentRef || 'iş numarasını'} ekleyin.
+          </div>
+          {hasIbanInConversation && (
+            <div className='mt-3 bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-900'>
+              Konuşmada IBAN bilgisi tespit edildi. Lütfen alıcı adını ve tutarı tekrar teyit edin.
+            </div>
+          )}
         </div>
 
         {/* Messages */}
@@ -210,12 +287,24 @@ const MessagingModal: React.FC<MessagingModalProps> = ({
 
         {/* Message Input */}
         <form onSubmit={sendMessage} className='p-4 border-t border-gray-200'>
+          <div className='flex flex-wrap gap-2 mb-3'>
+            {templates.map(t => (
+              <button
+                key={t.label}
+                type='button'
+                onClick={() => setNewMessage(t.text)}
+                className='px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded-lg transition-colors'
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
           <div className='flex gap-2'>
             <input
               type='text'
               value={newMessage}
               onChange={e => setNewMessage(e.target.value)}
-              placeholder='Mesajınızı yazın...'
+              placeholder='Ödeme/IBAN ve süreç için mesaj yazın...'
               className='flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
               disabled={isSending}
             />

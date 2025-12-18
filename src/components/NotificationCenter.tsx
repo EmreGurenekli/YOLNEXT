@@ -102,7 +102,9 @@ export default function NotificationCenter({
 
       if (response.ok) {
         const result = await response.json();
-        const data = result.data || result;
+        const data = Array.isArray(result?.data)
+          ? result.data
+          : (Array.isArray(result) ? result : []);
         setNotifications(data);
         setUnreadCount(data.filter((n: Notification) => !n.is_read).length);
       }
@@ -119,7 +121,7 @@ export default function NotificationCenter({
       const response = await fetch(
         createApiUrl(`/api/notifications/${id}/read`),
         {
-          method: 'POST',
+          method: 'PUT',
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -144,7 +146,7 @@ export default function NotificationCenter({
       const response = await fetch(
         createApiUrl('/api/notifications/mark-all-read'),
         {
-          method: 'POST',
+          method: 'PUT',
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',

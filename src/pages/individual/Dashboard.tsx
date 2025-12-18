@@ -5,24 +5,14 @@ import { useAuth } from '../../contexts/AuthContext';
 import { dashboardAPI, notificationAPI, shipmentAPI } from '../../services/api';
 import {
   Package,
-  CheckCircle,
   CheckCircle2,
   Clock,
-  DollarSign,
   Plus,
   Bell,
   MessageSquare,
   TrendingUp,
   Truck,
-  BarChart3,
   ArrowRight,
-  Eye,
-  Edit,
-  Trash2,
-  X,
-  Settings,
-  Activity,
-  AlertCircle,
 } from 'lucide-react';
 import LoadingState from '../../components/common/LoadingState';
 import { formatCurrency, formatDate } from '../../utils/format';
@@ -45,17 +35,26 @@ interface Shipment {
   estimatedDelivery: string;
 }
 
-interface Notification {
-  id: string;
-  title: string;
-  message: string;
-  type: string;
-  isRead: boolean;
-  createdAt: string;
-}
 
 const Dashboard = () => {
   const { user } = useAuth();
+
+  const toNumber = (value: any, fallback = 0) => {
+    if (typeof value === 'number') return Number.isFinite(value) ? value : fallback;
+    if (typeof value === 'string') {
+      const n = parseFloat(value.replace(/[^0-9.,-]/g, '').replace(',', '.'));
+      return Number.isFinite(n) ? n : fallback;
+    }
+    return fallback;
+  };
+
+  const safeFormatDate = (value: any, mode: 'short' | 'long' | 'time' = 'short') => {
+    if (!value) return '';
+    const d = value instanceof Date ? value : new Date(value);
+    if (!Number.isFinite(d.getTime())) return '';
+    return formatDate(d, mode);
+  };
+
   const [stats, setStats] = useState({
     totalShipments: 0,
     deliveredShipments: 0,
@@ -66,7 +65,6 @@ const Dashboard = () => {
     favoriteCarriers: 0,
   });
   const [recentShipments, setRecentShipments] = useState<Shipment[]>([]);
-  const [recentOffers, setRecentOffers] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -77,20 +75,23 @@ const Dashboard = () => {
 
         // Load stats from real API
         const statsResponse = await dashboardAPI.getStats('individual');
-        if (statsResponse?.success && statsResponse?.data?.stats) {
+        if (statsResponse?.success && statsResponse?.data) {
+          const statsData = (statsResponse.data.stats || statsResponse.data) as any;
           setStats({
-            ...statsResponse.data.stats,
-            deliveredShipments:
-              statsResponse.data.stats.completedShipments || 0,
+            totalShipments: statsData.totalShipments || 0,
+            deliveredShipments: statsData.completedShipments || 0,
+            pendingShipments: statsData.pendingShipments || 0,
             successRate:
-              statsResponse.data.stats.completedShipments > 0
-                ? (
-                    (statsResponse.data.stats.completedShipments /
-                      statsResponse.data.stats.totalShipments) *
+              statsData.completedShipments > 0 && statsData.totalShipments > 0
+                ? parseFloat(
+                    (
+                      (statsData.completedShipments /
+                        statsData.totalShipments) *
                     100
                   ).toFixed(1)
+                  )
                 : 0,
-            totalSpent: 0,
+            totalSpent: statsData.totalSpent || 0,
             thisMonthSpent: 0,
             favoriteCarriers: 0,
           });
@@ -99,21 +100,76 @@ const Dashboard = () => {
         // Load recent shipments from real API
         const shipmentsResponse = await shipmentAPI.getAll();
         if (shipmentsResponse?.success) {
-          const shipments =
-            (shipmentsResponse as any).shipments ||
-            shipmentsResponse.data ||
-            shipmentsResponse.data?.shipments ||
-            [];
-          setRecentShipments(Array.isArray(shipments) ? shipments : []);
+          // Backend'den dönen data structure'ı kontrol et ve map et
+          let shipments: any[] = [];
+          if (Array.isArray(shipmentsResponse.data)) {
+            shipments = shipmentsResponse.data;
+          } else if (shipmentsResponse.data?.shipments && Array.isArray(shipmentsResponse.data.shipments)) {
+            shipments = shipmentsResponse.data.shipments;
+          } else if (shipmentsResponse.data?.data && Array.isArray(shipmentsResponse.data.data)) {
+            shipments = shipmentsResponse.data.data;
+          } else if (Array.isArray((shipmentsResponse as any)?.shipments)) {
+            shipments = (shipmentsResponse as any).shipments;
+          }
+          
+          // Backend verilerini frontend formatına çevir
+          const formattedShipments = (Array.isArray(shipments) ? shipments : []).map((shipment: any) => {
+            const rawStatus = shipment?.status;
+            const normalizedStatus =
+              rawStatus === 'open' || rawStatus === 'waiting_for_offers'
+                ? 'waiting'
+                : rawStatus === 'offer_accepted' || rawStatus === 'accepted'
+                  ? 'offer_accepted'
+                  : rawStatus === 'in_transit' || rawStatus === 'in_progress'
+                    ? 'in_transit'
+                    : rawStatus === 'delivered' || rawStatus === 'completed'
+                      ? 'delivered'
+                      : rawStatus === 'cancelled'
+                        ? 'cancelled'
+                        : rawStatus === 'preparing'
+                          ? 'preparing'
+                          : rawStatus || 'waiting';
+
+            const priceNumber = toNumber(
+              shipment?.displayPrice ?? shipment?.price ?? shipment?.offerPrice ?? shipment?.value,
+              0
+            );
+
+            const volumeNumber = toNumber(shipment?.volume ?? shipment?.volume_m3 ?? shipment?.volumeM3, 0);
+
+            const createdAt = shipment?.createdAt || shipment?.created_at || shipment?.createdAt;
+            const estimatedDelivery = shipment?.estimatedDelivery || shipment?.estimated_delivery || shipment?.deliveryDate || shipment?.delivery_date;
+
+            return {
+              ...shipment,
+              id: shipment?.id?.toString?.() || String(shipment?.id || ''),
+              status: normalizedStatus,
+              price: priceNumber,
+              volume: volumeNumber,
+              createdAt,
+              estimatedDelivery,
+              trackingCode:
+                shipment?.trackingCode ||
+                shipment?.trackingNumber ||
+                shipment?.tracking_number ||
+                `TRK${(shipment?.id || '').toString().padStart(6, '0')}`,
+              from: shipment?.pickupCity || shipment?.fromCity || shipment?.from || 'Bilinmiyor',
+              to: shipment?.deliveryCity || shipment?.toCity || shipment?.to || 'Bilinmiyor',
+              carrierName: shipment?.carrierName || shipment?.carrier_name || shipment?.nakliyeciName || shipment?.nakliyeci_name || undefined,
+              rating: toNumber(shipment?.rating, 0),
+            };
+          });
+          
+          setRecentShipments(formattedShipments);
         }
 
         // Load unread notifications count from real API
         const notificationsResponse = await notificationAPI.getUnreadCount();
-        if (notificationsResponse?.success && notificationsResponse?.data) {
-          setUnreadCount(notificationsResponse.data.count || 0);
+        if (notificationsResponse?.success) {
+          const d = (notificationsResponse as any).data || {};
+          setUnreadCount(d.count || d.unreadCount || d.unread || 0);
         }
       } catch (error) {
-        console.error('Error loading dashboard data:', error);
         // Fallback to empty data
         setStats({
           totalShipments: 0,
@@ -126,20 +182,26 @@ const Dashboard = () => {
         });
         setUnreadCount(0);
         setRecentShipments([]);
-        setRecentOffers([]);
       } finally {
         setIsLoading(false);
       }
     };
 
     loadDashboardData();
+    
+    // Refresh data every 10 seconds to catch real-time updates
+    const interval = setInterval(() => {
+      loadDashboardData();
+    }, 10000);
+    
+    return () => clearInterval(interval);
   }, []);
 
   if (isLoading) {
     return (
       <div className='min-h-screen bg-gray-50 flex items-center justify-center'>
         <LoadingState
-          message='Dashboard yükleniyor...'
+          message='Ana Sayfa yükleniyor...'
           size='lg'
           className='py-12'
         />
@@ -407,7 +469,7 @@ const Dashboard = () => {
               </div>
             </Link>
 
-            <Link to='/individual/shipments'>
+            <Link to='/individual/my-shipments'>
               <div className='group bg-white rounded-2xl p-6 shadow-lg border border-slate-200 hover:shadow-xl hover:border-emerald-300 transition-all duration-300 hover:-translate-y-2'>
                 <div className='flex flex-col items-center text-center'>
                   <div className='w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300 mb-4'>
@@ -470,7 +532,7 @@ const Dashboard = () => {
               <p className='text-slate-600'>Aktif gönderilerinizi takip edin</p>
             </div>
             <Link
-              to='/individual/shipments'
+              to='/individual/my-shipments'
               className='text-blue-600 hover:text-blue-700 font-medium flex items-center gap-2'
             >
               Tümünü Gör
@@ -514,7 +576,7 @@ const Dashboard = () => {
                           {shipment.trackingCode}
                         </div>
                         <div className='text-xs text-slate-500'>
-                          {shipment.createdAt ? formatDate(shipment.createdAt, 'short') : ''}
+                          {safeFormatDate((shipment as any).createdAt, 'short')}
                         </div>
                         <div className='text-xs text-slate-500'>
                           {shipment.title}
@@ -525,7 +587,7 @@ const Dashboard = () => {
                           {shipment.from} → {shipment.to}
                         </div>
                         <div className='text-xs text-slate-500'>
-                          {shipment.category} - {shipment.subCategory}
+                          {shipment.subCategory || shipment.category || '-'}
                         </div>
                       </td>
                       <td className='py-4 px-4'>
@@ -546,6 +608,8 @@ const Dashboard = () => {
                             <Package className='w-3 h-3 mr-1' />
                           ) : shipment.status === 'delivered' ? (
                             <CheckCircle2 className='w-3 h-3 mr-1' />
+                          ) : shipment.status === 'offer_accepted' || shipment.status === 'accepted' ? (
+                            <CheckCircle2 className='w-3 h-3 mr-1' />
                           ) : (
                             <Clock className='w-3 h-3 mr-1' />
                           )}
@@ -555,6 +619,10 @@ const Dashboard = () => {
                               ? 'Teslim Edildi'
                               : shipment.status === 'preparing'
                                 ? 'Hazırlanıyor'
+                                : shipment.status === 'offer_accepted' || shipment.status === 'accepted'
+                                  ? 'Teklif Kabul Edildi'
+                                  : shipment.status === 'waiting_for_offers' || shipment.status === 'waiting'
+                                    ? 'Teklif Bekliyor'
                                 : 'Teklif Bekliyor'}
                         </span>
                       </td>
@@ -570,13 +638,13 @@ const Dashboard = () => {
                       </td>
                       <td className='py-4 px-4'>
                         <div className='text-sm font-bold text-blue-700'>
-                          {shipment.price ? formatCurrency(shipment.price) : '₺0'}
+                          {toNumber((shipment as any).price, 0) > 0 ? formatCurrency(toNumber((shipment as any).price, 0)) : '₺0'}
                         </div>
                         <div className='text-xs text-slate-500'>
-                          {shipment.weight ? `${shipment.weight} kg` : ''} {shipment.volume ? `• ${shipment.volume} m³` : ''}
+                          {toNumber((shipment as any).volume, 0) > 0 ? `${toNumber((shipment as any).volume, 0).toFixed(2)} m³` : ''}
                         </div>
                         <div className='text-xs text-slate-500'>
-                          {shipment.estimatedDelivery ? formatDate(shipment.estimatedDelivery, 'short') : ''}
+                          {safeFormatDate((shipment as any).estimatedDelivery, 'short')}
                         </div>
                       </td>
                       <td className='py-4 px-4'>

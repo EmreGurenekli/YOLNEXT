@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
+import { useSearchParams } from 'react-router-dom';
 import {
   MessageCircle,
   Search,
   Filter,
   Send,
   Phone,
-  Mail,
   MoreVertical,
   Star,
   Clock,
@@ -33,9 +33,13 @@ import {
   Settings,
   RefreshCw,
 } from 'lucide-react';
+import { createApiUrl } from '../../config/api';
 
 export default function CorporateMessages() {
-  const [selectedChat, setSelectedChat] = useState(1);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const userIdParam = searchParams.get('userId');
+  const prefillParam = searchParams.get('prefill');
+  const [selectedChat, setSelectedChat] = useState<number | null>(null);
   const [newMessage, setNewMessage] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -52,7 +56,7 @@ export default function CorporateMessages() {
 
   const handleCallCarrier = (carrierId: number) => {
     console.log('Nakliyeci aranıyor:', carrierId);
-    window.open('tel:+905551234567');
+    return;
   };
 
   const handleVideoCall = (carrierId: number) => {
@@ -64,9 +68,9 @@ export default function CorporateMessages() {
   const loadConversations = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch('/api/messages/corporate', {
+      const response = await fetch(createApiUrl('/api/messages/corporate'), {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
+          Authorization: `Bearer ${localStorage.getItem('authToken') || localStorage.getItem('token')}`,
           'Content-Type': 'application/json',
         },
       });
@@ -93,12 +97,12 @@ export default function CorporateMessages() {
   };
 
   const handleSendMessage = async () => {
-    if (newMessage.trim() && selectedChat) {
+    if (newMessage.trim() && selectedChat !== null) {
       try {
-        const response = await fetch('/api/messages/send', {
+        const response = await fetch(createApiUrl('/api/messages/send'), {
           method: 'POST',
           headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
+            Authorization: `Bearer ${localStorage.getItem('authToken') || localStorage.getItem('token')}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
@@ -122,6 +126,30 @@ export default function CorporateMessages() {
   useEffect(() => {
     loadConversations();
   }, []);
+
+  // Auto-select conversation when userId is provided in URL
+  useEffect(() => {
+    if (userIdParam && conversations.length > 0) {
+      const conversation = conversations.find(
+        conv => conv.carrier?.id === parseInt(userIdParam) || conv.carrierId === parseInt(userIdParam)
+      );
+      if (conversation) {
+        setSelectedChat(conversation.id);
+        const prefill = String(prefillParam || '').trim();
+        if (prefill) {
+          setNewMessage(prefill);
+        }
+        // Remove userId from URL after selecting
+        setSearchParams({});
+      }
+    }
+  }, [userIdParam, conversations, setSearchParams]);
+
+  useEffect(() => {
+    const prefill = String(prefillParam || '').trim();
+    if (!prefill) return;
+    setNewMessage(prefill);
+  }, [prefillParam]);
 
   const selectedConversation = conversations.find(
     conv => conv.id === selectedChat
@@ -387,7 +415,8 @@ export default function CorporateMessages() {
                             onClick={() =>
                               handleCallCarrier(selectedConversation.carrier.id)
                             }
-                            className='p-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors'
+                            disabled
+                            className='p-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
                           >
                             <Phone className='w-5 h-5' />
                           </button>
@@ -395,7 +424,8 @@ export default function CorporateMessages() {
                             onClick={() =>
                               handleVideoCall(selectedConversation.carrier.id)
                             }
-                            className='p-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors'
+                            disabled
+                            className='p-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
                           >
                             <Video className='w-5 h-5' />
                           </button>
