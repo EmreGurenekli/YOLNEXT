@@ -9,13 +9,20 @@ test-results/
 test-screenshots/
 test-videos/
 screenshots/
+playwright-report/
+.playwright-mcp/
 *.log
 *.cache
+
+# Temporary/generated files
+microservices/api-gateway/temp_settings.html
+public/sw.js
 
 # Cursor/IDE
 .vscode/
 .cursor/
 *.code-workspace
+.idea/
 
 # OS
 .DS_Store
@@ -35,11 +42,22 @@ legacy/
 
 # Sensitive data
 backend-data.json
+backend-output.log
+frontend-output.log
+backend_output.log
 *.key
 *.pem
 *.cert
 ssl/
 secrets/
+
+# Local databases
+*.sqlite
+*.sqlite3
+*.db
+
+# Local artifacts
+.local-artifacts/
 
 # Logs
 logs/
@@ -51,3 +69,6 @@ yarn-error.log*
 # Production builds
 dist/
 build/
+
+# TypeScript build artifacts
+*.tsbuildinfo
