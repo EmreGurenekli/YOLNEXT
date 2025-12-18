@@ -6,21 +6,88 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3008;
 
-// Redis client
+// Redis client with in-memory fallback when Redis is not available
 const redisClient = redis.createClient({
-  host: process.env.REDIS_HOST || 'localhost',
-  port: process.env.REDIS_PORT || 6379,
+  socket: {
+    host: process.env.REDIS_HOST || 'localhost',
+    port: process.env.REDIS_PORT ? Number(process.env.REDIS_PORT) : 6379
+  },
   password: process.env.REDIS_PASSWORD || undefined
 });
+
+let redisAvailable = false;
+const inMemoryStore = new Map();
+
+function nowMs() { return Date.now(); }
+
+function makePatternRegex(pattern) {
+  // very small conversion: * -> .* (anchors applied)
+  const esc = pattern.replace(/[-/\\^$+?.()|[\]{}]/g, '\\$&');
+  const re = '^' + esc.replace(/\\\*/g, '.*') + '$';
+  return new RegExp(re);
+}
+
+async function cacheGetRaw(key) {
+  if (redisAvailable) return await redisClient.get(key);
+  const entry = inMemoryStore.get(key);
+  if (!entry) return null;
+  if (entry.expiresAt && entry.expiresAt <= nowMs()) { inMemoryStore.delete(key); return null; }
+  return JSON.stringify(entry.value);
+}
+
+async function cacheSetEx(key, ttl, value) {
+  if (redisAvailable) return await redisClient.setEx(key, ttl, JSON.stringify(value));
+  const expiresAt = ttl ? (nowMs() + ttl * 1000) : undefined;
+  inMemoryStore.set(key, { value, expiresAt });
+  return 'OK';
+}
+
+async function cacheDel(key) {
+  if (redisAvailable) return await redisClient.del(key);
+  return inMemoryStore.delete(key) ? 1 : 0;
+}
+
+async function cacheKeys(pattern) {
+  if (redisAvailable) return await redisClient.keys(pattern);
+  const re = makePatternRegex(pattern || '*');
+  return Array.from(inMemoryStore.keys()).filter(k => re.test(k));
+}
+
+async function cacheFlushAll() {
+  if (redisAvailable) return await redisClient.flushAll();
+  inMemoryStore.clear();
+  return 'OK';
+}
+
+async function cacheTtl(key) {
+  if (redisAvailable) return await redisClient.ttl(key);
+  const entry = inMemoryStore.get(key);
+  if (!entry) return -2; // Redis returns -2 when key does not exist
+  if (!entry.expiresAt) return -1; // no expire
+  const remaining = Math.ceil((entry.expiresAt - nowMs()) / 1000);
+  return remaining > 0 ? remaining : -2;
+}
+
+async function cacheInfo() {
+  if (redisAvailable) return await redisClient.info();
+  return `# Server\nredis_version:local-fallback\n# Memory\nused_memory:${JSON.stringify([...inMemoryStore]).reduce((s,kv)=>s+JSON.stringify(kv).length,0)}`;
+}
+
+async function cacheMemoryUsage() {
+  if (redisAvailable) return await redisClient.memory('usage');
+  return JSON.stringify([...inMemoryStore]).reduce((s,kv)=>s+JSON.stringify(kv).length,0);
+}
 
 redisClient.on('error', (err) => {
   console.error('Redis Client Error:', err);
 });
 
 redisClient.connect().then(() => {
+  redisAvailable = true;
   console.log('✅ Cache Service Redis connected');
 }).catch((err) => {
-  console.error('❌ Cache Service Redis connection failed:', err);
+  redisAvailable = false;
+  console.error('❌ Cache Service Redis connection failed — using in-memory fallback:', err && err.message ? err.message : err);
 });
 
 // Middleware
@@ -31,13 +98,12 @@ app.use(express.json());
 app.get('/cache/:key', async (req, res) => {
   try {
     const { key } = req.params;
-    const value = await redisClient.get(key);
-    
-    if (value) {
-      res.json({ 
-        key, 
-        value: JSON.parse(value),
-        ttl: await redisClient.ttl(key)
+    const raw = await cacheGetRaw(key);
+    if (raw) {
+      res.json({
+        key,
+        value: JSON.parse(raw),
+        ttl: await cacheTtl(key)
       });
     } else {
       res.status(404).json({ error: 'Key not found' });
@@ -56,7 +122,7 @@ app.post('/cache', async (req, res) => {
       return res.status(400).json({ error: 'Key and value required' });
     }
 
-    await redisClient.setEx(key, ttl, JSON.stringify(value));
+    await cacheSetEx(key, ttl, value);
     res.json({ message: 'Cache set successfully', key, ttl });
   } catch (error) {
     console.error('Cache set error:', error);
@@ -67,8 +133,7 @@ app.post('/cache', async (req, res) => {
 app.delete('/cache/:key', async (req, res) => {
   try {
     const { key } = req.params;
-    const result = await redisClient.del(key);
-    
+    const result = await cacheDel(key);
     if (result) {
       res.json({ message: 'Cache deleted successfully', key });
     } else {
@@ -83,7 +148,7 @@ app.delete('/cache/:key', async (req, res) => {
 app.get('/cache/keys/:pattern', async (req, res) => {
   try {
     const { pattern } = req.params;
-    const keys = await redisClient.keys(pattern);
+    const keys = await cacheKeys(pattern);
     res.json({ keys, count: keys.length });
   } catch (error) {
     console.error('Cache keys error:', error);
@@ -93,7 +158,7 @@ app.get('/cache/keys/:pattern', async (req, res) => {
 
 app.post('/cache/flush', async (req, res) => {
   try {
-    await redisClient.flushAll();
+    await cacheFlushAll();
     res.json({ message: 'Cache flushed successfully' });
   } catch (error) {
     console.error('Cache flush error:', error);
@@ -103,9 +168,9 @@ app.post('/cache/flush', async (req, res) => {
 
 app.get('/cache/stats', async (req, res) => {
   try {
-    const info = await redisClient.info();
-    const keys = await redisClient.keys('*');
-    
+    const info = await cacheInfo();
+    const keys = await cacheKeys('*');
+
     res.json({
       info: info.split('\r\n').reduce((acc, line) => {
         if (line.includes(':')) {
@@ -115,7 +180,7 @@ app.get('/cache/stats', async (req, res) => {
         return acc;
       }, {}),
       totalKeys: keys.length,
-      memoryUsage: await redisClient.memory('usage')
+      memoryUsage: await cacheMemoryUsage()
     });
   } catch (error) {
     console.error('Cache stats error:', error);

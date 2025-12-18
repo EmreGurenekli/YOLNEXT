@@ -10,21 +10,45 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Redis client for caching
+// Redis client for caching with in-memory fallback
 const redisClient = redis.createClient({
-  host: process.env.REDIS_HOST || 'localhost',
-  port: process.env.REDIS_PORT || 6379,
+  socket: {
+    host: process.env.REDIS_HOST || 'localhost',
+    port: process.env.REDIS_PORT ? Number(process.env.REDIS_PORT) : 6379
+  },
   password: process.env.REDIS_PASSWORD || undefined
 });
+
+let redisAvailable = false;
+const localCache = new Map();
+
+function nowMs() { return Date.now(); }
+
+async function cacheGetRaw(key) {
+  if (redisAvailable) return await redisClient.get(key);
+  const v = localCache.get(key);
+  if (!v) return null;
+  if (v.expiresAt && v.expiresAt <= nowMs()) { localCache.delete(key); return null; }
+  return JSON.stringify(v.value);
+}
+
+async function cacheSetEx(key, ttl, value) {
+  if (redisAvailable) return await redisClient.setEx(key, ttl, JSON.stringify(value));
+  const expiresAt = ttl ? (nowMs() + ttl * 1000) : undefined;
+  localCache.set(key, { value, expiresAt });
+  return 'OK';
+}
 
 redisClient.on('error', (err) => {
   console.error('Redis Client Error:', err);
 });
 
 redisClient.connect().then(() => {
+  redisAvailable = true;
   console.log('✅ Redis connected');
 }).catch((err) => {
-  console.error('❌ Redis connection failed:', err);
+  redisAvailable = false;
+  console.error('❌ Redis connection failed — using in-memory fallback:', err && err.message ? err.message : err);
 });
 
 // Security middleware
@@ -71,8 +95,8 @@ const authenticateToken = async (req, res, next) => {
       return next();
     }
 
-    // Check Redis cache first
-    const cachedUser = await redisClient.get(`user:${token}`);
+    // Check cache first (Redis or in-memory fallback)
+    const cachedUser = await cacheGetRaw(`user:${token}`);
     if (cachedUser) {
       req.user = JSON.parse(cachedUser);
       return next();
@@ -82,7 +106,7 @@ const authenticateToken = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
     
     // Cache user data
-    await redisClient.setEx(`user:${token}`, 300, JSON.stringify(decoded)); // 5 minutes cache
+    await cacheSetEx(`user:${token}`, 300, decoded); // 5 minutes cache
     
     req.user = decoded;
     next();
@@ -175,16 +199,16 @@ const cacheMiddleware = async (req, res, next) => {
 
   try {
     const cacheKey = `cache:${req.originalUrl}`;
-    const cachedData = await redisClient.get(cacheKey);
-    
+    const cachedData = await cacheGetRaw(cacheKey);
+
     if (cachedData) {
       return res.json(JSON.parse(cachedData));
     }
 
-    // Store response in cache
+    // Store response in cache (Redis or in-memory fallback)
     const originalSend = res.json;
     res.json = function(data) {
-      redisClient.setEx(cacheKey, 300, JSON.stringify(data)); // 5 minutes cache
+      cacheSetEx(cacheKey, 300, data); // 5 minutes cache
       return originalSend.call(this, data);
     };
 

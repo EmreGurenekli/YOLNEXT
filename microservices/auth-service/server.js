@@ -10,16 +10,32 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Redis client
+// Redis client with in-memory fallback
 const redisClient = redis.createClient({
-  host: process.env.REDIS_HOST || 'localhost',
-  port: process.env.REDIS_PORT || 6379
+  socket: {
+    host: process.env.REDIS_HOST || 'localhost',
+    port: process.env.REDIS_PORT ? Number(process.env.REDIS_PORT) : 6379
+  }
 });
 
+let redisAvailable = false;
+const localCache = new Map();
+
+function nowMs(){ return Date.now(); }
+
+async function cacheSetEx(key, ttl, value) {
+  if (redisAvailable) return await redisClient.setEx(key, ttl, JSON.stringify(value));
+  const expiresAt = ttl ? (nowMs() + ttl * 1000) : undefined;
+  localCache.set(key, { value, expiresAt });
+  return 'OK';
+}
+
 redisClient.connect().then(() => {
+  redisAvailable = true;
   console.log('✅ Auth Service Redis connected');
 }).catch((err) => {
-  console.error('❌ Auth Service Redis connection failed:', err);
+  redisAvailable = false;
+  console.error('❌ Auth Service Redis connection failed — using in-memory fallback:', err && err.message ? err.message : err);
 });
 
 // SQLite database
@@ -160,7 +176,7 @@ app.post('/register', async (req, res) => {
     );
 
     // Cache user data
-    await redisClient.setEx(`user:${token}`, 300, JSON.stringify({ userId, email, panel_type }));
+    await cacheSetEx(`user:${token}`, 300, { userId, email, panel_type });
 
     res.status(201).json({
       message: 'User created successfully',
@@ -221,11 +237,11 @@ app.post('/login', async (req, res) => {
     );
 
     // Cache user data
-    await redisClient.setEx(`user:${token}`, 300, JSON.stringify({ 
-      userId: user.id, 
-      email: user.email, 
-      panel_type: user.panel_type 
-    }));
+    await cacheSetEx(`user:${token}`, 300, {
+      userId: user.id,
+      email: user.email,
+      panel_type: user.panel_type
+    });
 
     res.json({
       message: 'Login successful',
