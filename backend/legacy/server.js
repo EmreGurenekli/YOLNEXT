@@ -5,10 +5,11 @@ const path = require('path');
 
 // Routes
 const verificationRoutes = require('./routes/simple-verification');
-const shipmentRoutes = require('./routes/simple-shipments');
+const shipmentRoutes = require('./routes/shipments');
+const offersRoutes = require('./routes/offers-fixed');
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3002; // Changed port to 3002
 
 // Middleware
 app.use(cors());
@@ -26,6 +27,7 @@ app.use((req, res, next) => {
 // Routes
 app.use('/api/verify', verificationRoutes);
 app.use('/api/shipments', shipmentRoutes);
+app.use('/api/offers', offersRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
