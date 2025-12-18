@@ -3,7 +3,7 @@ services:
     name: yolnext-backend
     env: node
     buildCommand: cd backend && npm install
-    startCommand: node postgres-backend.js
+    startCommand: node server-modular.js
     envVars:
       - key: NODE_ENV
         value: production

@@ -19,7 +19,7 @@ RUN mkdir -p database
 EXPOSE 5000
 
 # Start backend
-CMD ["node", "simple-stable-server.js"]
+CMD ["node", "server-modular.js"]
 
 
 

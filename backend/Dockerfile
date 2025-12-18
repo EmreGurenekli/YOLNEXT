@@ -24,8 +24,7 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/backend/node_modules ./backend/node_modules
 
 # Copy application code
-COPY backend/postgres-backend.js ./backend/
-COPY backend/env.example ./backend/
+COPY backend/ ./backend/
 
 # Set working directory to backend
 WORKDIR /app/backend
@@ -48,4 +47,4 @@ EXPOSE 5000
 ENTRYPOINT ["dumb-init", "--"]
 
 # Start the application
-CMD ["node", "postgres-backend.js"]
+CMD ["node", "server-modular.js"]
