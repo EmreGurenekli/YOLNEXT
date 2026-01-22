@@ -1,0 +1,16 @@
+﻿const fs = require('fs');
+const file = 'src/components/navigation/NakliyeciSidebar.tsx';
+let content = fs.readFileSync(file, 'utf8');
+content = content.replace('Ana Menü', 'Ana Menü');
+content = content.replace('YÃk PazarÄ', 'Yük Pazarı');
+content = content.replace('Aktif YÃkler', 'Aktif Yükler');
+content = content.replace('GÃnderilerim', 'Gönderilerim');
+content = content.replace('TaÅŸÄyÄcÄlarÄm', 'Taşıyıcılarım');
+content = content.replace('ÄlanlarÄm', 'İlanlarım');
+content = content.replace('AkÄllÄ Rota', 'Akıllı Rota');
+content = content.replace('CÃzdan', 'Cüzdan');
+content = content.replace('ÄletiÅŸim', 'İletişim');
+content = content.replace('YardÄm', 'Yardım');
+content = content.replace('HÄzlÄ Lojistik A.ÅŸ.', 'Hızlı Lojistik A.Ş.');
+fs.writeFileSync(file, content, 'utf8');
+console.log('NakliyeciSidebar fixed');

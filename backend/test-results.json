@@ -1,0 +1,353 @@
+{
+  "timestamp": "2025-10-30T00:00:32.863Z",
+  "duration": 5851,
+  "summary": {
+    "passed": 67,
+    "failed": 0,
+    "warnings": 0,
+    "total": 67
+  },
+  "results": {
+    "passed": [
+      {
+        "category": "Health",
+        "test": "Health endpoint responds",
+        "details": ""
+      },
+      {
+        "category": "Health",
+        "test": "Health status is ok",
+        "details": ""
+      },
+      {
+        "category": "Health",
+        "test": "Database is healthy",
+        "details": ""
+      },
+      {
+        "category": "Health",
+        "test": "Readiness probe",
+        "details": ""
+      },
+      {
+        "category": "Health",
+        "test": "Service is ready",
+        "details": ""
+      },
+      {
+        "category": "Health",
+        "test": "Liveness probe",
+        "details": ""
+      },
+      {
+        "category": "Health",
+        "test": "Service is alive",
+        "details": ""
+      },
+      {
+        "category": "Health",
+        "test": "Metrics endpoint",
+        "details": ""
+      },
+      {
+        "category": "Health",
+        "test": "Metrics format correct",
+        "details": ""
+      },
+      {
+        "category": "Auth",
+        "test": "User registration succeeds",
+        "details": ""
+      },
+      {
+        "category": "Auth",
+        "test": "Registration returns success",
+        "details": ""
+      },
+      {
+        "category": "Auth",
+        "test": "Registration returns token",
+        "details": ""
+      },
+      {
+        "category": "Auth",
+        "test": "Invalid email rejected",
+        "details": ""
+      },
+      {
+        "category": "Auth",
+        "test": "Weak password rejected",
+        "details": ""
+      },
+      {
+        "category": "Auth",
+        "test": "First registration succeeds",
+        "details": ""
+      },
+      {
+        "category": "Auth",
+        "test": "Duplicate email rejected",
+        "details": ""
+      },
+      {
+        "category": "Auth",
+        "test": "Valid login succeeds",
+        "details": ""
+      },
+      {
+        "category": "Auth",
+        "test": "Login returns token",
+        "details": ""
+      },
+      {
+        "category": "Auth",
+        "test": "Invalid password rejected",
+        "details": ""
+      },
+      {
+        "category": "Auth",
+        "test": "Non-existent email rejected",
+        "details": ""
+      },
+      {
+        "category": "Security",
+        "test": "Protected endpoint requires auth",
+        "details": ""
+      },
+      {
+        "category": "Security",
+        "test": "Invalid token rejected",
+        "details": ""
+      },
+      {
+        "category": "Auth",
+        "test": "Valid token works",
+        "details": ""
+      },
+      {
+        "category": "Shipments",
+        "test": "Create shipment",
+        "details": ""
+      },
+      {
+        "category": "Shipments",
+        "test": "Create returns success",
+        "details": ""
+      },
+      {
+        "category": "Shipments",
+        "test": "Create returns shipment ID",
+        "details": ""
+      },
+      {
+        "category": "Shipments",
+        "test": "Missing fields rejected",
+        "details": ""
+      },
+      {
+        "category": "Shipments",
+        "test": "List shipments",
+        "details": ""
+      },
+      {
+        "category": "Shipments",
+        "test": "List returns array",
+        "details": ""
+      },
+      {
+        "category": "Shipments",
+        "test": "Pagination metadata exists",
+        "details": ""
+      },
+      {
+        "category": "Shipments",
+        "test": "Pagination total is number",
+        "details": ""
+      },
+      {
+        "category": "Shipments",
+        "test": "List open shipments",
+        "details": ""
+      },
+      {
+        "category": "Shipments",
+        "test": "Open shipments pagination",
+        "details": ""
+      },
+      {
+        "category": "Shipments",
+        "test": "Get shipment detail",
+        "details": ""
+      },
+      {
+        "category": "Shipments",
+        "test": "Idempotency prevents duplicates",
+        "details": ""
+      },
+      {
+        "category": "Offers",
+        "test": "Create offer",
+        "details": ""
+      },
+      {
+        "category": "Offers",
+        "test": "Create returns success",
+        "details": ""
+      },
+      {
+        "category": "Offers",
+        "test": "Invalid price rejected",
+        "details": ""
+      },
+      {
+        "category": "Offers",
+        "test": "Duplicate offer rejected",
+        "details": ""
+      },
+      {
+        "category": "Offers",
+        "test": "List offers",
+        "details": ""
+      },
+      {
+        "category": "Offers",
+        "test": "Offers pagination",
+        "details": ""
+      },
+      {
+        "category": "Offers",
+        "test": "Accept offer",
+        "details": ""
+      },
+      {
+        "category": "Offers",
+        "test": "Accept idempotency",
+        "details": ""
+      },
+      {
+        "category": "Offers",
+        "test": "Reject offer",
+        "details": ""
+      },
+      {
+        "category": "Messages",
+        "test": "Send message",
+        "details": ""
+      },
+      {
+        "category": "Messages",
+        "test": "List messages",
+        "details": ""
+      },
+      {
+        "category": "Messages",
+        "test": "Messages pagination",
+        "details": ""
+      },
+      {
+        "category": "Messages",
+        "test": "Mark as read",
+        "details": ""
+      },
+      {
+        "category": "Messages",
+        "test": "Send requires auth",
+        "details": ""
+      },
+      {
+        "category": "Notifications",
+        "test": "Unread count",
+        "details": ""
+      },
+      {
+        "category": "Notifications",
+        "test": "Count is number",
+        "details": ""
+      },
+      {
+        "category": "Notifications",
+        "test": "List notifications",
+        "details": ""
+      },
+      {
+        "category": "Notifications",
+        "test": "Notifications pagination",
+        "details": ""
+      },
+      {
+        "category": "Notifications",
+        "test": "Mark as read",
+        "details": ""
+      },
+      {
+        "category": "Profile",
+        "test": "Get profile",
+        "details": ""
+      },
+      {
+        "category": "Profile",
+        "test": "Profile returns email",
+        "details": ""
+      },
+      {
+        "category": "Profile",
+        "test": "Profile is real (not demo)",
+        "details": ""
+      },
+      {
+        "category": "GDPR",
+        "test": "Data export",
+        "details": ""
+      },
+      {
+        "category": "GDPR",
+        "test": "Export includes user data",
+        "details": ""
+      },
+      {
+        "category": "GDPR",
+        "test": "Export includes shipments",
+        "details": ""
+      },
+      {
+        "category": "GDPR",
+        "test": "Account deletion",
+        "details": ""
+      },
+      {
+        "category": "GDPR",
+        "test": "Deleted account cannot login",
+        "details": ""
+      },
+      {
+        "category": "Delivery",
+        "test": "Mark as delivered",
+        "details": ""
+      },
+      {
+        "category": "Delivery",
+        "test": "Delivery idempotency",
+        "details": ""
+      },
+      {
+        "category": "Security",
+        "test": "CORS preflight",
+        "details": ""
+      },
+      {
+        "category": "Security",
+        "test": "Rate limiting",
+        "details": "Rate limit triggered"
+      },
+      {
+        "category": "Security",
+        "test": "Invalid JSON rejected",
+        "details": ""
+      }
+    ],
+    "failed": [],
+    "warnings": [],
+    "total": 67,
+    "startTime": 1761782427012
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "version": "1.0.0",
+  "environment": "production",
+  "org": "yolnext",
+  "project": "backend",
+  "url": "https://sentry.io/api/0/projects/yolnext/backend/releases/",
+  "alerts": [
+    {
+      "name": "High Error Rate",
+      "metric": "errors.per.second",
+      "threshold": 0.1,
+      "window": 300,
+      "alertType": "critical"
+    },
+    {
+      "name": "Database Connection Issues",
+      "metric": "database.connection.errors",
+      "threshold": 5,
+      "window": 60,
+      "alertType": "critical"
+    },
+    {
+      "name": "High Response Time",
+      "metric": "response.time.p95",
+      "threshold": 2000,
+      "window": 300,
+      "alertType": "warning"
+    },
+    {
+      "name": "Memory Leak Detection",
+      "metric": "memory.usage",
+      "threshold": 2048,
+      "window": 600,
+      "alertType": "warning"
+    }
+  ],
+  "integrations": {
+    "slack": {
+      "enabled": true,
+      "webhook": "${SLACK_WEBHOOK_URL}",
+      "channels": ["#alerts", "#critical"],
+      "notifyOn": ["critical", "warning"]
+    },
+    "email": {
+      "enabled": true,
+      "recipients": ["devops@yolnext.com"],
+      "notifyOn": ["critical"]
+    }
+  },
+  "releaseNotes": "Production release with data retention, audit logs, and alerting"
+}
+
+

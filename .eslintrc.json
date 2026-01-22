@@ -1,0 +1,59 @@
+{
+  "extends": [
+    "eslint:recommended",
+    "plugin:@typescript-eslint/recommended",
+    "plugin:react/recommended",
+    "plugin:react-hooks/recommended"
+  ],
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "ecmaVersion": 2020,
+    "sourceType": "module",
+    "ecmaFeatures": {
+      "jsx": true
+    },
+    "project": null
+  },
+  "plugins": [
+    "@typescript-eslint",
+    "react",
+    "react-hooks"
+  ],
+  "rules": {
+    "no-console": "off",
+    "react/react-in-jsx-scope": "off",
+    "react/prop-types": "off",
+    "react/no-unescaped-entities": "off",
+    "react-hooks/exhaustive-deps": "off",
+    "no-useless-catch": "off",
+    "prefer-const": "off",
+    "@typescript-eslint/no-explicit-any": "off",
+    "@typescript-eslint/no-unused-vars": "off"
+  },
+  "env": {
+    "browser": true,
+    "node": true,
+    "es2020": true
+  },
+  "settings": {
+    "react": {
+      "version": "detect"
+    }
+  },
+  "ignorePatterns": [
+    "node_modules/**",
+    "dist/**",
+    "coverage/**",
+    "build/**",
+    "tests/**",
+    "tools/**",
+    "backend/**",
+    "**/*.cjs",
+    "**/*.test.js",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/*.spec.js",
+    "**/*.spec.ts",
+    "**/*.spec.tsx"
+  ]
+}

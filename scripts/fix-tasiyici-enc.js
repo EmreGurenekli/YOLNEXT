@@ -1,0 +1,11 @@
+﻿const fs = require('fs');
+const file = 'src/components/navigation/TasiyiciSidebar.tsx';
+let content = fs.readFileSync(file, 'utf8');
+content = content.replace('Ana Menü', 'Ana Menü');
+content = content.replace('ÄÅŸ PazarÄ', 'İş Pazarı');
+content = content.replace('Aktif ÄÅŸler', 'Aktif İşler');
+content = content.replace('Tamamlanan ÄÅŸler', 'Tamamlanan İşler');
+content = content.replace('YardÄm', 'Yardım');
+content = content.replace('TaÅŸÄyÄcÄ Hesap', 'Taşıyıcı Hesap');
+fs.writeFileSync(file, content, 'utf8');
+console.log('TasiyiciSidebar fixed');

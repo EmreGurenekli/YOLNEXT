@@ -1,0 +1,16 @@
+# YolNext Robots.txt
+# https://www.yolnext.com/robots.txt
+
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /admin/
+Disallow: /debug/
+Disallow: /login
+Disallow: /register
+
+# Sitemap
+Sitemap: https://www.yolnext.com/sitemap.xml
+
+# Crawl-delay
+Crawl-delay: 1
