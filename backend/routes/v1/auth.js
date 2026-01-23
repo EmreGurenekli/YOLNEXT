@@ -300,6 +300,33 @@ function createAuthRoutes(pool, JWT_SECRET, createNotification, sendEmail) {
         });
       }
 
+      // Normalize phone number if provided
+      let normalizedPhone = null;
+      if (phone) {
+        // Clean phone number (remove all non-digits)
+        let cleanPhone = String(phone || '').replace(/\D/g, '');
+        
+        // Normalize Turkish phone numbers
+        // Remove country code (+90 or 90)
+        if (cleanPhone.startsWith('90') && cleanPhone.length >= 12) {
+          cleanPhone = cleanPhone.slice(2);
+        }
+        // Remove leading zero
+        if (cleanPhone.startsWith('0') && cleanPhone.length === 11) {
+          cleanPhone = cleanPhone.slice(1);
+        }
+
+        // Validate format (must be exactly 10 digits starting with 5)
+        if (cleanPhone.length === 10 && cleanPhone.startsWith('5') && /^[0-9]{10}$/.test(cleanPhone)) {
+          normalizedPhone = cleanPhone;
+        } else {
+          return res.status(400).json({
+            success: false,
+            message: 'Invalid phone format. Please use Turkish format: 05XX XXX XX XX or +90 5XX XXX XX XX',
+          });
+        }
+      }
+
       // Check if user exists
       const existingUser = await pool.query(
         'SELECT id FROM users WHERE email = $1',
