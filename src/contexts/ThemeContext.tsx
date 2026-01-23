@@ -40,13 +40,20 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [theme]);
 
   useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    
     const updateActualTheme = () => {
       if (theme === 'system') {
-        const systemTheme = window.matchMedia('(prefers-color-scheme: dark)')
-          .matches
-          ? 'dark'
-          : 'light';
-        setActualTheme(systemTheme);
+        try {
+          const systemTheme = window.matchMedia('(prefers-color-scheme: dark)')
+            .matches
+            ? 'dark'
+            : 'light';
+          setActualTheme(systemTheme);
+        } catch (error) {
+          console.warn('Failed to detect system theme:', error);
+          setActualTheme('light');
+        }
       } else {
         setActualTheme(theme);
       }
@@ -55,15 +62,25 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
     updateActualTheme();
 
     // Listen for system theme changes
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const handleChange = () => {
-      if (theme === 'system') {
-        updateActualTheme();
-      }
-    };
+    try {
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      const handleChange = () => {
+        if (theme === 'system') {
+          updateActualTheme();
+        }
+      };
 
-    mediaQuery.addEventListener('change', handleChange);
-    return () => mediaQuery.removeEventListener('change', handleChange);
+      mediaQuery.addEventListener('change', handleChange);
+      return () => {
+        try {
+          mediaQuery.removeEventListener('change', handleChange);
+        } catch (error) {
+          console.warn('Failed to remove media query listener:', error);
+        }
+      };
+    } catch (error) {
+      console.warn('Failed to set up theme listener:', error);
+    }
   }, [theme]);
 
   useEffect(() => {
