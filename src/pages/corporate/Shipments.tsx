@@ -916,7 +916,7 @@ export default function CorporateShipments() {
                         setSelectedShipmentId(shipment.id);
                         setShowRatingModal(true);
                       }}
-                      onCancel={handleCancelClick}
+                      onCancel={(shipment: any) => handleCancelClick(shipment as Shipment)}
                       isMessagingEnabled={isMessagingEnabledForStatus}
                       canCancel={canCancelShipment}
                       normalizeStatus={normalizeShipmentStatus}
@@ -1047,7 +1047,7 @@ export default function CorporateShipments() {
                               →{' '}
                               {
                                 shipments.find(
-                                  s => s.id === selectedShipmentForTracking
+                                  s => s.id === selectedShipmentForTracking?.id
                                 )?.to
                               }
                             </span>
@@ -1057,7 +1057,7 @@ export default function CorporateShipments() {
                             <span className='text-sm text-gray-600'>
                               {
                                 shipments.find(
-                                  s => s.id === selectedShipmentForTracking
+                                  s => s.id === selectedShipmentForTracking?.id
                                 )?.estimatedDelivery
                               }
                             </span>
@@ -1068,11 +1068,11 @@ export default function CorporateShipments() {
                         <div
                           className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
                             shipments.find(
-                              s => s.id === selectedShipmentForTracking
+                              s => s.id === selectedShipmentForTracking?.id
                             )?.statusColor === 'bg-green-500'
                               ? 'bg-green-100 text-green-800'
                               : shipments.find(
-                                    s => s.id === selectedShipmentForTracking
+                                    s => s.id === selectedShipmentForTracking?.id
                                   )?.statusColor === 'bg-orange-500'
                                 ? 'bg-orange-100 text-orange-800'
                                 : 'bg-blue-100 text-blue-800'
@@ -1080,7 +1080,7 @@ export default function CorporateShipments() {
                         >
                           {
                             shipments.find(
-                              s => s.id === selectedShipmentForTracking
+                              s => s.id === selectedShipmentForTracking?.id
                             )?.statusText
                           }
                         </div>
@@ -1088,7 +1088,7 @@ export default function CorporateShipments() {
                           %
                           {
                             shipments.find(
-                              s => s.id === selectedShipmentForTracking
+                              s => s.id === selectedShipmentForTracking?.id
                             )?.progress
                           }{' '}
                           tamamlandı
@@ -1233,7 +1233,7 @@ export default function CorporateShipments() {
               {(() => {
                 const shipment =
                   selectedShipmentDetail ||
-                  selectedShipmentForDetails ? shipments.find(s => s.id === selectedShipmentForDetails.id) : null;
+                  (selectedShipmentForDetails ? shipments.find(s => s.id === selectedShipmentForDetails.id) : null);
                 if (!shipment) return null;
 
                 return (
