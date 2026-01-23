@@ -115,6 +115,79 @@ export default function CorporateShipments() {
   const { user } = useAuth();
   const { showToast } = useToast();
 
+  // State variables
+  const [shipments, setShipments] = useState<Shipment[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [sortBy, setSortBy] = useState<'date' | 'price' | 'status'>('date');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
+  const [selectedShipmentDetail, setSelectedShipmentDetail] = useState<Shipment | null>(null);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [selectedShipmentForDetails, setSelectedShipmentForDetails] = useState<Shipment | null>(null);
+  const [selectedShipmentForCancel, setSelectedShipmentForCancel] = useState<Shipment | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [selectedShipmentForTracking, setSelectedShipmentForTracking] = useState<Shipment | null>(null);
+  const [showTrackingModal, setShowTrackingModal] = useState(false);
+  const [selectedCarrier, setSelectedCarrier] = useState<any>(null);
+  const [selectedShipmentId, setSelectedShipmentId] = useState<number | null>(null);
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [acceptedShipmentId, setAcceptedShipmentId] = useState<number | null>(null);
+  const [showProcessAssistantDetails, setShowProcessAssistantDetails] = useState(false);
+
+  // Base shipment template
+  const baseShipment: Shipment = {
+    id: 0,
+    title: '',
+    trackingCode: '',
+    from: '',
+    to: '',
+    status: 'waiting_for_offers',
+    carrier: '',
+    rating: 0,
+    value: '₺0',
+    weight: 0,
+    volume: 0,
+    estimatedDelivery: '',
+    statusText: 'Beklemede',
+    progress: 0,
+    notes: '',
+    specialRequirements: [],
+    createdAt: '',
+    category: '',
+    subCategory: '',
+    statusColor: '',
+  };
+
+  // Helper functions
+  const toTrackingCode = (raw: any, id: number | string): string => {
+    if (raw && String(raw).trim() !== '') return String(raw);
+    return `YOL${String(id).padStart(6, '0')}`;
+  };
+
+  const toNumber = (value: any, defaultValue: number = 0): number => {
+    if (typeof value === 'number') return value;
+    if (typeof value === 'string') {
+      const parsed = parseFloat(value.replace(/[^\d.-]/g, ''));
+      return isNaN(parsed) ? defaultValue : parsed;
+    }
+    return defaultValue;
+  };
+
+  const isMessagingEnabledForStatus = (status: string): boolean => {
+    const normalized = normalizeShipmentStatus(status);
+    return ['accepted', 'offer_accepted', 'in_progress', 'in_transit', 'picked_up'].includes(normalized);
+  };
+
+  const handleViewDetails = (shipment: Shipment) => {
+    setSelectedShipmentForDetails(shipment);
+    setShowDetailsModal(true);
+    loadShipmentDetail(String(shipment.id));
+  };
+
   const loadShipmentDetail = async (shipmentId: string) => {
     setIsLoading(true);
     const timeoutId = setTimeout(() => {
