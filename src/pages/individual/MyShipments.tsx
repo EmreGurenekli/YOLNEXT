@@ -1249,14 +1249,14 @@ const MyShipments: React.FC<{ basePath?: string }> = ({ basePath = '/individual'
                     sortedShipments.map((shipment, index) => (
                       <MyShipmentsTableRow
                         key={`${shipment.id}-${shipment.trackingCode}-${index}`}
-                        shipment={shipment}
+                        shipment={shipment as any}
                         index={index}
                         onViewDetails={handleViewDetails}
                         onTrack={handleTrackShipment}
-                        onMessage={handleMessage}
-                        onConfirmDelivery={handleConfirmDelivery}
-                        onRateCarrier={handleRateCarrier}
-                        onCancel={handleCancelClick}
+                        onMessage={(shipment: any) => handleMessage(shipment)}
+                        onConfirmDelivery={(shipment: any) => handleConfirmDelivery(shipment)}
+                        onRateCarrier={(shipment: any) => handleRateCarrier(shipment)}
+                        onCancel={(shipment: any) => handleCancelClick(shipment)}
                         isTrackEnabled={isTrackEnabledForShipment}
                         isMessagingEnabled={isMessagingEnabledForShipment}
                         canCancel={canCancelShipment}
