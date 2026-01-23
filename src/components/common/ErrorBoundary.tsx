@@ -57,15 +57,20 @@ class ErrorBoundary extends Component<Props, State> {
               deneyin.
             </p>
 
-            {import.meta.env.DEV && this.state.error && (
-              <details className='mb-6 text-left'>
+            {this.state.error && (
+              <details className='mb-6 text-left' open>
                 <summary className='cursor-pointer text-sm font-medium text-slate-700 mb-2'>
-                  Hata Detayları (Geliştirici Modu)
+                  Hata Detayları
                 </summary>
-                <div className='bg-slate-100 rounded-lg p-3 text-xs text-slate-600 overflow-auto max-h-32'>
-                  <pre>{this.state.error.toString()}</pre>
+                <div className='bg-slate-100 rounded-lg p-3 text-xs text-slate-600 overflow-auto max-h-64'>
+                  <pre className='whitespace-pre-wrap break-words'>{this.state.error.toString()}</pre>
+                  {this.state.error.stack && (
+                    <pre className='mt-2 whitespace-pre-wrap break-words text-red-600'>
+                      {this.state.error.stack}
+                    </pre>
+                  )}
                   {this.state.errorInfo && (
-                    <pre className='mt-2'>
+                    <pre className='mt-2 whitespace-pre-wrap break-words'>
                       {this.state.errorInfo.componentStack}
                     </pre>
                   )}
