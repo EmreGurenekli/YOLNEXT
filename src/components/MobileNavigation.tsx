@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Menu, X, Home, Package, Truck } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 
@@ -78,6 +78,10 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({
   };
 
   const navigationItems = getNavigationItems();
+
+  useEffect(() => {
+    setIsOpen(false);
+  }, [location.pathname]);
 
   const isActive = (href: string) => {
     return location.pathname === href;

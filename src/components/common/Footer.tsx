@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Mail, Phone, MapPin, Facebook, Twitter, Linkedin, Instagram } from 'lucide-react';
 import YolNextLogo from './yolnextLogo';
+import { LEGAL_CONTACT } from '../../config/legal';
 
 const Footer = () => {
   return (
@@ -108,6 +109,34 @@ const Footer = () => {
                   KVKK Aydınlatma Metni
                 </Link>
               </li>
+              <li>
+                <Link to="/consumer-rights" className="text-slate-300 hover:text-white transition-colors">
+                  Tüketici Hakları
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/distance-selling-contract"
+                  className="text-slate-300 hover:text-white transition-colors"
+                >
+                  Mesafeli Satış Sözleşmesi
+                </Link>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  onClick={() => {
+                    try {
+                      window.dispatchEvent(new Event('yolnext:cookie-preferences'));
+                    } catch {
+                      // ignore
+                    }
+                  }}
+                  className="text-slate-300 hover:text-white transition-colors"
+                >
+                  Çerez Tercihleri
+                </button>
+              </li>
             </ul>
           </div>
         </div>
@@ -118,12 +147,12 @@ const Footer = () => {
             <div className="flex items-start">
               <Mail className="w-5 h-5 text-blue-400 mr-3 mt-1" />
               <div>
-                <p className="text-sm text-slate-400">Email</p>
+                <p className="text-sm text-slate-400">E-posta</p>
                 <a
-                  href="mailto:destek@yolnext.com"
+                  href={`mailto:${LEGAL_CONTACT.supportEmail}`}
                   className="text-slate-300 hover:text-white transition-colors"
                 >
-                  destek@yolnext.com
+                  {LEGAL_CONTACT.supportEmail}
                 </a>
               </div>
             </div>
@@ -132,10 +161,10 @@ const Footer = () => {
               <div>
                 <p className="text-sm text-slate-400">Telefon</p>
                 <a
-                  href="tel:+902121234567"
+                  href={`tel:${String(LEGAL_CONTACT.phone).replace(/[^\d+]/g, '')}`}
                   className="text-slate-300 hover:text-white transition-colors"
                 >
-                  +90 (212) 123 45 67
+                  {LEGAL_CONTACT.phone}
                 </a>
               </div>
             </div>
@@ -143,7 +172,7 @@ const Footer = () => {
               <MapPin className="w-5 h-5 text-blue-400 mr-3 mt-1" />
               <div>
                 <p className="text-sm text-slate-400">Adres</p>
-                <p className="text-slate-300">İstanbul, Türkiye</p>
+                <p className="text-slate-300">{LEGAL_CONTACT.address}</p>
               </div>
             </div>
           </div>
@@ -152,7 +181,7 @@ const Footer = () => {
         {/* Copyright */}
         <div className="border-t border-slate-800 mt-8 pt-8 text-center">
           <p className="text-slate-400 text-sm">
-            © {new Date().getFullYear()} YolNext. Tüm hakları saklıdır.
+            © {new Date().getFullYear()} {LEGAL_CONTACT.companyName}. Tüm hakları saklıdır.
           </p>
         </div>
       </div>

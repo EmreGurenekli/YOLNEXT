@@ -8,6 +8,12 @@ interface BadgeCounts {
   pendingShipments: number;
 }
 
+const offersLastSeenKey = (userId: string | number | null | undefined, role: string) =>
+  `yolnext:lastSeen:offers:${userId ?? 'anon'}:${role || 'unknown'}`;
+
+const marketLastSeenKey = (userId: string | number | null | undefined, role: string) =>
+  `yolnext:lastSeen:market:${userId ?? 'anon'}:${role || 'unknown'}`;
+
 export const useBadgeCounts = () => {
   const { user, token } = useAuth();
   const [badgeCounts, setBadgeCounts] = useState<BadgeCounts>({
@@ -24,7 +30,21 @@ export const useBadgeCounts = () => {
       return;
     }
 
+    let inFlight: Promise<void> | null = null;
+    let nextAllowedAt = 0;
+    let consecutiveFailures = 0;
+
     const fetchBadgeCounts = async () => {
+      // Dedup concurrent triggers (interval + focus + manual events)
+      if (inFlight) return inFlight;
+
+      // Cooldown to prevent error spam when backend is unhealthy
+      const now = Date.now();
+      if (now < nextAllowedAt) {
+        return;
+      }
+
+      inFlight = (async () => {
       try {
         setIsLoading(true);
 
@@ -39,6 +59,26 @@ export const useBadgeCounts = () => {
             headers: authHeaders,
           });
 
+          if (response.status === 401 || response.status === 403) {
+            try {
+              const text = await response.text();
+              const lower = String(text || '').toLowerCase();
+              if (lower.includes('invalid or expired token') || lower.includes('invalid token') || lower.includes('expired token')) {
+                try {
+                  localStorage.removeItem('authToken');
+                  localStorage.removeItem('token');
+                  localStorage.removeItem('user');
+                } catch (_) {
+                  // ignore
+                }
+                window.dispatchEvent(new Event('auth:logout'));
+              }
+            } catch (_) {
+              // ignore
+            }
+            throw new Error(`${endpoint} yanıtı ${response.status}`);
+          }
+
           if (!response.ok) {
             throw new Error(`${endpoint} yanıtı ${response.status}`);
           }
@@ -52,10 +92,61 @@ export const useBadgeCounts = () => {
 
         // Use correct endpoint based on user role
         // tasiyici and nakliyeci should not call /offers/individual
+        const role = String(user.role || '').toLowerCase();
         const offersEndpoint =
-          user.role === 'nakliyeci' || user.role === 'tasiyici'
+          role === 'nakliyeci' || role === 'tasiyici'
             ? '/offers'
-            : '/offers/individual';
+            : role === 'corporate'
+              ? '/offers/corporate'
+              : '/offers/individual';
+
+        const getPendingMarketCount = async (): Promise<number> => {
+          const role = String(user.role || '').toLowerCase();
+          const lastSeenKey = marketLastSeenKey(user?.id, role);
+          const lastSeenRaw = localStorage.getItem(lastSeenKey);
+          const lastSeenMs = lastSeenRaw ? new Date(lastSeenRaw).getTime() : 0;
+
+          const countNewerThan = (rows: any[]) => {
+            if (!Array.isArray(rows)) return 0;
+            if (!Number.isFinite(lastSeenMs) || lastSeenMs <= 0) return rows.length;
+            return rows.filter(r => {
+              const createdAt = r?.createdAt || r?.created_at || r?.createdat || r?.created_at;
+              const createdMs = createdAt ? new Date(createdAt).getTime() : 0;
+              if (!Number.isFinite(createdMs) || createdMs <= 0) return false;
+              return createdMs > lastSeenMs;
+            }).length;
+          };
+
+          if (role === 'nakliyeci') {
+            const openShipments = await fetchJson('/shipments/open');
+            const rows =
+              openShipments?.data?.data ||
+              openShipments?.data ||
+              openShipments?.shipments ||
+              openShipments?.data?.shipments ||
+              [];
+            return countNewerThan(Array.isArray(rows) ? rows : []);
+          }
+
+          if (role === 'tasiyici') {
+            try {
+              const listings = await fetchJson('/carrier-market/available');
+              const rows = listings?.data || (Array.isArray(listings) ? listings : []);
+              return countNewerThan(Array.isArray(rows) ? rows : []);
+            } catch {
+              const openShipments = await fetchJson('/shipments/open');
+              const rows =
+                openShipments?.data?.data ||
+                openShipments?.data ||
+                openShipments?.shipments ||
+                openShipments?.data?.shipments ||
+                [];
+              return countNewerThan(Array.isArray(rows) ? rows : []);
+            }
+          }
+
+          return 0;
+        };
 
         const [offersResult, messagesResult, shipmentsResult] =
           await Promise.allSettled([
@@ -73,21 +164,31 @@ export const useBadgeCounts = () => {
             (Array.isArray(offersData) ? offersData : []);
 
           if (Array.isArray(offers)) {
+            const lastSeenKey = offersLastSeenKey(user?.id, role);
+            const lastSeenRaw = localStorage.getItem(lastSeenKey);
+            const lastSeenMs = lastSeenRaw ? new Date(lastSeenRaw).getTime() : 0;
             newOffers = offers.filter(
               offer =>
                 (offer.status === 'pending' ||
                   offer.status === 'waiting' ||
                   offer.status === 'open') &&
-                !offer.isRead
+                offer.isRead === false
             ).length;
 
             // Fallback: if backend doesn't send isRead flags, count plain pending
             if (newOffers === 0) {
               newOffers = offers.filter(
-                offer =>
-                  offer.status === 'pending' ||
-                  offer.status === 'waiting' ||
-                  offer.status === 'open'
+                offer => {
+                  const status = offer.status;
+                  if (!(status === 'pending' || status === 'waiting' || status === 'open')) return false;
+                  const createdAt = offer.createdAt || offer.created_at || offer.createdat || offer.created_at;
+                  const createdMs = createdAt ? new Date(createdAt).getTime() : 0;
+                  // If we have a lastSeen value and createdAt is missing/invalid, assume it's not "new"
+                  // (otherwise badge never clears on schema variants without created timestamps)
+                  if (!Number.isFinite(lastSeenMs) || lastSeenMs <= 0) return true;
+                  if (!Number.isFinite(createdMs) || createdMs <= 0) return false;
+                  return createdMs > lastSeenMs;
+                }
               ).length;
             }
           }
@@ -108,7 +209,10 @@ export const useBadgeCounts = () => {
         }
 
         let pendingShipments = 0;
-        if (shipmentsResult.status === 'fulfilled') {
+        if (role === 'nakliyeci' || role === 'tasiyici') {
+          // For market badges, use market-specific endpoints (more accurate than /shipments)
+          pendingShipments = await getPendingMarketCount();
+        } else if (shipmentsResult.status === 'fulfilled') {
           const shipmentsData = shipmentsResult.value;
           const shipments =
             shipmentsData.data?.shipments ||
@@ -133,16 +237,29 @@ export const useBadgeCounts = () => {
           newMessages,
           pendingShipments,
         });
+
+        // Reset backoff on success
+        consecutiveFailures = 0;
+        nextAllowedAt = 0;
       } catch (error) {
+        consecutiveFailures += 1;
+        // exponential backoff: 5s, 10s, 20s, 40s, max 60s
+        const backoffMs = Math.min(60000, 5000 * Math.pow(2, Math.max(0, consecutiveFailures - 1)));
+        nextAllowedAt = Date.now() + backoffMs;
+
         // Error building badge counts - log removed for performance
         // Only log critical errors in development
         if (import.meta.env.DEV && error instanceof Error && error.message.includes('500')) {
-          console.error('Critical error building badge counts:', error);
+          console.error('Rozet sayıları oluşturulurken kritik hata:', error);
         }
         setBadgeCounts({ newOffers: 0, newMessages: 0, pendingShipments: 0 });
       } finally {
         setIsLoading(false);
+        inFlight = null;
       }
+      })();
+
+      return inFlight;
     };
 
     fetchBadgeCounts();
@@ -150,7 +267,26 @@ export const useBadgeCounts = () => {
     // Refresh every 30 seconds
     const interval = setInterval(fetchBadgeCounts, 30000);
 
-    return () => clearInterval(interval);
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        fetchBadgeCounts();
+      }
+    };
+
+    const handleSocketRefresh = () => {
+      fetchBadgeCounts();
+    };
+
+    window.addEventListener('focus', handleVisibilityOrFocus);
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    window.addEventListener('yolnext:refresh-badges', handleSocketRefresh);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      window.removeEventListener('yolnext:refresh-badges', handleSocketRefresh);
+    };
   }, [user, token]);
 
   return { badgeCounts, isLoading };

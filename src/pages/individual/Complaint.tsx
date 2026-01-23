@@ -94,7 +94,7 @@ const Complaint: React.FC = () => {
       if (response.ok) {
         navigate('/individual/my-shipments?complaint=submitted');
       } else {
-        throw new Error('Complaint submission failed');
+        throw new Error('Şikayet gönderilemedi');
       }
     } catch (error: any) {
       setError(error.message);

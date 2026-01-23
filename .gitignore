@@ -4,7 +4,7 @@ dist/
 coverage/
 build/
 
-# Test files
+# Test files (removed - no unit tests)
 test-results/
 test-screenshots/
 test-videos/
@@ -13,6 +13,12 @@ playwright-report/
 .playwright-mcp/
 *.log
 *.cache
+tests/
+backend/tests/
+tools/legacy/
+backup/
+backend/backup/
+backend/backups/
 
 # Temporary/generated files
 microservices/api-gateway/temp_settings.html
@@ -24,12 +30,29 @@ public/sw.js
 *.code-workspace
 .idea/
 
+!.vscode/settings.json
+
 # OS
 .DS_Store
 Thumbs.db
 
-# Legacy
-/legacy/
+# Legacy (removed)
+# /legacy/
+
+# Microservices (removed - using monolith)
+# /microservices/
+
+# Monitoring (removed - production not needed)
+# /monitoring/
+
+# Tools (removed - no tests)
+# /tools/
+
+# Test results
+playwright-report/
+test-results/
+screenshots/
+testsprite_tests/
 
 # Environment files (CRITICAL - Never commit these!)
 .env
@@ -42,7 +65,6 @@ Thumbs.db
 
 # Sensitive data
 backend-data.json
-backend-output.log
 frontend-output.log
 backend_output.log
 *.key
@@ -61,10 +83,14 @@ secrets/
 
 # Logs
 logs/
-*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+*.log
+# Allowlisted local logs for debugging (do not commit sensitive env)
+!backend-output.log
+!backend/backend-error.log
+!backend/debug_shipment_error.log
 
 # Production builds
 dist/

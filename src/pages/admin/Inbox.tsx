@@ -12,7 +12,7 @@ const Inbox: React.FC = () => {
       try {
         setLoading(true);
         setError('');
-        const token = localStorage.getItem('authToken');
+        const token = localStorage.getItem('token') || localStorage.getItem('authToken');
         const res = await fetch(createApiUrl('/api/admin/inbox'), {
           headers: {
             Authorization: `Bearer ${token || ''}`,
@@ -21,14 +21,14 @@ const Inbox: React.FC = () => {
         });
         const payload = await res.json().catch(() => null);
         if (!res.ok) {
-          const msg = payload?.message || `Inbox yüklenemedi (HTTP ${res.status})`;
+          const msg = payload?.message || `Gelen kutusu yüklenemedi (HTTP ${res.status})`;
           throw new Error(msg);
         }
         const data = payload?.data || payload || {};
         const list = data.items || data.data || data;
         setItems(Array.isArray(list) ? list : Array.isArray(data.items) ? data.items : []);
       } catch (e: any) {
-        setError(e?.message || 'Inbox yüklenemedi');
+        setError(e?.message || 'Gelen kutusu yüklenemedi');
       } finally {
         setLoading(false);
       }
@@ -39,12 +39,12 @@ const Inbox: React.FC = () => {
   return (
     <div className='min-h-[calc(100vh-56px)] bg-gray-50'>
       <Helmet>
-        <title>Inbox - Admin</title>
+        <title>Gelen Kutusu - Admin</title>
       </Helmet>
 
       <div className='container-custom py-6 lg:py-8'>
         <div className='mb-6'>
-          <h1 className='text-2xl font-bold text-slate-900'>Inbox</h1>
+          <h1 className='text-2xl font-bold text-slate-900'>Gelen Kutusu</h1>
           <p className='text-slate-600'>Şikayet + Flag + Overdue görevler (otomatik öncelik sırası)</p>
         </div>
 
@@ -58,7 +58,7 @@ const Inbox: React.FC = () => {
           {loading ? (
             <div className='text-sm text-slate-600'>Yükleniyor...</div>
           ) : items.length === 0 ? (
-            <div className='text-sm text-slate-600'>Şu an inbox boş.</div>
+            <div className='text-sm text-slate-600'>Şu an gelen kutusu boş.</div>
           ) : (
             <div className='space-y-3'>
               {items.slice(0, 20).map((it, idx) => (

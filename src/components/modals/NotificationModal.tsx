@@ -49,6 +49,11 @@ export default function NotificationModal({
   const [filterType, setFilterType] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
 
+  const safeDateText = (value: any) => {
+    const d = value instanceof Date ? value : new Date(value || '');
+    return Number.isFinite(d.getTime()) ? d.toLocaleDateString('tr-TR') : '—';
+  };
+
   useEffect(() => {
     if (isOpen) {
       loadNotifications();
@@ -58,9 +63,16 @@ export default function NotificationModal({
   const loadNotifications = async () => {
     try {
       setLoading(true);
-      const response = await notificationAPI.getNotifications();
-      const notifications = response.data || [];
-      setNotifications(notifications);
+      const getFn =
+        (notificationAPI as any).getNotifications || (notificationAPI as any).getAll;
+      const response = getFn ? await getFn() : null;
+      const raw =
+        (response as any)?.data?.notifications ||
+        (response as any)?.data ||
+        (response as any)?.notifications ||
+        response ||
+        [];
+      setNotifications(Array.isArray(raw) ? raw : []);
     } catch (error) {
       console.error('Bildirimler yüklenemedi:', error);
       setNotifications([]);
@@ -82,7 +94,13 @@ export default function NotificationModal({
 
   const handleMarkAllAsRead = async () => {
     try {
-      await notificationAPI.markAllAsRead();
+      const markAllFn =
+        (notificationAPI as any).markAllAsRead ||
+        (notificationAPI as any).markAllAsRead ||
+        (notificationAPI as any).markAllAsRead;
+      const legacyMarkAllFn = (notificationAPI as any).markAllAsRead;
+      const fn = markAllFn || legacyMarkAllFn;
+      if (fn) await fn();
       setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
     } catch (error) {
       console.error('Tüm bildirimler okundu işaretlenemedi:', error);
@@ -91,7 +109,9 @@ export default function NotificationModal({
 
   const handleDeleteNotification = async (notificationId: number) => {
     try {
-      await notificationAPI.deleteNotification(notificationId);
+      const deleteFn =
+        (notificationAPI as any).deleteNotification || (notificationAPI as any).delete;
+      if (deleteFn) await deleteFn(notificationId);
       setNotifications(prev => prev.filter(n => n.id !== notificationId));
     } catch (error) {
       console.error('Bildirim silinemedi:', error);
@@ -300,9 +320,11 @@ export default function NotificationModal({
                           </div>
                           <span className='text-xs text-gray-500 flex items-center gap-1'>
                             <Clock className='w-3 h-3' />
-                            {new Date(
-                              notification.createdAt
-                            ).toLocaleDateString('tr-TR')}
+                            {safeDateText(
+                              (notification as any).createdAt ||
+                                (notification as any).created_at ||
+                                (notification as any).createdat
+                            )}
                           </span>
                         </div>
 

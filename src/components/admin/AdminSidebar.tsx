@@ -8,6 +8,7 @@ import {
   LogOut,
   Menu,
   X,
+  LayoutDashboard,
 } from 'lucide-react';
 import YolNextLogo from '../common/yolnextLogo';
 import { useAuth } from '../../contexts/AuthContext';
@@ -28,6 +29,7 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({ onLogout }) => {
     {
       title: 'Merkez',
       items: [
+        { name: 'Dashboard', href: `${base}/dashboard`, icon: LayoutDashboard },
         { name: 'Operasyon Masası', href: `${base}/ops`, icon: Shield },
       ],
     },

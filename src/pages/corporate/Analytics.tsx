@@ -40,7 +40,7 @@ export default function CorporateAnalytics() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to load analytics');
+        throw new Error('Analitik veriler yüklenemedi');
       }
 
       const raw = await response.json();
@@ -59,7 +59,7 @@ export default function CorporateAnalytics() {
 
       setAnalyticsData(normalized);
     } catch (error) {
-      console.error('Error loading analytics:', error);
+      logger.error('Analitik veriler yüklenirken hata:', error);
       setError('Analitik veriler yüklenemedi. Lütfen daha sonra tekrar deneyin.');
       // Set empty data on error
       setAnalyticsData({
@@ -96,7 +96,7 @@ export default function CorporateAnalytics() {
         setCarriers(carriersData);
       }
     } catch (error) {
-      console.error('Error loading carriers:', error);
+      logger.error('Taşıyıcılar yüklenirken hata:', error);
     }
   };
 
@@ -248,8 +248,8 @@ export default function CorporateAnalytics() {
           </div>
         </div>
 
-        {/* 3 Main KPI Cards */}
-        <div className='grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8'>
+        {/* 2 Main KPI Cards */}
+        <div className='grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8'>
           {/* Toplam Gönderi */}
           <div className='bg-white rounded-xl p-6 shadow-lg border border-slate-200 hover:shadow-xl transition-shadow'>
             <div className='flex items-center justify-between mb-4'>
@@ -274,30 +274,6 @@ export default function CorporateAnalytics() {
             </div>
           </div>
 
-          {/* Toplam Gelir */}
-          <div className='bg-white rounded-xl p-6 shadow-lg border border-slate-200 hover:shadow-xl transition-shadow'>
-            <div className='flex items-center justify-between mb-4'>
-              <div className='p-3 bg-slate-100 rounded-lg'>
-                <DollarSign className='w-6 h-6 text-slate-700' />
-              </div>
-              <div className='flex items-center gap-1'>
-                {getTrendIcon('up')}
-                <span className='text-sm font-medium text-green-600'>
-                  +{analyticsData?.revenueGrowth}%
-                </span>
-              </div>
-            </div>
-            <div className='mb-2'>
-              <h3 className='text-2xl font-bold text-slate-900'>
-                ₺{(analyticsData?.totalRevenue / 1000000).toFixed(1)}M
-              </h3>
-              <p className='text-sm text-slate-600'>Toplam Gelir</p>
-            </div>
-            <div className='text-xs text-slate-500'>
-              Bu dönem nakliye geliri
-            </div>
-          </div>
-
           {/* Müşteri Memnuniyeti */}
           <div className='bg-white rounded-xl p-6 shadow-lg border border-slate-200 hover:shadow-xl transition-shadow'>
             <div className='flex items-center justify-between mb-4'>
@@ -315,7 +291,7 @@ export default function CorporateAnalytics() {
               <h3 className='text-2xl font-bold text-slate-900'>
                 {analyticsData?.customerSatisfaction}/5
               </h3>
-              <p className='text-sm text-slate-600'>Müşteri Memnuniyeti</p>
+              <div className='text-sm text-slate-500'>Henüz veri yok - gönderi oluşturun</div>
             </div>
             <div className='text-xs text-slate-500'>Ortalama müşteri puanı</div>
           </div>

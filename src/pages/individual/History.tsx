@@ -13,16 +13,27 @@ import {
   Eye,
   MessageCircle,
   Plus,
-  Filter,
   Search,
   Download,
   Star,
   DollarSign,
   Building2,
+  X,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createApiUrl } from '../../config/api';
 import { useAuth } from '../../contexts/AuthContext';
+import Pagination from '../../components/common/Pagination';
+import Breadcrumb from '../../components/common/Breadcrumb';
+import { sanitizeShipmentTitle } from '../../utils/format';
+import { logger } from '../../utils/logger';
+import { normalizeTrackingCode } from '../../utils/trackingCode';
+
+// Breadcrumb items tanımlaması
+const breadcrumbItems = [
+  { label: 'Ana Sayfa', href: '/individual/dashboard' },
+  { label: 'Geçmiş Gönderiler', href: '/individual/history' }
+];
 
 interface ShipmentHistory {
   id: string;
@@ -50,11 +61,13 @@ const IndividualHistory: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortBy, setSortBy] = useState('date');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
 
   useEffect(() => {
     const loadHistoryData = async () => {
       try {
-        console.log('🔄 Geçmiş gönderiler yükleniyor...');
+        logger.log('🔄 Geçmiş gönderiler yükleniyor...');
         setLoading(true);
 
         // Use regular shipments endpoint and filter for delivered status on frontend
@@ -64,6 +77,10 @@ const IndividualHistory: React.FC = () => {
           setLoading(false);
           return;
         }
+
+        // Timeout protection - maksimum 10 saniye bekle
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
 
         const params = new URLSearchParams({
           page: '1',
@@ -75,10 +92,13 @@ const IndividualHistory: React.FC = () => {
             Authorization: `Bearer ${localStorage.getItem('authToken')}`,
             'Content-Type': 'application/json',
           },
+          signal: controller.signal,
         });
 
+        clearTimeout(timeoutId);
+
         if (!response.ok) {
-          throw new Error('Failed to load history data');
+          throw new Error('Geçmiş verileri yüklenemedi');
         }
 
         const data = await response.json();
@@ -90,7 +110,7 @@ const IndividualHistory: React.FC = () => {
           (shipment: any) => shipment.status === 'delivered'
         ).map((shipment: any) => ({
           id: shipment.id?.toString() || '',
-          title: shipment.title || shipment.productDescription || 'Gönderi',
+          title: sanitizeShipmentTitle(shipment.title || shipment.productDescription || shipment.description || 'Gönderi'),
           from: shipment.pickupCity || shipment.fromCity || '',
           to: shipment.deliveryCity || shipment.toCity || '',
           status: 'delivered' as const,
@@ -100,7 +120,7 @@ const IndividualHistory: React.FC = () => {
           price: typeof shipment.price === 'string' ? parseFloat(shipment.price) || 0 : (shipment.price || 0),
           carrierName: shipment.carrierName || shipment.nakliyeciName || 'Nakliyeci',
           rating: shipment.rating || 0,
-          trackingCode: shipment.trackingNumber || shipment.trackingCode || shipment.id?.toString() || '',
+          trackingCode: normalizeTrackingCode(shipment.trackingNumber || shipment.trackingCode, shipment.id),
           category: shipment.category || '',
           weight: shipment.weight?.toString() || '',
           dimensions: shipment.dimensions || '',
@@ -108,12 +128,16 @@ const IndividualHistory: React.FC = () => {
         }));
         
         setShipments(deliveredShipments);
-        console.log(
+        logger.log(
           '✅ Geçmiş gönderiler yüklendi (sadece teslim edilenler):',
           deliveredShipments.length
         );
-      } catch (error) {
-        console.error('❌ Geçmiş gönderiler yüklenirken hata:', error);
+      } catch (error: any) {
+        logger.error('❌ Geçmiş gönderiler yüklenirken hata:', error);
+        // Timeout veya network hatası kontrolü
+        if (error?.name === 'AbortError' || error?.message?.includes('fetch')) {
+          logger.warn('API çağrısı zaman aşımına uğradı veya bağlantı hatası');
+        }
         setShipments([]);
       } finally {
         setLoading(false);
@@ -121,7 +145,7 @@ const IndividualHistory: React.FC = () => {
     };
 
     loadHistoryData();
-  }, []);
+  }, [user?.id]);
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -163,6 +187,54 @@ const IndividualHistory: React.FC = () => {
     return matchesSearch && matchesStatus;
   });
 
+  const sortedShipments = filteredShipments.slice().sort((a, b) => {
+    const getTime = (v: any) => {
+      const t = new Date(v || 0).getTime();
+      return Number.isFinite(t) ? t : 0;
+    };
+
+    const statusRank = (s: ShipmentHistory) => {
+      const v = String(s.status || '').toLowerCase();
+      if (v === 'in_progress') return 1;
+      if (v === 'failed') return 2;
+      if (v === 'cancelled') return 3;
+      if (v === 'delivered') return 4;
+      return 9;
+    };
+
+    if (sortBy === 'status') {
+      const d = statusRank(a) - statusRank(b);
+      if (d !== 0) return d;
+      return getTime(b.createdAt) - getTime(a.createdAt);
+    }
+
+    if (sortBy === 'price') {
+      const d = (Number(b.price) || 0) - (Number(a.price) || 0);
+      if (d !== 0) return d;
+      return getTime(b.createdAt) - getTime(a.createdAt);
+    }
+
+    if (sortBy === 'rating') {
+      const d = (Number(b.rating) || 0) - (Number(a.rating) || 0);
+      if (d !== 0) return d;
+      return getTime(b.createdAt) - getTime(a.createdAt);
+    }
+
+    // date (default)
+    return getTime(b.createdAt) - getTime(a.createdAt);
+  });
+
+  // Pagination calculations
+  const totalPages = Math.ceil(sortedShipments.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedShipments = sortedShipments.slice(startIndex, endIndex);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [statusFilter, searchTerm, sortBy]);
+
   if (loading) {
     return (
       <div className='min-h-screen bg-gray-50 flex items-center justify-center'>
@@ -185,6 +257,11 @@ const IndividualHistory: React.FC = () => {
       </Helmet>
 
       <div className='max-w-5xl mx-auto px-4 py-6'>
+        {/* Breadcrumb */}
+        <div className='mb-4'>
+          <Breadcrumb items={breadcrumbItems} />
+        </div>
+        
         {/* Header - Match MyShipments Design */}
         <div className='text-center mb-12'>
           <div className='flex justify-center mb-6'>
@@ -315,9 +392,17 @@ const IndividualHistory: React.FC = () => {
               <option value='rating'>Puana Göre</option>
             </select>
 
-            <button className='px-4 py-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors flex items-center justify-center gap-2'>
-              <Filter className='w-4 h-4' />
-              Filtrele
+            <button
+              onClick={() => {
+                setSearchTerm('');
+                setStatusFilter('all');
+                setSortBy('date');
+                setCurrentPage(1);
+              }}
+              className='px-4 py-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors flex items-center justify-center gap-2'
+            >
+              <X className='w-4 h-4' />
+              Sıfırla
             </button>
           </div>
         </div>
@@ -349,8 +434,8 @@ const IndividualHistory: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredShipments.length > 0 ? (
-                  filteredShipments.map(shipment => (
+                {paginatedShipments.length > 0 ? (
+                  paginatedShipments.map(shipment => (
                     <tr
                       key={shipment.id}
                       className='border-b border-slate-100 hover:bg-slate-50 transition-colors'
@@ -439,10 +524,10 @@ const IndividualHistory: React.FC = () => {
                       <div className='text-slate-500'>
                         <Package className='w-12 h-12 mx-auto mb-4 text-slate-300' />
                         <p className='text-lg font-medium mb-2'>
-                          Geçmiş bulunamadı
+                          📜 Henüz geçmiş yok
                         </p>
                         <p className='text-sm'>
-                          Arama kriterlerinize uygun gönderi geçmişi bulunamadı.
+                          Tamamlanan gönderileriniz burada görünür.
                         </p>
                       </div>
                     </td>
@@ -452,6 +537,17 @@ const IndividualHistory: React.FC = () => {
             </table>
           </div>
         </div>
+
+        {/* Pagination */}
+        {sortedShipments.length > itemsPerPage && (
+          <div className='mt-6'>
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+            />
+          </div>
+        )}
 
         {/* Quick Actions */}
         <div className='mt-8 text-center'>

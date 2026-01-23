@@ -61,7 +61,7 @@ const Cases: React.FC = () => {
           <div className='mt-4 p-4 bg-gray-50 border border-gray-200 rounded-xl'>
             <div className='text-sm font-semibold text-slate-900'>Hedef akış</div>
             <div className='text-xs text-slate-600 mt-1'>
-              pending/reviewing şikayetleri “vaka” olarak toplamak ve Operasyon Masası’ndaki inspector’a bağlamak.
+              beklemede/inceleniyor şikayetleri “vaka” olarak toplamak ve Operasyon Masası’ndaki inspector’a bağlamak.
             </div>
           </div>
         </div>

@@ -17,6 +17,7 @@ export { default as LoadingSpinner } from './common/LoadingSpinner';
 export { default as LoadingCard } from './common/LoadingCard';
 export { default as LoadingState } from './common/LoadingState';
 export { default as ErrorBoundary } from './common/ErrorBoundary';
+// error/ErrorBoundary.tsx removed - using common/ErrorBoundary.tsx
 export { default as EmptyState } from './common/EmptyState';
 export { default as Modal } from './common/Modal';
 export { default as Toast } from './common/Toast';

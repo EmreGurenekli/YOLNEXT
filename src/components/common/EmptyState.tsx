@@ -21,15 +21,15 @@ const EmptyState: React.FC<EmptyStateProps> = ({
 }) => {
   return (
     <div className={`text-center py-12 ${className}`}>
-      <div className='w-16 h-16 mx-auto mb-4 text-gray-400'>
-        <Icon className='w-full h-full' />
+      <div className='w-20 h-20 mx-auto mb-5 bg-gradient-to-br from-blue-100 to-slate-100 rounded-full flex items-center justify-center'>
+        <Icon className='w-10 h-10 text-blue-600' />
       </div>
-      <h3 className='text-lg font-semibold text-gray-900 mb-2'>{title}</h3>
-      <p className='text-gray-600 mb-6 max-w-md mx-auto'>{description}</p>
+      <h3 className='text-xl font-bold text-gray-900 mb-3'>{title}</h3>
+      <p className='text-gray-600 mb-6 max-w-md mx-auto leading-relaxed'>{description}</p>
       {action && (
         <button
           onClick={action.onClick}
-          className='px-4 py-2 bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 text-white rounded-lg transition-all duration-200 shadow-md hover:shadow-lg'
+          className='px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105'
         >
           {action.label}
         </button>

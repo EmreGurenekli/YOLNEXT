@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 // import { Helmet } from 'react-helmet-async';
 import { createApiUrl } from '../../config/api';
 import { formatDate } from '../../utils/format';
+import { resolveShipmentRoute } from '../../utils/shipmentRoute';
+import { getStatusInfo } from '../../utils/shipmentStatus';
 
 interface Shipment {
   id: number;
@@ -42,25 +44,21 @@ interface Shipment {
   deliveryCity?: string;
 }
 
+const buildRoute = (raw: any) => resolveShipmentRoute(raw);
+
 // Backend durum kodlarını kullanıcıya gösterilecek Türkçe metinlere çevir
-const STATUS_LABELS: Record<string, string> = {
-  waiting_for_offers: 'Teklif Bekliyor',
-  waiting: 'Teklif Bekliyor',
-  pending: 'Beklemede',
-  preparing: 'Hazırlanıyor',
-  in_progress: 'Yükleme',
-  in_transit: 'Yolda',
-  delivered: 'Teslim Edildi',
-  completed: 'Teslim Edildi',
-  offer_accepted: 'Teklif Kabul Edildi',
-  accepted: 'Teklif Kabul Edildi',
-  cancelled: 'İptal Edildi',
-};
+// Merkezi status utility kullanılıyor
+function normalizeShipmentStatus(rawStatus?: any) {
+  const s = String(rawStatus || '').trim();
+  if (!s) return 'waiting_for_offers';
+  if (s === 'open') return 'waiting_for_offers';
+  return s;
+}
 
 const formatStatusText = (rawStatus?: string): string => {
   if (!rawStatus) return 'Beklemede';
-  const key = String(rawStatus).trim();
-  return STATUS_LABELS[key] || key;
+  const normalized = normalizeShipmentStatus(rawStatus);
+  return getStatusInfo(normalized).text;
 };
 
 // Özel gereksinim etiketlerini Türkçe göster
@@ -79,7 +77,6 @@ const formatSpecialRequirement = (req: string): string => {
 import {
   Package,
   Search,
-  Filter,
   MapPin,
   Clock,
   Star,
@@ -92,8 +89,11 @@ import {
   X,
   Navigation,
   FileText,
+  Info,
+  Phone,
+  User,
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import Breadcrumb from '../../components/common/Breadcrumb';
 import EmptyState from '../../components/common/EmptyState';
 import LoadingState from '../../components/common/LoadingState';
@@ -101,10 +101,15 @@ import LoadingState from '../../components/common/LoadingState';
 import RatingModal from '../../components/RatingModal';
 import Pagination from '../../components/common/Pagination';
 import { useAuth } from '../../contexts/AuthContext';
+import GuidanceOverlay from '../../components/common/GuidanceOverlay';
+import { useToast } from '../../contexts/ToastContext';
+import { TOAST_MESSAGES, showProfessionalToast } from '../../utils/toastMessages';
+import { logger } from '../../utils/logger';
 
 export default function CorporateShipments() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { showToast } = useToast();
 
   const [showProcessAssistantDetails, setShowProcessAssistantDetails] = useState(false);
 
@@ -117,11 +122,21 @@ export default function CorporateShipments() {
     return fallback;
   };
 
-  const normalizeShipmentStatus = (rawStatus?: any) => {
-    const s = String(rawStatus || '').trim();
-    if (!s) return 'waiting_for_offers';
-    if (s === 'open') return 'waiting_for_offers';
-    return s;
+  const toTrackingCode = (value: any, idFallback?: any) => {
+    const v = String(value ?? '').trim();
+    if (!v) {
+      const n = Number(String(idFallback ?? '').trim());
+      if (Number.isFinite(n) && n > 0) {
+        return `TRK${Math.trunc(n).toString().padStart(6, '0')}`;
+      }
+      return '';
+    }
+    if (/^TRK/i.test(v)) return v;
+    const n = Number(v);
+    if (Number.isFinite(n) && n > 0) {
+      return `TRK${Math.trunc(n).toString().padStart(6, '0')}`;
+    }
+    return v;
   };
 
   const isMessagingEnabledForStatus = (rawStatus?: any) => {
@@ -150,7 +165,7 @@ export default function CorporateShipments() {
   >(null);
   const [selectedShipmentDetail, setSelectedShipmentDetail] =
     useState<Shipment | null>(null);
-  const [isLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 6;
   const [showRatingModal, setShowRatingModal] = useState(false);
@@ -177,6 +192,12 @@ export default function CorporateShipments() {
     const baseShipment = shipments.find(s => s.id === shipmentId);
     if (!baseShipment) return;
 
+    setIsLoading(true);
+    const timeoutId = setTimeout(() => {
+      setIsLoading(false);
+      showProfessionalToast(showToast, 'TIMEOUT_ERROR', 'error');
+    }, 10000); // 10 seconds timeout
+
     try {
       const token = localStorage.getItem('authToken');
       const response = await fetch(
@@ -188,17 +209,32 @@ export default function CorporateShipments() {
           },
         }
       );
+      
+      clearTimeout(timeoutId);
 
       if (response.ok) {
         const data = await response.json();
         const detail = data.shipment || data.data || data;
+
+        const pickStr = (...keys: string[]) => {
+          for (const k of keys) {
+            const v = (detail as any)?.[k];
+            if (v != null && String(v).trim() !== '') return String(v);
+            const lk = String(k).toLowerCase();
+            const lv = (detail as any)?.[lk];
+            if (lv != null && String(lv).trim() !== '') return String(lv);
+          }
+          return '';
+        };
 
         const detailCategoryData =
           (detail && (detail.categoryData || detail.category_data)) || {};
 
         setSelectedShipmentDetail({
           ...baseShipment,
-          carrier: detail.carrierName || detail.carrier_name || baseShipment.carrier,
+          carrier:
+            pickStr('carrierName', 'carrier_name', 'carrierEmail', 'carrier_email') ||
+            baseShipment.carrier,
           vehiclePlate:
             detail.vehiclePlate ||
             detail.vehicle_plate ||
@@ -218,18 +254,16 @@ export default function CorporateShipments() {
             baseShipment.carrierCompany,
           driverName: detail.driverName || baseShipment.driverName,
           pickupAddress:
-            detail.pickupAddress ||
-            detail.pickup_address ||
+            pickStr('pickupAddress', 'pickup_address', 'fromAddress', 'from_address') ||
             baseShipment.pickupAddress,
           deliveryAddress:
-            detail.deliveryAddress ||
-            detail.delivery_address ||
+            pickStr('deliveryAddress', 'delivery_address', 'toAddress', 'to_address') ||
             baseShipment.deliveryAddress,
           pickupCity:
-            detail.pickupCity || detail.pickup_city || baseShipment.pickupCity,
+            pickStr('pickupCity', 'pickup_city', 'fromCity', 'from_city') ||
+            baseShipment.pickupCity,
           deliveryCity:
-            detail.deliveryCity ||
-            detail.delivery_city ||
+            pickStr('deliveryCity', 'delivery_city', 'toCity', 'to_city') ||
             baseShipment.deliveryCity,
           description: detail.description || baseShipment.description,
           unitType:
@@ -256,10 +290,15 @@ export default function CorporateShipments() {
             baseShipment.loadingEquipment,
         });
       } else {
+        clearTimeout(timeoutId);
         setSelectedShipmentDetail(baseShipment);
       }
     } catch {
+      clearTimeout(timeoutId);
       setSelectedShipmentDetail(baseShipment);
+    } finally {
+      clearTimeout(timeoutId);
+      setIsLoading(false);
     }
 
     setSelectedShipmentForDetails(shipmentId);
@@ -274,7 +313,7 @@ export default function CorporateShipments() {
 
   const handleMessage = (shipment: Shipment) => {
     const carrierId = shipment.carrierId ? String(shipment.carrierId) : '';
-    const prefill = `Merhaba, ödeme ve yükleme planını netleştirelim. İş No: #${shipment.trackingCode}`;
+    const prefill = `Merhaba, ödeme ve yükleme planını netleştirelim. İş No: ${shipment.trackingCode}`;
     if (!carrierId) {
       navigate('/corporate/messages');
       return;
@@ -361,12 +400,24 @@ export default function CorporateShipments() {
           const mapped: Shipment[] =
             rows.map((row: ReloadBackendShipment) => {
               const rowCategoryData = (row as any).categoryData || (row as any).category_data || {};
+              const { from, to } = buildRoute(row as any);
+              const rawTracking =
+                (row as any).trackingNumber ||
+                (row as any).tracking_number ||
+                (row as any).trackingnumber ||
+                (row as any).trackingCode ||
+                (row as any).tracking_code ||
+                (row as any).trackingcode ||
+                (row as any).shipmentCode ||
+                (row as any).shipment_code ||
+                (row as any).shipmentcode ||
+                undefined;
               return ({
               id: typeof row.id === 'number' ? row.id : parseInt(String(row.id), 10),
-              trackingCode: row.trackingCode || `SHP-${row.id}`,
+              trackingCode: toTrackingCode(rawTracking, row.id),
               title: row.title || '',
-              from: row.pickupCity || '',
-              to: row.deliveryCity || '',
+              from,
+              to,
               status: normalizeShipmentStatus(row.status),
               unitType: rowCategoryData.unitType || (row as any).unitType,
               temperatureSetpoint:
@@ -423,14 +474,14 @@ export default function CorporateShipments() {
             }) || [];
           setShipments(mapped);
         }
-        alert('Teslimat başarıyla onaylandı!');
+        showProfessionalToast(showToast, 'DELIVERY_CONFIRMED', 'success');
       } else {
         const errorData = await response.json();
-        alert(errorData.message || 'Teslimat onaylanamadı');
+        showProfessionalToast(showToast, 'OPERATION_FAILED', 'error');
       }
     } catch (error) {
       // Error confirming delivery
-      alert('Teslimat onaylanırken bir hata oluştu');
+      showProfessionalToast(showToast, 'NETWORK_ERROR', 'error');
     }
   };
 
@@ -457,28 +508,21 @@ export default function CorporateShipments() {
       );
 
       if (response.ok) {
-        const data = await response.json();
+        const data = await response.json().catch(() => null);
         setShowCancelModal(false);
         setCancelReason('');
         setSelectedShipmentForCancel(null);
-        
-        // Show appropriate message based on refund status
-        if (data.data?.refundDenied) {
-          alert(`Gönderi iptal edildi.\n\n${data.warning || data.data.refundReason || 'İade koşulları sağlanmadığı için komisyon iadesi yapılamadı.'}`);
-        } else if (data.data?.commissionRefunded) {
-          alert(`Gönderi iptal edildi.\n\nKomisyon iadesi yapıldı (${data.data.refundAmount?.toFixed(2) || '0'} TL). İşlem ücreti kesildi.`);
-        } else {
-          alert('Gönderi başarıyla iptal edildi');
-        }
+
+        showProfessionalToast(showToast, 'ACTION_COMPLETED', 'success');
         
         // Reload shipments
-        window.location.reload();
+        await loadShipments();
       } else {
         const errorData = await response.json();
-        alert(errorData.message || 'Gönderi iptal edilemedi');
+        showProfessionalToast(showToast, 'OPERATION_FAILED', 'error');
       }
     } catch (error) {
-      alert('Gönderi iptal edilirken bir hata oluştu');
+      showProfessionalToast(showToast, 'NETWORK_ERROR', 'error');
     } finally {
       setIsCancelling(false);
     }
@@ -494,155 +538,194 @@ export default function CorporateShipments() {
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [isLoadingShipments, setIsLoadingShipments] = useState(true);
 
-  useEffect(() => {
-    const loadShipments = async () => {
-      try {
-        setIsLoadingShipments(true);
-        const userRaw = localStorage.getItem('user');
-        const userId = userRaw ? JSON.parse(userRaw || '{}').id : undefined;
-        const token = localStorage.getItem('authToken');
-        const response = await fetch(createApiUrl('/api/shipments'), {
-          headers: {
-            Authorization: `Bearer ${token || ''}`,
-            'X-User-Id': userId || '',
-            'Content-Type': 'application/json',
-          },
-        });
+  const loadShipments = async () => {
+    try {
+      setIsLoadingShipments(true);
+      const userRaw = localStorage.getItem('user');
+      const userId = userRaw ? JSON.parse(userRaw || '{}').id : undefined;
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(createApiUrl('/api/shipments'), {
+        headers: {
+          Authorization: `Bearer ${token || ''}`,
+          'X-User-Id': userId || '',
+          'Content-Type': 'application/json',
+        },
+      });
 
-        if (!response.ok) {
-          throw new Error('Failed to load shipments');
-        }
+      if (!response.ok) {
+        throw new Error('Gönderiler yüklenemedi');
+      }
 
-        const data = await response.json();
+      const data = await response.json();
 
-        type BackendShipment = {
-          id: number;
-          title?: string;
-          pickupCity?: string;
-          pickup_city?: string;
-          pickupAddress?: string;
-          pickup_address?: string;
-          deliveryCity?: string;
-          delivery_city?: string;
-          deliveryAddress?: string;
-          delivery_address?: string;
-          status?: string;
-          unitType?: string;
-          temperatureSetpoint?: string;
-          temperature_setpoint?: string;
-          unNumber?: string;
-          un_number?: string;
-          loadingEquipment?: string;
-          loading_equipment?: string;
-          categoryData?: any;
-          category_data?: any;
-          carrierName?: string;
-          carrierId?: number;
-          carrier_id?: number;
-          rating?: number;
-          price?: number | string;
-          weight?: number;
-          volume?: number;
-          deliveryDate?: string;
-          createdAt?: string;
-          created_at?: string;
-          notes?: string;
-          specialRequirements?: string | string[];
-          cargoType?: string;
-          cargoSubType?: string;
-          subCategory?: string;
-          trackingCode?: string;
+      type BackendShipment = {
+        id: number;
+        title?: string;
+        pickupCity?: string;
+        pickup_city?: string;
+        pickupAddress?: string;
+        pickup_address?: string;
+        deliveryCity?: string;
+        delivery_city?: string;
+        deliveryAddress?: string;
+        delivery_address?: string;
+        status?: string;
+        unitType?: string;
+        temperatureSetpoint?: string;
+        temperature_setpoint?: string;
+        unNumber?: string;
+        un_number?: string;
+        loadingEquipment?: string;
+        loading_equipment?: string;
+        categoryData?: any;
+        category_data?: any;
+        carrierName?: string;
+        carrierId?: number;
+        carrier_id?: number;
+        rating?: number;
+        price?: number | string;
+        weight?: number;
+        volume?: number;
+        deliveryDate?: string;
+        createdAt?: string;
+        created_at?: string;
+        notes?: string;
+        specialRequirements?: string | string[];
+        cargoType?: string;
+        cargoSubType?: string;
+        subCategory?: string;
+        trackingCode?: string;
+      };
+      const rows = (
+        Array.isArray(data) ? data : data.data || data.shipments || data.rows || []
+      ) as BackendShipment[];
+
+      // Remove duplicates based on id
+      const uniqueRows = rows.filter(
+        (row, index, self) => index === self.findIndex(r => r.id === row.id)
+      );
+
+      const mapped: Shipment[] = uniqueRows.map((row: BackendShipment) => {
+        const rowCategoryData = row.categoryData || row.category_data || {};
+        const { from, to } = buildRoute(row as any);
+        const rawTracking =
+          (row as any).trackingNumber ||
+          (row as any).tracking_number ||
+          (row as any).trackingnumber ||
+          (row as any).trackingCode ||
+          (row as any).tracking_code ||
+          (row as any).trackingcode ||
+          (row as any).shipmentCode ||
+          (row as any).shipment_code ||
+          (row as any).shipmentcode ||
+          undefined;
+        return {
+          id: row.id,
+          title: row.title || `${row.pickupCity || ''} → ${row.deliveryCity || ''}`,
+          trackingCode: toTrackingCode(rawTracking, row.id),
+          from,
+          to,
+          status: normalizeShipmentStatus(row.status),
+          unitType: rowCategoryData.unitType || row.unitType,
+          temperatureSetpoint:
+            rowCategoryData.temperatureSetpoint ||
+            rowCategoryData.temperature_setpoint ||
+            row.temperatureSetpoint ||
+            row.temperature_setpoint ||
+            undefined,
+          unNumber:
+            rowCategoryData.unNumber ||
+            rowCategoryData.un_number ||
+            row.unNumber ||
+            row.un_number,
+          loadingEquipment:
+            rowCategoryData.loadingEquipment ||
+            rowCategoryData.loading_equipment ||
+            row.loadingEquipment ||
+            row.loading_equipment ||
+            undefined,
+          carrier: row.carrierName || '',
+          carrierId: row.carrierId || row.carrier_id || undefined,
+          rating: row.rating || 0,
+          value: `₺${toNumber(row.price, 0).toLocaleString()}`,
+          weight: row.weight || 0,
+          volume: row.volume || 0,
+          estimatedDelivery: row.deliveryDate || '-',
+          statusText: formatStatusText(row.status),
+          progress:
+            normalizeShipmentStatus(row.status) === 'completed' ||
+            normalizeShipmentStatus(row.status) === 'delivered'
+              ? 100
+              : normalizeShipmentStatus(row.status) === 'accepted' ||
+                  normalizeShipmentStatus(row.status) === 'offer_accepted'
+                ? 60
+                : 10,
+          notes: row.notes || '',
+          specialRequirements: row.specialRequirements
+            ? Array.isArray(row.specialRequirements)
+              ? row.specialRequirements
+              : String(row.specialRequirements)
+                  .split(',')
+                  .map((s: string) => s.trim())
+                  .filter(Boolean)
+            : [],
+          // Bireysel paneldeki gibi okunabilir tarih & kategori
+          createdAt: row.createdAt || row.created_at || '',
+          category:
+            row.cargoType ||
+            (row as unknown as { category?: string }).category ||
+            row.title ||
+            '-',
+          subCategory: row.cargoSubType || row.subCategory || '-',
+          statusColor:
+            normalizeShipmentStatus(row.status) === 'completed' ||
+            normalizeShipmentStatus(row.status) === 'delivered'
+              ? 'bg-green-500'
+              : normalizeShipmentStatus(row.status) === 'accepted' ||
+                  normalizeShipmentStatus(row.status) === 'offer_accepted'
+                ? 'bg-blue-500'
+                : 'bg-yellow-500',
         };
-        const rows = (
-          Array.isArray(data)
-            ? data
-            : data.data || data.shipments || data.rows || []
-        ) as BackendShipment[];
-        
-        // Remove duplicates based on id
-        const uniqueRows = rows.filter((row, index, self) => 
-          index === self.findIndex(r => r.id === row.id)
-        );
-        
-        const mapped: Shipment[] = uniqueRows.map((row: BackendShipment) => {
-          const rowCategoryData = row.categoryData || row.category_data || {};
-          return {
-            id: row.id,
-            title:
-              row.title || `${row.pickupCity || ''} → ${row.deliveryCity || ''}`,
-            trackingCode: row.trackingCode || `SHP-${row.id}`,
-            from: row.pickupAddress || row.pickupCity || '-',
-            to: row.deliveryAddress || row.deliveryCity || '-',
-            status: normalizeShipmentStatus(row.status),
-            unitType: rowCategoryData.unitType || row.unitType,
-            temperatureSetpoint:
-              rowCategoryData.temperatureSetpoint ||
-              rowCategoryData.temperature_setpoint ||
-              row.temperatureSetpoint ||
-              row.temperature_setpoint ||
-              undefined,
-            unNumber:
-              rowCategoryData.unNumber ||
-              rowCategoryData.un_number ||
-              row.unNumber ||
-              row.un_number,
-            loadingEquipment:
-              rowCategoryData.loadingEquipment ||
-              rowCategoryData.loading_equipment ||
-              row.loadingEquipment ||
-              row.loading_equipment ||
-              undefined,
-            carrier: row.carrierName || '',
-            carrierId: row.carrierId || row.carrier_id || undefined,
-            rating: row.rating || 0,
-            value: `₺${toNumber(row.price, 0).toLocaleString()}`,
-            weight: row.weight || 0,
-            volume: row.volume || 0,
-            estimatedDelivery: row.deliveryDate || '-',
-            statusText: formatStatusText(row.status),
-            progress:
-              normalizeShipmentStatus(row.status) === 'completed' || normalizeShipmentStatus(row.status) === 'delivered'
-                ? 100
-                : normalizeShipmentStatus(row.status) === 'accepted' || normalizeShipmentStatus(row.status) === 'offer_accepted'
-                  ? 60
-                  : 10,
-            notes: row.notes || '',
-            specialRequirements: row.specialRequirements
-              ? Array.isArray(row.specialRequirements)
-                ? row.specialRequirements
-                : String(row.specialRequirements)
-                    .split(',')
-                    .map((s: string) => s.trim())
-                    .filter(Boolean)
-              : [],
-            // Bireysel paneldeki gibi okunabilir tarih & kategori
-            createdAt: row.createdAt || row.created_at || '',
-            category:
-              row.cargoType ||
-              (row as unknown as { category?: string }).category ||
-              row.title ||
-              '-',
-            subCategory: row.cargoSubType || row.subCategory || '-',
-            statusColor:
-              normalizeShipmentStatus(row.status) === 'completed' || normalizeShipmentStatus(row.status) === 'delivered'
-                ? 'bg-green-500'
-                : normalizeShipmentStatus(row.status) === 'accepted' || normalizeShipmentStatus(row.status) === 'offer_accepted'
-                  ? 'bg-blue-500'
-                  : 'bg-yellow-500',
-          };
-        });
+      });
 
-        setShipments(mapped);
-      } catch (error) {
-        console.error('Error loading shipments:', error);
-        setShipments([]);
-      } finally {
-        setIsLoadingShipments(false);
+      setShipments(mapped);
+    } catch (error) {
+      logger.error('Gönderiler yüklenirken hata:', error);
+      setShipments([]);
+    } finally {
+      setIsLoadingShipments(false);
+    }
+  };
+
+  useEffect(() => {
+    loadShipments();
+  }, []);
+
+  useEffect(() => {
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        loadShipments();
       }
     };
 
-    loadShipments();
+    const handleGlobalRefresh = () => {
+      loadShipments();
+    };
+
+    window.addEventListener('focus', handleVisibilityOrFocus);
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    window.addEventListener('yolnext:refresh-badges', handleGlobalRefresh);
+
+    return () => {
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      window.removeEventListener('yolnext:refresh-badges', handleGlobalRefresh);
+    };
   }, []);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterStatus, searchTerm, sortBy]);
 
   const filteredShipments = shipments.filter(shipment => {
     const matchesSearch =
@@ -661,10 +744,58 @@ export default function CorporateShipments() {
     return matchesSearch && matchesStatus;
   });
 
+  const sortedShipments = filteredShipments
+    .slice()
+    .sort((a: Shipment, b: Shipment) => {
+      const getTime = (v: any) => {
+        const t = new Date(v || 0).getTime();
+        return Number.isFinite(t) ? t : 0;
+      };
+
+      const statusRank = (s: Shipment) => {
+        const v = normalizeShipmentStatus(s.status).toLowerCase();
+        if (['waiting_for_offers', 'waiting', 'pending', 'preparing'].includes(v)) return 1;
+        if (v === 'offer_accepted' || v === 'accepted') return 2;
+        if (v === 'in_progress' || v === 'in_transit') return 3;
+        if (v === 'delivered' || v === 'completed') return 4;
+        if (v === 'cancelled') return 5;
+        return 9;
+      };
+
+      const isUrgent = (s: Shipment) =>
+        (s.specialRequirements || []).some(
+          r => String(r || '').trim().toLowerCase() === 'urgent'
+        );
+
+      if (sortBy === 'status') {
+        const d = statusRank(a) - statusRank(b);
+        if (d !== 0) return d;
+        return getTime(b.createdAt) - getTime(a.createdAt);
+      }
+
+      if (sortBy === 'value') {
+        const d = toNumber(b.value, 0) - toNumber(a.value, 0);
+        if (d !== 0) return d;
+        return getTime(b.createdAt) - getTime(a.createdAt);
+      }
+
+      if (sortBy === 'priority') {
+        const ua = isUrgent(a) ? 0 : 1;
+        const ub = isUrgent(b) ? 0 : 1;
+        if (ua !== ub) return ua - ub;
+        const d = statusRank(a) - statusRank(b);
+        if (d !== 0) return d;
+        return getTime(b.createdAt) - getTime(a.createdAt);
+      }
+
+      // date (default)
+      return getTime(b.createdAt) - getTime(a.createdAt);
+    });
+
   // Pagination logic
-  const totalPages = Math.ceil(filteredShipments.length / itemsPerPage);
+  const totalPages = Math.ceil(sortedShipments.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedShipments = filteredShipments.slice(
+  const paginatedShipments = sortedShipments.slice(
     startIndex,
     startIndex + itemsPerPage
   );
@@ -690,19 +821,8 @@ export default function CorporateShipments() {
   };
 
   const getStatusStyle = (status: string) => {
-    const s = formatStatusText(status);
-    switch (s) {
-      case 'Teslim Edildi':
-        return 'bg-green-100 text-green-800';
-      case 'Yolda':
-        return 'bg-blue-100 text-blue-800';
-      case 'Yükleme':
-        return 'bg-orange-100 text-orange-800';
-      case 'Beklemede':
-        return 'bg-yellow-100 text-yellow-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
+    const normalized = normalizeShipmentStatus(status);
+    return getStatusInfo(normalized).color;
   };
 
   return (
@@ -729,6 +849,24 @@ export default function CorporateShipments() {
           <p className='text-sm sm:text-base md:text-lg text-slate-600 px-4'>
             Gönderilerinizin durumunu takip edin ve yönetin
           </p>
+        </div>
+
+        <div className='mb-6'>
+          <GuidanceOverlay
+            storageKey='corporate.shipments'
+            isEmpty={!isLoadingShipments && shipments.length === 0}
+            icon={Package}
+            title='Gönderi Yönetimi'
+            description='Yeni gönderi oluşturup teklif toplayabilir, kabul edilen tekliflerin sürecini buradan takip edebilirsiniz. Düzenli çalıştığınız nakliyecileri "Nakliyeciler" sayfasından yönetebilirsiniz.'
+            primaryAction={{
+              label: 'Gönderi Oluştur',
+              to: '/corporate/create-shipment',
+            }}
+            secondaryAction={{
+              label: 'Nakliyeciler',
+              to: '/corporate/carriers',
+            }}
+          />
         </div>
 
         {/* Filters Card - Mobile Optimized */}
@@ -767,9 +905,17 @@ export default function CorporateShipments() {
               <option value='value'>Değere Göre</option>
             </select>
 
-            <button className='px-3 sm:px-4 py-2 sm:py-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors flex items-center justify-center gap-2 text-sm sm:text-base'>
-              <Filter className='w-4 h-4' />
-              Filtrele
+            <button
+              onClick={() => {
+                setSearchTerm('');
+                setFilterStatus('all');
+                setSortBy('date');
+                setCurrentPage(1);
+              }}
+              className='px-3 sm:px-4 py-2 sm:py-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors flex items-center justify-center gap-2 text-sm sm:text-base'
+            >
+              <X className='w-4 h-4' />
+              Sıfırla
             </button>
           </div>
         </div>
@@ -956,18 +1102,20 @@ export default function CorporateShipments() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={6} className='py-12 text-center'>
-                      <EmptyState
-                        icon={Package}
-                        title='Gönderi bulunamadı'
-                        description='Arama kriterlerinize uygun gönderi bulunamadı'
-                        action={{
-                          label: 'Yeni Gönderi Oluştur',
-                          onClick: () =>
-                            (window.location.href =
-                              '/corporate/create-shipment'),
-                        }}
-                      />
+                    <td colSpan={6} className='p-0'>
+                      <div className='min-h-[50vh] flex items-center justify-center px-4 py-12'>
+                        <div className='bg-white rounded-2xl shadow-xl border border-slate-200 p-10 text-center w-full max-w-2xl'>
+                          <EmptyState
+                            icon={Package}
+                            title='Henüz Gönderin Yok'
+                            description='İlk gönderinizi oluşturun, nakliyecilerden teklif alın'
+                            action={{
+                              label: 'Yeni Gönderi Oluştur',
+                              onClick: () => navigate('/corporate/create-shipment'),
+                            }}
+                          />
+                        </div>
+                      </div>
                     </td>
                   </tr>
                 )}
@@ -977,86 +1125,114 @@ export default function CorporateShipments() {
 
           {/* Mobile Cards */}
           <div className='lg:hidden space-y-4'>
-            {filteredShipments.map((shipment, index) => (
-              <div
-                key={`${shipment.id}-${shipment.trackingCode}-${index}`}
-                className='bg-slate-50 rounded-xl p-4 border border-slate-200'
-              >
-                <div className='flex items-start justify-between mb-3'>
-                  <div>
-                    <div className='font-mono text-sm font-semibold text-slate-900'>
-                      #{shipment.trackingCode}
+            {isLoadingShipments ? (
+              <LoadingState message='Gönderiler yükleniyor...' />
+            ) : paginatedShipments.length > 0 ? (
+              paginatedShipments.map((shipment, index) => (
+                <div
+                  key={`${shipment.id}-${shipment.trackingCode}-${index}`}
+                  className='bg-slate-50 rounded-xl p-4 border border-slate-200'
+                >
+                  <div className='flex items-start justify-between mb-3'>
+                    <div>
+                      <div className='font-mono text-sm font-semibold text-slate-900'>
+                        {shipment.trackingCode}
+                      </div>
+                      <div className='text-xs text-slate-500'>
+                        {shipment.createdAt}
+                      </div>
                     </div>
-                    <div className='text-xs text-slate-500'>
-                      {shipment.createdAt}
-                    </div>
-                  </div>
-                  <span
-                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusStyle(shipment.status)}`}
-                  >
-                    {shipment.statusText}
-                  </span>
-                </div>
-
-                <div className='space-y-2 mb-4'>
-                  <div className='flex items-center gap-2'>
-                    <MapPin className='w-4 h-4 text-blue-500' />
-                    <span className='text-sm font-medium text-slate-900'>
-                      {shipment.from} → {shipment.to}
+                    <span
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusStyle(shipment.status)}`}
+                    >
+                      {shipment.statusText}
                     </span>
                   </div>
-                  <div className='text-xs text-slate-500'>{shipment.title}</div>
 
-                  <div className='flex items-center gap-2'>
-                    <div className='w-6 h-6 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center'>
-                      <Truck className='w-3 h-3 text-white' />
+                  <div className='space-y-2 mb-4'>
+                    <div className='flex items-center gap-2'>
+                      <MapPin className='w-4 h-4 text-blue-500' />
+                      <span className='text-sm font-medium text-slate-900'>
+                        {shipment.from} → {shipment.to}
+                      </span>
                     </div>
-                    <div>
-                      <div className='text-sm font-medium text-slate-900'>
-                        {shipment.carrier}
+                    <div className='text-xs text-slate-500'>{shipment.title}</div>
+
+                    <div className='flex items-center gap-2'>
+                      <div className='w-6 h-6 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center'>
+                        <Truck className='w-3 h-3 text-white' />
                       </div>
-                      <div className='text-xs text-slate-500'>
-                        {shipment.rating}/5 ⭐
+                      <div>
+                        <div className='text-sm font-medium text-slate-900'>
+                          {shipment.carrier}
+                        </div>
+                        <div className='text-xs text-slate-500'>
+                          {shipment.rating}/5 ⭐
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className='flex items-center justify-between'>
+                      <div>
+                        <div className='text-sm font-bold text-slate-900'>
+                          {shipment.value}
+                        </div>
+                        <div className='text-xs text-slate-500'>
+                          {shipment.estimatedDelivery}
+                        </div>
+                      </div>
+                      <div className='text-right'>
+                        <div className='text-xs text-slate-500'>
+                          %{shipment.progress} tamamlandı
+                        </div>
                       </div>
                     </div>
                   </div>
 
-                  <div className='flex items-center justify-between'>
-                    <div>
-                      <div className='text-sm font-bold text-slate-900'>
-                        {shipment.value}
-                      </div>
-                      <div className='text-xs text-slate-500'>
-                        {shipment.estimatedDelivery}
-                      </div>
-                    </div>
-                    <div className='text-right'>
-                      <div className='text-xs text-slate-500'>
-                        %{shipment.progress} tamamlandı
-                      </div>
-                    </div>
+                  <div className='flex gap-2'>
+                    <button
+                      onClick={() => {
+                        setSelectedShipmentForTracking(shipment.id);
+                        setShowTrackingModal(true);
+                      }}
+                      className='flex-1 px-3 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs font-medium rounded-lg transition-colors'
+                    >
+                      Takip Et
+                    </button>
+                    <button
+                      onClick={() => handleViewDetails(shipment.id)}
+                      className='flex-1 px-3 py-2 bg-green-100 hover:bg-green-200 text-green-700 text-xs font-medium rounded-lg transition-colors'
+                    >
+                      Detay
+                    </button>
+                    <button
+                      onClick={() => handleMessage(shipment)}
+                      disabled={!isMessagingEnabledForStatus(shipment.status)}
+                      title={!isMessagingEnabledForStatus(shipment.status) ? 'Mesajlaşma teklif kabul edilince açılır' : 'Nakliyeci ile mesajlaş'}
+                      className={`flex-1 px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                        isMessagingEnabledForStatus(shipment.status)
+                          ? 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                          : 'bg-gray-50 text-gray-400 cursor-not-allowed'
+                      }`}
+                    >
+                      Mesaj
+                    </button>
                   </div>
                 </div>
-
-                <div className='flex gap-2'>
-                  <button
-                    onClick={() => setSelectedShipmentForTracking(shipment.id)}
-                    className='flex-1 px-3 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs font-medium rounded-lg transition-colors'
-                  >
-                    Takip Et
-                  </button>
-                  <button
-                    onClick={() => setSelectedShipmentForDetails(shipment.id)}
-                    className='flex-1 px-3 py-2 bg-green-100 hover:bg-green-200 text-green-700 text-xs font-medium rounded-lg transition-colors'
-                  >
-                    Detay
-                  </button>
-                  <button className='flex-1 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded-lg transition-colors'>
-                    Mesaj
-                  </button>
-                </div>
+              ))
+            ) : (
+              <div className='py-12'>
+                <EmptyState
+                  icon={Package}
+                  title='📦 Henüz gönderin yok'
+                  description='İlk gönderinizi oluşturun, nakliyecilerden teklif alın'
+                  action={{
+                    label: 'Yeni Gönderi Oluştur',
+                    onClick: () => navigate('/corporate/create-shipment'),
+                  }}
+                />
               </div>
-            ))}
+            )}
           </div>
         </div>
 
@@ -1514,6 +1690,71 @@ export default function CorporateShipments() {
                       </div>
                     </div>
 
+                    {/* Teslimat Onayı Bilgisi */}
+                    {normalizeShipmentStatus(shipment.status) === 'delivered' && (
+                      <div className='mb-6 p-4 bg-emerald-50 border-2 border-emerald-200 rounded-lg'>
+                        <div className='flex items-start gap-3'>
+                          <CheckCircle className='w-6 h-6 text-emerald-700 flex-shrink-0 mt-0.5' />
+                          <div className='flex-1'>
+                            <h4 className='text-sm font-semibold text-emerald-900 mb-2'>Teslimat Onayı</h4>
+                            <p className='text-xs text-emerald-800 leading-relaxed mb-3'>
+                              Yükünüz teslim edildi. Lütfen yükü kontrol edip onaylayın. Onayladığınızda ödeme nakliyeciye aktarılır.
+                            </p>
+                            <p className='text-xs text-emerald-700'>
+                              <span className='font-semibold'>Sorun varsa:</span> Yükü onaylamadan önce nakliyeci ile mesajlaşarak durumu netleştirin. Sorunlar taraflar arasında çözülmelidir.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Ödeme Detayları Bilgisi - Teklif kabul edildikten sonra */}
+                    {(normalizeShipmentStatus(shipment.status) === 'offer_accepted' || normalizeShipmentStatus(shipment.status) === 'accepted' || normalizeShipmentStatus(shipment.status) === 'in_progress' || normalizeShipmentStatus(shipment.status) === 'picked_up' || normalizeShipmentStatus(shipment.status) === 'in_transit') && shipment.carrierId && (
+                      <div className='mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg'>
+                        <div className='flex items-start gap-3'>
+                          <DollarSign className='w-5 h-5 text-blue-700 flex-shrink-0 mt-0.5' />
+                          <div className='flex-1'>
+                            <h4 className='text-sm font-semibold text-blue-900 mb-2'>Ödeme Detayları</h4>
+                            <p className='text-xs text-blue-800 leading-relaxed mb-2'>
+                              Ödeme tutarı güvence altına alınmıştır. Ödeme yöntemi (IBAN, alıcı adı, açıklama) ve yükleme saatini nakliyeci ile mesajlaşma üzerinden netleştirin.
+                            </p>
+                            <p className='text-xs text-blue-700'>
+                              <span className='font-semibold'>Önemli:</span> Ödeme detaylarını yazılı olarak teyit edin. Sorun olursa nakliyeci ile mesajlaşarak çözüm bulun. Platform sadece tarafları buluşturan bir pazaryeridir.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Acil Durum Bilgilendirmesi - Yolda olan gönderiler için */}
+                    {(normalizeShipmentStatus(shipment.status) === 'picked_up' || normalizeShipmentStatus(shipment.status) === 'in_transit') && (
+                      <div className='mb-6 p-4 bg-red-50 border-2 border-red-300 rounded-lg'>
+                        <div className='flex items-start gap-3'>
+                          <AlertCircle className='w-5 h-5 text-red-700 flex-shrink-0 mt-0.5' />
+                          <div className='flex-1'>
+                            <h4 className='text-sm font-semibold text-red-900 mb-2'>Acil Durumlar ve Sorumluluk</h4>
+                            <p className='text-xs text-red-800 leading-relaxed mb-3'>
+                              <strong>YolNext bir pazaryeri platformudur. Hiçbir sorumluluk almaz.</strong>
+                            </p>
+                            <div className='space-y-2 text-xs text-red-800 mb-3'>
+                              <p>
+                                <strong>Kaza, yangın, çalınma gibi durumlarda:</strong>
+                              </p>
+                              <ul className='list-disc list-inside space-y-1 ml-2'>
+                                <li>Doğrudan nakliyeci ve taşıyıcı ile iletişime geçin</li>
+                                <li>Tüm sorunlar taraflar arasında çözülmelidir</li>
+                                <li>Platform sadece tarafları buluşturan bir aracıdır</li>
+                                <li>Sigorta ihtiyacınız varsa, kendi sigortanızı yaptırmak sizin sorumluluğunuzdadır</li>
+                              </ul>
+                            </div>
+                            <p className='text-xs text-red-700'>
+                              <span className='font-semibold'>İletişim:</span> Yukarıdaki taşıyıcı ve nakliyeci bilgilerini kullanarak doğrudan iletişime geçin.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     {/* NAKLİYECİ BİLGİLERİ - bireysel tasarıma benzer */}
                     {shipment.carrier && (
                       <div className='bg-blue-50 rounded-lg p-5 border border-blue-200'>
@@ -1628,7 +1869,7 @@ export default function CorporateShipments() {
                   });
 
                   if (!response.ok) {
-                    throw new Error('Failed to load shipments');
+                    throw new Error('Gönderiler yüklenemedi');
                   }
 
                   const data = await response.json();
@@ -1636,7 +1877,18 @@ export default function CorporateShipments() {
                   const mapped = rows.map((row: any) => ({
                     id: row.id,
                     title: row.title || 'Gönderi',
-                    trackingCode: row.trackingCode || row.trackingnumber || `#${row.id}`,
+                    trackingCode: toTrackingCode(
+                      row.trackingNumber ||
+                        row.tracking_number ||
+                        row.trackingnumber ||
+                        row.trackingCode ||
+                        row.tracking_code ||
+                        row.trackingcode ||
+                        row.shipmentCode ||
+                        row.shipment_code ||
+                        row.shipmentcode,
+                      row.id
+                    ),
                     from: row.pickupCity || row.from || 'Bilinmeyen',
                     to: row.deliveryCity || row.to || 'Bilinmeyen',
                     status: normalizeShipmentStatus(row.status),
@@ -1710,25 +1962,32 @@ export default function CorporateShipments() {
                   </button>
                 </div>
                 <p className='text-gray-600 mb-4'>
-                  Gönderi #{selectedShipmentForCancel.trackingCode} - {selectedShipmentForCancel.title}
+                  Gönderi {selectedShipmentForCancel.trackingCode ? selectedShipmentForCancel.trackingCode : `#${selectedShipmentForCancel.id}`} - {selectedShipmentForCancel.title}
                 </p>
                 
-                {/* İade Politikası Uyarısı - Sadece offer_accepted durumunda */}
-                {(selectedShipmentForCancel.status === 'offer_accepted' || selectedShipmentForCancel.status === 'accepted' || selectedShipmentForCancel.statusText === 'Kabul Edildi') && (
-                  <div className='mb-4 p-3 bg-amber-50 border border-amber-300 rounded-lg'>
-                    <div className='flex items-start gap-2'>
-                      <AlertCircle className='w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5' />
-                      <div className='text-xs text-amber-800'>
-                        <p className='font-semibold mb-1'>⚠️ İade Politikası:</p>
-                        <ul className='list-disc list-inside space-y-1 ml-2'>
-                          <li>Komisyon iadesi sadece <strong>taşıyıcı atanmadan önce</strong> ve <strong>ilk 24 saat içinde</strong> yapılır</li>
-                          <li>İade yapılırsa <strong>işlem maliyeti (min. 2 TL)</strong> kesilir</li>
-                          <li>Taşıyıcı atandıktan sonra veya 24 saat sonra <strong>iade yapılmaz</strong></li>
-                        </ul>
-                      </div>
+                {/* İptal Kuralları Bilgisi */}
+                <div className='mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg'>
+                  <div className='flex items-start gap-3'>
+                    <Info className='w-5 h-5 text-blue-700 flex-shrink-0 mt-0.5' />
+                    <div className='flex-1'>
+                      <h4 className='text-sm font-semibold text-blue-900 mb-2'>İptal Kuralları</h4>
+                      <ul className='text-xs text-blue-800 space-y-1.5'>
+                        <li className='flex items-start gap-2'>
+                          <span className='font-semibold'>•</span>
+                          <span>Teklif kabul edilmeden önce: İptal edebilirsiniz, herhangi bir ücret kesintisi olmaz.</span>
+                        </li>
+                        <li className='flex items-start gap-2'>
+                          <span className='font-semibold'>•</span>
+                          <span>Teklif kabul edildikten sonra: İptal işlemi ilgili taraflara bildirilir. Ödeme güvence altındaysa iade süreci başlatılır.</span>
+                        </li>
+                        <li className='flex items-start gap-2'>
+                          <span className='font-semibold'>•</span>
+                          <span>Yük yola çıktıktan sonra: İptal edilemez. Sorun olursa nakliyeci ile mesajlaşarak çözüm bulun.</span>
+                        </li>
+                      </ul>
                     </div>
                   </div>
-                )}
+                </div>
                 
                 <div className='mb-4'>
                   <label className='block text-sm font-medium text-gray-700 mb-2'>

@@ -2,6 +2,7 @@ import React from 'react';
 import Footer from '../components/common/Footer';
 import { Helmet } from 'react-helmet-async';
 import { Mail, Phone, MapPin, Send } from 'lucide-react';
+import { LEGAL_CONTACT } from '../config/legal';
 
 export default function Contact() {
   return (
@@ -31,8 +32,8 @@ export default function Contact() {
                   </div>
                   <div>
                     <h3 className='font-semibold text-gray-900 mb-1'>E-posta</h3>
-                    <p className='text-gray-600'>info@yolnext.com</p>
-                    <p className='text-gray-600'>destek@yolnext.com</p>
+                    <p className='text-gray-600'>{LEGAL_CONTACT.supportEmail}</p>
+                    <p className='text-gray-600'>{LEGAL_CONTACT.kvkkEmail}</p>
                   </div>
                 </div>
 
@@ -42,7 +43,7 @@ export default function Contact() {
                   </div>
                   <div>
                     <h3 className='font-semibold text-gray-900 mb-1'>Telefon</h3>
-                    <p className='text-gray-600'>+90 (212) 555 0123</p>
+                    <p className='text-gray-600'>{LEGAL_CONTACT.phone}</p>
                     <p className='text-gray-600'>7/24 Destek Hattı</p>
                   </div>
                 </div>
@@ -54,8 +55,8 @@ export default function Contact() {
                   <div>
                     <h3 className='font-semibold text-gray-900 mb-1'>Adres</h3>
                     <p className='text-gray-600'>
-                      YolNext Teknoloji A.Ş.<br />
-                      İstanbul, Türkiye
+                      {LEGAL_CONTACT.companyName}<br />
+                      {LEGAL_CONTACT.address}
                     </p>
                   </div>
                 </div>

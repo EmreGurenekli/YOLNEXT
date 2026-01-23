@@ -1,5 +1,5 @@
 // Notification helper utility
-function createNotificationHelper(pool, io) {
+function createNotificationHelper(pool) {
   /**
    * Create a notification for a user
    * @param {number} userId - The user ID to notify
@@ -15,6 +15,33 @@ function createNotificationHelper(pool, io) {
     try {
       if (!pool) {
         console.error('Database pool not available for notifications');
+        return null;
+      }
+
+      // Backwards/forwards compatibility:
+      // Some routes call createNotification(userId, type, title, ...)
+      // Others call createNotification({ userId, type, title, message, linkUrl, priority, metadata, ... })
+      if (userId && typeof userId === 'object' && !Array.isArray(userId)) {
+        const payload = userId;
+        userId = payload.userId;
+        type = payload.type;
+        title = payload.title;
+        message = payload.message;
+        linkUrl = payload.linkUrl ?? payload.link_url ?? payload.url ?? null;
+        priority = payload.priority ?? 'normal';
+
+        if (payload.metadata != null) {
+          metadata = payload.metadata;
+        } else {
+          const derived = {};
+          if (payload.shipmentId != null) derived.shipmentId = payload.shipmentId;
+          if (payload.offerId != null) derived.offerId = payload.offerId;
+          if (payload.driverId != null) derived.driverId = payload.driverId;
+          metadata = Object.keys(derived).length > 0 ? derived : null;
+        }
+      }
+
+      if (userId == null || type == null || title == null || message == null) {
         return null;
       }
 
@@ -49,12 +76,26 @@ function createNotificationHelper(pool, io) {
             );
           } catch (colError2) {
             if (colError2 && colError2.code === '42703') {
-              result = await pool.query(
-                `INSERT INTO notifications ("userId", type, title, message, linkUrl, priority, metadata, createdAt)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP)
-                 RETURNING *`,
-                insertValues
-              );
+              try {
+                result = await pool.query(
+                  `INSERT INTO notifications ("userId", type, title, message, linkUrl, priority, metadata, createdAt)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP)
+                   RETURNING *`,
+                  insertValues
+                );
+              } catch (colError3) {
+                if (colError3 && colError3.code === '42703') {
+                  // created_at support
+                  result = await pool.query(
+                    `INSERT INTO notifications ("userId", type, title, message, linkUrl, priority, metadata, created_at)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP)
+                     RETURNING *`,
+                    insertValues
+                  );
+                } else {
+                  throw colError3;
+                }
+              }
             } else {
               throw colError2;
             }
@@ -66,23 +107,13 @@ function createNotificationHelper(pool, io) {
 
       const notification = result.rows[0];
 
-      // Emit real-time notification via Socket.IO if available
-      if (io) {
-        io.to(`user_${userId}`).emit('notification', {
-          id: notification.id,
-          type: notification.type,
-          title: notification.title,
-          message: notification.message,
-          linkUrl: notification.linkurl,
-          priority: notification.priority,
-          metadata: notification.metadata,
-          createdAt: notification.createdat
-        });
-      }
+      // Socket.IO removed - using REST API only
+      // Real-time notifications can be polled via GET /api/notifications
 
       return notification;
     } catch (error) {
-      console.error('Error creating notification:', error);
+      // Error creating notification - silent fail in production
+      // Can be logged to error tracking service if needed
       return null;
     }
   };

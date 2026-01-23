@@ -1,21 +1,31 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useAuth } from '../../contexts/AuthContext';
-import { dashboardAPI, notificationAPI, shipmentAPI } from '../../services/api';
+import { dashboardAPI, notificationAPI } from '../../services/api';
 import {
   Package,
   CheckCircle2,
   Clock,
+  XCircle,
   Plus,
   Bell,
   MessageSquare,
   TrendingUp,
   Truck,
   ArrowRight,
+  Users,
 } from 'lucide-react';
 import LoadingState from '../../components/common/LoadingState';
-import { formatCurrency, formatDate } from '../../utils/format';
+import GuidanceOverlay from '../../components/common/GuidanceOverlay';
+import SimpleOnboarding from '../../components/onboarding/SimpleOnboarding';
+import { formatCurrency, formatDate, sanitizeShipmentTitle } from '../../utils/format';
+import { createApiUrl } from '../../config/api';
+import { resolveShipmentRoute } from '../../utils/shipmentRoute';
+import NotificationCenter from '../../components/NotificationCenter';
+import CarrierInfoCard from '../../components/CarrierInfoCard';
+import { normalizeTrackingCode } from '../../utils/trackingCode';
+import { getStatusInfo } from '../../utils/shipmentStatus';
 
 interface Shipment {
   id: string;
@@ -29,6 +39,14 @@ interface Shipment {
   status: string;
   carrierName: string;
   rating: number;
+  carrierId?: string | number;
+  carrierEmail?: string;
+  carrierCompany?: string;
+  carrierRating?: number;
+  carrierReviews?: number;
+  carrierVerified?: boolean;
+  completedJobs?: number;
+  successRate?: number;
   price: number;
   weight: number;
   volume: number;
@@ -36,8 +54,28 @@ interface Shipment {
 }
 
 
+// Kategori çeviri mapping
+const categoryLabels: Record<string, string> = {
+  house_move: 'Ev Taşınması',
+  furniture: 'Mobilya Taşıma',
+  special: 'Özel Yük',
+  other: 'Diğer',
+  general: 'Genel Gönderi',
+  // Alt kategoriler
+  'Ev Taşınması': 'Ev Taşınması',
+  'Mobilya Taşıma': 'Mobilya Taşıma',
+  'Özel Yük': 'Özel Yük',
+  'Diğer': 'Diğer',
+};
+
+const getCategoryLabel = (category: string | undefined | null): string => {
+  if (!category) return '-';
+  return categoryLabels[category] || category;
+};
+
 const Dashboard = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   const toNumber = (value: any, fallback = 0) => {
     if (typeof value === 'number') return Number.isFinite(value) ? value : fallback;
@@ -57,8 +95,10 @@ const Dashboard = () => {
 
   const [stats, setStats] = useState({
     totalShipments: 0,
+    activeShipments: 0,
     deliveredShipments: 0,
     pendingShipments: 0,
+    cancelledShipments: 0,
     successRate: 0,
     totalSpent: 0,
     thisMonthSpent: 0,
@@ -66,136 +106,181 @@ const Dashboard = () => {
   });
   const [recentShipments, setRecentShipments] = useState<Shipment[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
+  useEffect(() => {
+    // İlk giriş kontrolü - onboarding göster
+    const hasSeenOnboarding = localStorage.getItem('onboardingCompleted');
+    if (!hasSeenOnboarding && user?.id) {
+      setShowOnboarding(true);
+    }
+  }, [user?.id]);
 
   useEffect(() => {
     const loadDashboardData = async () => {
+      if (!user?.id) {
+        setIsLoading(false);
+        return;
+      }
+      
+      setIsLoading(true);
+      
+      // Timeout protection - maksimum 10 saniye bekle
+      const timeoutId = setTimeout(() => {
+        setIsLoading(false);
+      }, 10000);
+      
       try {
-        setIsLoading(true);
-
         // Load stats from real API
-        const statsResponse = await dashboardAPI.getStats('individual');
-        if (statsResponse?.success && statsResponse?.data) {
-          const statsData = (statsResponse.data.stats || statsResponse.data) as any;
-          setStats({
-            totalShipments: statsData.totalShipments || 0,
-            deliveredShipments: statsData.completedShipments || 0,
-            pendingShipments: statsData.pendingShipments || 0,
-            successRate:
-              statsData.completedShipments > 0 && statsData.totalShipments > 0
-                ? parseFloat(
-                    (
-                      (statsData.completedShipments /
-                        statsData.totalShipments) *
-                    100
-                  ).toFixed(1)
-                  )
-                : 0,
-            totalSpent: statsData.totalSpent || 0,
-            thisMonthSpent: 0,
-            favoriteCarriers: 0,
-          });
+        try {
+          const statsResponse = await dashboardAPI.getStats('individual');
+          if (statsResponse?.success && statsResponse?.data) {
+            const statsData = (statsResponse.data.stats || statsResponse.data) as any;
+            setStats({
+              totalShipments: toNumber(statsData.totalShipments, 0),
+              activeShipments: toNumber(statsData.activeShipments, 0),
+              deliveredShipments: toNumber(statsData.completedShipments ?? statsData.deliveredShipments, 0),
+              pendingShipments: toNumber(statsData.pendingShipments, 0),
+              cancelledShipments: toNumber(statsData.cancelledShipments ?? statsData.canceledShipments, 0),
+              successRate: toNumber(statsData.successRate, 0),
+              totalSpent: toNumber(statsData.totalSpent, 0),
+              thisMonthSpent: 0,
+              favoriteCarriers: 0,
+            });
+          }
+        } catch (e) {
+          // keep previous stats on partial failure
         }
 
-        // Load recent shipments from real API
-        const shipmentsResponse = await shipmentAPI.getAll();
-        if (shipmentsResponse?.success) {
-          // Backend'den dönen data structure'ı kontrol et ve map et
-          let shipments: any[] = [];
-          if (Array.isArray(shipmentsResponse.data)) {
-            shipments = shipmentsResponse.data;
-          } else if (shipmentsResponse.data?.shipments && Array.isArray(shipmentsResponse.data.shipments)) {
-            shipments = shipmentsResponse.data.shipments;
-          } else if (shipmentsResponse.data?.data && Array.isArray(shipmentsResponse.data.data)) {
-            shipments = shipmentsResponse.data.data;
-          } else if (Array.isArray((shipmentsResponse as any)?.shipments)) {
-            shipments = (shipmentsResponse as any).shipments;
+        // Load recent shipments using same endpoint as MyShipments for consistency
+        try {
+          const token = localStorage.getItem('authToken') || localStorage.getItem('token');
+          if (!token) {
+            setRecentShipments([]);
+          } else {
+            const params = new URLSearchParams({
+              page: '1',
+              limit: '5',
+              userId: String(user.id),
+            });
+            const response = await fetch(createApiUrl(`/api/shipments?${params.toString()}`), {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
+            });
+            const data = await response.json();
+            if (response.ok && data?.success) {
+              const shipments =
+                data.data?.shipments ||
+                data.shipments ||
+                (Array.isArray(data.data) ? data.data : []) ||
+                [];
+
+              const formattedShipments = (Array.isArray(shipments) ? shipments : []).map((shipment: any) => {
+              const { from, to } = resolveShipmentRoute(shipment);
+              const rawStatus = String(shipment?.status || '').trim().toLowerCase();
+              const normalizedStatus =
+                rawStatus === 'open' || rawStatus === 'waiting_for_offers'
+                  ? 'waiting'
+                  : rawStatus === 'offer_accepted' || rawStatus === 'accepted'
+                    ? 'offer_accepted'
+                    : rawStatus === 'in_transit' || rawStatus === 'in_progress'
+                      ? 'in_transit'
+                      : rawStatus === 'delivered' || rawStatus === 'completed'
+                        ? 'delivered'
+                        : rawStatus === 'cancelled' || rawStatus === 'canceled'
+                          ? 'cancelled'
+                          : rawStatus === 'preparing'
+                            ? 'preparing'
+                            : rawStatus || 'waiting';
+
+              const priceNumber = toNumber(
+                shipment?.displayPrice ?? shipment?.price ?? shipment?.offerPrice ?? shipment?.value,
+                0
+              );
+              const volumeNumber = toNumber(shipment?.volume ?? shipment?.volume_m3 ?? shipment?.volumeM3, 0);
+              const createdAt = shipment?.createdAt || shipment?.created_at || shipment?.createdAt;
+              const estimatedDelivery =
+                shipment?.estimatedDelivery ||
+                shipment?.estimated_delivery ||
+                shipment?.deliveryDate ||
+                shipment?.delivery_date;
+
+              return {
+                ...shipment,
+                id: shipment?.id?.toString?.() || String(shipment?.id || ''),
+                title: sanitizeShipmentTitle(shipment?.title || shipment?.productDescription || shipment?.description || 'Gönderi'),
+                status: normalizedStatus,
+                price: priceNumber,
+                volume: volumeNumber,
+                createdAt,
+                estimatedDelivery,
+                trackingCode: normalizeTrackingCode(
+                  shipment?.trackingCode ||
+                  shipment?.trackingNumber ||
+                  shipment?.tracking_number,
+                  shipment?.id
+                ),
+                from,
+                to,
+                carrierName:
+                  shipment?.carrierName ||
+                  shipment?.carrier_name ||
+                  shipment?.nakliyeciName ||
+                  shipment?.nakliyeci_name ||
+                  shipment?.assignedCarrierName ||
+                  undefined,
+                carrierEmail: shipment?.carrierEmail || shipment?.carrier_email || undefined,
+                carrierCompany: shipment?.carrierCompany || shipment?.carrier_company || undefined,
+                carrierId: shipment?.carrierId || shipment?.carrier_id || shipment?.nakliyeciId || shipment?.nakliyeci_id || undefined,
+                carrierRating: shipment?.carrierRating || 0,
+                carrierReviews: shipment?.carrierReviews || 0,
+                carrierVerified: shipment?.carrierVerified || false,
+                completedJobs: shipment?.completedJobs || 0,
+                successRate: shipment?.successRate || 0,
+                rating: toNumber(shipment?.rating, 0),
+              };
+            });
+
+              const sorted = formattedShipments
+                .slice()
+                .sort((a, b) => {
+                  const ta = new Date(a.createdAt || (a as any).updatedAt || 0).getTime();
+                  const tb = new Date(b.createdAt || (b as any).updatedAt || 0).getTime();
+                  return tb - ta;
+                })
+                .slice(0, 5);
+              setRecentShipments(sorted);
+            }
           }
-          
-          // Backend verilerini frontend formatına çevir
-          const formattedShipments = (Array.isArray(shipments) ? shipments : []).map((shipment: any) => {
-            const rawStatus = shipment?.status;
-            const normalizedStatus =
-              rawStatus === 'open' || rawStatus === 'waiting_for_offers'
-                ? 'waiting'
-                : rawStatus === 'offer_accepted' || rawStatus === 'accepted'
-                  ? 'offer_accepted'
-                  : rawStatus === 'in_transit' || rawStatus === 'in_progress'
-                    ? 'in_transit'
-                    : rawStatus === 'delivered' || rawStatus === 'completed'
-                      ? 'delivered'
-                      : rawStatus === 'cancelled'
-                        ? 'cancelled'
-                        : rawStatus === 'preparing'
-                          ? 'preparing'
-                          : rawStatus || 'waiting';
-
-            const priceNumber = toNumber(
-              shipment?.displayPrice ?? shipment?.price ?? shipment?.offerPrice ?? shipment?.value,
-              0
-            );
-
-            const volumeNumber = toNumber(shipment?.volume ?? shipment?.volume_m3 ?? shipment?.volumeM3, 0);
-
-            const createdAt = shipment?.createdAt || shipment?.created_at || shipment?.createdAt;
-            const estimatedDelivery = shipment?.estimatedDelivery || shipment?.estimated_delivery || shipment?.deliveryDate || shipment?.delivery_date;
-
-            return {
-              ...shipment,
-              id: shipment?.id?.toString?.() || String(shipment?.id || ''),
-              status: normalizedStatus,
-              price: priceNumber,
-              volume: volumeNumber,
-              createdAt,
-              estimatedDelivery,
-              trackingCode:
-                shipment?.trackingCode ||
-                shipment?.trackingNumber ||
-                shipment?.tracking_number ||
-                `TRK${(shipment?.id || '').toString().padStart(6, '0')}`,
-              from: shipment?.pickupCity || shipment?.fromCity || shipment?.from || 'Bilinmiyor',
-              to: shipment?.deliveryCity || shipment?.toCity || shipment?.to || 'Bilinmiyor',
-              carrierName: shipment?.carrierName || shipment?.carrier_name || shipment?.nakliyeciName || shipment?.nakliyeci_name || undefined,
-              rating: toNumber(shipment?.rating, 0),
-            };
-          });
-          
-          setRecentShipments(formattedShipments);
+        } catch (e) {
+          // keep previous recent shipments on partial failure
         }
 
         // Load unread notifications count from real API
-        const notificationsResponse = await notificationAPI.getUnreadCount();
-        if (notificationsResponse?.success) {
-          const d = (notificationsResponse as any).data || {};
-          setUnreadCount(d.count || d.unreadCount || d.unread || 0);
+        try {
+          const notificationsResponse = await notificationAPI.getUnreadCount();
+          if (notificationsResponse?.success) {
+            const d = (notificationsResponse as any).data || {};
+            setUnreadCount(d.count || d.unreadCount || d.unread || 0);
+          }
+        } catch (e) {
+          // keep previous unread count on partial failure
         }
       } catch (error) {
-        // Fallback to empty data
-        setStats({
-          totalShipments: 0,
-          deliveredShipments: 0,
-          pendingShipments: 0,
-          successRate: 0,
-          totalSpent: 0,
-          thisMonthSpent: 0,
-          favoriteCarriers: 0,
-        });
-        setUnreadCount(0);
-        setRecentShipments([]);
+        // Global error handling - ensure loading state is cleared
+        console.error('Dashboard data loading error:', error);
       } finally {
+        clearTimeout(timeoutId);
         setIsLoading(false);
       }
     };
 
     loadDashboardData();
-    
-    // Refresh data every 10 seconds to catch real-time updates
-    const interval = setInterval(() => {
-      loadDashboardData();
-    }, 10000);
-    
-    return () => clearInterval(interval);
-  }, []);
+  }, [user?.id]);
 
   if (isLoading) {
     return (
@@ -224,8 +309,8 @@ const Dashboard = () => {
           <div className='absolute bottom-0 left-0 w-64 h-64 bg-gradient-to-tr from-slate-400/10 to-blue-400/10 rounded-full translate-y-32 -translate-x-32'></div>
 
           <div className='relative z-10'>
-            <div className='flex items-center justify-between'>
-              <div className='flex-1'>
+            <div className='flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between'>
+              <div className='flex-1 min-w-0'>
                 <div className='flex items-center gap-4 mb-4'>
                   <div className='w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl flex items-center justify-center shadow-xl border border-white/20'>
                     <span className='text-white font-bold text-xl'>YN</span>
@@ -239,17 +324,17 @@ const Dashboard = () => {
                       ! 👋
                     </h1>
                     <p className='text-slate-200 text-lg leading-relaxed'>
-                      Profesyonel nakliye hizmetlerinize hoş geldiniz.
+                      Gönderilerinizi yönetin, takip edin, <span className='text-blue-300 font-semibold'>tasarruf edin!</span>
                       <br />
-                      <span className='text-blue-300 font-semibold'>
-                        Güvenilir, hızlı ve ekonomik
+                      <span className='text-emerald-300 font-semibold'>
+                        Her gönderide %30-50 daha ucuz
                       </span>{' '}
-                      çözümlerimizle yanınızdayız.
+                      fiyatlarla yanınızdayız.
                     </p>
                   </div>
                 </div>
 
-                <div className='flex items-center gap-4'>
+                <div className='flex flex-wrap items-center gap-4'>
                   <div className='flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-2xl px-4 py-2 border border-white/20'>
                     <div className='w-2 h-2 bg-emerald-400 rounded-full animate-pulse shadow-lg'></div>
                     <span className='text-slate-200 font-medium'>
@@ -264,23 +349,23 @@ const Dashboard = () => {
                 </div>
               </div>
 
-              <div className='flex items-center gap-3'>
-                <Link to='/individual/notifications' className='relative group'>
-                  <button
-                    className='min-w-[44px] min-h-[44px] w-12 h-12 bg-white/10 backdrop-blur-sm rounded-2xl flex items-center justify-center hover:bg-white/20 transition-all duration-300 border border-white/20 group-hover:scale-110'
-                    aria-label='Bildirimleri görüntüle'
-                  >
-                    <Bell size={20} className='text-white' />
-                    {unreadCount > 0 && (
-                      <span className='absolute -top-1 -right-1 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center font-bold shadow-lg'>
-                        {unreadCount}
-                      </span>
-                    )}
-                  </button>
-                </Link>
+              <div className='flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto'>
+                <button
+                  type='button'
+                  onClick={() => setIsNotificationOpen(true)}
+                  className='relative min-w-[44px] min-h-[44px] w-12 h-12 bg-white/10 backdrop-blur-sm rounded-2xl flex items-center justify-center hover:bg-white/20 transition-all duration-300 border border-white/20'
+                  aria-label='Bildirimleri aç'
+                >
+                  <Bell size={20} className='text-white' />
+                  {unreadCount > 0 && (
+                    <span className='absolute -top-1 -right-1 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center font-bold shadow-lg'>
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
+                </button>
                 <Link to='/individual/create-shipment'>
                   <button
-                    className='bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 text-white px-6 py-3 rounded-lg font-medium transition-all duration-300 flex items-center gap-2 text-base shadow-lg hover:shadow-xl'
+                    className='bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 text-white px-6 py-3 rounded-lg font-medium transition-all duration-300 flex items-center justify-center gap-2 text-base shadow-lg hover:shadow-xl w-full sm:w-auto'
                     aria-label='Yeni gönderi oluştur'
                   >
                     <Plus size={20} />
@@ -292,8 +377,25 @@ const Dashboard = () => {
           </div>
         </div>
 
+        <div className='mb-6'>
+          <GuidanceOverlay
+            storageKey='individual.dashboard'
+            icon={Package}
+            title='Nasıl Başlayalım?'
+            description='🚀 1) Gönderi oluştur 2) Dakikalar içinde teklifler gelecek 3) En uygununu seç - bu kadar basit!'
+            primaryAction={{
+              label: 'Gönderi Oluştur',
+              to: '/individual/create-shipment',
+            }}
+            secondaryAction={{
+              label: 'Tekliflere Git',
+              to: '/individual/offers',
+            }}
+          />
+        </div>
+
         {/* Stats Grid - ANA RENK: from-slate-800 to-blue-900 */}
-        <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6'>
+        <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6'>
           <div
             className='bg-white rounded-xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:border-blue-300 transition-all duration-300'
             role='region'
@@ -335,7 +437,33 @@ const Dashboard = () => {
               Toplam Gönderi
             </div>
             <div className='mt-1 text-xs text-slate-500'>
-              Aktif gönderi sayısı
+              Şimdiye kadar yaptığın tüm gönderiler
+            </div>
+          </div>
+
+          <div
+            className='bg-white rounded-xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:border-blue-300 transition-all duration-300'
+            role='region'
+            aria-label='Aktif gönderi istatistiği'
+          >
+            <div className='flex items-center justify-between mb-4'>
+              <div
+                className='w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center'
+                aria-hidden='true'
+              >
+                <Truck className='w-6 h-6 text-white' />
+              </div>
+              <div className='text-right'>
+                <div className='text-2xl font-bold text-slate-900 mb-1' aria-live='polite'>
+                  {stats.activeShipments}
+                </div>
+              </div>
+            </div>
+            <div className='text-slate-700 font-semibold text-sm'>
+              Aktif Gönderi
+            </div>
+            <div className='mt-1 text-xs text-slate-500'>
+              Şu anda yoldaki gönderiler
             </div>
           </div>
 
@@ -360,10 +488,10 @@ const Dashboard = () => {
               </div>
             </div>
             <div className='text-slate-700 font-semibold text-sm'>
-              Teslim Edildi
+              Teslim Edildi ✓
             </div>
             <div className='mt-1 text-xs text-slate-500'>
-              Başarıyla teslim edilen
+              Sorunsuz tamamlanan gönderiler
             </div>
           </div>
 
@@ -391,7 +519,7 @@ const Dashboard = () => {
               Beklemede
             </div>
             <div className='mt-1 text-xs text-slate-500'>
-              İşlem bekleyen gönderiler
+              Teklif bekleyen veya onay bekleyen
             </div>
           </div>
 
@@ -419,7 +547,7 @@ const Dashboard = () => {
               Başarı Oranı
             </div>
             <div className='mt-1 text-xs text-slate-500'>
-              Teslimat başarı yüzdesi
+              Sorunsuz teslimat oranın - yüksek = güven
             </div>
           </div>
         </div>
@@ -432,7 +560,7 @@ const Dashboard = () => {
                 Hızlı İşlemler
               </h2>
               <p className='text-slate-600'>
-                Profesyonel hizmetlerimize hızlı erişim
+                En çok kullandığın özellikler - tek tıkla erişim
               </p>
             </div>
             <div className='w-14 h-14 bg-gradient-to-br from-slate-800 to-blue-900 rounded-2xl flex items-center justify-center shadow-lg'>
@@ -462,7 +590,7 @@ const Dashboard = () => {
                     Yeni Gönderi
                   </h3>
                   <p className='text-sm text-slate-600'>
-                    Profesyonel nakliye hizmeti
+                    3 adımda oluştur, dakikalar içinde teklif al
                   </p>
                   <div className='mt-3 w-8 h-1 bg-blue-600 rounded-full group-hover:w-12 transition-all duration-300'></div>
                 </div>
@@ -479,7 +607,7 @@ const Dashboard = () => {
                     Gönderilerim
                   </h3>
                   <p className='text-sm text-slate-600'>
-                    Gönderileri görüntüle ve yönet
+                    Tüm gönderilerini tek yerden yönet
                   </p>
                   <div className='mt-3 w-8 h-1 bg-gradient-to-r from-slate-800 to-blue-900 rounded-full group-hover:w-12 transition-all duration-300'></div>
                 </div>
@@ -496,7 +624,7 @@ const Dashboard = () => {
                     Canlı Takip
                   </h3>
                   <p className='text-sm text-slate-600'>
-                    Gönderileri gerçek zamanlı takip et
+                    Gönderinin nerede olduğunu anlık gör
                   </p>
                   <div className='mt-3 w-8 h-1 bg-purple-600 rounded-full group-hover:w-12 transition-all duration-300'></div>
                 </div>
@@ -513,7 +641,7 @@ const Dashboard = () => {
                     Mesajlar
                   </h3>
                   <p className='text-sm text-slate-600'>
-                    Müşteri hizmetleri ile iletişim
+                    Nakliyecinle direkt iletişim kur
                   </p>
                   <div className='mt-3 w-8 h-1 bg-amber-600 rounded-full group-hover:w-12 transition-all duration-300'></div>
                 </div>
@@ -527,9 +655,9 @@ const Dashboard = () => {
           <div className='flex items-center justify-between mb-6'>
             <div>
               <h2 className='text-2xl font-bold text-slate-900 mb-2'>
-                Son Gönderiler
+                📦 Son Gönderiler
               </h2>
-              <p className='text-slate-600'>Aktif gönderilerinizi takip edin</p>
+              <p className='text-slate-600'>En son oluşturduğun gönderiler - hızlı erişim için buradan</p>
             </div>
             <Link
               to='/individual/my-shipments'
@@ -587,7 +715,7 @@ const Dashboard = () => {
                           {shipment.from} → {shipment.to}
                         </div>
                         <div className='text-xs text-slate-500'>
-                          {shipment.subCategory || shipment.category || '-'}
+                          {getCategoryLabel(shipment.subCategory || shipment.category)}
                         </div>
                       </td>
                       <td className='py-4 px-4'>
@@ -597,6 +725,8 @@ const Dashboard = () => {
                               ? 'bg-green-100 text-green-800'
                               : shipment.status === 'in_transit'
                                 ? 'bg-blue-100 text-blue-800'
+                                : shipment.status === 'cancelled'
+                                  ? 'bg-red-100 text-red-800'
                                 : shipment.status === 'preparing'
                                   ? 'bg-orange-100 text-orange-800'
                                   : 'bg-yellow-100 text-yellow-800'
@@ -604,6 +734,8 @@ const Dashboard = () => {
                         >
                           {shipment.status === 'in_transit' ? (
                             <Truck className='w-3 h-3 mr-1' />
+                          ) : shipment.status === 'cancelled' ? (
+                            <XCircle className='w-3 h-3 mr-1' />
                           ) : shipment.status === 'preparing' ? (
                             <Package className='w-3 h-3 mr-1' />
                           ) : shipment.status === 'delivered' ? (
@@ -613,32 +745,39 @@ const Dashboard = () => {
                           ) : (
                             <Clock className='w-3 h-3 mr-1' />
                           )}
-                          {shipment.status === 'in_transit'
-                            ? 'Yolda'
-                            : shipment.status === 'delivered'
-                              ? 'Teslim Edildi'
-                              : shipment.status === 'preparing'
-                                ? 'Hazırlanıyor'
-                                : shipment.status === 'offer_accepted' || shipment.status === 'accepted'
-                                  ? 'Teklif Kabul Edildi'
-                                  : shipment.status === 'waiting_for_offers' || shipment.status === 'waiting'
-                                    ? 'Teklif Bekliyor'
-                                : 'Teklif Bekliyor'}
+                          {getStatusInfo(shipment.status).text}
                         </span>
                       </td>
                       <td className='py-4 px-4'>
-                        <div className='text-sm font-medium text-slate-900'>
-                          {shipment.carrierName || 'Atanmamış'}
-                        </div>
-                        {shipment.carrierName && shipment.rating && (
-                          <div className='text-xs text-slate-500'>
-                            {shipment.rating}/5 ⭐
+                        {shipment.carrierId && shipment.carrierName ? (
+                          <CarrierInfoCard
+                            carrierId={String(shipment.carrierId)}
+                            carrierName={shipment.carrierName}
+                            companyName={shipment.carrierCompany}
+                            carrierRating={shipment.carrierRating || 0}
+                            carrierReviews={shipment.carrierReviews || 0}
+                            carrierVerified={shipment.carrierVerified || false}
+                            successRate={shipment.successRate || 0}
+                            completedJobs={shipment.completedJobs || 0}
+                            variant="compact"
+                            showMessaging={false}
+                            className="max-w-xs"
+                          />
+                        ) : (
+                          <div className='text-sm font-medium text-slate-500'>
+                            {(shipment.status === 'offer_accepted' || shipment.status === 'accepted' || shipment.status === 'in_transit' || shipment.status === 'delivered')
+                              ? 'Nakliyeci Atandı'
+                              : 'Atanmamış'}
                           </div>
                         )}
                       </td>
                       <td className='py-4 px-4'>
                         <div className='text-sm font-bold text-blue-700'>
-                          {toNumber((shipment as any).price, 0) > 0 ? formatCurrency(toNumber((shipment as any).price, 0)) : '₺0'}
+                          {toNumber((shipment as any).price, 0) > 0 
+                            ? formatCurrency(toNumber((shipment as any).price, 0)) 
+                            : (shipment.status === 'waiting_for_offers' || shipment.status === 'waiting' || shipment.status === 'pending' || shipment.status === 'open')
+                              ? <span className='text-slate-400 font-normal'>Teklif Bekleniyor</span>
+                              : '—'}
                         </div>
                         <div className='text-xs text-slate-500'>
                           {toNumber((shipment as any).volume, 0) > 0 ? `${toNumber((shipment as any).volume, 0).toFixed(2)} m³` : ''}
@@ -649,17 +788,50 @@ const Dashboard = () => {
                       </td>
                       <td className='py-4 px-4'>
                         <div className='flex items-center gap-2'>
-                          <button className='px-3 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs font-medium rounded-lg transition-colors'>
+                          <button
+                            onClick={() => navigate(`/individual/shipments/${shipment.id}`)}
+                            className='px-3 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs font-medium rounded-lg transition-colors'
+                          >
                             Detay
                           </button>
-                          {shipment.status !== 'waiting' && (
-                            <button className='px-3 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs font-medium rounded-lg transition-colors'>
+                          {shipment.status !== 'waiting' && shipment.status !== 'cancelled' && (
+                            <button
+                              onClick={() => navigate(`/individual/live-tracking?shipmentId=${encodeURIComponent(shipment.id)}`)}
+                              className='px-3 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs font-medium rounded-lg transition-colors'
+                            >
                               Takip
                             </button>
                           )}
-                          <button className='px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded-lg transition-colors'>
-                            Mesaj
-                          </button>
+                          {(() => {
+                              const carrierId =
+                                (shipment as any).carrierId ||
+                                (shipment as any).carrier_id ||
+                                (shipment as any).nakliyeciId ||
+                                (shipment as any).nakliyeci_id ||
+                                (shipment as any).carrier?.id ||
+                                (shipment as any).nakliyeci?.id ||
+                                null;
+                              const hasCarrier = carrierId !== null && carrierId !== undefined && String(carrierId) !== '';
+                              const canMessage = hasCarrier && shipment.status !== 'cancelled';
+                              return (
+                                <button
+                                  onClick={() => {
+                                    if (!canMessage) return;
+                                    navigate(
+                                      `/individual/messages?userId=${encodeURIComponent(String(carrierId))}&shipmentId=${encodeURIComponent(String(shipment.id))}`
+                                    );
+                                  }}
+                                  disabled={!canMessage}
+                                  className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                                    canMessage 
+                                      ? 'bg-green-100 hover:bg-green-200 text-green-700' 
+                                      : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                  }`}
+                                >
+                                  Mesaj
+                                </button>
+                              );
+                            })()}
                         </div>
                       </td>
                     </tr>
@@ -667,20 +839,26 @@ const Dashboard = () => {
                 ) : (
                   <tr>
                     <td colSpan={6} className='py-12 text-center'>
-                      <Package className='w-16 h-16 text-slate-300 mx-auto mb-4' />
-                      <h3 className='text-lg font-medium text-slate-900 mb-2'>
-                        Gönderi bulunamadı
-                      </h3>
-                      <p className='text-slate-500 mb-4'>
-                        Henüz gönderiniz bulunmuyor.
-                      </p>
-                      <Link
-                        to='/individual/create-shipment'
-                        className='inline-flex items-center gap-2 bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 text-white px-4 py-2 rounded-lg font-medium transition-all duration-300 shadow-lg hover:shadow-xl'
-                      >
-                        <Plus className='w-4 h-4' />
-                        İlk Gönderinizi Oluşturun
-                      </Link>
+                      <div className='bg-white rounded-2xl p-8 shadow-xl border border-slate-200'>
+                        <div className='text-center'>
+                          <div className='w-16 h-16 bg-gradient-to-br from-slate-700 to-blue-800 rounded-full mx-auto mb-4 flex items-center justify-center'>
+                            <Package className='w-8 h-8 text-white' />
+                          </div>
+                          <h3 className='text-xl font-bold text-slate-900 mb-2'>
+                            Henüz Gönderiniz Yok
+                          </h3>
+                          <p className='text-slate-600 mb-6'>
+                            İlk gönderinizi oluşturun, dakikalar içinde nakliyecilerden teklifler gelmeye başlayacak. Ortalama bekleme süresi 5-15 dakikadır.
+                          </p>
+                          <Link
+                            to='/individual/create-shipment'
+                            className='inline-flex items-center gap-2 bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl'
+                          >
+                            <Plus className='w-5 h-5' />
+                            Gönderi Oluştur
+                          </Link>
+                        </div>
+                      </div>
                     </td>
                   </tr>
                 )}
@@ -689,6 +867,21 @@ const Dashboard = () => {
           </div>
         </div>
       </div>
+      <NotificationCenter
+        isOpen={isNotificationOpen}
+        onClose={() => {
+          setIsNotificationOpen(false);
+          window.dispatchEvent(new Event('yolnext:refresh-notifications'));
+          window.dispatchEvent(new Event('yolnext:refresh-badges'));
+        }}
+      />
+      {/* Onboarding Modal - İlk Giriş Rehberi */}
+      {showOnboarding && (
+        <SimpleOnboarding
+          userType="individual"
+          onComplete={() => setShowOnboarding(false)}
+        />
+      )}
     </div>
   );
 };

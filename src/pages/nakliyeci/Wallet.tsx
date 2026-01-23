@@ -21,6 +21,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import Breadcrumb from '../../components/common/Breadcrumb';
 import LoadingState from '../../components/common/LoadingState';
 import EmptyState from '../../components/common/EmptyState';
+import GuidanceOverlay from '../../components/common/GuidanceOverlay';
 import { createApiUrl } from '../../config/api';
 import { formatCurrency, formatDateTime } from '../../utils/format';
 
@@ -29,7 +30,7 @@ interface CommissionTransaction {
   offerId: number;
   shipmentTitle: string;
   amount: number;
-  status: 'pending' | 'completed' | 'refunded';
+  status: 'pending' | 'completed';
   createdAt: string;
   completedAt?: string;
 }
@@ -38,7 +39,6 @@ interface WalletData {
   balance: number;
   pendingCommissions: number;
   totalCommissions: number;
-  totalRefunds: number;
   commissionRate: number;
 }
 
@@ -48,7 +48,6 @@ const Wallet: React.FC = () => {
     balance: 0,
     pendingCommissions: 0,
     totalCommissions: 0,
-    totalRefunds: 0,
     commissionRate: 1,
   });
   const [transactions, setTransactions] = useState<CommissionTransaction[]>([]);
@@ -59,7 +58,7 @@ const Wallet: React.FC = () => {
 
   const breadcrumbItems = [
     { label: 'Ana Sayfa', href: '/nakliyeci/dashboard' },
-    { label: 'Cüzdan', href: '/nakliyeci/cuzdan' },
+    { label: 'Cüzdan', href: '/nakliyeci/wallet' },
   ];
 
   useEffect(() => {
@@ -100,7 +99,6 @@ const Wallet: React.FC = () => {
           balance: walletData.balance || 0,
           pendingCommissions: walletData.pendingCommissions || 0,
           totalCommissions: walletData.totalCommissions || 0,
-          totalRefunds: walletData.totalRefunds || 0,
           commissionRate: walletData.commissionRate || 1,
         });
         setTransactions(walletData.transactions || data.transactions || []);
@@ -122,24 +120,51 @@ const Wallet: React.FC = () => {
     }
 
     try {
-      const response = await fetch(createApiUrl('/api/wallet/deposit'), {
+      setError(null);
+      const token = localStorage.getItem('authToken');
+      const amount = parseFloat(depositAmount);
+
+      const intentRes = await fetch(createApiUrl('/api/wallet/topup/intent'), {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${localStorage.getItem('authToken')}`,
+          Authorization: `Bearer ${token || ''}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          amount: parseFloat(depositAmount),
-        }),
+        body: JSON.stringify({ amount }),
       });
 
-      if (response.ok) {
+      const intentJson = await intentRes.json().catch(() => null);
+      if (!intentRes.ok || !intentJson?.success) {
+        setError(intentJson?.message || 'Para yatırma işlemi başarısız');
+        return;
+      }
+
+      const provider = intentJson?.data?.provider;
+      const providerIntentId = intentJson?.data?.providerIntentId;
+
+      if (provider === 'mock' && providerIntentId) {
+        const confirmRes = await fetch(createApiUrl('/api/wallet/topup/confirm'), {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token || ''}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ providerIntentId }),
+        });
+
+        const confirmJson = await confirmRes.json().catch(() => null);
+        if (!confirmRes.ok || !confirmJson?.success) {
+          setError(confirmJson?.message || 'Ödeme doğrulanamadı');
+          return;
+        }
+
         setDepositAmount('');
         setShowDepositModal(false);
         loadWalletData();
-      } else {
-        setError('Para yatırma işlemi başarısız');
+        return;
       }
+
+      setError('Ödeme adımı gerekli. Lütfen ödeme ekranını tamamlayın.');
     } catch (err) {
       console.error('Para yatırma hatası:', err);
       setError('Para yatırma işlemi başarısız');
@@ -156,8 +181,6 @@ const Wallet: React.FC = () => {
         return <CheckCircle className='w-4 h-4 text-green-500' />;
       case 'pending':
         return <Clock className='w-4 h-4 text-yellow-500' />;
-      case 'refunded':
-        return <RefreshCw className='w-4 h-4 text-blue-500' />;
       default:
         return <AlertCircle className='w-4 h-4 text-gray-500' />;
     }
@@ -169,8 +192,6 @@ const Wallet: React.FC = () => {
         return 'Tamamlandı';
       case 'pending':
         return 'Bekliyor';
-      case 'refunded':
-        return 'İade Edildi';
       default:
         return 'Bilinmiyor';
     }
@@ -182,8 +203,6 @@ const Wallet: React.FC = () => {
         return 'text-green-600 bg-green-50';
       case 'pending':
         return 'text-yellow-600 bg-yellow-50';
-      case 'refunded':
-        return 'text-blue-600 bg-blue-50';
       default:
         return 'text-gray-600 bg-gray-50';
     }
@@ -222,6 +241,24 @@ const Wallet: React.FC = () => {
           <p className='text-sm sm:text-base md:text-lg text-slate-600 px-4'>
             Bakiye yönetimi ve komisyon takibi
           </p>
+        </div>
+
+        <div className='mb-6'>
+          <GuidanceOverlay
+            storageKey='nakliyeci.wallet'
+            isEmpty={!loading && transactions.length === 0}
+            icon={WalletIcon}
+            title='Cüzdan'
+            description='Teklif verirken komisyon blokesini, teklif kabul edildiğinde komisyon kesintisini buradan takip edebilirsin. Yeni iş almak için “Yük Pazarı”na, aktif operasyon için “Aktif Yükler”e geç.'
+            primaryAction={{
+              label: 'Yük Pazarı',
+              to: '/nakliyeci/jobs',
+            }}
+            secondaryAction={{
+              label: 'Aktif Yükler',
+              to: '/nakliyeci/active-shipments',
+            }}
+          />
         </div>
 
         {/* Action Buttons */}
@@ -354,11 +391,15 @@ const Wallet: React.FC = () => {
 
           <div className='p-4 sm:p-6'>
             {transactions.length === 0 ? (
-              <EmptyState
-                icon={History}
-                title='Henüz komisyon işlemi yok'
-                description='Teklif verdiğinizde komisyon işlemleri burada görünecek'
-              />
+              <div className='min-h-[320px] lg:min-h-[50vh] flex items-center justify-center'>
+                <div className='bg-white rounded-2xl shadow-xl border border-slate-200 p-8 text-center w-full max-w-2xl'>
+                  <EmptyState
+                    icon={History}
+                    title='Henüz komisyon işlemi yok'
+                    description='Teklif verdiğinizde komisyon işlemleri burada görünecek'
+                  />
+                </div>
+              </div>
             ) : (
               <div className='space-y-4'>
                 {transactions.map(transaction => (

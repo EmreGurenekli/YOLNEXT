@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Package,
   MapPin,
@@ -27,9 +27,11 @@ import {
   ExternalLink,
   FileText,
 } from 'lucide-react';
-import { realApiService } from '../../services/realApi';
 import { useNavigate, useParams } from 'react-router-dom';
 import { createApiUrl } from '../../config/api';
+import { TOAST_MESSAGES, showProfessionalToast } from '../../utils/toastMessages';
+import { sanitizeShipmentTitle } from '../../utils/format';
+import { normalizeTrackingCode } from '../../utils/trackingCode';
 
 interface ShipmentDetail {
   id: string;
@@ -39,9 +41,13 @@ interface ShipmentDetail {
   status:
     | 'pending'
     | 'bidding'
+    | 'offer_accepted'
     | 'accepted'
     | 'in_progress'
+    | 'picked_up'
+    | 'in_transit'
     | 'delivered'
+    | 'completed'
     | 'cancelled';
   priority: 'urgent' | 'high' | 'normal' | 'low';
   fromAddress: {
@@ -134,12 +140,15 @@ const getStatusInfo = (status: ShipmentDetail['status']) => {
         color: 'blue',
         icon: <DollarSign className='w-5 h-5' />,
       };
+    case 'offer_accepted':
     case 'accepted':
       return {
         text: 'Kabul Edildi',
         color: 'purple',
         icon: <CheckCircle className='w-5 h-5' />,
       };
+    case 'picked_up':
+    case 'in_transit':
     case 'in_progress':
       return {
         text: 'Yolda',
@@ -149,6 +158,12 @@ const getStatusInfo = (status: ShipmentDetail['status']) => {
     case 'delivered':
       return {
         text: 'Teslim Edildi',
+        color: 'gray',
+        icon: <Package className='w-5 h-5' />,
+      };
+    case 'completed':
+      return {
+        text: 'Tamamlandı',
         color: 'gray',
         icon: <Package className='w-5 h-5' />,
       };
@@ -193,7 +208,7 @@ const getCargoTypeInfo = (type: ShipmentDetail['cargoDetails']['type']) => {
     case 'is_yeri':
       return { text: 'İş Yeri', icon: '🏢' };
     case 'ozel':
-      return { text: 'Özel', icon: '✨' };
+      return { text: 'Özel', icon: '📦' };
     default:
       return { text: 'Diğer', icon: '❓' };
   }
@@ -209,41 +224,173 @@ const IndividualShipmentDetail: React.FC = () => {
   const [showDocuments, setShowDocuments] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
 
-  useEffect(() => {
-    const fetchShipmentDetail = async () => {
-      setLoading(true);
-      try {
-        // Gerçek API çağrısı
-        const response = await fetch(createApiUrl(`/api/shipments/${id}`), {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('authToken')}`,
-            'Content-Type': 'application/json',
-          },
-        });
+  const normalizeDetailStatus = (raw: any): ShipmentDetail['status'] => {
+    const s = String(raw || '').toLowerCase();
+    if (s === 'waiting' || s === 'open' || s === 'waiting_for_offers') return 'pending';
+    if (s === 'bidding') return 'bidding';
+    if (s === 'offer_accepted') return 'offer_accepted';
+    if (s === 'accepted') return 'accepted';
+    if (s === 'in_progress') return 'in_progress';
+    if (s === 'picked_up') return 'picked_up';
+    if (s === 'in_transit') return 'in_transit';
+    if (s === 'delivered') return 'delivered';
+    if (s === 'completed') return 'completed';
+    if (s === 'cancelled') return 'cancelled';
+    return 'pending';
+  };
 
-        if (response.ok) {
-          const data = await response.json();
-          const maybeShipment =
-            data?.shipment ||
-            data?.data?.shipment ||
-            data?.data ||
-            data;
-          setShipment(maybeShipment || null);
-        } else {
-          // Failed to fetch shipment detail
-          setShipment(null);
-        }
-      } catch (error) {
-        // Error fetching shipment detail
-        setShipment(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (id) {
-      fetchShipmentDetail();
+  const fetchTrackingUpdates = async (shipmentId: string, token: string | null) => {
+    if (!shipmentId || !token) return [] as TrackingUpdate[];
+    try {
+      const resp = await fetch(createApiUrl(`/api/shipments/${shipmentId}/tracking`), {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      if (!resp.ok) return [] as TrackingUpdate[];
+      const data = await resp.json();
+      const rows = Array.isArray(data) ? data : (Array.isArray(data?.data) ? data.data : []);
+      return (rows || []).map((r: any, idx: number) => {
+        const status = String(r.status || '');
+        const ts = String(r.created_at || r.createdAt || new Date().toISOString());
+        const isDelivered = status === 'delivered' || status === 'completed';
+        return {
+          id: String(r.id || `${shipmentId}-${idx}`),
+          status,
+          location: String(r.location || ''),
+          description: String(r.notes || r.note || r.description || status || 'Güncelleme'),
+          timestamp: ts,
+          isDelivered,
+        } as TrackingUpdate;
+      });
+    } catch {
+      return [] as TrackingUpdate[];
     }
+  };
+
+  const loadShipmentDetail = async () => {
+    if (!id) return;
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(createApiUrl(`/api/shipments/${id}`), {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        setShipment(null);
+        return;
+      }
+
+      const data = await response.json();
+      const maybeShipment = data?.shipment || data?.data?.shipment || data?.data || data;
+      const tracking = await fetchTrackingUpdates(String(id), token);
+
+      if (maybeShipment) {
+        const raw: any = maybeShipment as any;
+        const pickStr = (...keys: string[]) => {
+          for (const k of keys) {
+            const v = raw?.[k];
+            if (v != null && String(v).trim() !== '') return String(v);
+            const lk = String(k).toLowerCase();
+            const lv = raw?.[lk];
+            if (lv != null && String(lv).trim() !== '') return String(lv);
+          }
+          return '';
+        };
+
+        const pickupCity = pickStr('pickupCity', 'pickup_city', 'fromCity', 'from_city');
+        const pickupDistrict = pickStr('pickupDistrict', 'pickup_district', 'fromDistrict', 'from_district');
+        const pickupAddress = pickStr('pickupAddress', 'pickup_address', 'fromAddress', 'from_address');
+        const deliveryCity = pickStr('deliveryCity', 'delivery_city', 'toCity', 'to_city');
+        const deliveryDistrict = pickStr('deliveryDistrict', 'delivery_district', 'toDistrict', 'to_district');
+        const deliveryAddress = pickStr('deliveryAddress', 'delivery_address', 'toAddress', 'to_address');
+
+        const weight = Number(raw.weight ?? 0) || 0;
+        const volume = Number(raw.volume ?? 0) || 0;
+        const value = Number(raw.value ?? raw.price ?? 0) || 0;
+
+        const createdAt = pickStr('createdAt', 'created_at', 'createdat') || new Date().toISOString();
+        const updatedAt = pickStr('updatedAt', 'updated_at', 'updatedat') || createdAt;
+        const pickupDate = pickStr('pickupDate', 'pickup_date', 'pickupdate') || createdAt;
+        const deliveryDate = pickStr('deliveryDate', 'delivery_date', 'estimatedDelivery', 'estimated_delivery', 'deliverydate') || updatedAt;
+
+        const normalized: ShipmentDetail = {
+          ...(raw as any),
+          id: String(raw.id ?? id),
+          title: sanitizeShipmentTitle(raw.title || raw.productDescription || raw.description || 'Gönderi'),
+          description: String(raw.description || ''),
+          trackingCode: normalizeTrackingCode(raw.trackingCode || raw.trackingNumber || raw.tracking_number, raw.id ?? id),
+          status: normalizeDetailStatus(raw.status),
+          priority: (raw.priority as any) || 'normal',
+          fromAddress: {
+            name: String(raw.fromName || raw.senderName || raw.sender_name || 'Gönderici'),
+            address: pickupAddress,
+            city: pickupCity,
+            district: pickupDistrict,
+            postalCode: String(raw.fromPostalCode || raw.from_postal_code || ''),
+            phone: String(raw.fromPhone || raw.senderPhone || raw.sender_phone || ''),
+          },
+          toAddress: {
+            name: String(raw.toName || raw.receiverName || raw.receiver_name || 'Alıcı'),
+            address: deliveryAddress,
+            city: deliveryCity,
+            district: deliveryDistrict,
+            postalCode: String(raw.toPostalCode || raw.to_postal_code || ''),
+            phone: String(raw.toPhone || raw.receiverPhone || raw.receiver_phone || ''),
+          },
+          cargoDetails: {
+            type: (raw.cargoDetails?.type as any) || (raw.cargoType as any) || 'kisisel',
+            weight,
+            volume,
+            value,
+            description: String(raw.cargoDetails?.description || raw.cargoDescription || raw.cargo_description || raw.description || ''),
+          },
+          schedule: {
+            preferredDate: String(raw.schedule?.preferredDate || raw.preferredDate || raw.preferred_date || pickupDate),
+            timePreference: (raw.schedule?.timePreference as any) || (raw.timePreference as any) || (raw.time_preference as any) || 'herhangi',
+            estimatedDelivery: String(raw.schedule?.estimatedDelivery || raw.estimatedDelivery || raw.estimated_delivery || deliveryDate),
+            actualDelivery: raw.actualDelivery || raw.actual_delivery || raw.actualDeliveryDate || raw.actual_delivery_date,
+          },
+          carrier: raw.carrier
+            ? raw.carrier
+            : (raw.carrierId || raw.carrier_id || raw.nakliyeci_id || raw.carrierEmail || raw.carrier_email || raw.carrierName || raw.carrier_name || raw.nakliyeciName || raw.nakliyeci_name)
+              ? {
+                  id: String(raw.carrierId || raw.carrier_id || raw.nakliyeci_id || ''),
+                  name: String(raw.carrierName || raw.carrier_name || raw.nakliyeciName || raw.nakliyeci_name || raw.carrierEmail || raw.carrier_email || ''),
+                  company: String(raw.carrierCompany || raw.carrier_company || raw.nakliyeciCompany || raw.nakliyeci_company || ''),
+                  phone: String(raw.carrierPhone || raw.carrier_phone || ''),
+                  email: String(raw.carrierEmail || raw.carrier_email || ''),
+                  rating: Number(raw.carrierRating || raw.carrier_rating || 0) || 0,
+                  avatar: raw.carrierAvatar || raw.carrier_avatar,
+                }
+              : undefined,
+          offers: Array.isArray(raw.offers) ? raw.offers : [],
+          documents: Array.isArray(raw.documents) ? raw.documents : [],
+          tracking: Array.isArray(raw.tracking) ? raw.tracking : tracking,
+          createdAt,
+          updatedAt,
+        };
+
+        setShipment({
+          ...normalized,
+        });
+      } else {
+        setShipment(null);
+      }
+    } catch {
+      setShipment(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadShipmentDetail();
   }, [id]);
 
   const handleAcceptOffer = async (offerId: string) => {
@@ -263,26 +410,16 @@ const IndividualShipmentDetail: React.FC = () => {
       });
 
       if (response.ok) {
-        // Reload shipment data to get updated status
-        const detailResponse = await fetch(createApiUrl(`/api/shipments/${id}`), {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        });
-        if (detailResponse.ok) {
-          const detailData = await detailResponse.json();
-          setShipment(detailData.shipment || detailData.data);
-        }
-        alert('Teklif başarıyla kabul edildi!');
+        await loadShipmentDetail();
+        showProfessionalToast(showToast, 'OFFER_ACCEPTED', 'success');
         // Navigate to shipments page
         navigate('/individual/my-shipments');
       } else {
         const errorData = await response.json().catch(() => ({}));
-        alert(errorData.message || 'Teklif kabul edilemedi');
+        showProfessionalToast(showToast, 'OPERATION_FAILED', 'error');
       }
     } catch (error) {
-      alert('Teklif kabul edilirken bir hata oluştu');
+      showProfessionalToast(toast, 'NETWORK_ERROR', 'error');
     } finally {
       setIsConfirming(false);
     }
@@ -305,24 +442,14 @@ const IndividualShipmentDetail: React.FC = () => {
       });
 
       if (response.ok) {
-        // Reload shipment data to get updated offers
-        const detailResponse = await fetch(createApiUrl(`/api/shipments/${id}`), {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        });
-        if (detailResponse.ok) {
-          const detailData = await detailResponse.json();
-          setShipment(detailData.shipment || detailData.data);
-        }
-        alert('Teklif reddedildi');
+        await loadShipmentDetail();
+        showProfessionalToast(showToast, 'OFFER_REJECTED', 'success');
       } else {
         const errorData = await response.json().catch(() => ({}));
-        alert(errorData.message || 'Teklif reddedilemedi');
+        showProfessionalToast(showToast, 'OPERATION_FAILED', 'error');
       }
     } catch (error) {
-      alert('Teklif reddedilirken bir hata oluştu');
+      showProfessionalToast(toast, 'NETWORK_ERROR', 'error');
     } finally {
       setIsConfirming(false);
     }
@@ -364,25 +491,15 @@ const IndividualShipmentDetail: React.FC = () => {
         const data = await response.json();
         // Update local state
         setShipment((prev: ShipmentDetail | null) => prev ? { ...prev, status: 'delivered' } : null);
-        alert('Teslimat başarıyla onaylandı!');
-        // Reload shipment data
-        const detailResponse = await fetch(createApiUrl(`/api/shipments/${shipment.id}`), {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        });
-        if (detailResponse.ok) {
-          const detailData = await detailResponse.json();
-          setShipment(detailData.shipment || detailData.data);
-        }
+        showProfessionalToast(showToast, 'DELIVERY_CONFIRMED', 'success');
+        await loadShipmentDetail();
       } else {
         const errorData = await response.json();
-        alert(errorData.message || 'Teslimat onaylanamadı');
+        showProfessionalToast(showToast, 'OPERATION_FAILED', 'error');
       }
     } catch (error) {
       // Error confirming delivery
-      alert('Teslimat onaylanırken bir hata oluştu');
+      showProfessionalToast(toast, 'NETWORK_ERROR', 'error');
     } finally {
       setIsConfirming(false);
     }
@@ -654,9 +771,7 @@ const IndividualShipmentDetail: React.FC = () => {
                               {shipment.fromAddress.city}{' '}
                               {shipment.fromAddress.postalCode}
                             </p>
-                            <p className='text-gray-600'>
-                              {shipment.fromAddress.phone}
-                            </p>
+                            {/* Telefon numarası gizlilik nedeniyle gösterilmiyor */}
                           </div>
                         </div>
                         <div>
@@ -675,9 +790,7 @@ const IndividualShipmentDetail: React.FC = () => {
                               {shipment.toAddress.city}{' '}
                               {shipment.toAddress.postalCode}
                             </p>
-                            <p className='text-gray-600'>
-                              {shipment.toAddress.phone}
-                            </p>
+                            {/* Telefon numarası gizlilik nedeniyle gösterilmiyor */}
                           </div>
                         </div>
                       </div>

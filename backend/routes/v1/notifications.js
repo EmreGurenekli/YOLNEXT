@@ -15,6 +15,53 @@ function createNotificationRoutes(pool, authenticateToken) {
     }
   }
 
+  const resolveUserIdForRequest = async (user) => {
+    const candidates = [user?.id, user?.userId, user?.user_id, user?.userid].filter(v => v != null);
+    for (const c of candidates) {
+      const n = typeof c === 'number' ? c : parseInt(String(c), 10);
+      if (Number.isFinite(n)) {
+        try {
+          const exists = await pool.query('SELECT id FROM users WHERE id = $1 LIMIT 1', [n]);
+          if (exists.rows && exists.rows[0]?.id) return exists.rows[0].id;
+        } catch (_) {
+          // ignore
+        }
+      }
+    }
+    return null;
+  };
+
+  const resolveNotificationsMeta = async () => {
+    const tRes = await pool.query(
+      `SELECT table_schema
+       FROM information_schema.tables
+       WHERE table_name = 'notifications'
+       ORDER BY (table_schema = 'public') DESC, table_schema ASC
+       LIMIT 1`
+    );
+    const schema = tRes.rows && tRes.rows[0]?.table_schema ? tRes.rows[0].table_schema : 'public';
+    const colsRes = await pool.query(
+      `SELECT column_name FROM information_schema.columns WHERE table_name = 'notifications' AND table_schema = $1`,
+      [schema]
+    );
+    const cols = new Set((colsRes.rows || []).map(r => r.column_name));
+    const pick = (...names) => names.find(n => cols.has(n)) || null;
+    const qCol = (c) => (c && /[A-Z]/.test(c) ? `"${c}"` : c);
+
+    const userCol = pick('userId', 'user_id', 'userid');
+    const isReadCol = pick('isRead', 'is_read', 'isread');
+    const createdCol = pick('createdAt', 'created_at', 'createdat');
+    const readAtCol = pick('readAt', 'read_at', 'readat');
+
+    return {
+      schema,
+      userExpr: userCol ? qCol(userCol) : null,
+      isReadExpr: isReadCol ? qCol(isReadCol) : null,
+      createdExpr: createdCol ? qCol(createdCol) : null,
+      readAtExpr: readAtCol ? qCol(readAtCol) : null,
+    };
+  };
+
   // Get unread notifications count
   router.get('/unread-count', authenticateToken, async (req, res) => {
     try {
@@ -25,10 +72,18 @@ function createNotificationRoutes(pool, authenticateToken) {
         });
       }
 
-      const userId = req.user.id;
-      const countResult = await queryWithFallback(
-        'SELECT COUNT(*) as count FROM notifications WHERE userId = $1 AND isRead = false',
-        'SELECT COUNT(*) as count FROM notifications WHERE "userId" = $1 AND "isRead" = false',
+      const userId = await resolveUserIdForRequest(req.user);
+      if (!userId) {
+        return res.status(401).json({ success: false, error: 'User not authenticated' });
+      }
+
+      const meta = await resolveNotificationsMeta();
+      if (!meta.userExpr || !meta.isReadExpr) {
+        return res.json({ success: true, data: { count: 0, unreadCount: 0 } });
+      }
+
+      const countResult = await pool.query(
+        `SELECT COUNT(*) as count FROM "${meta.schema}".notifications WHERE ${meta.userExpr} = $1 AND ${meta.isReadExpr} = false`,
         [userId]
       );
 
@@ -58,24 +113,25 @@ function createNotificationRoutes(pool, authenticateToken) {
         });
       }
 
-      const userId = req.user.id;
+      const userId = await resolveUserIdForRequest(req.user);
+      if (!userId) {
+        return res.status(401).json({ success: false, error: 'User not authenticated' });
+      }
       const { limit = 50, offset = 0 } = req.query;
 
-      const result = await queryWithFallback(
-        `SELECT * FROM notifications 
-         WHERE userId = $1 
-         ORDER BY createdAt DESC 
-         LIMIT $2 OFFSET $3`,
-        `SELECT * FROM notifications 
-         WHERE "userId" = $1 
-         ORDER BY "createdAt" DESC 
-         LIMIT $2 OFFSET $3`,
+      const meta = await resolveNotificationsMeta();
+      if (!meta.userExpr) {
+        return res.json({ success: true, data: [], meta: { total: 0, limit: parseInt(limit), offset: parseInt(offset) } });
+      }
+      const orderExpr = meta.createdExpr ? meta.createdExpr : 'id';
+
+      const result = await pool.query(
+        `SELECT * FROM "${meta.schema}".notifications WHERE ${meta.userExpr} = $1 ORDER BY ${orderExpr} DESC LIMIT $2 OFFSET $3`,
         [userId, limit, offset]
       );
 
-      const countResult = await queryWithFallback(
-        'SELECT COUNT(*) as total FROM notifications WHERE userId = $1',
-        'SELECT COUNT(*) as total FROM notifications WHERE "userId" = $1',
+      const countResult = await pool.query(
+        `SELECT COUNT(*) as total FROM "${meta.schema}".notifications WHERE ${meta.userExpr} = $1`,
         [userId]
       );
 
@@ -108,17 +164,20 @@ function createNotificationRoutes(pool, authenticateToken) {
       }
 
       const { id } = req.params;
-      const userId = req.user.id;
+      const userId = await resolveUserIdForRequest(req.user);
+      if (!userId) {
+        return res.status(401).json({ success: false, error: 'User not authenticated' });
+      }
 
-      const result = await queryWithFallback(
-        `UPDATE notifications 
-         SET isRead = true, readAt = CURRENT_TIMESTAMP 
-         WHERE id = $1 AND userId = $2
-         RETURNING *`,
-        `UPDATE notifications 
-         SET "isRead" = true, "readAt" = CURRENT_TIMESTAMP 
-         WHERE id = $1 AND "userId" = $2
-         RETURNING *`,
+      const meta = await resolveNotificationsMeta();
+      if (!meta.userExpr || !meta.isReadExpr) {
+        return res.status(500).json({ success: false, error: 'Notifications schema not compatible' });
+      }
+
+      const setParts = [`${meta.isReadExpr} = true`];
+      if (meta.readAtExpr) setParts.push(`${meta.readAtExpr} = CURRENT_TIMESTAMP`);
+      const result = await pool.query(
+        `UPDATE "${meta.schema}".notifications SET ${setParts.join(', ')} WHERE id = $1 AND ${meta.userExpr} = $2 RETURNING *`,
         [id, userId]
       );
 
@@ -156,11 +215,21 @@ function createNotificationRoutes(pool, authenticateToken) {
         });
       }
 
-      const userId = req.user.id;
+      const userId = await resolveUserIdForRequest(req.user);
+      if (!userId) {
+        return res.status(401).json({ success: false, error: 'User not authenticated' });
+      }
 
-      await queryWithFallback(
-        `UPDATE notifications SET isRead = true, readAt = CURRENT_TIMESTAMP WHERE userId = $1`,
-        `UPDATE notifications SET "isRead" = true, "readAt" = CURRENT_TIMESTAMP WHERE "userId" = $1`,
+      const meta = await resolveNotificationsMeta();
+      if (!meta.userExpr || !meta.isReadExpr) {
+        return res.status(500).json({ success: false, error: 'Notifications schema not compatible' });
+      }
+
+      const setParts = [`${meta.isReadExpr} = true`];
+      if (meta.readAtExpr) setParts.push(`${meta.readAtExpr} = CURRENT_TIMESTAMP`);
+
+      await pool.query(
+        `UPDATE "${meta.schema}".notifications SET ${setParts.join(', ')} WHERE ${meta.userExpr} = $1`,
         [userId]
       );
 

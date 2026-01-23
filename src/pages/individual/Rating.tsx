@@ -79,7 +79,7 @@ const Rating: React.FC = () => {
       if (response.ok) {
         navigate('/individual/my-shipments?rated=true');
       } else {
-        throw new Error('Rating submission failed');
+        throw new Error('Değerlendirme gönderilemedi');
       }
     } catch (error: any) {
       setError(error.message);

@@ -1,400 +1,369 @@
-// Modular backend server - Uses route modules
-require('dotenv').config();
+/**
+ * Modular Backend Server
+ * Main entry point - uses modular configuration files
+ */
+
+const path = require('path');
+const dotenv = require('dotenv');
+
+// Load env from repo root with precedence:
+// .env (lowest) < env.development < env.local (highest)
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
+dotenv.config({ path: path.resolve(__dirname, '../env.development'), override: true });
+dotenv.config({ path: path.resolve(__dirname, '../env.local'), override: true });
 
 const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
-const morgan = require('morgan');
-const rateLimit = require('express-rate-limit');
-const slowDown = require('express-slow-down');
-const client = require('prom-client');
-const { Pool } = require('pg');
 const { createServer } = require('http');
-const { Server } = require('socket.io');
-const jwt = require('jsonwebtoken');
-const Sentry = require('@sentry/node');
 const errorLogger = require('./utils/errorLogger');
+const MigrationRunner = require('./migrations/migration-runner');
+const { createDatabasePool } = require('./config/database');
+const { setupMiddleware } = require('./config/middleware');
+const { setupRoutes } = require('./config/routes');
+const { setupEmailService, setupFileUpload } = require('./config/services');
+const { setupIdempotencyGuard, setupAdminGuard, setupAuditLog } = require('./config/guards');
+const { createNotificationHelper } = require('./utils/notifications');
 
+// Environment variables
 const PORT = process.env.PORT || 5000;
 const NODE_ENV = process.env.NODE_ENV || 'development';
+const IS_TEST = NODE_ENV === 'test' || !!process.env.JEST_WORKER_ID;
 const JWT_SECRET = process.env.JWT_SECRET || (NODE_ENV === 'production' ? null : 'dev-secret-key-change-in-production');
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || 'http://localhost:5173';
 const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://postgres:2563@localhost:5432/yolnext';
+const SENTRY_DSN = process.env.SENTRY_DSN;
+
+// Initialize Sentry (optional)
+let Sentry = null;
+if (SENTRY_DSN) {
+  try {
+    Sentry = require('@sentry/node');
+    Sentry.init({
+      dsn: SENTRY_DSN,
+      environment: NODE_ENV,
+      tracesSampleRate: NODE_ENV === 'production' ? 0.1 : 1.0,
+    });
+  } catch (e) {
+    errorLogger.warn('Sentry initialization failed, continuing without it', { error: e.message });
+  }
+}
+
+// Environment validation
+function validateEnvironment() {
+  const requiredVars = ['JWT_SECRET', 'DATABASE_URL', 'FRONTEND_ORIGIN'];
+  const missingVars = requiredVars.filter(varName => !process.env[varName]);
+
+  if (missingVars.length > 0) {
+    errorLogger.error('Missing required environment variables', { missingVars });
+    if (NODE_ENV === 'production') {
+      errorLogger.error('CRITICAL: Cannot start in production without required environment variables', { missingVars });
+      process.exit(1);
+    } else {
+      errorLogger.warn('Running in development mode with missing variables - this is not recommended for production', { missingVars });
+    }
+  }
+
+  // Validate JWT secret strength
+  if (JWT_SECRET && JWT_SECRET.length < 32) {
+    errorLogger.warn('JWT_SECRET is weak (less than 32 characters) - use a strong secret in production');
+  }
+
+  // Validate database URL
+  if (!DATABASE_URL.includes('postgresql://')) {
+    errorLogger.error('DATABASE_URL must be a valid PostgreSQL connection string', { databaseUrl: DATABASE_URL.substring(0, 20) + '...' });
+    process.exit(1);
+  }
+
+  errorLogger.info('Environment validation completed');
+}
+
+validateEnvironment();
 
 if (NODE_ENV === 'production' && !JWT_SECRET) {
-  console.error('❌ CRITICAL: JWT_SECRET must be set in production!');
+  errorLogger.error('CRITICAL: JWT_SECRET must be set in production!');
   process.exit(1);
 }
 
+// Create Express app
 const app = express();
+app.disable('etag'); // Prevent client/proxy caching of API responses
 const server = createServer(app);
-const io = new Server(server, {
-  cors: {
-    origin: FRONTEND_ORIGIN.split(',').map(o => o.trim()),
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-    credentials: true,
-  },
-});
 
-// PostgreSQL connection
+// Create database pool
 let pool;
 try {
-  pool = new Pool({
-    connectionString: DATABASE_URL,
-    max: parseInt(process.env.DB_POOL_MAX) || 20,
-    idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT) || 30000,
-    connectionTimeoutMillis: parseInt(process.env.DB_CONNECTION_TIMEOUT) || 2000,
-    ssl: NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-  });
-
-  pool.on('connect', () => console.log('✅ PostgreSQL connected'));
-  pool.on('error', err => console.error('❌ PostgreSQL pool error:', err));
-  console.log('✅ PostgreSQL pool created');
+  pool = createDatabasePool(DATABASE_URL, NODE_ENV);
 } catch (error) {
-  console.error('❌ Error creating PostgreSQL pool:', error);
+  errorLogger.error('Failed to create database pool', { error: error.message });
+  process.exit(1);
 }
 
-// Middleware
-const allowedOrigins = FRONTEND_ORIGIN.split(',').map(o => o.trim());
+// Setup middleware
+const middleware = setupMiddleware(app, pool, JWT_SECRET, FRONTEND_ORIGIN, NODE_ENV);
 
-try {
-  const { trackRequest } = require('./utils/monitoring');
-  app.use(trackRequest);
-} catch (error) {
-  console.warn('⚠️ Monitoring middleware not available:', error.message);
-}
+// Setup services
+const { sendEmail } = setupEmailService();
+const upload = setupFileUpload();
 
-app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) return callback(null, true);
-    if (NODE_ENV === 'development') return callback(null, true);
-    callback(new Error('Not allowed by CORS'));
-  },
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  credentials: true,
-  optionsSuccessStatus: 200,
-}));
+// Setup guards and utilities (async)
+let idempotencyGuard, requireAdmin, writeAuditLog, createNotification;
 
-app.use(helmet({
-  contentSecurityPolicy: NODE_ENV === 'production' ? undefined : false,
-}));
+// Initialize synchronously where possible
+requireAdmin = setupAdminGuard();
+createNotification = createNotificationHelper(pool);
 
-app.use(morgan(NODE_ENV === 'production' ? 'combined' : 'dev'));
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
-// Rate limiters
-const generalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  message: { success: false, message: 'Too many requests' },
-});
-
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 5,
-  message: { success: false, message: 'Too many auth requests' },
-});
-
-const offerSpeedLimiter = slowDown({
-  windowMs: 60 * 1000,
-  delayAfter: 5,
-  delayMs: () => 200,
-});
-
-const messageSpeedLimiter = slowDown({
-  windowMs: 60 * 1000,
-  delayAfter: 15,
-  delayMs: () => 100,
-});
-
-// Metrics
-client.collectDefaultMetrics();
-app.get('/metrics', async (req, res) => {
-  try {
-    res.set('Content-Type', client.register.contentType);
-    res.end(await client.register.metrics());
-  } catch (e) {
-    res.status(500).end(e.message);
-  }
-});
-
-// Sentry
-const SENTRY_DSN = process.env.SENTRY_DSN || '';
-if (SENTRY_DSN) {
-  Sentry.init({
-    dsn: SENTRY_DSN,
-    environment: NODE_ENV,
-    tracesSampleRate: NODE_ENV === 'production' ? 0.1 : 1.0,
-  });
-  app.use(Sentry.requestHandler());
-}
-
-// Email/SMS services
-const nodemailer = require('nodemailer');
-const twilio = require('twilio');
-
-const EMAIL_SMTP_URL = process.env.EMAIL_SMTP_URL || '';
-const EMAIL_FROM = process.env.EMAIL_FROM || 'no-reply@yolnext.local';
-const TWILIO_SID = process.env.TWILIO_SID || '';
-const TWILIO_TOKEN = process.env.TWILIO_TOKEN || '';
-const TWILIO_FROM = process.env.TWILIO_FROM || '';
-
-let mailer = null;
-if (EMAIL_SMTP_URL) {
-  mailer = nodemailer.createTransport(EMAIL_SMTP_URL);
-}
-
-let smsClient = null;
-if (TWILIO_SID && TWILIO_TOKEN) {
-  smsClient = twilio(TWILIO_SID, TWILIO_TOKEN);
-}
-
-async function sendEmail(to, subject, text) {
-  if (!mailer) return false;
-  try {
-    await mailer.sendMail({ from: EMAIL_FROM, to, subject, text });
-    return true;
-  } catch (e) {
-    console.error('Email error:', e.message);
-    return false;
-  }
-}
-
-async function sendSMS(to, body) {
-  if (!smsClient || !TWILIO_FROM) return false;
-  try {
-    await smsClient.messages.create({ from: TWILIO_FROM, to, body });
-    return true;
-  } catch (e) {
-    console.error('SMS error:', e.message);
-    return false;
-  }
-}
-
-// File uploads
-const multer = require('multer');
-const fs = require('fs');
-const uploadsDir = require('path').join(__dirname, 'uploads');
-try {
-  if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir);
-} catch (error) {
-  // Uploads directory creation failed
-}
-
-const upload = multer({
-  storage: multer.diskStorage({
-    destination: (req, file, cb) => cb(null, uploadsDir),
-    filename: (req, file, cb) =>
-      cb(null, `${Date.now()}-${file.originalname.replace(/\s+/g, '_')}`),
-  }),
-  limits: { fileSize: 10 * 1024 * 1024 },
-});
-app.use('/uploads', express.static(uploadsDir));
-
-// Idempotency guard
+// Setup async guards and routes
 (async () => {
   try {
-    if (pool) {
-      await pool.query(`CREATE TABLE IF NOT EXISTS idempotency_keys (
-        key TEXT PRIMARY KEY,
-        method TEXT NOT NULL,
-        path TEXT NOT NULL,
-        userId INTEGER,
-        createdAt TIMESTAMP DEFAULT NOW()
-      )`);
-    }
-  } catch (e) {
-    console.error('Idempotency table initialization error:', e.message);
+    idempotencyGuard = await setupIdempotencyGuard(pool);
+    writeAuditLog = await setupAuditLog(pool);
+    
+    // Setup routes after guards are ready
+    setupRoutes(app, pool, middleware, {
+      createNotification,
+      sendEmail,
+      writeAuditLog,
+    }, {
+      idempotencyGuard,
+      upload,
+      requireAdmin,
+    });
+  } catch (error) {
+    errorLogger.error('Failed to setup guards', { error: error.message });
+    process.exit(1);
   }
 })();
 
-async function idempotencyGuard(req, res, next) {
-  try {
-    if (req.method !== 'POST') return next();
-    const key = req.get('Idempotency-Key');
-    if (!key) return next();
-    const exists = await pool.query(
-      'SELECT key FROM idempotency_keys WHERE key=$1',
-      [key]
-    );
-    if (exists.rows.length > 0) {
-      return res.status(409).json({ success: true, message: 'Idempotent replay' });
-    }
-    await pool.query(
-      'INSERT INTO idempotency_keys(key, method, path, userId) VALUES($1,$2,$3,$4)',
-      [key, req.method, req.path, req.user?.id || null]
-    );
-    next();
-  } catch (e) {
-    next(e);
-  }
+// Serve static uploads
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Sentry request handler (must be first middleware)
+if (Sentry) {
+  app.use(Sentry.Handlers.requestHandler());
+  app.use(Sentry.Handlers.tracingHandler());
 }
 
-// Audit logs
-(async () => {
-  try {
-    if (pool) {
-      await pool.query(`CREATE TABLE IF NOT EXISTS audit_logs (
-        id SERIAL PRIMARY KEY,
-        userId INTEGER,
-        action TEXT NOT NULL,
-        entity TEXT,
-        entityId TEXT,
-        ip TEXT,
-        userAgent TEXT,
-        metadata JSONB,
-        createdAt TIMESTAMP DEFAULT NOW()
-      )`);
-    }
-  } catch (e) {
-    console.error('Audit log table error:', e.message);
-  }
-})();
-
-async function writeAuditLog({ userId, action, entity, entityId, req, metadata }) {
-  try {
-    if (!pool) return;
-    await pool.query(
-      `INSERT INTO audit_logs(userId, action, entity, entityId, ip, userAgent, metadata)
-       VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-      [
-        userId || null,
-        action,
-        entity || null,
-        entityId || null,
-        req.ip,
-        req.headers['user-agent'] || null,
-        metadata ? JSON.stringify(metadata) : null,
-      ]
-    );
-  } catch (e) {
-    console.error('Audit write error:', e.message);
-  }
+// Serve frontend in production (after API routes)
+if (NODE_ENV === 'production') {
+  app.use(express.static(path.join(__dirname, '../public')));
+  app.get('*', (req, res) => {
+    res.sendFile(path.resolve(__dirname, '../public', 'index.html'));
+  });
 }
 
-// Authentication middleware
-const { createAuthMiddleware } = require('./middleware/auth');
-const authenticateToken = createAuthMiddleware(pool, JWT_SECRET);
-
-// Notification helper
-const { createNotificationHelper } = require('./utils/notifications');
-const createNotification = createNotificationHelper(pool, io);
-
-// Import route modules
-const createAuthRoutes = require('./routes/v1/auth');
-const createShipmentRoutes = require('./routes/v1/shipments');
-const createMessageRoutes = require('./routes/v1/messages');
-const createOfferRoutes = require('./routes/v1/offers');
-const createDashboardRoutes = require('./routes/v1/dashboard');
-const createNotificationRoutes = require('./routes/v1/notifications');
-const createHealthRoutes = require('./routes/v1/health');
-
-// Create route instances
-const authRoutes = createAuthRoutes(pool, JWT_SECRET, createNotification, sendEmail);
-const shipmentRoutes = createShipmentRoutes(pool, authenticateToken, createNotification, idempotencyGuard);
-const messageRoutes = createMessageRoutes(pool, authenticateToken, createNotification, io, writeAuditLog, messageSpeedLimiter, idempotencyGuard, generalLimiter, upload);
-const offerRoutes = createOfferRoutes(pool, authenticateToken, createNotification, sendEmail, sendSMS, writeAuditLog, offerSpeedLimiter, idempotencyGuard);
-const dashboardRoutes = createDashboardRoutes(pool, authenticateToken);
-const notificationRoutes = createNotificationRoutes(pool, authenticateToken);
-const healthRoutes = createHealthRoutes(pool, NODE_ENV);
-
-// Swagger documentation
-try {
-  const { setupSwagger } = require('./swagger');
-  setupSwagger(app);
-} catch (error) {
-  console.warn('⚠️ Swagger setup failed:', error.message);
+// Sentry error handler (must be before other error middleware)
+if (Sentry) {
+  app.use(Sentry.Handlers.errorHandler());
 }
 
-// Register routes
-app.use('/api/auth', authLimiter, authRoutes);
-app.use('/api/shipments', generalLimiter, shipmentRoutes);
-app.use('/api/messages', generalLimiter, messageRoutes);
-app.use('/api/offers', generalLimiter, offerRoutes);
-app.use('/api/dashboard', generalLimiter, dashboardRoutes);
-app.use('/api/notifications', generalLimiter, notificationRoutes);
-app.use('/api/health', healthRoutes);
-
-// Socket.IO connection handling
-io.on('connection', (socket) => {
-  console.log(`✅ Client connected: ${socket.id}`);
-  
-  socket.on('join_user', (userId) => {
-    socket.join(`user_${userId}`);
-    console.log(`✅ User ${userId} joined their room`);
-  });
-
-  socket.on('join_shipment', (shipmentId) => {
-    socket.join(`shipment_${shipmentId}`);
-    console.log(`✅ User joined shipment ${shipmentId}`);
-  });
-
-  socket.on('disconnect', () => {
-    console.log(`❌ Client disconnected: ${socket.id}`);
-  });
-});
-
-// Error handler
+// Centralized error handling middleware
 app.use((err, req, res, next) => {
-  console.error('Error:', err);
-  errorLogger.error('Unhandled error', {
-    error: err.message,
-    stack: err.stack,
-    url: req.url,
-    method: req.method,
-  });
-  res.status(500).json({
+  if (res.headersSent) {
+    return next(err);
+  }
+
+  errorLogger.logApiError(err, req, { statusCode: res.statusCode || 500 });
+
+  // Handle specific error types
+  if (err && (err.code === 'ETIMEDOUT' || err.message?.includes('timeout'))) {
+    return res.status(408).json({
+      success: false,
+      message: 'Request timeout',
+      error: NODE_ENV === 'development' ? err.message : undefined,
+      code: 'REQUEST_TIMEOUT'
+    });
+  }
+
+  if (err.message?.includes('CORS')) {
+    return res.status(403).json({
+      success: false,
+      message: 'CORS policy violation',
+      error: NODE_ENV === 'development' ? err.message : undefined,
+      code: 'CORS_ERROR'
+    });
+  }
+
+  if (err.type === 'entity.too.large') {
+    return res.status(413).json({
+      success: false,
+      message: 'Request payload too large',
+      error: NODE_ENV === 'development' ? err.message : undefined,
+      code: 'PAYLOAD_TOO_LARGE'
+    });
+  }
+
+  if (err.message?.includes('Too many requests')) {
+    return res.status(429).json({
+      success: false,
+      message: 'Too many requests, please try again later',
+      error: NODE_ENV === 'development' ? err.message : undefined,
+      code: 'RATE_LIMIT_EXCEEDED',
+      retryAfter: res.get('Retry-After') || 60
+    });
+  }
+
+  if (err.name === 'ValidationError' || err.message?.includes('validation')) {
+    return res.status(400).json({
+      success: false,
+      message: 'Validation error',
+      error: NODE_ENV === 'development' ? err.message : undefined,
+      code: 'VALIDATION_ERROR',
+      details: err.details || err.errors
+    });
+  }
+
+  if (err.code && (err.code.startsWith('23') || err.code.startsWith('42'))) {
+    return res.status(400).json({
+      success: false,
+      message: 'Database constraint violation',
+      error: NODE_ENV === 'development' ? err.message : undefined,
+      code: 'DATABASE_CONSTRAINT_ERROR'
+    });
+  }
+
+  if (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError') {
+    return res.status(401).json({
+      success: false,
+      message: 'Authentication token error',
+      error: NODE_ENV === 'development' ? err.message : undefined,
+      code: 'AUTH_TOKEN_ERROR'
+    });
+  }
+
+  // Default error response
+  const statusCode = err.status || err.statusCode || 500;
+  res.status(statusCode).json({
     success: false,
-    message: 'Internal server error',
-    ...(NODE_ENV !== 'production' && { error: err.message }),
+    message: statusCode >= 500 ? 'Internal server error' : 'Request failed',
+    error: NODE_ENV === 'development' ? err.message : undefined,
+    code: err.code || 'INTERNAL_ERROR',
+    timestamp: new Date().toISOString(),
+    path: req.path,
+    method: req.method
   });
 });
-
-if (SENTRY_DSN) {
-  app.use(Sentry.errorHandler());
-}
 
 // Database initialization
 const { createTables, seedData } = require('./database/init');
 
+// Graceful shutdown
+function gracefulShutdown() {
+  errorLogger.info('Starting graceful shutdown');
+
+  server.close(async () => {
+    errorLogger.info('HTTP server closed');
+
+    try {
+      // Close Sentry connections
+      if (Sentry) {
+        try {
+          await Sentry.close(2000);
+          errorLogger.info('Sentry client closed');
+        } catch (e) {
+          errorLogger.error('Error closing Sentry client', { error: e.message });
+        }
+      }
+
+      // Close database connections
+      if (pool) {
+        await pool.end();
+        errorLogger.info('Database pool closed');
+      }
+
+      errorLogger.info('Graceful shutdown completed');
+      process.exit(0);
+    } catch (error) {
+      errorLogger.error('Error during graceful shutdown', { error: error.message });
+      process.exit(1);
+    }
+  });
+
+  // Force shutdown after 30 seconds
+  setTimeout(() => {
+    errorLogger.error('Forced shutdown after timeout');
+    process.exit(1);
+  }, 30000);
+}
+
+// Handle process termination signals
+process.on('SIGTERM', () => {
+  errorLogger.info('SIGTERM received, shutting down gracefully');
+  gracefulShutdown();
+});
+
+process.on('SIGINT', () => {
+  errorLogger.info('SIGINT received, shutting down gracefully');
+  gracefulShutdown();
+});
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+  errorLogger.error('Uncaught Exception', { error: error.message, stack: error.stack });
+  gracefulShutdown();
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  errorLogger.error('Unhandled Rejection', {
+        reason: reason?.toString(),
+    stack: reason?.stack
+      });
+  gracefulShutdown();
+});
+
 // Start server
 async function startServer() {
   try {
-    console.log('🚀 Starting Modular PostgreSQL Backend...');
+    errorLogger.info('Starting Modular PostgreSQL Backend');
 
-    const tablesCreated = await createTables(pool);
-    if (!tablesCreated) {
-      console.log('⚠️ Table creation skipped - using existing tables');
-    }
-
-    if (NODE_ENV !== 'production') {
-      const dataSeeded = await seedData(pool);
-      if (!dataSeeded) {
-        console.log('⚠️ Data seeding skipped');
+    // Run migrations
+    if (!IS_TEST && NODE_ENV !== 'production') {
+      try {
+        const migrationRunner = new MigrationRunner(pool, errorLogger);
+        await migrationRunner.runMigrations();
+      } catch (e) {
+        errorLogger.warn('Could not run migrations automatically', { error: e?.message || String(e) });
       }
     }
 
+    // Initialize database tables
+    const tablesCreated = await createTables(pool);
+    if (!tablesCreated) {
+      errorLogger.error('Canonical DB schema not satisfied. Refusing to start backend.');
+      process.exit(1);
+    }
+
+    // Seed data (development only)
+    if (NODE_ENV !== 'production') {
+      const dataSeeded = await seedData(pool);
+      if (!dataSeeded) {
+        errorLogger.info('Data seeding skipped');
+      }
+    }
+
+    server.once('error', (err) => {
+      if (err && err.code === 'EADDRINUSE') {
+        errorLogger.error(`Port ${PORT} is already in use. Stop the other process or change PORT.`);
+        process.exit(1);
+      }
+      errorLogger.error('Server failed to start', { error: err.message });
+      process.exit(1);
+    });
+
     server.listen(PORT, () => {
-      console.log(`🚀 Modular Backend running on http://localhost:${PORT}`);
-      console.log(`✅ Using modular route structure!`);
-      console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
-      console.log(`📦 Shipments API: http://localhost:${PORT}/api/shipments`);
-      console.log(`🔌 WebSocket: Socket.IO enabled`);
+      errorLogger.info(`Modular Backend running on http://localhost:${PORT}`, {
+        port: PORT,
+        environment: NODE_ENV,
+        healthCheck: `http://localhost:${PORT}/api/health`
+      });
     });
   } catch (error) {
-    console.error('❌ Failed to start server:', error);
+    errorLogger.error('Failed to start server', { error: error.message, stack: error.stack });
+    process.exit(1);
   }
 }
 
-startServer();
+// Only start the server when this file is executed directly
+if (require.main === module && !IS_TEST) {
+  startServer();
+}
 
-module.exports = { app, server, pool, io };
-
-
-
-
-
-
-
+module.exports = { app, server, pool };

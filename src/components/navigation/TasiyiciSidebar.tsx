@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   User,
@@ -11,7 +11,6 @@ import {
   Truck,
   FileText,
   Users,
-  Bell,
   Gift,
   PieChart,
   TrendingUp,
@@ -21,6 +20,7 @@ import {
   MapPin,
   CheckCircle,
   HelpCircle,
+  LifeBuoy,
 } from 'lucide-react';
 import YolNextLogo from '../common/yolnextLogo';
 import { useBadgeCounts } from '../../hooks/useBadgeCounts';
@@ -36,6 +36,11 @@ const TasiyiciSidebar: React.FC<TasiyiciSidebarProps> = ({ onLogout }) => {
   const { badgeCounts } = useBadgeCounts();
   const { user } = useAuth();
 
+  useEffect(() => {
+    // Ensure we never leave the mobile overlay open across route transitions
+    setIsMobileMenuOpen(false);
+  }, [location.pathname]);
+
     const menuSections = [
     {
       title: 'Ana Menü',
@@ -44,14 +49,13 @@ const TasiyiciSidebar: React.FC<TasiyiciSidebarProps> = ({ onLogout }) => {
         { name: 'İş Pazarı', href: '/tasiyici/market', icon: MapPin,
           badge: badgeCounts.pendingShipments > 0 ? badgeCounts.pendingShipments : undefined,
         },
-        { name: 'Tekliflerim', href: '/tasiyici/my-offers', icon: Package },
-        { name: 'Aktif İşler', href: '/tasiyici/active-jobs', icon: Clock },
+        { name: 'İşlerim', href: '/tasiyici/islerim', icon: Package },
         { name: 'Tamamlanan İşler', href: '/tasiyici/completed-jobs', icon: CheckCircle },
         { name: 'Mesajlar', href: '/tasiyici/messages', icon: MessageSquare,
           badge: badgeCounts.newMessages > 0 ? badgeCounts.newMessages : undefined,
         },
         { name: 'Ayarlar', href: '/tasiyici/settings', icon: Settings },
-        { name: 'Yardım', href: '/tasiyici/help', icon: HelpCircle },
+        { name: 'Yardım ve Destek Merkezi', href: '/tasiyici/help', icon: LifeBuoy },
       ],
     },
   ];
@@ -99,7 +103,7 @@ const TasiyiciSidebar: React.FC<TasiyiciSidebarProps> = ({ onLogout }) => {
       `}
       >
         {/* Logo */}
-        <div className='border-b border-slate-200 bg-white overflow-hidden flex items-center justify-center h-24 px-2'>
+        <div className='border-b border-slate-200 bg-white overflow-hidden flex items-center justify-between h-20 px-3'>
           <Link
             to='/tasiyici/dashboard'
             className='block focus:outline-none flex items-center justify-center'

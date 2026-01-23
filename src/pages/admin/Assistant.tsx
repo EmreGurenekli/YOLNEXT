@@ -16,7 +16,7 @@ const Assistant: React.FC = () => {
       try {
         setLoading(true);
         setError('');
-        const token = localStorage.getItem('authToken');
+        const token = localStorage.getItem('token') || localStorage.getItem('authToken');
         const res = await fetch(createApiUrl('/api/admin/planner/briefing'), {
           headers: {
             Authorization: `Bearer ${token || ''}`,
@@ -122,7 +122,7 @@ const Assistant: React.FC = () => {
                     <div className='text-2xl font-bold text-slate-900 mt-1'>
                       {briefing?.openComplaints ?? 0}
                     </div>
-                    <div className='text-xs text-slate-600 mt-1'>pending/reviewing</div>
+                    <div className='text-xs text-slate-600 mt-1'>beklemede/inceleniyor</div>
                   </div>
                 </div>
               )}

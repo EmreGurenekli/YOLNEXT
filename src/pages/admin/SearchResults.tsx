@@ -23,13 +23,13 @@ const SearchResults: React.FC = () => {
       try {
         setLoading(true);
         setError('');
-        const token = localStorage.getItem('authToken');
+        const token = localStorage.getItem('token') || localStorage.getItem('authToken');
         const res = await fetch(createApiUrl(`/api/admin/search?q=${encodeURIComponent(q)}`), {
           headers: { Authorization: `Bearer ${token || ''}`, 'Content-Type': 'application/json' },
         });
         const payload = await res.json().catch(() => null);
         if (!res.ok) {
-          throw new Error(payload?.message || `Search failed (HTTP ${res.status})`);
+          throw new Error(payload?.message || `Arama başarısız (HTTP ${res.status})`);
         }
         setUsers(Array.isArray(payload?.data?.users) ? payload.data.users : []);
       } catch (e: any) {
@@ -55,7 +55,7 @@ const SearchResults: React.FC = () => {
       <div className='container-custom py-6 lg:py-8'>
         <div className='mb-6'>
           <h1 className='text-2xl font-bold text-slate-900'>Arama</h1>
-          <p className='text-slate-600'>Email / telefon / userId / admin ref</p>
+          <p className='text-slate-600'>E-posta / telefon / kullanıcı ID / admin referansı</p>
         </div>
 
         <div className='card p-6'>

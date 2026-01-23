@@ -14,11 +14,31 @@ import {
   ArrowLeft,
   AlertCircle,
   Building2,
+  DollarSign,
 } from 'lucide-react';
-import { toast } from 'react-hot-toast';
+import { useToast } from '../../contexts/ToastContext';
+import { TOAST_MESSAGES, showProfessionalToast } from '../../utils/toastMessages';
 import Breadcrumb from '../../components/common/Breadcrumb';
 import LoadingState from '../../components/common/LoadingState';
 import { createApiUrl } from '../../config/api';
+import { formatDate, formatDateTime } from '../../utils/format';
+import { logger } from '../../utils/logger';
+
+const safeFormatDate = (dateString: string, format: 'date' | 'datetime' = 'date') => {
+  if (!dateString) return 'Belirtilmemiş';
+  
+  try {
+    if (format === 'date') {
+      const formatted = formatDate(dateString, 'long');
+      return formatted || 'Belirtilmemiş';
+    } else {
+      const formatted = formatDateTime(dateString);
+      return formatted || 'Belirtilmemiş';
+    }
+  } catch (error) {
+    return 'Belirtilmemiş';
+  }
+};
 
 interface Job {
   id: number;
@@ -41,9 +61,17 @@ interface Job {
   nakliyeciPhone?: string;
   nakliyeciCompany?: string;
   carrierId?: number;
+  shipperName?: string;
+  shipperCompany?: string;
+  ownerName?: string;
+  ownerCompany?: string;
+  senderName?: string;
+  senderCompany?: string;
+  metadata?: any;
 }
 
 const TasiyiciJobs: React.FC = () => {
+  const { showToast } = useToast();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [job, setJob] = useState<Job | null>(null);
@@ -69,24 +97,66 @@ const TasiyiciJobs: React.FC = () => {
 
       if (response.ok) {
         const data = await response.json();
-        const jobData = data.data || data;
-        // Map nakliyeci object to nakliyeciName, nakliyeciCompany, etc.
+        const jobData: any = data.data || data;
+
+        // Normalize backend field names (lowercase) to frontend expectations
+        jobData.pickupCity = jobData.pickupCity ?? jobData.pickup_city ?? jobData.pickupcity ?? jobData.fromCity ?? jobData.from_city ?? 'Şehir Belirtilmemiş';
+        jobData.deliveryCity = jobData.deliveryCity ?? jobData.delivery_city ?? jobData.deliverycity ?? jobData.toCity ?? jobData.to_city ?? 'Şehir Belirtilmemiş';
+        jobData.pickupAddress =
+          jobData.pickupAddress ?? jobData.pickup_address ?? jobData.pickupaddress ?? jobData.from_address ?? jobData.fromAddress ?? 
+          jobData.senderAddress ?? jobData.sender_address ?? `${jobData.pickupCity || 'Şehir Belirtilmemiş'} - Detaylı adres belirtilmemiş`;
+        jobData.deliveryAddress =
+          jobData.deliveryAddress ?? jobData.delivery_address ?? jobData.deliveryaddress ?? jobData.to_address ?? jobData.toAddress ??
+          jobData.receiverAddress ?? jobData.receiver_address ?? `${jobData.deliveryCity || 'Şehir Belirtilmemiş'} - Detaylı adres belirtilmemiş`;
+        jobData.pickupDate = jobData.pickupDate ?? jobData.pickup_date ?? jobData.pickupdate ?? jobData.createdAt ?? jobData.created_at ?? jobData.createdat ?? new Date().toISOString();
+        jobData.deliveryDate = jobData.deliveryDate ?? jobData.delivery_date ?? jobData.deliverydate ?? jobData.expectedDelivery ?? jobData.expected_delivery;
+        jobData.createdAt =
+          jobData.createdAt ??
+          jobData.created_at ??
+          jobData.createdat ??
+          jobData.updatedAt ??
+          jobData.updated_at ??
+          jobData.updatedat ??
+          new Date().toISOString();
+        jobData.title = jobData.title ?? jobData.description ?? `${jobData.pickupCity || 'Başlangıç'} → ${jobData.deliveryCity || 'Varış'}`.trim();
+        jobData.price =
+          jobData.displayPrice ?? jobData.price ?? jobData.offerPrice ?? jobData.offer_price ?? jobData.amount ?? jobData.totalAmount ?? 0;
+        
+        // Ensure weight and volume have default values for driver info
+        jobData.weight = jobData.weight ?? jobData.totalWeight ?? jobData.total_weight ?? 0;
+        jobData.volume = jobData.volume ?? jobData.totalVolume ?? jobData.total_volume ?? 0;
+
+        // Backend /api/shipments/:id returns carrier* fields for nakliyeci (joined from users)
+        // Map them to the UI's nakliyeci* fields.
+        jobData.nakliyeciName = jobData.nakliyeciName ?? jobData.carrierName ?? '';
+        jobData.nakliyeciCompany = jobData.nakliyeciCompany ?? jobData.carrierCompany ?? '';
+        jobData.nakliyeciPhone = jobData.nakliyeciPhone ?? jobData.carrierPhone ?? '';
+        jobData.nakliyeciEmail = jobData.nakliyeciEmail ?? jobData.carrierEmail ?? '';
+        jobData.carrierId =
+          jobData.carrierId ?? jobData.nakliyeci_id ?? jobData.carrier_id ?? undefined;
+
+        // If some deployments return nested nakliyeci object, keep supporting it
         if (jobData.nakliyeci && typeof jobData.nakliyeci === 'object') {
           jobData.nakliyeciName = jobData.nakliyeci.name || jobData.nakliyeciName;
           jobData.nakliyeciCompany = jobData.nakliyeci.company || jobData.nakliyeciCompany;
           jobData.nakliyeciPhone = jobData.nakliyeci.phone || jobData.nakliyeciPhone;
           jobData.nakliyeciEmail = jobData.nakliyeci.email || jobData.nakliyeciEmail;
         }
-        setJob(jobData);
+
+        // Gönderici bilgilerini normalize et
+        jobData.shipperName = jobData.shipperName || jobData.ownerName || jobData.owner_name || jobData.senderName || jobData.sender_name || jobData.shipper?.name || jobData.sender?.name || jobData.owner?.name || '';
+        jobData.shipperCompany = jobData.shipperCompany || jobData.ownerCompany || jobData.owner_company || jobData.senderCompany || jobData.sender_company || jobData.shipper?.company || jobData.sender?.company || jobData.owner?.company || '';
+
+        setJob(jobData as Job);
       } else if (response.status === 404) {
-        toast.error('İş bulunamadı');
+        showProfessionalToast(toast, 'JOB_NOT_FOUND', 'error');
         navigate('/tasiyici/active-jobs');
       } else {
         throw new Error('İş yüklenemedi');
       }
     } catch (error) {
-      if (import.meta.env.DEV) console.error('Error loading job:', error);
-      toast.error('İş yüklenemedi');
+      if (import.meta.env.DEV) console.error('İş yüklenirken hata:', error);
+      showProfessionalToast(toast, 'REQUEST_FAILED', 'error');
       navigate('/tasiyici/active-jobs');
     } finally {
       setLoading(false);
@@ -98,15 +168,18 @@ const TasiyiciJobs: React.FC = () => {
   }, [loadJob]);
 
   const updateStatus = async (newStatus: string) => {
+    setUpdatingStatus(true);
+    const timeoutId = setTimeout(() => {
+      setUpdatingStatus(false);
+      showProfessionalToast(toast, 'TIMEOUT_ERROR', 'error');
+    }, 10000); // 10 seconds timeout
+
     try {
-      setUpdatingStatus(true);
       const token = localStorage.getItem('authToken');
       const userRaw = localStorage.getItem('user');
       const userId = userRaw ? JSON.parse(userRaw || '{}').id : undefined;
 
-      if (import.meta.env.DEV) {
-        console.log('🔄 Status güncelleniyor:', { id, newStatus, userId });
-      }
+      logger.log('🔄 Status güncelleniyor:', { id, newStatus, userId });
 
       const response = await fetch(createApiUrl(`/api/shipments/${id}`), {
         method: 'PUT',
@@ -120,57 +193,50 @@ const TasiyiciJobs: React.FC = () => {
 
       const responseData = await response.json();
 
-      if (import.meta.env.DEV) {
-        console.log('📥 API Response:', { status: response.status, data: responseData });
-      }
+      logger.log('📥 API Response:', { status: response.status, data: responseData });
 
       if (response.ok && responseData.success) {
+        clearTimeout(timeoutId);
         if (newStatus === 'picked_up') {
-          toast.success('✅ Yük alındı. Takip ekranı güncellendi.', {
-            duration: 3000,
-          });
+          showProfessionalToast(showToast, 'PICKUP_CONFIRMED', 'success');
           await loadJob();
         } else if (newStatus === 'in_transit') {
-          toast.success('🚚 Yola çıkıldı. Göndericiye bildirim gitti.', {
-            duration: 3000,
-          });
+          showProfessionalToast(showToast, 'TRANSIT_STARTED', 'success');
           await loadJob();
         } else if (newStatus === 'delivered') {
-          toast.success('📦 Teslimat tamamlandı. Gönderici onayı bekleniyor.', {
-            duration: 4000,
-          });
+          showProfessionalToast(showToast, 'DELIVERY_CONFIRMED', 'success');
           await loadJob();
         } else {
-          toast.success('İş durumu güncellendi');
+          showProfessionalToast(showToast, 'STATUS_UPDATED', 'success');
           await loadJob();
         }
       } else {
+        clearTimeout(timeoutId);
         const errorMsg = responseData.message || 'Bu işlem şu an yapılamıyor.';
-        if (import.meta.env.DEV) {
-          console.error('❌ Status güncelleme hatası:', errorMsg);
-        }
-        toast.error(`${errorMsg} Lütfen sayfayı yenileyip tekrar deneyin.`);
+        logger.error('❌ Status güncelleme hatası:', errorMsg);
+        showProfessionalToast(toast, 'UPDATE_FAILED', 'error');
       }
     } catch (error: any) {
-      if (import.meta.env.DEV) {
-        console.error('❌ Status güncelleme exception:', error);
-      }
-      toast.error((error?.message && String(error.message).slice(0, 140)) || 'Bağlantı sorunu oluştu. Lütfen tekrar deneyin.');
+      clearTimeout(timeoutId);
+      logger.error('❌ Status güncelleme exception:', error);
+      showProfessionalToast(toast, 'NETWORK_ERROR', 'error');
     } finally {
+      clearTimeout(timeoutId);
       setUpdatingStatus(false);
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'pending':
-      case 'accepted':
-        return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'offer_accepted':
+      case 'assigned':
       case 'in_progress':
+        return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'picked_up':
       case 'in_transit':
         return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'completed':
       case 'delivered':
+      case 'completed':
         return 'bg-green-100 text-green-800 border-green-200';
       case 'cancelled':
         return 'bg-red-100 text-red-800 border-red-200';
@@ -181,19 +247,43 @@ const TasiyiciJobs: React.FC = () => {
 
   const getStatusText = (status: string) => {
     const statusMap: Record<string, string> = {
-      pending: 'Beklemede',
-      accepted: 'Kabul Edildi',
-      in_progress: 'Devam Ediyor',
+      offer_accepted: 'Teklif Kabul Edildi',
+      accepted: 'Teklif Kabul Edildi',
+      assigned: 'İşi Kabul Et',
+      in_progress: 'İşi Kabul Et',
+      picked_up: 'Yük Alındı',
       in_transit: 'Yolda',
-      completed: 'Tamamlandı',
       delivered: 'Teslim Edildi',
+      completed: 'Tamamlandı',
       cancelled: 'İptal Edildi',
     };
     return statusMap[status] || status;
   };
 
+  const getRoutePlan = () => {
+    if (!job) return null;
+    let meta = (job as any).metadata;
+    if (typeof meta === 'string') {
+      try {
+        meta = JSON.parse(meta);
+      } catch {
+        meta = null;
+      }
+    }
+    const plan = meta && typeof meta === 'object' ? meta.routePlan : null;
+    if (!plan || typeof plan !== 'object') return null;
+    const points = Array.isArray(plan.points) ? plan.points : [];
+    if (!points.length) return null;
+    return {
+      createdAt: plan.createdAt,
+      vehicle: plan.vehicle,
+      summary: plan.summary,
+      points,
+    };
+  };
+
   if (loading) {
-    return <LoadingState />;
+    return <LoadingState message='İş yükleniyor...' />;
   }
 
   if (!job) {
@@ -214,7 +304,7 @@ const TasiyiciJobs: React.FC = () => {
   }
 
   return (
-    <div className='min-h-screen bg-white'>
+    <div className='min-h-screen bg-gradient-to-br from-slate-50 to-slate-50'>
       <Helmet>
         <title>İş Detayı - {job.title} - Taşıyıcı Panel</title>
       </Helmet>
@@ -252,6 +342,7 @@ const TasiyiciJobs: React.FC = () => {
                   <div className='w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl flex items-center justify-center shadow-xl border border-white/20'>
                     <Package className='w-8 h-8 text-white' />
                   </div>
+
                   <div>
                     <h1 className='text-3xl font-bold mb-2 bg-gradient-to-r from-white to-blue-200 bg-clip-text text-transparent'>
                       {job.title || `Gönderi #${job.id}`}
@@ -278,40 +369,44 @@ const TasiyiciJobs: React.FC = () => {
           {/* Main Content */}
           <div className='lg:col-span-2 space-y-6'>
             {/* Route Information */}
-            <div className='bg-white rounded-xl p-6 shadow-lg border border-gray-100'>
+            <div className='bg-white rounded-2xl shadow-lg border border-slate-200 p-6 sm:p-8'>
               <h2 className='text-xl font-bold text-slate-900 mb-6 flex items-center gap-2'>
                 <MapPin className='w-5 h-5 text-blue-600' />
                 Rota Bilgileri
               </h2>
               <div className='space-y-4'>
                 <div className='flex items-start gap-4'>
-                  <div className='w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center'>
+                  <div className='w-12 h-12 bg-gradient-to-br from-green-600 to-emerald-700 rounded-lg flex items-center justify-center'>
                     <MapPin className='w-6 h-6 text-white' />
                   </div>
                   <div className='flex-1'>
-                    <div className='text-xs text-slate-500 mb-1'>Çıkış Noktası</div>
-                    <div className='font-semibold text-slate-900'>{job.pickupCity}</div>
-                    <div className='text-sm text-slate-600'>{job.pickupAddress}</div>
+                    <div className='text-xs text-slate-500 mb-1 font-medium'>📍 YÜKLEME ADRESİ</div>
+                    <div className='font-bold text-slate-900 text-lg'>{job.pickupCity}</div>
+                    <div className='text-sm text-slate-700 mt-1 bg-slate-50 p-2 rounded-lg border'>
+                      {job.pickupAddress || `${job.pickupCity} - Detaylı adres yüklemeden önce nakliyeci ile koordine edilecek`}
+                    </div>
                   </div>
                 </div>
                 <div className='flex justify-center my-2'>
                   <div className='w-0.5 h-12 bg-gradient-to-b from-blue-600 to-blue-400'></div>
                 </div>
                 <div className='flex items-start gap-4'>
-                  <div className='w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center'>
+                  <div className='w-12 h-12 bg-gradient-to-br from-red-600 to-pink-700 rounded-lg flex items-center justify-center'>
                     <MapPin className='w-6 h-6 text-white' />
                   </div>
                   <div className='flex-1'>
-                    <div className='text-xs text-slate-500 mb-1'>Varış Noktası</div>
-                    <div className='font-semibold text-slate-900'>{job.deliveryCity}</div>
-                    <div className='text-sm text-slate-600'>{job.deliveryAddress}</div>
+                    <div className='text-xs text-slate-500 mb-1 font-medium'>🎯 TESLİMAT ADRESİ</div>
+                    <div className='font-bold text-slate-900 text-lg'>{job.deliveryCity}</div>
+                    <div className='text-sm text-slate-700 mt-1 bg-slate-50 p-2 rounded-lg border'>
+                      {job.deliveryAddress || `${job.deliveryCity} - Detaylı adres teslimat öncesi nakliyeci ile koordine edilecek`}
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
 
             {/* Job Details */}
-            <div className='bg-white rounded-xl p-6 shadow-lg border border-gray-100'>
+            <div className='bg-white rounded-2xl shadow-lg border border-slate-200 p-6 sm:p-8'>
               <h2 className='text-xl font-bold text-slate-900 mb-6'>İş Detayları</h2>
               <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
                 <div className='flex items-center gap-3'>
@@ -321,11 +416,7 @@ const TasiyiciJobs: React.FC = () => {
                   <div>
                     <div className='text-xs text-slate-500'>Yükleme Tarihi</div>
                     <div className='font-semibold text-slate-900'>
-                      {new Date(job.pickupDate).toLocaleDateString('tr-TR', {
-                        day: 'numeric',
-                        month: 'long',
-                        year: 'numeric',
-                      })}
+                      {safeFormatDate(job.pickupDate)}
                     </div>
                   </div>
                 </div>
@@ -337,140 +428,128 @@ const TasiyiciJobs: React.FC = () => {
                     <div>
                       <div className='text-xs text-slate-500'>Teslimat Tarihi</div>
                       <div className='font-semibold text-slate-900'>
-                        {new Date(job.deliveryDate).toLocaleDateString('tr-TR', {
-                          day: 'numeric',
-                          month: 'long',
-                          year: 'numeric',
-                        })}
+                        {safeFormatDate(job.deliveryDate)}
                       </div>
                     </div>
                   </div>
                 )}
-                {job.weight && (
-                  <div className='flex items-center gap-3'>
-                    <div className='w-10 h-10 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center'>
-                      <Truck className='w-5 h-5 text-white' />
-                    </div>
-                    <div>
-                      <div className='text-xs text-slate-500'>Ağırlık</div>
-                      <div className='font-semibold text-slate-900'>{job.weight} kg</div>
+                <div className='flex items-center gap-3'>
+                  <div className='w-10 h-10 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center'>
+                    <Truck className='w-5 h-5 text-white' />
+                  </div>
+                  <div>
+                    <div className='text-xs text-slate-500'>Ağırlık</div>
+                    <div className='font-semibold text-slate-900'>
+                      {(job.weight && job.weight > 0) ? `${job.weight} kg` : 'Belirtilmemiş (Nakliyeci ile koordine edilecek)'}
                     </div>
                   </div>
-                )}
-                {job.volume && (
-                  <div className='flex items-center gap-3'>
-                    <div className='w-10 h-10 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center'>
-                      <Package className='w-5 h-5 text-white' />
-                    </div>
-                    <div>
-                      <div className='text-xs text-slate-500'>Hacim</div>
-                      <div className='font-semibold text-slate-900'>{job.volume} m³</div>
+                </div>
+                <div className='flex items-center gap-3'>
+                  <div className='w-10 h-10 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center'>
+                    <Package className='w-5 h-5 text-white' />
+                  </div>
+                  <div>
+                    <div className='text-xs text-slate-500'>Hacim</div>
+                    <div className='font-semibold text-slate-900'>
+                      {(job.volume && job.volume > 0) ? `${job.volume} m³` : 'Belirtilmemiş (Nakliyeci ile koordine edilecek)'}
                     </div>
                   </div>
-                )}
+                </div>
+                <div className='flex items-center gap-3'>
+                  <div className='w-10 h-10 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center'>
+                    <Package className='w-5 h-5 text-white' />
+                  </div>
+                  <div>
+                    <div className='text-xs text-slate-500'>Ücret</div>
+                    <div className='font-semibold text-green-700 text-lg'>
+                      {job.price > 0 ? `₺${job.price.toLocaleString('tr-TR', {minimumFractionDigits: 2})}` : 'Teklif Verilecek'}
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* Nakliyeci Contact */}
-            {(job.nakliyeciName || job.nakliyeciCompany || job.carrierId) && (
-              <div className='bg-white rounded-xl p-6 shadow-lg border border-gray-100'>
-                <div className='flex items-center justify-between mb-6'>
-                  <h2 className='text-xl font-bold text-slate-900 flex items-center gap-2'>
-                    <Building2 className='w-5 h-5 text-blue-600' />
-                    Nakliyeci Bilgileri
-                  </h2>
-                </div>
-                
-
-                <div className='space-y-3'>
-                  {job.nakliyeciName && (
-                    <div className='flex items-center gap-3'>
-                      <User className='w-5 h-5 text-gray-400' />
-                      <div>
-                        <div className='text-xs text-slate-500'>Ad Soyad</div>
-                        <div className='font-semibold text-slate-900'>{job.nakliyeciName}</div>
+            {/* Route Plan */}
+            {getRoutePlan() && (
+              <div className='bg-white rounded-2xl shadow-lg border border-slate-200 p-6 sm:p-8'>
+                <h2 className='text-xl font-bold text-slate-900 mb-6 flex items-center gap-2'>
+                  <MapPin className='w-5 h-5 text-blue-600' />
+                  Rota Planı
+                </h2>
+                <div className='space-y-4'>
+                  <div className='flex items-center gap-3'>
+                    <div className='w-10 h-10 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center'>
+                      <Calendar className='w-5 h-5 text-white' />
+                    </div>
+                    <div>
+                      <div className='text-xs text-slate-500'>Oluşturulma Tarihi</div>
+                      <div className='font-semibold text-slate-900'>
+                        {safeFormatDate(getRoutePlan()?.createdAt)}
                       </div>
                     </div>
-                  )}
-                  {job.nakliyeciCompany && (
-                    <div className='flex items-center gap-3'>
-                      <Building2 className='w-5 h-5 text-gray-400' />
-                      <div>
-                        <div className='text-xs text-slate-500'>Şirket</div>
-                        <div className='font-semibold text-slate-900'>{job.nakliyeciCompany}</div>
-                      </div>
+                  </div>
+                  {getRoutePlan()?.vehicle?.name && (
+                    <div className='text-sm text-slate-700 mb-3'>
+                      Araç: <span className='font-semibold'>{String(getRoutePlan()?.vehicle.name)}</span>
                     </div>
                   )}
-                  {job.nakliyeciPhone && (
-                    <div className='flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-200'>
-                      <div className='flex items-center gap-3 flex-1'>
-                        <Phone className='w-5 h-5 text-blue-600' />
-                        <div>
-                          <div className='text-xs text-slate-500 mb-1'>Telefon</div>
-                          <a
-                            href={`tel:${job.nakliyeciPhone}`}
-                            className='font-bold text-blue-600 hover:text-blue-700 text-base'
-                          >
-                            {job.nakliyeciPhone}
-                          </a>
+                  <div className='space-y-2'>
+                    {getRoutePlan()?.points
+                      .slice()
+                      .sort((a: any, b: any) => (Number(a.order || 0) - Number(b.order || 0)))
+                      .map((p: any, idx: number) => (
+                        <div key={String(p.id || idx)} className='flex items-start gap-3'>
+                          <div className='w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold flex-shrink-0'>
+                            {idx + 1}
+                          </div>
+                          <div className='flex-1'>
+                            <div className='text-sm font-semibold text-slate-900'>
+                              {p.type === 'pickup' ? '📦 Yük Al' : p.type === 'delivery' ? '🏠 Teslim Et' : 'Durak'}
+                              {p.name ? ` - ${String(p.name)}` : ''}
+                            </div>
+                            {p.address && <div className='text-xs text-slate-600 font-medium'>📍 {String(p.address)}</div>}
+                            {p.price && p.price > 0 && (
+                              <div className='text-xs text-green-600 font-bold mt-1'>💰 ₺{Number(p.price).toLocaleString('tr-TR')} (bilgi)</div>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                      <a
-                        href={`tel:${job.nakliyeciPhone}`}
-                        className='px-4 py-2 bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 text-white rounded-lg font-medium transition-all duration-300 flex items-center gap-2 shadow-md hover:shadow-lg whitespace-nowrap'
-                      >
-                        <Phone className='w-4 h-4' />
-                        Ara
-                      </a>
-                    </div>
-                  )}
-                  {job.nakliyeciEmail && (
-                    <div className='flex items-center gap-3'>
-                      <Mail className='w-5 h-5 text-gray-400' />
-                      <div>
-                        <div className='text-xs text-slate-500'>E-posta</div>
-                        <a
-                          href={`mailto:${job.nakliyeciEmail}`}
-                          className='font-semibold text-blue-600 hover:text-blue-700'
-                        >
-                          {job.nakliyeciEmail}
-                        </a>
-                      </div>
-                    </div>
-                  )}
-                  {!job.nakliyeciName && !job.nakliyeciCompany && !job.nakliyeciPhone && !job.nakliyeciEmail && (
-                    <div className='text-sm text-slate-500 text-center py-4'>
-                      Nakliyeci bilgileri bulunamadı
-                    </div>
-                  )}
+                      ))}
+                  </div>
                 </div>
               </div>
             )}
-
           </div>
 
           {/* Sidebar */}
           <div className='space-y-6'>
-            {/* Actions - Basit Durum Butonları */}
-            <div className='bg-white rounded-xl p-6 shadow-lg border border-gray-100'>
-              <h3 className='text-lg font-bold text-slate-900 mb-4'>İş Durumu</h3>
-              <div className='space-y-3'>
-                {/* Testimi Aldım - sadece accepted/pending durumunda */}
-                {(job.status === 'accepted' || 
-                  job.status === 'pending' || 
-                  job.status === 'test' ||
-                  (!job.status || (job.status !== 'picked_up' && job.status !== 'in_progress' && job.status !== 'in_transit' && job.status !== 'completed' && job.status !== 'delivered'))) && (
+            <div className='bg-white rounded-2xl shadow-lg border border-slate-200 p-6 sm:p-8'>
+              <h3 className='text-lg font-bold text-slate-900 mb-4'>Aksiyonlar</h3>
+              <div className='space-y-4'>
+                {/* İşi Kabul Et - offer_accepted durumunda */}
+                {(job.status === 'offer_accepted' || job.status === 'accepted') && (
+                  <button
+                    onClick={() => updateStatus('assigned')}
+                    disabled={updatingStatus}
+                    className='w-full px-4 py-4 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg font-bold text-base transition-all duration-300 flex items-center justify-center gap-3 shadow-lg hover:shadow-xl disabled:opacity-50'
+                  >
+                    <CheckCircle className='w-6 h-6' />
+                    ✅ İşi Kabul Et
+                  </button>
+                )}
+
+                {/* Yükü Aldım - assigned/in_progress durumunda */}
+                {(job.status === 'assigned' || job.status === 'in_progress') && (
                   <button
                     onClick={() => updateStatus('picked_up')}
                     disabled={updatingStatus}
                     className='w-full px-4 py-4 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg font-bold text-base transition-all duration-300 flex items-center justify-center gap-3 shadow-lg hover:shadow-xl disabled:opacity-50'
                   >
-                    <CheckCircle className='w-6 h-6' />
+                    <Truck className='w-6 h-6' />
                     ✅ Yükü Aldım
                   </button>
                 )}
-                
-                {/* Yoldayım - picked_up durumunda */}
+
+                {/* Yola Çıktım - picked_up durumunda */}
                 {job.status === 'picked_up' && (
                   <button
                     onClick={() => updateStatus('in_transit')}
@@ -478,7 +557,7 @@ const TasiyiciJobs: React.FC = () => {
                     className='w-full px-4 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg font-bold text-base transition-all duration-300 flex items-center justify-center gap-3 shadow-lg hover:shadow-xl disabled:opacity-50'
                   >
                     <Truck className='w-6 h-6' />
-                    🚚 Yola Çıktım
+                    Yola Çıktım
                   </button>
                 )}
                 
@@ -507,18 +586,37 @@ const TasiyiciJobs: React.FC = () => {
               </div>
             </div>
 
+            {/* Ödeme Bilgisi */}
+            {job.price > 0 && (
+              <div className='bg-green-50 rounded-2xl shadow-lg border border-green-200 p-6 sm:p-8'>
+                <h3 className='text-lg font-bold text-slate-900 mb-4 flex items-center gap-2'>
+                  <DollarSign className='w-5 h-5 text-green-600' />
+                  Ödeme Bilgisi
+                </h3>
+                <div className='space-y-3 text-sm'>
+                  <div>
+                    <span className='text-slate-500 block mb-1'>İş Ücreti</span>
+                    <span className='font-bold text-green-700 text-lg'>₺{job.price.toLocaleString('tr-TR', {minimumFractionDigits: 2})}</span>
+                  </div>
+                  <div className='mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700'>
+                    <strong>Önemli:</strong> Ödeme işlemi nakliyeci ile gönderici arasında gerçekleşir. İş tamamlandığında nakliyeci ödemeyi yapar. Ödeme detaylarını nakliyeci ile koordine edin. Platform sadece tarafları buluşturan bir pazaryeridir.
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Job Info */}
-            <div className='bg-white rounded-xl p-6 shadow-lg border border-gray-100'>
+            <div className='bg-white rounded-2xl shadow-lg border border-slate-200 p-6 sm:p-8'>
               <h3 className='text-lg font-bold text-slate-900 mb-4'>İş Bilgileri</h3>
               <div className='space-y-3 text-sm'>
                 <div className='flex justify-between'>
                   <span className='text-slate-500'>İş No</span>
                   <span className='font-semibold text-slate-900'>#{job.id}</span>
-                  </div>
+                </div>
                 <div className='flex justify-between'>
                   <span className='text-slate-500'>Oluşturulma</span>
                   <span className='font-semibold text-slate-900'>
-                    {new Date(job.createdAt).toLocaleDateString('tr-TR')}
+                    {safeFormatDate(job.createdAt)}
                   </span>
                 </div>
               </div>

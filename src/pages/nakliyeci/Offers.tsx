@@ -3,7 +3,6 @@ import { Helmet } from 'react-helmet-async';
 import {
   DollarSign,
   Search,
-  Filter,
   Plus,
   Eye,
   Edit,
@@ -35,17 +34,21 @@ import EmptyState from '../../components/common/EmptyState';
 import LoadingState from '../../components/common/LoadingState';
 import Modal from '../../components/common/Modal';
 import SuccessMessage from '../../components/common/SuccessMessage';
+import { resolveShipmentRoute } from '../../utils/shipmentRoute';
 import Pagination from '../../components/common/Pagination';
+import GuidanceOverlay from '../../components/common/GuidanceOverlay';
 import { createApiUrl } from '../../config/api';
+import { useNavigate } from 'react-router-dom';
+import { normalizeTrackingCode } from '../../utils/trackingCode';
 
 export default function NakliyeciOffers() {
+  const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('pending');
   const [sortBy, setSortBy] = useState('date');
   const [sortOrder, setSortOrder] = useState('desc');
   const [viewMode, setViewMode] = useState('grid');
-  const [showFilters, setShowFilters] = useState(false);
   interface OfferDetail {
     shipmentId: string | number;
     status: string;
@@ -53,14 +56,31 @@ export default function NakliyeciOffers() {
     from: string;
     to: string;
     price: number;
-    matchScore: number;
+    matchScore: number | null;
     description: string;
   }
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('user');
+      const parsed = raw ? JSON.parse(raw) : null;
+      const userId = parsed?.id;
+      const role = String(parsed?.role || 'nakliyeci').toLowerCase();
+      if (!userId) return;
+      localStorage.setItem(`yolnext:lastSeen:offers:${userId}:${role}`, new Date().toISOString());
+      window.dispatchEvent(new Event('yolnext:refresh-badges'));
+    } catch {
+      // ignore
+    }
+  }, []);
   
   const [selectedOffer, setSelectedOffer] = useState<OfferDetail | null>(null);
   const [showOfferModal, setShowOfferModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
+  const [showCommissionModal, setShowCommissionModal] = useState(false);
+  const [commissionAcked, setCommissionAcked] = useState(false);
+  const [navigateAfterAck, setNavigateAfterAck] = useState(false);
   const [editingOffer, setEditingOffer] = useState<any>(null);
   const [editPrice, setEditPrice] = useState('');
   const [editMessage, setEditMessage] = useState('');
@@ -76,16 +96,93 @@ export default function NakliyeciOffers() {
 
   const [offers, setOffers] = useState<any[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const showApiDebug =
+    !!(import.meta as any)?.env?.DEV &&
+    (() => {
+      try {
+        return localStorage.getItem('debug:api') === '1';
+      } catch {
+        return false;
+      }
+    })();
 
-  const mapOffer = (o: any) => ({
+  const toNumber = (value: any, fallback = 0) => {
+    if (typeof value === 'number') return Number.isFinite(value) ? value : fallback;
+    if (typeof value === 'string') {
+      const n = parseFloat(value.replace(/[^0-9.,-]/g, '').replace(',', '.'));
+      return Number.isFinite(n) ? n : fallback;
+    }
+    return fallback;
+  };
+
+  const toTrackingCode = (value: any, idFallback?: any) => {
+    const v = String(value ?? '').trim();
+    const fallback = String(idFallback ?? '').trim();
+
+    if (!v) {
+      if (!fallback) return '';
+      if (/^TRK/i.test(fallback)) return fallback;
+      const n = Number(fallback);
+      if (Number.isFinite(n) && n > 0) {
+        return `TRK${Math.trunc(n).toString().padStart(6, '0')}`;
+      }
+      return fallback;
+    }
+
+    if (/^TRK/i.test(v)) return v;
+    const n = Number(v);
+    if (Number.isFinite(n) && n > 0) {
+      return `TRK${Math.trunc(n).toString().padStart(6, '0')}`;
+    }
+    return v;
+  };
+
+  const mapOffer = (o: any) => {
+    if (showApiDebug) {
+      console.log('Offer Debug:', {
+        id: o.id,
+        pickupCity: o.pickupCity,
+        deliveryCity: o.deliveryCity,
+        fromCity: o.fromCity,
+        toCity: o.toCity,
+        pickupAddress: o.pickupAddress,
+        deliveryAddress: o.deliveryAddress,
+        raw: o
+      });
+    }
+    const { from, to } = resolveShipmentRoute(o);
+    const sender =
+      o.ownerName ||
+      o.owner_name ||
+      o.shipmentOwnerName ||
+      o.shipmentownername ||
+      o.shipmentownername ||
+      o.shipmentOwnerName ||
+      o.ownerName ||
+      o.owner_name ||
+      o.senderName ||
+      o.sender_name ||
+      o.sender ||
+      o.shipperName ||
+      o.shipper_name ||
+      o.userName ||
+      o.user_name ||
+      o.user?.fullName ||
+      o.user?.name ||
+      o.shipper?.fullName ||
+      o.shipper?.name ||
+      'Gönderici';
+
+    const price = toNumber(o.price ?? o.offerPrice ?? o.offer_price ?? o.displayPrice ?? o.display_price ?? o.value, 0);
+    return ({
     id: o.id,
     shipmentId: o.shipmentid || o.shipmentId,
-    sender: o.shipmentownername || o.sender || o.ownerName || 'Gönderici',
-    from: o.pickupcity || o.from || o.pickupCity,
-    to: o.deliverycity || o.to || o.deliveryCity,
+    sender,
+    from,
+    to,
     status: o.status,
     date: o.createdat || o.createdAt,
-    price: Number(o.price || 0),
+    price,
     weight: o.weight
       ? `${o.weight} kg`
       : o.shipmentWeight
@@ -95,14 +192,24 @@ export default function NakliyeciOffers() {
     estimatedDelivery: o.estimateddelivery || o.estimatedDelivery,
     description: o.message || o.description || '',
     priority: o.priority || 'normal',
-    matchScore: o.matchScore || 80,
+    matchScore: (() => {
+      const raw = o.matchScore ?? o.match_score;
+      const n = typeof raw === 'number' ? raw : typeof raw === 'string' ? parseFloat(raw) : NaN;
+      return Number.isFinite(n) ? n : null;
+    })(),
   });
+  };
 
   const loadOffers = async () => {
+    setIsLoading(true);
+    setLoadError(null);
+    
+    // Timeout protection - maksimum 10 saniye bekle
+    const timeoutId = setTimeout(() => {
+      setIsLoading(false);
+    }, 10000);
+    
     try {
-      setIsLoading(true);
-      setLoadError(null);
-      
       const userRaw = localStorage.getItem('user');
       const userId = userRaw ? JSON.parse(userRaw || '{}').id : undefined;
       const token = localStorage.getItem('authToken');
@@ -112,6 +219,10 @@ export default function NakliyeciOffers() {
           ? `?status=${encodeURIComponent(filterStatus)}`
           : '';
       
+      // AbortController for timeout
+      const controller = new AbortController();
+      const fetchTimeoutId = setTimeout(() => controller.abort(), 10000);
+      
       const url = createApiUrl(`/api/offers${statusParam}`);
       const response = await fetch(url, {
         headers: {
@@ -119,7 +230,10 @@ export default function NakliyeciOffers() {
           'X-User-Id': userId || '',
           'Content-Type': 'application/json',
         },
+        signal: controller.signal,
       });
+      
+      clearTimeout(fetchTimeoutId);
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -135,16 +249,60 @@ export default function NakliyeciOffers() {
       ) as any[];
       setOffers(list.map(mapOffer));
     } catch (err: any) {
-      console.error('Offers load error:', err);
+      console.error('Teklifler yüklenirken hata:', err);
       setLoadError(err?.message || 'Teklifler yüklenemedi');
       setOffers([]);
     } finally {
+      clearTimeout(timeoutId);
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
+    const ack = localStorage.getItem('commission_ack_v1');
+    if (ack === 'true') {
+      setCommissionAcked(true);
+    } else {
+      // İlk girişte gösterelim (bir kere)
+      setShowCommissionModal(true);
+    }
     loadOffers();
+  }, [filterStatus, currentPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterStatus, sortBy, sortOrder]);
+
+  const handleCommissionAcknowledge = () => {
+    localStorage.setItem('commission_ack_v1', 'true');
+    setCommissionAcked(true);
+    setShowCommissionModal(false);
+    if (navigateAfterAck) {
+      setNavigateAfterAck(false);
+      navigate('/nakliyeci/jobs');
+    }
+  };
+
+  useEffect(() => {
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        loadOffers();
+      }
+    };
+
+    const handleGlobalRefresh = () => {
+      loadOffers();
+    };
+
+    window.addEventListener('focus', handleVisibilityOrFocus);
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    window.addEventListener('yolnext:refresh-badges', handleGlobalRefresh);
+
+    return () => {
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      window.removeEventListener('yolnext:refresh-badges', handleGlobalRefresh);
+    };
   }, [filterStatus]);
 
   const getStatusStyle = (status: string) => {
@@ -205,18 +363,44 @@ export default function NakliyeciOffers() {
     }
   };
 
-  const getMatchScoreColor = (score: number) => {
+  const getMatchScoreColor = (score: number | null) => {
+    if (score === null || !Number.isFinite(score)) return 'text-slate-500';
     if (score >= 90) return 'text-green-600';
     if (score >= 70) return 'text-yellow-600';
     return 'text-red-600';
   };
 
+  const normalizeForSearch = (input: any) => {
+    const s = String(input ?? '')
+      .toLowerCase()
+      .trim();
+    return s
+      .replace(/ı/g, 'i')
+      .replace(/ğ/g, 'g')
+      .replace(/ü/g, 'u')
+      .replace(/ş/g, 's')
+      .replace(/ö/g, 'o')
+      .replace(/ç/g, 'c');
+  };
+
   const filteredOffers = offers.filter(offer => {
-    const shipmentIdText = String(offer.shipmentId || '').toLowerCase();
-    const senderText = String(offer.sender || '').toLowerCase();
-    const query = searchTerm.toLowerCase();
+    const query = normalizeForSearch(searchTerm);
+    const tokens = query.split(/\s+/).filter(Boolean);
+
+    const haystack = [
+      offer.shipmentId,
+      offer.sender,
+      offer.from,
+      offer.to,
+      offer.category,
+      offer.description,
+      offer.price,
+    ]
+      .map(normalizeForSearch)
+      .join(' ');
+
     const matchesSearch =
-      shipmentIdText.includes(query) || senderText.includes(query);
+      tokens.length === 0 || tokens.every(t => haystack.includes(t));
     const matchesStatus =
       filterStatus === 'all' || offer.status === filterStatus;
     return matchesSearch && matchesStatus;
@@ -232,6 +416,9 @@ export default function NakliyeciOffers() {
       return sortOrder === 'asc' ? a.price - b.price : b.price - a.price;
     }
     if (sortBy === 'matchScore') {
+      if (a.matchScore === null && b.matchScore === null) return 0;
+      if (a.matchScore === null) return 1;
+      if (b.matchScore === null) return -1;
       return sortOrder === 'asc'
         ? a.matchScore - b.matchScore
         : b.matchScore - a.matchScore;
@@ -248,59 +435,30 @@ export default function NakliyeciOffers() {
     setShowOfferModal(true);
   };
 
-  // Auto-assign or open broadcast
-  const handleAutoAssign = async (offer: any) => {
-    try {
-      const token = localStorage.getItem('authToken');
-      const userRaw = localStorage.getItem('user');
-      const userId = userRaw ? JSON.parse(userRaw || '{}').id : undefined;
-      
-      // Try assign with preferred (no body) - backend will read user settings
-      const response1 = await fetch(createApiUrl(`/api/shipments/${offer.shipmentId}/assign-carrier`), {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token || ''}`,
-          'X-User-Id': userId || '',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({}),
-      });
-      
-      if (response1.ok) {
-        setSuccessMessage('Tercihli taşıyıcı atandı');
-        setShowSuccessMessage(true);
-        setTimeout(() => setShowSuccessMessage(false), 3000);
-        await loadOffers();
-        return;
-      }
-      
-      // If no preferred, open broadcast
-      const response2 = await fetch(createApiUrl(`/api/shipments/${offer.shipmentId}/open-broadcast`), {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token || ''}`,
-          'X-User-Id': userId || '',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ target: 'my-network' }),
-      });
-      
-      if (response2.ok) {
-        setSuccessMessage('Taşıyıcılar için ilan açıldı');
-        setShowSuccessMessage(true);
-        setTimeout(() => setShowSuccessMessage(false), 3000);
-        await loadOffers();
-      } else {
-        throw new Error('İşlem başarısız');
-      }
-    } catch (err: any) {
-      setSuccessMessage(err?.message || 'İşlem başarısız');
-      setShowSuccessMessage(true);
-      setTimeout(() => setShowSuccessMessage(false), 3000);
-    }
+  const safeDateText = (value: any) => {
+    const d = value instanceof Date ? value : new Date(value || '');
+    return Number.isFinite(d.getTime()) ? d.toLocaleDateString('tr-TR') : '—';
+  };
+
+  // After an offer is accepted, the next operational step for a nakliyeci is driver assignment,
+  // which lives in the "Aktif Yükler" page. The assign-carrier/open-broadcast endpoints are
+  // owner actions and can fail by design for nakliyeci role.
+  const handleGoToActiveShipments = (offer: any) => {
+    setSuccessMessage('Aktif Yükler sayfasına yönlendiriliyorsunuz...');
+    setShowSuccessMessage(true);
+    setTimeout(() => {
+      setShowSuccessMessage(false);
+      navigate(`/nakliyeci/active-shipments?shipmentId=${encodeURIComponent(String(offer.shipmentId || ''))}`);
+    }, 2000);
   };
 
   const handleAccept = async (id: number) => {
+    const timeoutId = setTimeout(() => {
+      setSuccessMessage('Teklif kabul işlemi zaman aşımına uğradı. Lütfen tekrar deneyin.');
+      setShowSuccessMessage(true);
+      setTimeout(() => setShowSuccessMessage(false), 2000);
+    }, 10000); // 10 seconds timeout
+    
     try {
       const token = localStorage.getItem('authToken');
       const userRaw = localStorage.getItem('user');
@@ -316,17 +474,20 @@ export default function NakliyeciOffers() {
       });
 
       if (!response.ok) {
+        clearTimeout(timeoutId);
         throw new Error('Teklif kabul edilemedi');
       }
 
-      setSuccessMessage('Teklif başarıyla kabul edildi');
+      clearTimeout(timeoutId);
+      setSuccessMessage('Teklif başarıyla kabul edildi. İşlem başlatıldı.');
       setShowSuccessMessage(true);
-      setTimeout(() => setShowSuccessMessage(false), 3000);
+      setTimeout(() => setShowSuccessMessage(false), 2000);
       await loadOffers();
     } catch (e) {
-      setSuccessMessage('Teklif kabul edilemedi');
+      clearTimeout(timeoutId);
+      setSuccessMessage('Teklif kabul edilemedi. Lütfen tekrar deneyin.');
       setShowSuccessMessage(true);
-      setTimeout(() => setShowSuccessMessage(false), 3000);
+      setTimeout(() => setShowSuccessMessage(false), 2000);
     }
   };
 
@@ -348,14 +509,14 @@ export default function NakliyeciOffers() {
         throw new Error('Teklif reddedilemedi');
       }
 
-      setSuccessMessage('Teklif reddedildi');
+      setSuccessMessage('Teklif başarıyla reddedildi');
       setShowSuccessMessage(true);
-      setTimeout(() => setShowSuccessMessage(false), 3000);
+      setTimeout(() => setShowSuccessMessage(false), 2000);
       await loadOffers();
     } catch (e) {
-      setSuccessMessage('Teklif reddedilemedi');
+      setSuccessMessage('Teklif reddedilemedi. Lütfen tekrar deneyin.');
       setShowSuccessMessage(true);
-      setTimeout(() => setShowSuccessMessage(false), 3000);
+      setTimeout(() => setShowSuccessMessage(false), 2000);
     }
   };
 
@@ -393,14 +554,14 @@ export default function NakliyeciOffers() {
 
       setSuccessMessage('Teklif başarıyla güncellendi');
       setShowSuccessMessage(true);
-      setTimeout(() => setShowSuccessMessage(false), 3000);
+      setTimeout(() => setShowSuccessMessage(false), 2000);
       setShowEditModal(false);
       setEditingOffer(null);
       await loadOffers();
     } catch (e: any) {
-      setSuccessMessage(e?.message || 'Teklif güncellenemedi');
+      setSuccessMessage(e?.message || 'Teklif güncellenemedi. Lütfen tekrar deneyin.');
       setShowSuccessMessage(true);
-      setTimeout(() => setShowSuccessMessage(false), 3000);
+      setTimeout(() => setShowSuccessMessage(false), 2000);
     }
   };
 
@@ -418,22 +579,18 @@ export default function NakliyeciOffers() {
       const token = localStorage.getItem('authToken');
       const userRaw = localStorage.getItem('user');
       const userId = userRaw ? JSON.parse(userRaw || '{}').id : undefined;
-      
-      // Determine endpoint based on offer status
-      const endpoint = editingOffer.status === 'accepted' 
-        ? `/api/offers/${editingOffer.id}/cancel-accepted`
-        : `/api/offers/${editingOffer.id}/cancel`;
-      
-      const response = await fetch(createApiUrl(endpoint), {
-        method: 'POST',
+
+      if (editingOffer.status !== 'pending') {
+        throw new Error('Bu teklif artık iptal edilemez. Kabul edilen teklifler “Aktif Yükler” üzerinden yönetilir.');
+      }
+
+      const response = await fetch(createApiUrl(`/api/offers/${editingOffer.id}`), {
+        method: 'DELETE',
         headers: {
           Authorization: `Bearer ${token || ''}`,
           'X-User-Id': userId || '',
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          reason: cancelReason.trim() || undefined,
-        }),
       });
 
       if (!response.ok) {
@@ -441,13 +598,8 @@ export default function NakliyeciOffers() {
         throw new Error(errorData.message || 'Teklif iptal edilemedi');
       }
 
-      const data = await response.json();
-      let message = 'Teklif başarıyla iptal edildi';
-      if (editingOffer.status === 'accepted' && data.data?.commissionRefunded) {
-        message = `Teklif iptal edildi. Komisyon iadesi yapıldı (${data.data.commissionRefunded.toFixed(2)} TL).`;
-      }
-
-      setSuccessMessage(message);
+      await response.json().catch(() => null);
+      setSuccessMessage('Teklif başarıyla iptal edildi');
       setShowSuccessMessage(true);
       setTimeout(() => setShowSuccessMessage(false), 5000);
       setShowCancelModal(false);
@@ -455,7 +607,7 @@ export default function NakliyeciOffers() {
       setCancelReason('');
       await loadOffers();
     } catch (e: any) {
-      setSuccessMessage(e?.message || 'Teklif iptal edilemedi');
+      setSuccessMessage(e?.message || 'Teklif iptal edilemedi. Lütfen tekrar deneyin.');
       setShowSuccessMessage(true);
       setTimeout(() => setShowSuccessMessage(false), 5000);
     }
@@ -489,6 +641,24 @@ export default function NakliyeciOffers() {
           <Breadcrumb items={breadcrumbItems} />
         </div>
 
+        <div className='mb-6'>
+          <GuidanceOverlay
+            storageKey='nakliyeci.offers'
+            isEmpty={!isLoading && offers.length === 0}
+            icon={DollarSign}
+            title='Tekliflerim'
+            description='Beklemedeki tekliflerinizi buradan takip edebilir ve yönetebilirsiniz. Kabul edilen teklifler "Aktif Yükler" sayfasına aktarılır. Yeni iş almak için "Yük Pazarı" sayfasına geçebilirsiniz.'
+            primaryAction={{
+              label: 'Yük Pazarına Git',
+              to: '/nakliyeci/jobs',
+            }}
+            secondaryAction={{
+              label: 'Aktif Yükler',
+              to: '/nakliyeci/active-shipments',
+            }}
+          />
+        </div>
+
         {/* Header */}
         <div className='text-center mb-8 sm:mb-12'>
           <div className='flex justify-center mb-4 sm:mb-6'>
@@ -508,21 +678,23 @@ export default function NakliyeciOffers() {
               <p className='font-semibold mb-1'>💡 Bilgi:</p>
               <p>Beklemede olan tekliflerinizi düzenleyebilir veya iptal edebilirsiniz. Kabul edilen teklifler "Aktif Yükler" sayfasına otomatik olarak aktarılır.</p>
             </div>
-            <div className='bg-amber-50 border border-amber-300 rounded-lg p-4 text-sm'>
-              <div className='flex items-start gap-2'>
-                <AlertCircle className='w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5' />
-                <div>
-                  <p className='font-bold text-amber-900 mb-2'>⚠️ Komisyon İade Politikası</p>
-                  <ul className='space-y-1 text-amber-800 text-xs'>
-                    <li>• Teklifiniz kabul edildiğinde %1 komisyon cüzdanınızdan kesilir.</li>
-                    <li>• <strong>İade sadece şu koşullarda yapılır:</strong></li>
-                    <li className='ml-4'>- Taşıyıcı atanmadan önce iptal edilirse</li>
-                    <li className='ml-4'>- İlk 24 saat içinde iptal edilirse</li>
-                    <li>• İade yapılırsa işlem maliyeti (min. 2 TL) kesilir.</li>
-                    <li>• <strong>Taşıyıcı atandıktan sonra iade yapılmaz.</strong></li>
-                    <li>• <strong>24 saat sonra iade yapılmaz.</strong></li>
-                  </ul>
-                </div>
+            <div className='flex items-start gap-2 text-xs sm:text-sm text-slate-700'>
+              <AlertCircle className='w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5' />
+              <div className='space-y-1'>
+                <p className='font-medium text-slate-900'>
+                  1% komisyon bilgisi — detaylar
+                  <button
+                    className='ml-1 underline font-semibold hover:text-blue-700'
+                    type='button'
+                    onClick={() => setShowCommissionModal(true)}
+                  >
+                    burada
+                  </button>
+                  .
+                </p>
+                <p className='text-slate-600'>
+                  Şeffaflık için kısa özet: Teklif verirken 1% komisyon için cüzdanınızda yeterli bakiye gerekir. Teklif beklemedeyken iptal ederseniz komisyon blokesi kaldırılır. Teklif kabul edildiğinde komisyon kesintisi kesinleşir.
+                </p>
               </div>
             </div>
           </div>
@@ -543,7 +715,17 @@ export default function NakliyeciOffers() {
           </div>
 
           <div className='flex flex-wrap gap-2 sm:gap-3'>
-            <button className='flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-3 bg-gradient-to-r from-slate-800 to-blue-900 text-white rounded-lg sm:rounded-xl hover:shadow-lg transition-all duration-200 text-sm font-medium'>
+            <button
+              onClick={() => {
+                if (!commissionAcked) {
+                  setNavigateAfterAck(true);
+                  setShowCommissionModal(true);
+                  return;
+                }
+                navigate('/nakliyeci/jobs');
+              }}
+              className='flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-3 bg-gradient-to-r from-slate-800 to-blue-900 text-white rounded-lg sm:rounded-xl hover:shadow-lg transition-all duration-200 text-sm font-medium'
+            >
               <Plus className='w-4 h-4 sm:w-5 sm:h-5' />
               <span className='hidden sm:inline'>Yeni Teklif</span>
             </button>
@@ -666,11 +848,19 @@ export default function NakliyeciOffers() {
 
         {/* Offers List */}
         {currentOffers.length === 0 ? (
-          <EmptyState
-            icon={DollarSign}
-            title='Teklif bulunamadı'
-            description='Arama kriterlerinize uygun teklif bulunamadı.'
-          />
+          <div className='min-h-[50vh] flex items-center justify-center'>
+            <div className='bg-white rounded-2xl shadow-xl border border-slate-200 p-10 text-center w-full max-w-2xl'>
+              <EmptyState
+                icon={DollarSign}
+                title='Henüz Teklif Yok'
+                description='Yük Pazarı’ndan uygun ilanlara teklif verin, kabul edilince kazanın!'
+                action={{
+                  label: 'Yük Pazarına Git',
+                  onClick: () => navigate('/nakliyeci/jobs'),
+                }}
+              />
+            </div>
+          </div>
         ) : (
           <div className='space-y-4'>
             {currentOffers.map(offer => (
@@ -682,7 +872,7 @@ export default function NakliyeciOffers() {
                   <div className='flex-1'>
                     <div className='flex items-center gap-3 mb-2'>
                       <span className='text-sm font-medium text-slate-600'>
-                        #{offer.shipmentId}
+                        {toTrackingCode(undefined, offer.shipmentId)}
                       </span>
                       <span
                         className={`px-2 py-1 rounded-full text-xs font-medium border ${getStatusStyle(offer.status)}`}
@@ -703,7 +893,7 @@ export default function NakliyeciOffers() {
                         <span
                           className={`text-xs font-medium ${getMatchScoreColor(offer.matchScore)}`}
                         >
-                          %{offer.matchScore} Eşleşme
+                          {offer.matchScore === null ? '— Eşleşme' : `%${offer.matchScore} Eşleşme`}
                         </span>
                       </div>
                     </div>
@@ -740,9 +930,9 @@ export default function NakliyeciOffers() {
                         <Clock className='w-3 h-3' />
                         <span>
                           Teslimat:{' '}
-                          {new Date(offer.estimatedDelivery).toLocaleDateString(
-                            'tr-TR'
-                          )}
+                          {offer.estimatedDelivery && new Date(offer.estimatedDelivery).getFullYear() > 1971
+                            ? new Date(offer.estimatedDelivery).toLocaleDateString('tr-TR')
+                            : 'Belirtilmedi'}
                         </span>
                       </div>
                       <div className='flex items-center gap-1'>
@@ -776,18 +966,10 @@ export default function NakliyeciOffers() {
                     {offer.status === 'accepted' && (
                       <>
                         <button
-                          onClick={() => handleAutoAssign(offer)}
+                          onClick={() => handleGoToActiveShipments(offer)}
                           className='px-3 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-medium transition-colors'
                         >
-                          Otomatik Ata
-                        </button>
-                        <button
-                          onClick={() => handleCancelClick(offer)}
-                          className='px-3 py-2 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white rounded-lg text-sm font-medium transition-all duration-200 shadow-md hover:shadow-lg flex items-center gap-1'
-                          title='Kabul edilen teklifi iptal et'
-                        >
-                          <XCircle className='w-4 h-4' />
-                          <span className='hidden sm:inline'>Teklifi İptal Et</span>
+                          Aktif Yüklere Git
                         </button>
                       </>
                     )}
@@ -827,8 +1009,8 @@ export default function NakliyeciOffers() {
           <div className='space-y-4'>
             <div className='grid grid-cols-2 gap-4'>
               <div>
-                <p className='text-sm text-slate-500'>Gönderi ID</p>
-                <p className='font-medium'>{selectedOffer.shipmentId}</p>
+                <p className='text-sm text-slate-500'>Takip No</p>
+                <p className='font-medium'>{toTrackingCode(undefined, selectedOffer.shipmentId)}</p>
               </div>
               <div>
                 <p className='text-sm text-slate-500'>Durum</p>
@@ -861,7 +1043,50 @@ export default function NakliyeciOffers() {
                 <p
                   className={`font-medium ${getMatchScoreColor(selectedOffer.matchScore)}`}
                 >
-                  %{selectedOffer.matchScore}
+                  {selectedOffer.matchScore === null ? '—' : `%${selectedOffer.matchScore}`}
+                </p>
+              </div>
+            </div>
+
+            <div className='grid grid-cols-2 gap-4'>
+              <div>
+                <p className='text-sm text-slate-500'>Teklif Tarihi</p>
+                <p className='font-medium'>{safeDateText((selectedOffer as any).date)}</p>
+              </div>
+              <div>
+                <p className='text-sm text-slate-500'>Tahmini Teslimat</p>
+                <p className='font-medium'>{safeDateText((selectedOffer as any).estimatedDelivery)}</p>
+              </div>
+            </div>
+
+            <div className='grid grid-cols-2 gap-4'>
+              <div>
+                <p className='text-sm text-slate-500'>Kategori</p>
+                <p className='font-medium'>{(selectedOffer as any).category || '—'}</p>
+              </div>
+              <div>
+                <p className='text-sm text-slate-500'>Ağırlık</p>
+                <p className='font-medium'>{(selectedOffer as any).weight || '—'}</p>
+              </div>
+            </div>
+
+            <div className='grid grid-cols-2 gap-4'>
+              <div>
+                <p className='text-sm text-slate-500'>Öncelik</p>
+                <p className='font-medium'>
+                  {(selectedOffer as any).priority === 'high'
+                    ? 'Yüksek'
+                    : (selectedOffer as any).priority === 'normal'
+                      ? 'Normal'
+                      : (selectedOffer as any).priority === 'low'
+                        ? 'Düşük'
+                        : '—'}
+                </p>
+              </div>
+              <div>
+                <p className='text-sm text-slate-500'>Eşleşme</p>
+                <p className={`font-medium ${getMatchScoreColor(selectedOffer.matchScore)}`}>
+                  {selectedOffer.matchScore === null ? '—' : `%${selectedOffer.matchScore}`}
                 </p>
               </div>
             </div>
@@ -944,26 +1169,15 @@ export default function NakliyeciOffers() {
             setEditingOffer(null);
             setCancelReason('');
           }}
-          title={editingOffer.status === 'accepted' ? 'Kabul Edilen Teklifi İptal Et' : 'Teklifi İptal Et'}
+          title='Teklifi İptal Et'
         >
           <div className='p-6'>
-            {editingOffer.status === 'accepted' && (
-              <div className='mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800'>
-                <p className='font-semibold mb-1'>⚠️ Önemli Bilgi:</p>
-                <ul className='list-disc list-inside space-y-0.5'>
-                  <li>Kabul edilen teklifi iptal ederseniz, komisyonunuz tam olarak iade edilecektir.</li>
-                  <li>Gönderi durumu "Teklif Bekliyor" olarak değişecek ve gönderici tekrar teklif alabilecektir.</li>
-                  <li>Eğer taşıyıcı atandıysa, teklif iptal edilemez.</li>
-                  <li>Gönderi yolda veya teslim edildiyse, teklif iptal edilemez.</li>
-                </ul>
-              </div>
-            )}
             <p className='text-slate-600 mb-4'>
               Bu teklifi iptal etmek istediğinizden emin misiniz?
             </p>
             <div className='bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4'>
               <p className='text-sm text-yellow-800'>
-                <strong>Gönderi:</strong> #{editingOffer.shipmentId}
+                <strong>Gönderi:</strong> {toTrackingCode(undefined, editingOffer.shipmentId)}
               </p>
               <p className='text-sm text-yellow-800'>
                 <strong>Fiyat:</strong> ₺{editingOffer.price.toLocaleString()}
@@ -998,7 +1212,36 @@ export default function NakliyeciOffers() {
                 onClick={handleCancelSubmit}
                 className='px-6 py-2 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white rounded-lg transition-all duration-200 shadow-md hover:shadow-lg'
               >
-                {editingOffer.status === 'accepted' ? 'Teklifi İptal Et ve Komisyon İadesi Al' : 'Teklifi İptal Et'}
+                Teklifi İptal Et
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Commission Info Modal */}
+      {showCommissionModal && (
+        <Modal
+          isOpen={showCommissionModal}
+          onClose={() => setShowCommissionModal(false)}
+          title='Komisyon Bilgisi'
+        >
+          <div className='space-y-3 text-sm text-slate-700'>
+            <p className='font-semibold text-slate-900'>Şeffaf bilgi:</p>
+            <ul className='list-disc list-inside space-y-1'>
+              <li>Kabul edilen tekliften 1% komisyon cüzdandan düşülür.</li>
+              <li>Teklif beklemedeyken iptal ederseniz komisyon blokesi kaldırılır.</li>
+              <li>Teklif kabul edildiğinde komisyon kesintisi kesinleşir.</li>
+            </ul>
+            <p className='text-slate-600'>
+              Bu kural sürpriz maliyetleri önlemek ve platform maliyetlerini karşılamak içindir. Teklif vermeden önce lütfen kesinleşmiş işler için ilerleyin.
+            </p>
+            <div className='flex justify-end'>
+              <button
+                onClick={handleCommissionAcknowledge}
+                className='px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors'
+              >
+                Anladım
               </button>
             </div>
           </div>
@@ -1016,3 +1259,5 @@ export default function NakliyeciOffers() {
     </div>
   );
 }
+
+

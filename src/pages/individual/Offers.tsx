@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createApiUrl } from '../../config/api';
 import { useNavigate, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
@@ -43,12 +43,14 @@ import {
 } from 'lucide-react';
 import Breadcrumb from '../../components/common/Breadcrumb';
 import EmptyState from '../../components/common/EmptyState';
-
+import ErrorDisplay from '../../components/common/ErrorDisplay';
 import LoadingState from '../../components/common/LoadingState';
 import Modal from '../../components/common/Modal';
 import SuccessMessage from '../../components/common/SuccessMessage';
 import RatingModal from '../../components/RatingModal';
 import GuidanceOverlay from '../../components/common/GuidanceOverlay';
+import CarrierInfoCard from '../../components/CarrierInfoCard';
+import { normalizeTrackingCode } from '../../utils/trackingCode';
 
 // Tarih formatlama fonksiyonu - ISO tarihini Türkçe formatına çevirir
 const formatDeliveryDate = (dateStr: string): string => {
@@ -70,6 +72,7 @@ interface Offer {
   id: string;
   shipmentTitle: string;
   carrierName: string;
+  carrierCompany?: string;
   carrierId?: string;
   shipmentId?: string;
   carrierRating: number;
@@ -93,6 +96,7 @@ interface Offer {
   recentComments: string[];
   responseTime: string;
   successRate: number;
+  completedJobs?: number;
   isFromRoutePlanner?: boolean; // Rota planlayıcıdan gelen teklif mi?
   sourceCity?: string; // Nakliyeci'nin geldiği şehir
 }
@@ -145,10 +149,6 @@ export default function Offers() {
     paymentModalOpenRef.current = showPaymentModal;
   }, [showPaymentModal]);
 
-  useEffect(() => {
-    loadOffers();
-  }, []);
-
   // Cleanup timers on unmount
   useEffect(() => {
     return () => {
@@ -165,7 +165,7 @@ export default function Offers() {
     return 'pending';
   };
 
-  const loadOffers = async () => {
+  const loadOffers = useCallback(async () => {
     setIsLoading(true);
     try {
       const user = localStorage.getItem('user')
@@ -179,6 +179,11 @@ export default function Offers() {
         : null;
       const userId = user?.id;
       const token = localStorage.getItem('authToken');
+      
+      // Timeout protection - maksimum 10 saniye bekle
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      
       const response = await fetch(
         createApiUrl('/api/offers/individual'),
         {
@@ -186,8 +191,11 @@ export default function Offers() {
             Authorization: `Bearer ${token || ''}`,
             'Content-Type': 'application/json',
           },
+          signal: controller.signal,
         }
       );
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         throw new Error('Teklifler yüklenemedi');
@@ -239,11 +247,14 @@ export default function Offers() {
             shipmentId: offer.shipmentId ? String(offer.shipmentId) : (offer.shipment_id ? String(offer.shipment_id) : undefined),
             shipmentTitle: offer.shipmentTitle || offer.title || '',
             carrierName: offer.carrierName || offer.fullName || 'Nakliyeci',
+            carrierCompany: offer.carrierCompany || offer.companyName || undefined,
             carrierId: offer.carrierId != null ? String(offer.carrierId) : undefined,
             carrierRating: Number(offer.carrierRating || 0) || 0,
             carrierVerified: offer.carrierVerified || false,
             carrierReviews: Number(offer.carrierReviews || 0) || 0,
             carrierExperience: String(offer.carrierExperience || '').trim(),
+            completedJobs: Number(offer.completedJobs || 0) || 0,
+            successRate: Number(offer.successRate || 0) || 0,
             price: typeof offer.price === 'string' ? parseFloat(offer.price) || 0 : (offer.price || 0),
             estimatedDelivery: offer.estimatedDeliveryDate || offer.estimatedDelivery || '',
             message: message,
@@ -264,11 +275,10 @@ export default function Offers() {
             specialFeatures: offer.specialFeatures || [],
             tracking: offer.tracking || false,
             priority: (offer.priority || 'medium') as 'low' | 'medium' | 'high',
-            trackingCode: offer.trackingCode || offer.tracking_code || '',
+            trackingCode: normalizeTrackingCode(offer.trackingCode || offer.tracking_code, offer.shipmentId || offer.shipment_id),
             carrierLogo: offer.carrierLogo || '',
             recentComments: Array.isArray(offer.recentComments) ? offer.recentComments : [],
             responseTime: String(offer.responseTime || '').trim(),
-            successRate: Number(offer.successRate || 0) || 0,
           };
         });
       
@@ -284,8 +294,8 @@ export default function Offers() {
         topCarrier: '',
         responseTime: 0,
       });
-    } catch (error) {
-      // Error loading offers
+    } catch (error: any) {
+      // Error loading offers - show error with retry option
       setOffers([]);
       setStats({
         totalOffers: 0,
@@ -296,10 +306,50 @@ export default function Offers() {
         topCarrier: '',
         responseTime: 0,
       });
+      
+      // Determine error message based on error type
+      let errorMsg = 'Teklifler şu anda yüklenemiyor. Lütfen birkaç dakika sonra tekrar deneyin.';
+      
+      if (error?.name === 'AbortError' || error?.message?.includes('timeout') || error?.message?.includes('Timeout')) {
+        errorMsg = 'İstek zaman aşımına uğradı. Lütfen tekrar deneyin.';
+      } else if (error?.message?.includes('fetch') || error?.message?.includes('Failed to fetch')) {
+        errorMsg = 'İnternet bağlantınızı kontrol edin. Bağlantı sorunu giderildikten sonra tekrar deneyin.';
+      } else if (error?.response?.status === 500 || error?.status === 500) {
+        errorMsg = 'Teklifler şu anda yüklenemiyor. Lütfen birkaç dakika sonra tekrar deneyin.';
+      }
+      
+      setErrorMessage(errorMsg);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadOffers();
+    
+    // Auto-refresh offers every 30 seconds when page is visible
+    const intervalId = setInterval(() => {
+      if (document.visibilityState === 'visible' && !isLoading) {
+        loadOffers();
+      }
+    }, 30000);
+    
+    // Listen for real-time updates via custom events
+    const handleRefresh = () => {
+      if (!isLoading) {
+        loadOffers();
+      }
+    };
+    
+    window.addEventListener('yolnext:refresh-badges', handleRefresh);
+    window.addEventListener('focus', handleRefresh);
+    
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener('yolnext:refresh-badges', handleRefresh);
+      window.removeEventListener('focus', handleRefresh);
+    };
+  }, [loadOffers, isLoading]);
 
   // Only show pending offers - accepted/rejected should not appear
   const filteredOffers = offers.filter((offer: Offer) => {
@@ -368,6 +418,10 @@ export default function Offers() {
     
     setIsLoading(true);
     setShowAcceptConfirmModal(false);
+    const timeoutId = setTimeout(() => {
+      setIsLoading(false);
+      setErrorMessage('Teklif kabul işlemi zaman aşımına uğradı. Lütfen tekrar deneyin.');
+    }, 10000); // 10 seconds timeout
     
     try {
       const localOffer = offers.find((o: Offer) => String(o.id) === String(targetOfferId)) || null;
@@ -382,8 +436,11 @@ export default function Offers() {
       const payload = await response.json().catch(() => null);
 
       if (!response.ok) {
+        clearTimeout(timeoutId);
         throw new Error(payload?.message || 'Teklif kabul edilemedi');
       }
+      
+      clearTimeout(timeoutId);
 
       const carrierId = payload?.data?.carrierId
         ? String(payload.data.carrierId)
@@ -393,8 +450,8 @@ export default function Offers() {
         : (localOffer?.shipmentId ? String(localOffer.shipmentId) : null);
       const prefill = `Merhaba, ödeme detaylarını netleştirelim. İş No: #${shipmentId || ''}`.trim();
 
-      // Nakliyeci-style immediate success feedback
-      setSuccessMessage('Teklif kabul edildi! Gönderilere yönlendiriliyorsunuz...');
+      // Professional but warm success feedback with payment guarantee info
+      setSuccessMessage('Teklif başarıyla kabul edildi. Ödeme güvence altına alındı. Gönderileriniz sayfasına yönlendiriliyorsunuz...');
       setShowSuccessMessage(true);
       
       // Remove accepted offer from list immediately (goes to MyShipments)
@@ -407,7 +464,7 @@ export default function Offers() {
         acceptedOffers: prev.acceptedOffers + 1,
       }));
 
-      // Quick transition like Nakliyeci panel
+      // Standardized transition - 2 seconds for user to read success message
       setTimeout(() => {
         setShowSuccessMessage(false);
         navigate('/individual/my-shipments', {
@@ -421,12 +478,14 @@ export default function Offers() {
             },
           },
         });
-      }, 1200);
+      }, 2000);
     } catch (error) {
-      // Error accepting offer
-      setSuccessMessage('Teklif kabul edilirken bir hata oluştu.');
-      setShowSuccessMessage(true);
+      // Error accepting offer - show error with retry option
+      clearTimeout(timeoutId);
+      setErrorMessage('Teklif kabul edilirken bir hata oluştu. Lütfen tekrar deneyin.');
+      setIsLoading(false);
     } finally {
+      clearTimeout(timeoutId);
       setIsLoading(false);
       setOfferToAccept(null);
     }
@@ -447,7 +506,7 @@ export default function Offers() {
         throw new Error('Teklif reddedilemedi');
       }
 
-      setSuccessMessage('Teklif başarıyla reddedildi!');
+      setSuccessMessage('Teklif başarıyla reddedildi. İlgili taraf bilgilendirilmiştir.');
       setShowSuccessMessage(true);
       // Remove rejected offer from list immediately (it should disappear)
       setOffers((prev: Offer[]) =>
@@ -466,9 +525,9 @@ export default function Offers() {
       setRejectReason('');
       setRejectCustomReason('');
     } catch (error) {
-      // Error rejecting offer
-      setSuccessMessage('Teklif reddedilirken bir hata oluştu.');
-      setShowSuccessMessage(true);
+      // Error rejecting offer - show error with retry option
+      setErrorMessage('Teklif reddedilirken bir hata oluştu. Lütfen tekrar deneyin.');
+      setIsLoading(false);
     } finally {
       setIsLoading(false);
       setOfferToReject(null);
@@ -505,8 +564,12 @@ export default function Offers() {
     setShowReviewsModal(true);
   };
 
-  if (isLoading) {
-    return <LoadingState message='Teklifler yükleniyor...' />;
+  if (isLoading && offers.length === 0) {
+    return (
+      <div className='min-h-screen bg-white flex items-center justify-center'>
+        <LoadingState message='Teklifler yükleniyor...' size='lg' />
+      </div>
+    );
   }
 
   return (
@@ -514,9 +577,24 @@ export default function Offers() {
       <SuccessMessage
         isVisible={showSuccessMessage}
         message={successMessage}
-        duration={1500}
+        duration={2000}
         onClose={() => setShowSuccessMessage(false)}
       />
+      
+      {/* Global Error Message with Retry */}
+      {errorMessage && offers.length === 0 && !isLoading && (
+        <div className='max-w-5xl mx-auto px-4 py-6'>
+          <ErrorDisplay
+            title='Teklifler Yüklenemedi'
+            message={errorMessage}
+            onRetry={() => {
+              setErrorMessage('');
+              loadOffers();
+            }}
+            showSupport={true}
+          />
+        </div>
+      )}
       <Helmet>
         <title>Tekliflerim - YolNext Bireysel</title>
         <meta
@@ -550,8 +628,8 @@ export default function Offers() {
             storageKey='individual.offers'
             isEmpty={!isLoading && offers.length === 0}
             icon={FileText}
-            title='Şimdi ne yapmalısın?'
-            description='Teklifleri karşılaştırıp en uygun nakliyeciyi seç. Teklif kabul ettikten sonra süreç ve ödeme detaylarını “Mesajlar”dan netleştirebilirsin.'
+            title='Teklif Yönetimi'
+            description='Gelen teklifleri inceleyin, nakliyeci profillerini değerlendirin ve en uygun teklifi seçin. Teklif kabul edildikten sonra taşıma süreci başlar ve ödeme güvence altına alınır.'
             primaryAction={{
               label: 'Gönderi Oluştur',
               to: '/individual/create-shipment',
@@ -639,6 +717,7 @@ export default function Offers() {
                 value={searchTerm}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
                 className='w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                aria-label='Teklif ara'
               />
             </div>
 
@@ -646,6 +725,7 @@ export default function Offers() {
               value={filterStatus}
               onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFilterStatus(e.target.value)}
               className='px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+              aria-label='Durum filtresi'
             >
               <option value='all'>Tüm Durumlar</option>
               <option value='pending'>Bekleyen</option>
@@ -655,6 +735,7 @@ export default function Offers() {
               value={sortBy}
               onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSortBy(e.target.value)}
               className='px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+              aria-label='Sıralama seçeneği'
             >
               <option value='date'>Tarihe Göre</option>
               <option value='price'>Fiyata Göre</option>
@@ -700,7 +781,7 @@ export default function Offers() {
                   {offer.isFromRoutePlanner && offer.sourceCity && (
                     <div className='mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg'>
                       <p className='text-sm text-amber-800'>
-                        <span className='font-semibold'>ℹ️ Bilgi:</span> Bu araç <span className='font-bold'>{offer.sourceCity}</span>'dan geliyor.
+                        <span className='font-semibold'>Bilgi:</span> Bu araç <span className='font-bold'>{offer.sourceCity}</span>'dan geliyor.
                       </p>
                     </div>
                   )}
@@ -780,44 +861,20 @@ export default function Offers() {
                   </div>
 
                   {/* Carrier Preview */}
-                  <div className='flex items-center justify-between mb-4'>
-                    <div className='flex items-center gap-3'>
-                      <div className='w-8 h-8 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center text-white font-bold text-sm'>
-                        {offer.carrierLogo}
-                      </div>
-                      <div>
-                        <div className='flex items-center gap-2'>
-                          <span className='font-semibold text-slate-900'>
-                            {offer.carrierName}
-                          </span>
-                          {offer.carrierVerified && (
-                            <Shield className='w-4 h-4 text-green-600' />
-                          )}
-                        </div>
-                        <div className='flex items-center gap-2 text-sm text-slate-500'>
-                          {Number(offer.carrierRating || 0) > 0 ? (
-                            <div className='flex items-center gap-1'>
-                              <Star className='w-3 h-3 text-yellow-500 fill-current' />
-                              <span>{offer.carrierRating}</span>
-                            </div>
-                          ) : (
-                            <span>Henüz değerlendirilmemiş</span>
-                          )}
-                          <span>•</span>
-                          {Number(offer.carrierReviews || 0) > 0 ? (
-                            <span>{offer.carrierReviews} yorum</span>
-                          ) : (
-                            <span>Henüz değerlendirme bulunmuyor</span>
-                          )}
-                          {offer.carrierExperience && (
-                            <>
-                              <span>•</span>
-                              <span>{offer.carrierExperience} deneyim</span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
+                  <div className='mb-4'>
+                    <CarrierInfoCard
+                      carrierId={offer.carrierId}
+                      carrierName={offer.carrierName}
+                      companyName={offer.carrierCompany}
+                      carrierRating={offer.carrierRating}
+                      carrierReviews={offer.carrierReviews}
+                      carrierVerified={offer.carrierVerified}
+                      successRate={offer.successRate}
+                      completedJobs={offer.completedJobs}
+                      variant="compact"
+                      showMessaging={false}
+                      className="mb-3"
+                    />
                     <div className='flex items-center gap-2'>
                       {offer.carrierId && offer.carrierReviews > 0 && (
                         <button
@@ -871,20 +928,6 @@ export default function Offers() {
                         <Eye className='w-4 h-4' />
                         Detay
                       </button>
-                      {/* Gizlilik Kuralı: Sadece mesajlaşma butonu göster, telefon/email gizli */}
-                      <button
-                        onClick={() => handleContactCarrier(offer.status)}
-                        disabled={!isMessagingEnabledForOffer(offer.status)}
-                        title={!isMessagingEnabledForOffer(offer.status) ? 'Mesajlaşma teklif kabul edilince açılır' : 'Nakliyeci ile mesajlaş'}
-                        className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-1 ${
-                          isMessagingEnabledForOffer(offer.status)
-                            ? 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-                            : 'bg-gray-50 text-gray-400 cursor-not-allowed'
-                        }`}
-                      >
-                        <MessageCircle className='w-4 h-4' />
-                        Mesajlaş
-                      </button>
                     </div>
                   </div>
                 </div>
@@ -899,9 +942,20 @@ export default function Offers() {
                 <h3 className='text-xl font-bold text-slate-900 mb-2'>
                   Henüz Teklif Yok
                 </h3>
-                <p className='text-slate-600 mb-6'>
-                  Gönderi oluşturduktan sonra nakliyeciler sana teklif verecek.
+                <p className='text-slate-600 mb-4'>
+                  Gönderi oluşturduktan sonra nakliyecilerden teklifler gelmeye başlayacak. Ortalama bekleme süresi 5-15 dakikadır.
                 </p>
+                {stats.pendingOffers === 0 && offers.length === 0 && (
+                  <>
+                    <p className='text-sm text-slate-500 mb-2'>
+                      Teklifler geldiğinde burada görünecek ve bildirim alacaksınız.
+                    </p>
+                    <p className='text-sm text-slate-600 mb-6'>
+                      <span className='font-semibold'>Teklif gelmezse ne yapmalıyım?</span> 24 saat içinde teklif gelmezse otomatik bildirim alırsınız. 
+                      Gönderi bilgilerinizi kontrol edip güncelleyebilir veya fiyat teklifinizi gözden geçirebilirsiniz.
+                    </p>
+                  </>
+                )}
                 <Link
                   to='/individual/create-shipment'
                   className='inline-flex items-center gap-2 bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl'
@@ -985,82 +1039,19 @@ export default function Offers() {
 
             <div className='p-8'>
               {/* Carrier Profile */}
-              <div className='bg-gradient-to-r from-slate-50 to-blue-50 rounded-2xl p-8 mb-8 border border-slate-200'>
-                <div className='flex items-center gap-6 mb-6'>
-                  <div className='w-20 h-20 bg-gradient-to-br from-slate-800 to-blue-900 rounded-3xl flex items-center justify-center text-white font-bold text-2xl shadow-xl'>
-                    {selectedOffer.carrierLogo}
-                  </div>
-                  <div className='flex-1'>
-                    <div className='flex items-center gap-3 mb-3'>
-                      <h4 className='text-2xl font-bold text-slate-900'>
-                        {selectedOffer.carrierName}
-                      </h4>
-                      {selectedOffer.carrierVerified && (
-                        <div className='flex items-center gap-1 bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-semibold'>
-                          <Shield className='w-4 h-4' />
-                          Doğrulanmış
-                        </div>
-                      )}
-                    </div>
-                    <div className='grid grid-cols-2 lg:grid-cols-4 gap-6'>
-                      {Number(selectedOffer.carrierRating || 0) > 0 || Number(selectedOffer.carrierReviews || 0) > 0 ? (
-                        <div className='bg-white rounded-xl p-4 shadow-sm'>
-                          <div className='flex items-center gap-2 mb-1'>
-                            {Number(selectedOffer.carrierRating || 0) > 0 && (
-                              <>
-                                <Star className='w-5 h-5 text-yellow-500 fill-current' />
-                                <span className='text-lg font-bold text-slate-900'>
-                                  {selectedOffer.carrierRating}
-                                </span>
-                              </>
-                            )}
-                            {Number(selectedOffer.carrierRating || 0) <= 0 && (
-                              <span className='text-lg font-bold text-slate-900'>-</span>
-                            )}
-                          </div>
-                          <div className='text-sm text-slate-500'>
-                            {Number(selectedOffer.carrierReviews || 0) > 0
-                              ? `${selectedOffer.carrierReviews} yorum`
-                              : 'Henüz yorum yok'}
-                          </div>
-                        </div>
-                      ) : (
-                        <div className='bg-white rounded-xl p-4 shadow-sm'>
-                          <div className='text-sm text-slate-500'>Henüz değerlendirme yapılmamış</div>
-                        </div>
-                      )}
-                      {selectedOffer.carrierExperience && (
-                        <div className='bg-white rounded-xl p-4 shadow-sm'>
-                          <div className='text-lg font-bold text-slate-900 mb-1'>
-                            {selectedOffer.carrierExperience}
-                          </div>
-                          <div className='text-sm text-slate-500'>Deneyim</div>
-                        </div>
-                      )}
-                      {Number(selectedOffer.successRate || 0) > 0 && (
-                        <div className='bg-white rounded-xl p-4 shadow-sm'>
-                          <div className='text-lg font-bold text-slate-900 mb-1'>
-                            %{selectedOffer.successRate}
-                          </div>
-                          <div className='text-sm text-slate-500'>
-                            Başarı Oranı
-                          </div>
-                        </div>
-                      )}
-                      {selectedOffer.responseTime && (
-                        <div className='bg-white rounded-xl p-4 shadow-sm'>
-                          <div className='text-lg font-bold text-slate-900 mb-1'>
-                            {selectedOffer.responseTime}
-                          </div>
-                          <div className='text-sm text-slate-500'>
-                            Yanıt Süresi
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <CarrierInfoCard
+                carrierId={selectedOffer.carrierId}
+                carrierName={selectedOffer.carrierName}
+                companyName={selectedOffer.carrierCompany}
+                carrierRating={selectedOffer.carrierRating}
+                carrierReviews={selectedOffer.carrierReviews}
+                carrierVerified={selectedOffer.carrierVerified}
+                successRate={selectedOffer.successRate}
+                completedJobs={selectedOffer.completedJobs}
+                variant="detailed"
+                showMessaging={false}
+                className="mb-8"
+              />
 
               {/* Reviews Section */}
               <div className='mb-8'>
@@ -1073,7 +1064,7 @@ export default function Offers() {
                     <div className='text-sm text-slate-600'>
                       {selectedOffer.carrierReviews > 0
                         ? `${selectedOffer.carrierReviews} değerlendirme` 
-                        : 'Henüz değerlendirme yok'}
+                        : 'Değerlendirme bekleniyor'}
                     </div>
                     <button
                       onClick={() => {
@@ -1108,34 +1099,18 @@ export default function Offers() {
                 </div>
               </div>
 
-              {/* Gizlilik Kuralı: Sadece kabul edilen tekliflerde telefon görünsün, email hiç görünmesin */}
-              {selectedOffer.status === 'accepted' && (
-                <div className='mb-8'>
-                  <div className='bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-2xl p-8'>
-                    <div className='flex items-center gap-3 mb-6'>
-                      <div className='w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-2xl flex items-center justify-center'>
-                        <CheckCircle className='w-6 h-6 text-white' />
-                      </div>
-                      <div>
-                        <h5 className='text-xl font-bold text-slate-900'>
-                          Anlaşma Sağlandı!
-                        </h5>
-                        <p className='text-slate-600'>
-                          Nakliyeci ile mesajlaşabilirsiniz
-                        </p>
-                      </div>
-                    </div>
-                    <div className='flex justify-end'>
-                      <button
-                        onClick={() => {
-                          setShowDetailModal(false);
-                          navigate('/individual/messages');
-                        }}
-                        className='px-6 py-3 bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 text-white rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl flex items-center gap-2'
-                      >
-                        <MessageCircle className='w-5 h-5' />
-                        Mesajlar Sayfasına Git
-                      </button>
+              {/* Ödeme Güvencesi Bilgisi - Gönderici için */}
+              {selectedOffer.status === 'pending' && (
+                <div className='mb-8 p-5 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-xl'>
+                  <div className='flex items-start gap-3'>
+                    <Shield className='w-6 h-6 text-green-700 flex-shrink-0 mt-0.5' />
+                    <div className='flex-1'>
+                      <h5 className='text-base font-semibold text-green-900 mb-2'>Ödeme Güvencesi</h5>
+                      <p className='text-sm text-green-800 leading-relaxed'>
+                        Bu teklifi kabul ettiğinizde, ödeme tutarı güvence altına alınır. 
+                        Teslimat tamamlandığında ve siz onayladığınızda ödeme nakliyeciye aktarılır. 
+                        Bu sistem sayesinde hem siz hem de nakliyeci güvende olursunuz.
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -1241,14 +1216,31 @@ export default function Offers() {
           {/* Özel Bilgilendirme - Dışarıdan araç seçilirse */}
           {rejectReason === 'no_external_vehicle' && (
             <div className='bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800'>
-              <p className='font-semibold mb-1'>💡 Bilgi:</p>
+              <p className='font-semibold mb-1'>Bilgi:</p>
               <p>Bu seçenek, rota planlayıcı üzerinden eklenen gönderiler için özellikle önemlidir. Nakliyeci bilgilendirilecek ve bu tercihiniz kaydedilecektir.</p>
             </div>
           )}
 
           {errorMessage && (
-            <div className='bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-800'>
-              {errorMessage}
+            <div className='bg-red-50 border border-red-200 rounded-lg p-4' role='alert' aria-live='polite'>
+              <div className='flex items-start justify-between'>
+                <div className='flex-1'>
+                  <p className='text-sm font-medium text-red-800 mb-2'>{errorMessage}</p>
+                  <p className='text-xs text-red-600'>Sorun devam ederse gönderi bilgilerinizi kontrol edip tekrar deneyin.</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setErrorMessage('');
+                    if (offerToReject) {
+                      handleRejectOffer(offerToReject);
+                    }
+                  }}
+                  aria-label='Hata mesajını kapat'
+                  className='ml-4 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors'
+                >
+                  Tekrar Dene
+                </button>
+              </div>
             </div>
           )}
 

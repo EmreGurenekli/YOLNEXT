@@ -17,7 +17,7 @@ const CommandCenter: React.FC = () => {
   const [quickSearchLoading, setQuickSearchLoading] = useState(false);
   const [quickUsers, setQuickUsers] = useState<any[]>([]);
 
-  const token = useMemo(() => localStorage.getItem('authToken') || '', []);
+  const token = useMemo(() => localStorage.getItem('token') || localStorage.getItem('authToken') || '', []);
   const navigate = useNavigate();
   const base = getAdminBasePath();
 
@@ -42,7 +42,7 @@ const CommandCenter: React.FC = () => {
         throw new Error(briefingPayload?.message || `Briefing yüklenemedi (HTTP ${briefingRes.status})`);
       }
       if (!inboxRes.ok) {
-        throw new Error(inboxPayload?.message || `Inbox yüklenemedi (HTTP ${inboxRes.status})`);
+        throw new Error(inboxPayload?.message || `Gelen kutusu yüklenemedi (HTTP ${inboxRes.status})`);
       }
 
       const b = briefingPayload?.data?.briefing || briefingPayload?.briefing || briefingPayload?.data || null;
@@ -74,7 +74,7 @@ const CommandCenter: React.FC = () => {
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       });
       const payload = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(payload?.message || `Search failed (HTTP ${res.status})`);
+      if (!res.ok) throw new Error(payload?.message || `Arama başarısız (HTTP ${res.status})`);
       setQuickUsers(Array.isArray(payload?.data?.users) ? payload.data.users : []);
     } catch {
       setQuickUsers([]);
@@ -135,7 +135,7 @@ const CommandCenter: React.FC = () => {
               <div className='card p-6'>
                 <div className='text-xs font-semibold text-slate-500 uppercase tracking-wider'>Açık Şikayet</div>
                 <div className='text-3xl font-bold text-slate-900 mt-2'>{briefing?.openComplaints ?? 0}</div>
-                <div className='text-xs text-slate-600 mt-2'>pending/reviewing</div>
+                <div className='text-xs text-slate-600 mt-2'>beklemede/inceleniyor</div>
               </div>
             </div>
 
@@ -145,7 +145,7 @@ const CommandCenter: React.FC = () => {
                   <div className='flex items-center justify-between'>
                     <div className='flex items-center gap-2'>
                       <Inbox className='w-5 h-5 text-slate-900' />
-                      <div className='text-sm font-bold text-slate-900'>Triage / Inbox</div>
+                      <div className='text-sm font-bold text-slate-900'>Triage / Gelen Kutusu</div>
                     </div>
                     <div className='text-xs font-semibold text-slate-600'>
                       {inboxItems.length} kayıt
@@ -154,7 +154,7 @@ const CommandCenter: React.FC = () => {
 
                   <div className='mt-4 space-y-2'>
                     {inboxItems.length === 0 ? (
-                      <div className='text-sm text-slate-600'>Inbox boş.</div>
+                      <div className='text-sm text-slate-600'>Gelen kutusu boş.</div>
                     ) : (
                       inboxItems.map((it, idx) => {
                         const active = selected?.id === it?.id;
@@ -181,7 +181,7 @@ const CommandCenter: React.FC = () => {
                               {it?.type === 'complaint' && (
                                 <div className='inline-flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded-md'>
                                   <AlertTriangle className='w-4 h-4' />
-                                  Review
+                                  İncele
                                 </div>
                               )}
                             </div>
@@ -200,7 +200,7 @@ const CommandCenter: React.FC = () => {
                       <input
                         className='input pl-10'
                         value={quickSearch}
-                        placeholder='Email / telefon / userId'
+                        placeholder='E-posta / telefon / kullanıcı ID'
                         onChange={e => {
                           const v = e.target.value;
                           setQuickSearch(v);

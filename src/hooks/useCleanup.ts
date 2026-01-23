@@ -21,7 +21,7 @@ export const useCleanup = (): UseCleanupReturn => {
       try {
         cleanupFn();
       } catch (error) {
-        console.error('Cleanup function error:', error);
+        console.error('Temizleme fonksiyonunda hata:', error);
       }
     });
     cleanupFunctions.current = [];

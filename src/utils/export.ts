@@ -16,7 +16,7 @@ export const exportToCSV = (
   headers?: string[]
 ): void => {
   if (!data || data.length === 0) {
-    console.error('No data to export');
+    console.error('Dışa aktarılacak veri yok');
     return;
   }
 
@@ -111,7 +111,7 @@ export const exportToExcel = async (
 ): Promise<void> => {
   // For now, fallback to CSV until xlsx is properly configured in Vite
   // Excel export requires additional configuration
-  console.warn('Excel export not yet fully configured, using CSV fallback');
+  console.warn('Excel dışa aktarma tam yapılandırılmadı, CSV kullanılacak');
   exportToCSV(data, filename.replace('.xlsx', '.csv'), headers);
   
   /* TODO: Enable when xlsx is properly configured in Vite
@@ -122,13 +122,13 @@ export const exportToExcel = async (
       // Try to import xlsx
       XLSX = await import('xlsx');
     } catch (importError) {
-      console.warn('xlsx library not available, falling back to CSV');
+      console.warn('xlsx kütüphanesi bulunamadı, CSV kullanılacak');
       exportToCSV(data, filename.replace('.xlsx', '.csv'), headers);
       return;
     }
     
     if (!data || data.length === 0) {
-      console.error('No data to export');
+      console.error('Dışa aktarılacak veri yok');
       return;
     }
 
@@ -157,9 +157,9 @@ export const exportToExcel = async (
     // Generate Excel file and download
     XLSX.writeFile(workbook, filename);
   } catch (error) {
-    console.error('Excel export error:', error);
+    console.error('Excel dışa aktarma hatası:', error);
     // Fallback to CSV if xlsx is not available
-    console.warn('Falling back to CSV export');
+    console.warn('CSV dışa aktarmaya geri dönülüyor');
     exportToCSV(data, filename.replace('.xlsx', '.csv'), headers);
   }
   */

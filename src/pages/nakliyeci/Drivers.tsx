@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import Breadcrumb from '../../components/common/Breadcrumb';
 import Modal from '../../components/common/Modal';
+import GuidanceOverlay from '../../components/common/GuidanceOverlay';
 // Driver link data interface
 interface DriverLinkData {
   code?: string | null;
@@ -396,6 +397,27 @@ const Drivers = () => {
           <Breadcrumb items={[
             { label: 'Taşıyıcılarım', icon: <Users className="w-4 h-4" /> }
           ]} />
+        </div>
+
+        <div className='mb-6'>
+          <GuidanceOverlay
+            storageKey='nakliyeci.drivers'
+            isEmpty={!isLoading && drivers.length === 0}
+            icon={Users}
+            title='Taşıyıcı Yönetimi'
+            description='Taşıyıcı kodunu girerek ekle, müsait/aktif durumlarını takip et. Taşıyıcı ataması yapacağın yükleri “Aktif Yükler”de yönetirsin.'
+            primaryAction={{
+              label: 'Taşıyıcı Ekle',
+              onClick: () => {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                setTimeout(() => codeInputRef.current?.focus(), 350);
+              },
+            }}
+            secondaryAction={{
+              label: 'Aktif Yükler',
+              to: '/nakliyeci/active-shipments',
+            }}
+          />
         </div>
 
         {/* Header */}

@@ -125,14 +125,97 @@ class JobService {
           if (!this.pool) return;
 
           // 1. Clean up expired offers (runs every hour)
-          const expiredOffersResult = await this.pool.query(
-            `UPDATE offers 
-             SET status = 'rejected', updatedat = CURRENT_TIMESTAMP
-             WHERE status = 'pending' 
-             AND expiresAt IS NOT NULL 
-             AND expiresAt < CURRENT_TIMESTAMP`,
-            []
-          );
+          const expiredClient = await this.pool.connect();
+          let expiredOffersResult = { rowCount: 0 };
+          try {
+            await expiredClient.query('BEGIN');
+
+            const expiredOffers = await expiredClient.query(
+              `SELECT id, "nakliyeci_id" as carrier_id, price
+               FROM offers
+               WHERE status = 'pending'
+               AND expiresAt IS NOT NULL
+               AND expiresAt < CURRENT_TIMESTAMP
+               FOR UPDATE`,
+              []
+            );
+
+            expiredOffersResult = await expiredClient.query(
+              `UPDATE offers
+               SET status = 'rejected', updatedat = CURRENT_TIMESTAMP
+               WHERE status = 'pending'
+               AND expiresAt IS NOT NULL
+               AND expiresAt < CURRENT_TIMESTAMP`,
+              []
+            );
+
+            if (expiredOffers.rows && expiredOffers.rows.length > 0) {
+              for (const o of expiredOffers.rows) {
+                const carrierId = o.carrier_id;
+                if (!carrierId) continue;
+                const commission = Math.round(((parseFloat(o.price) || 0) * 0.01) * 100) / 100;
+                if (!(commission > 0)) continue;
+
+                let walletRes;
+                try {
+                  walletRes = await expiredClient.query(
+                    'SELECT reserved_balance FROM wallets WHERE user_id = $1 FOR UPDATE',
+                    [carrierId]
+                  );
+                } catch (e1) {
+                  try {
+                    walletRes = await expiredClient.query(
+                      'SELECT reserved_balance FROM wallets WHERE userid = $1 FOR UPDATE',
+                      [carrierId]
+                    );
+                  } catch (e2) {
+                    walletRes = await expiredClient.query(
+                      'SELECT reserved_balance FROM wallets WHERE "userId" = $1 FOR UPDATE',
+                      [carrierId]
+                    );
+                  }
+                }
+
+                if (!walletRes.rows || walletRes.rows.length === 0) continue;
+
+                try {
+                  await expiredClient.query(
+                    'UPDATE wallets SET reserved_balance = GREATEST(COALESCE(reserved_balance, 0) - $1, 0) WHERE user_id = $2',
+                    [commission, carrierId]
+                  );
+                } catch (e1) {
+                  try {
+                    await expiredClient.query(
+                      'UPDATE wallets SET reserved_balance = GREATEST(COALESCE(reserved_balance, 0) - $1, 0) WHERE userid = $2',
+                      [commission, carrierId]
+                    );
+                  } catch (e2) {
+                    await expiredClient.query(
+                      'UPDATE wallets SET reserved_balance = GREATEST(COALESCE(reserved_balance, 0) - $1, 0) WHERE "userId" = $2',
+                      [commission, carrierId]
+                    );
+                  }
+                }
+
+                await expiredClient.query(
+                  `INSERT INTO transactions (user_id, type, amount, status, description, reference_type, reference_id)
+                   VALUES ($1, 'commission_release', $2, 'completed', $3, 'offer', $4)`,
+                  [carrierId, commission, `Teklif #${o.id} için komisyon blokesi kaldırıldı`, o.id]
+                );
+              }
+            }
+
+            await expiredClient.query('COMMIT');
+          } catch (e) {
+            try {
+              await expiredClient.query('ROLLBACK');
+            } catch (_) {
+              // ignore
+            }
+            throw e;
+          } finally {
+            expiredClient.release();
+          }
 
           // Reduced logging to prevent Cursor slowdown
           if (expiredOffersResult.rowCount > 0 && this.NODE_ENV === 'development') {

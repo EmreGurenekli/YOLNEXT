@@ -1,6 +1,6 @@
 import React from 'react';
 import { ChevronRight, Home } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 
 interface BreadcrumbItem {
   label: string;
@@ -14,10 +14,22 @@ interface BreadcrumbProps {
 }
 
 const Breadcrumb: React.FC<BreadcrumbProps> = ({ items, className = '' }) => {
+  const location = useLocation();
+  const p = location.pathname || '';
+  const homeTo = p.startsWith('/individual')
+    ? '/individual/dashboard'
+    : p.startsWith('/corporate')
+      ? '/corporate/dashboard'
+      : p.startsWith('/nakliyeci')
+        ? '/nakliyeci/dashboard'
+        : p.startsWith('/tasiyici')
+          ? '/tasiyici/dashboard'
+          : '/';
+
   return (
     <nav className={`flex items-center space-x-2 text-sm ${className}`}>
       <Link
-        to='/'
+        to={homeTo}
         className='flex items-center text-gray-500 hover:text-gray-700 transition-colors'
       >
         <Home className='w-4 h-4' />

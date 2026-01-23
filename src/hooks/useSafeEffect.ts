@@ -56,7 +56,7 @@ export const useSafeAsyncEffect = (
         }
       } catch (error) {
         if (isMountedRef.current) {
-          console.error('Async effect error:', error);
+          console.error('Asenkron efekt hatası:', error);
         }
       }
     };

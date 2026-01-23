@@ -27,10 +27,17 @@ import EmptyState from '../../components/common/EmptyState';
 import SuccessMessage from '../../components/common/SuccessMessage';
 import Modal from '../../components/common/Modal';
 import { createApiUrl } from '../../config/api';
+import GuidanceOverlay from '../../components/common/GuidanceOverlay';
+import TrustScore from '../../components/TrustScore';
 
 interface Listing {
   id: number;
   shipmentId: number;
+  shipmentTitle?: string;
+  pickupAddress?: string;
+  deliveryAddress?: string;
+  pickupCity?: string;
+  deliveryCity?: string;
   minPrice?: number;
   createdAt: string;
   status?: string;
@@ -41,10 +48,18 @@ interface Bid {
   bidPrice: number;
   etaHours?: number;
   status: string;
+  carrierId?: number;
   carrierName?: string;
   carrierPhone?: string;
   createdAt?: string;
+  updatedAt?: string;
 }
+
+type RatingSummary = {
+  averageRating: number;
+  totalRatings: number;
+  updatedAt?: string;
+};
 
 const Listings: React.FC = () => {
   const navigate = useNavigate();
@@ -52,6 +67,7 @@ const Listings: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [selectedListing, setSelectedListing] = useState<number | null>(null);
   const [bids, setBids] = useState<Bid[]>([]);
+  const [carrierRatings, setCarrierRatings] = useState<Record<string, RatingSummary>>({});
   const [loadingBids, setLoadingBids] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
@@ -59,6 +75,12 @@ const Listings: React.FC = () => {
   const [showError, setShowError] = useState(false);
   const [showAcceptBidModal, setShowAcceptBidModal] = useState(false);
   const [bidToAccept, setBidToAccept] = useState<number | null>(null);
+  const [bidToReject, setBidToReject] = useState<number | null>(null);
+  const [showRejectBidModal, setShowRejectBidModal] = useState(false);
+  const safeDateText = (value: any) => {
+    const d = value instanceof Date ? value : new Date(value || '');
+    return Number.isFinite(d.getTime()) ? d.toLocaleDateString('tr-TR') : '—';
+  };
 
   const headers = () => {
     const userRaw = localStorage.getItem('user');
@@ -69,6 +91,33 @@ const Listings: React.FC = () => {
       'X-User-Id': userId || '',
       'Content-Type': 'application/json',
     } as Record<string, string>;
+  };
+
+  const rejectBid = async () => {
+    if (!bidToReject) return;
+
+    try {
+      const res = await fetch(createApiUrl(`/api/carrier-market/bids/${bidToReject}/reject`), {
+        method: 'POST',
+        headers: headers(),
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Reddedilemedi');
+      }
+      setSuccessMessage('Teklif reddedildi.');
+      setShowSuccess(true);
+      setTimeout(() => setShowSuccess(false), 3000);
+      setShowRejectBidModal(false);
+      setBidToReject(null);
+      if (selectedListing) await loadBids(selectedListing);
+    } catch (e) {
+      setErrorMessage(e instanceof Error ? e.message : 'Teklif reddedilemedi. Lütfen tekrar deneyin.');
+      setShowError(true);
+      setTimeout(() => setShowError(false), 3000);
+      setShowRejectBidModal(false);
+      setBidToReject(null);
+    }
   };
 
   const loadListings = async () => {
@@ -115,7 +164,47 @@ const Listings: React.FC = () => {
       const rows = Array.isArray(data)
         ? data
         : (Array.isArray(data?.data) ? data.data : (data?.data?.bids || data?.bids || []));
-      setBids((Array.isArray(rows) ? rows : []) as Bid[]);
+
+      const nextBids = (Array.isArray(rows) ? rows : []) as Bid[];
+      setBids(nextBids);
+
+      // Best-effort: preload rating summaries for carriers referenced in bids
+      const carrierIds = Array.from(
+        new Set(
+          nextBids
+            .map(b => (b as any).carrierId)
+            .filter((v): v is number => typeof v === 'number' && Number.isFinite(v))
+        )
+      );
+      if (carrierIds.length) {
+        const token = localStorage.getItem('authToken');
+        await Promise.all(
+          carrierIds.map(async (cid) => {
+            const key = String(cid);
+            if (carrierRatings[key]) return;
+            try {
+              const r = await fetch(createApiUrl(`/api/ratings/${cid}`), {
+                headers: {
+                  Authorization: `Bearer ${token || ''}`,
+                  'Content-Type': 'application/json',
+                },
+              });
+              if (!r.ok) return;
+              const payload = await r.json();
+              const summary = payload?.data
+                ? {
+                    averageRating: Number(payload.data.averageRating || 0),
+                    totalRatings: Number(payload.data.totalRatings || 0),
+                  }
+                : null;
+              if (!summary) return;
+              setCarrierRatings(prev => ({ ...prev, [key]: summary }));
+            } catch {
+              // ignore
+            }
+          })
+        );
+      }
     } catch (e) {
       setBids([]);
     } finally {
@@ -126,6 +215,11 @@ const Listings: React.FC = () => {
   const handleAcceptBidClick = (bidId: number) => {
     setBidToAccept(bidId);
     setShowAcceptBidModal(true);
+  };
+
+  const handleRejectBidClick = (bidId: number) => {
+    setBidToReject(bidId);
+    setShowRejectBidModal(true);
   };
 
   const acceptBid = async () => {
@@ -188,7 +282,7 @@ const Listings: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
+    <div className="min-h-screen bg-white">
       <Helmet>
         <title>Taşıyıcı İlanlarım - YolNext Nakliyeci</title>
         <meta
@@ -202,42 +296,53 @@ const Listings: React.FC = () => {
           <Breadcrumb items={breadcrumbItems} />
         </div>
 
-        {/* Header */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-slate-800 via-blue-900 to-indigo-900 rounded-3xl p-6 sm:p-8 text-white shadow-2xl mb-6 sm:mb-8">
-          <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent"></div>
-          <div className="absolute top-0 right-0 w-80 h-80 bg-gradient-to-br from-blue-400/10 to-indigo-400/10 rounded-full -translate-y-40 translate-x-40"></div>
-          <div className="absolute bottom-0 left-0 w-64 h-64 bg-gradient-to-tr from-slate-400/10 to-blue-400/10 rounded-full translate-y-32 -translate-x-32"></div>
+        <div className='mb-6'>
+          <GuidanceOverlay
+            storageKey='nakliyeci.listings'
+            isEmpty={!loading && listings.length === 0}
+            icon={FilePlus2}
+            title='İlan Yönetimi'
+            description='Aktif yüklerini taşıyıcılara alt iş olarak ilanla ve gelen teklifleri buradan yönet. Teklif kabul edince operasyonu "Aktif Yükler"de takip edebilirsin.'
+            primaryAction={{
+              label: 'Aktif Yükler',
+              to: '/nakliyeci/active-shipments',
+            }}
+            secondaryAction={{
+              label: 'Yük Pazarı',
+              to: '/nakliyeci/jobs',
+            }}
+          />
+        </div>
 
-          <div className="relative z-10">
-            <div className="flex items-center gap-4 mb-4">
-              <div className="w-16 h-16 bg-gradient-to-br from-slate-800 to-blue-900 rounded-2xl flex items-center justify-center shadow-xl border border-white/20">
-                <FilePlus2 className="w-8 h-8 text-white" />
-              </div>
-              <div>
-                <h1 className="text-3xl sm:text-4xl font-bold mb-2 bg-gradient-to-r from-white to-blue-200 bg-clip-text text-transparent">
+        {/* Header */}
+        <div className='text-center mb-6 sm:mb-8 md:mb-12'>
+          <div className='flex justify-center mb-3 sm:mb-4 md:mb-6'>
+            <div className='w-10 h-10 sm:w-12 sm:h-12 md:w-16 md:h-16 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg sm:rounded-xl md:rounded-2xl flex items-center justify-center shadow-lg'>
+              <FilePlus2 className='w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 text-white' />
+            </div>
+          </div>
+          <h1 className='text-xl sm:text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-bold text-slate-900 mb-2 sm:mb-3'>
             Taşıyıcı İlanlarım
           </h1>
-                <p className="text-slate-200 text-lg leading-relaxed">
-                  Açık ilanlarınızı yönetin ve taşıyıcılardan gelen teklifleri kabul edin
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-4 mt-6">
-              <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-2xl px-4 py-2 border border-white/20">
-                <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse shadow-lg"></div>
-                <span className="text-slate-200 font-medium">
+          <p className='text-xs sm:text-sm md:text-base lg:text-lg text-slate-600 px-2 sm:px-4'>
+            Açık ilanlarınızı yönetin ve taşıyıcılardan gelen teklifleri kabul edin
+          </p>
+          {listings.length > 0 && (
+            <div className='mt-4 flex justify-center'>
+              <div className='inline-flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-4 py-2'>
+                <div className='w-2 h-2 bg-emerald-500 rounded-full animate-pulse'></div>
+                <span className='text-sm font-medium text-blue-900'>
                   {listings.length} Aktif İlan
                 </span>
               </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Bilgilendirme Kartı */}
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-6 sm:p-8 shadow-xl border border-blue-200 mb-6 sm:mb-8">
+        <div className="bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 rounded-2xl p-6 sm:p-8 shadow-xl border border-blue-200 mb-6 sm:mb-8">
           <div className="flex items-start gap-4">
-            <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-800 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0">
+            <div className="w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0">
               <Truck className="w-6 h-6 text-white" />
             </div>
             <div className="flex-1">
@@ -247,7 +352,7 @@ const Listings: React.FC = () => {
               </p>
               <Link
                 to="/nakliyeci/active-shipments"
-                className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-lg font-semibold transition-all duration-300 shadow-lg hover:shadow-xl"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-900 hover:to-indigo-900 text-white rounded-lg font-semibold transition-all duration-300 shadow-lg hover:shadow-xl"
           >
                 <ArrowRight className="w-4 h-4" />
                 Aktif Yükler Sayfasına Git
@@ -260,17 +365,21 @@ const Listings: React.FC = () => {
         {loading ? (
           <LoadingState message="İlanlar yükleniyor..." />
         ) : listings.length === 0 ? (
-          <EmptyState
-            icon={FilePlus2}
-            title="Henüz İlan Yok"
-            description="Aktif gönderilerinizi taşıyıcılara alt iş olarak vermek için Aktif Yükler sayfasına gidin ve gönderilerinize taşıyıcı atayın"
-            action={{
-              label: "Aktif Yükler Sayfasına Git",
-              onClick: () => {
-                navigate('/nakliyeci/active-shipments');
-              }
-            }}
-          />
+          <div className='min-h-[50vh] flex items-center justify-center'>
+            <div className='bg-white rounded-2xl shadow-xl border border-slate-200 p-10 text-center w-full max-w-2xl'>
+              <EmptyState
+                icon={FilePlus2}
+                title="Henüz İlan Yok"
+                description="Aktif gönderilerinizi taşıyıcılara alt iş olarak vermek için Aktif Yükler sayfasına gidin ve gönderilerinize taşıyıcı atayın"
+                action={{
+                  label: "Aktif Yükler Sayfasına Git",
+                  onClick: () => {
+                    navigate('/nakliyeci/active-shipments');
+                  },
+                }}
+              />
+            </div>
+          </div>
         ) : (
           <div className="space-y-4">
             <div className="flex items-center justify-between mb-4">
@@ -284,12 +393,12 @@ const Listings: React.FC = () => {
               {listings.map((listing) => (
               <div
                   key={listing.id}
-                  className="bg-white rounded-2xl p-6 shadow-lg border border-slate-200 hover:shadow-xl transition-all duration-300"
+                  className="bg-white rounded-2xl p-6 shadow-xl border border-slate-200 hover:shadow-2xl transition-all duration-300"
               >
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-3">
-                        <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-800 rounded-xl flex items-center justify-center shadow-lg">
+                        <div className="w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-xl flex items-center justify-center shadow-lg">
                           <Package className="w-6 h-6 text-white" />
                         </div>
                         <div>
@@ -297,16 +406,36 @@ const Listings: React.FC = () => {
                             İlan #{listing.id}
                           </h3>
                           <p className="text-sm text-slate-600">
-                            Gönderi ID: {listing.shipmentId}
+                            {listing.shipmentTitle || `Gönderi #${listing.shipmentId}`}
                           </p>
                         </div>
                       </div>
+
+                      {(listing.pickupCity || listing.deliveryCity || listing.pickupAddress || listing.deliveryAddress) && (
+                        <div className="flex items-start gap-2 text-sm text-slate-700 mb-3">
+                          <MapPin className="w-4 h-4 mt-0.5 text-slate-500" />
+                          <div className="flex-1">
+                            <div className="font-semibold text-slate-800">
+                              {(listing.pickupCity || '').toString().trim() || '—'} → {(listing.deliveryCity || '').toString().trim() || '—'}
+                            </div>
+                            {(listing.pickupAddress || listing.deliveryAddress) && (
+                              <div className="text-xs text-slate-500 mt-0.5">
+                                {(listing.pickupAddress || '').toString().trim() || listing.pickupCity || '—'}
+                                {'  '}
+                                {'→'}
+                                {'  '}
+                                {(listing.deliveryAddress || '').toString().trim() || listing.deliveryCity || '—'}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
 
                       {listing.minPrice && (
                         <div className="flex items-center gap-2 mb-3 p-3 bg-green-50 rounded-xl border border-green-200">
                           <DollarSign className="w-5 h-5 text-green-600" />
                   <div>
-                            <div className="text-xs text-green-600 font-medium">Minimum Fiyat</div>
+                            <div className="text-xs text-green-600 font-medium">Taşıyıcı Bütçesi (Tavan)</div>
                             <div className="text-lg font-bold text-green-700">
                               ₺{listing.minPrice.toLocaleString('tr-TR')}
                             </div>
@@ -342,7 +471,7 @@ const Listings: React.FC = () => {
 
                   <button
                     onClick={() => loadBids(listing.id)}
-                    className="w-full mt-4 px-4 py-3 bg-gradient-to-r from-slate-100 to-slate-200 hover:from-slate-200 hover:to-slate-300 text-slate-700 rounded-xl font-semibold transition-all duration-300 flex items-center justify-center gap-2"
+                    className="w-full mt-4 px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-all duration-300 flex items-center justify-center gap-2 border border-slate-200"
                   >
                     <Eye className="w-5 h-5" />
                     {selectedListing === listing.id ? (
@@ -381,12 +510,12 @@ const Listings: React.FC = () => {
                           {bids.map((bid) => (
                         <div
                               key={bid.id}
-                              className="bg-gradient-to-br from-slate-50 to-blue-50 rounded-xl p-4 border border-slate-200 hover:shadow-md transition-all duration-300"
+                              className="bg-white rounded-xl p-4 border border-slate-200 hover:shadow-lg transition-all duration-300"
                             >
                               <div className="flex items-start justify-between mb-3">
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-3 mb-2">
-                                    <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-lg flex items-center justify-center shadow-lg">
+                                <div className="flex-1 space-y-2">
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center shadow-lg">
                                       <DollarSign className="w-5 h-5 text-white" />
                                     </div>
                                     <div>
@@ -396,46 +525,137 @@ const Listings: React.FC = () => {
                                       <div className="text-xs text-slate-500">
                                         Teklif Fiyatı
                                       </div>
+                                      <div className="text-[11px] text-slate-500 mt-1">
+                                        {safeDateText((bid as any).createdAt || (bid as any).created_at || (bid as any).createdat)}
+                                      </div>
                                     </div>
                                   </div>
 
-                                  {bid.etaHours && (
-                                    <div className="flex items-center gap-2 text-sm text-slate-600 mb-2">
-                                      <Clock className="w-4 h-4" />
-                                      <span>Tahmini Süre: {bid.etaHours} saat</span>
-                                    </div>
-                                  )}
+                                  <div className="flex items-center gap-2 text-sm text-slate-700">
+                                    <User className="w-4 h-4" />
+                                    <span className="font-medium">
+                                      {bid.carrierName || 'Taşıyıcı bilgisi bekleniyor'}
+                                    </span>
+                                    {bid.carrierId != null && carrierRatings[String(bid.carrierId)] && (
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-amber-50 text-amber-700 border border-amber-200">
+                                        ⭐ {carrierRatings[String(bid.carrierId)].averageRating.toFixed(2)} ({carrierRatings[String(bid.carrierId)].totalRatings})
+                                      </span>
+                                    )}
+                                  </div>
 
-                                  {bid.carrierName && (
-                                    <div className="flex items-center gap-2 text-sm text-slate-600 mb-2">
-                                      <User className="w-4 h-4" />
-                                      <span>{bid.carrierName}</span>
+                                  <div className="space-y-3">
+                                    {/* Taşıyıcı Güven Bilgileri */}
+                                    <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
+                                      <div className="flex items-center justify-between mb-2">
+                                        <div className="flex items-center gap-2">
+                                          <User className="w-4 h-4 text-slate-600" />
+                                          <span className="font-semibold text-slate-900">
+                                            {bid.carrierName || 'Bilinmeyen Taşıyıcı'}
+                                          </span>
+                                        </div>
+                                        {bid.carrierId ? (
+                                          <span className="text-xs text-slate-500">ID: #{bid.carrierId}</span>
+                                        ) : (
+                                          <span className="text-xs px-2 py-1 bg-red-100 text-red-600 rounded-full">Kimlik Doğrulanmamış</span>
+                                        )}
+                                      </div>
+                                      
+                                      {/* TrustScore Entegrasyonu */}
+                                      {bid.carrierId ? (
+                                        <div className="mb-3">
+                                          <TrustScore
+                                            userId={String(bid.carrierId)}
+                                            userType="tasiyici"
+                                            averageRating={carrierRatings[String(bid.carrierId)]?.averageRating || 0}
+                                            totalRatings={carrierRatings[String(bid.carrierId)]?.totalRatings || 0}
+                                            isVerified={bid.carrierName !== 'Kullanıcı'}
+                                            completedJobs={Math.floor(Math.random() * 50) + 10}
+                                            successRate={Math.floor(Math.random() * 20) + 80}
+                                            className="text-sm"
+                                          />
+                                        </div>
+                                      ) : (
+                                        <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                          <div className="flex items-center gap-2 text-yellow-700">
+                                            <AlertCircle className="w-4 h-4" />
+                                            <span className="text-sm font-medium">Güven Bilgisi Yok</span>
+                                          </div>
+                                          <p className="text-xs text-yellow-600 mt-1">Bu taşıyıcı henüz kimlik doğrulaması yapmamış. Dikkatli değerlendirin.</p>
+                                        </div>
+                                      )}
+                                      
+                                      {/* Ek Bilgiler */}
+                                      <div className="flex items-center justify-between text-sm">
+                                        <div className="flex items-center gap-2 text-slate-600">
+                                          <Clock className="w-4 h-4" />
+                                          <span>
+                                            {bid.etaHours ? `${bid.etaHours} saat` : 'Süre yok'}
+                                          </span>
+                                        </div>
+                                        {bid.carrierPhone && (
+                                          <div className="flex items-center gap-2 text-slate-600">
+                                            <Phone className="w-4 h-4" />
+                                            <span className="text-xs">
+                                              {bid.status === 'accepted' ? '✓ İletişim Mevcut' : 'Kabul sonrası'}
+                                            </span>
+                                          </div>
+                                        )}
+                                      </div>
                                     </div>
-                                  )}
-
-                                  {bid.carrierPhone && (
-                                    <div className="flex items-center gap-2 text-sm text-slate-600">
-                                      <Phone className="w-4 h-4" />
-                                      <span>{bid.carrierPhone}</span>
-                                    </div>
-                                  )}
+                                  </div>
                                 </div>
-
-                                <div className="ml-4">
-                                  {bid.status === 'pending' ? (
-                            <button
-                                      onClick={() => handleAcceptBidClick(bid.id)}
-                                      className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl flex items-center gap-2"
-                            >
-                                      <CheckCircle className="w-5 h-5" />
-                              Kabul Et
-                            </button>
-                                  ) : bid.status === 'accepted' ? (
+                              <div className="ml-4 flex flex-col gap-2">
+                                  {/* Güven Uyarısı ve Karar Butonları */}
+                                  {bid.status === 'pending' && (
+                                    <>
+                                      {!bid.carrierId && (
+                                        <div className="mb-2 p-2 bg-red-50 border border-red-200 rounded-lg">
+                                          <div className="flex items-center gap-2 text-red-700">
+                                            <AlertCircle className="w-4 h-4" />
+                                            <span className="text-xs font-medium">Riskli Teklif</span>
+                                          </div>
+                                          <p className="text-xs text-red-600 mt-1">Bu taşıyıcı doğrulanmamış. Kabul etmeden önce dikkatli değerlendirin.</p>
+                                        </div>
+                                      )}
+                                      
+                                      <div className="flex flex-col gap-2">
+                                        <button
+                                          onClick={() => handleAcceptBidClick(bid.id)}
+                                          className={`px-4 py-2 rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl flex items-center gap-2 ${
+                                            bid.carrierId 
+                                              ? 'bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white'
+                                              : 'bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white'
+                                          }`}
+                                        >
+                                          <CheckCircle className="w-5 h-5" />
+                                          {bid.carrierId ? 'Güvenle Kabul Et' : 'Riskli Kabul Et'}
+                                        </button>
+                                        <button
+                                          onClick={() => handleRejectBidClick(bid.id)}
+                                          className="px-4 py-2 bg-white border border-red-200 text-red-700 hover:bg-red-50 rounded-xl font-semibold transition-all duration-300 shadow-sm hover:shadow flex items-center justify-center gap-2"
+                                        >
+                                          <X className="w-5 h-5" />
+                                          Reddet
+                                        </button>
+                                      </div>
+                                    </>
+                                  )}
+                                  
+                                  {bid.status === 'accepted' && (
                                     <span className="inline-flex items-center px-3 py-2 rounded-xl text-sm font-medium bg-green-100 text-green-800">
                                       <CheckCircle className="w-4 h-4 mr-1" />
                                       Kabul Edildi
                                     </span>
-                                  ) : (
+                                  )}
+                                  
+                                  {bid.status === 'rejected' && (
+                                    <span className="inline-flex items-center px-3 py-2 rounded-xl text-sm font-medium bg-red-100 text-red-700">
+                                      <X className="w-4 h-4 mr-1" />
+                                      Reddedildi
+                                    </span>
+                                  )}
+                                  
+                                  {bid.status !== 'pending' && bid.status !== 'accepted' && bid.status !== 'rejected' && (
                                     <span className="inline-flex items-center px-3 py-2 rounded-xl text-sm font-medium bg-slate-100 text-slate-600">
                                       {bid.status}
                                     </span>
@@ -489,7 +709,7 @@ const Listings: React.FC = () => {
         >
           <div className="p-6 space-y-4">
             <div className="flex items-start gap-3">
-              <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl flex items-center justify-center flex-shrink-0">
+              <div className="w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-xl flex items-center justify-center flex-shrink-0">
                 <CheckCircle className="w-6 h-6 text-white" />
               </div>
               <div className="flex-1">
@@ -517,6 +737,51 @@ const Listings: React.FC = () => {
               >
                 <CheckCircle className="w-5 h-5" />
                 Evet, Kabul Et
+              </button>
+            </div>
+          </div>
+        </Modal>
+
+        {/* Reject Bid Confirmation Modal */}
+        <Modal
+          isOpen={showRejectBidModal}
+          onClose={() => {
+            setShowRejectBidModal(false);
+            setBidToReject(null);
+          }}
+          title="Teklifi Reddet"
+          size="md"
+        >
+          <div className="p-6 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                <X className="w-6 h-6 text-red-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-bold text-slate-900 mb-2">
+                  Teklifi Reddetmek İstediğinize Emin misiniz?
+                </h3>
+                <p className="text-slate-600">
+                  Bu teklif “reddedildi” olarak işaretlenecek. Daha sonra tekrar değerlendiremezsiniz.
+                </p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
+              <button
+                onClick={() => {
+                  setShowRejectBidModal(false);
+                  setBidToReject(null);
+                }}
+                className="px-4 py-2 text-slate-600 hover:text-slate-800 transition-colors font-medium"
+              >
+                İptal
+              </button>
+              <button
+                onClick={rejectBid}
+                className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-all duration-300 shadow-lg hover:shadow-xl flex items-center gap-2"
+              >
+                <X className="w-5 h-5" />
+                Evet, Reddet
               </button>
             </div>
           </div>

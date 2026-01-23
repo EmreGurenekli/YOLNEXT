@@ -86,7 +86,7 @@ export default function CommissionManager({
         setTotalPages(Math.ceil((result.pagination?.total || 0) / 20));
       }
     } catch (error) {
-      console.error('Error loading commissions:', error);
+      console.error('Komisyonlar yüklenirken hata:', error);
     } finally {
       setIsLoading(false);
     }
@@ -110,7 +110,7 @@ export default function CommissionManager({
         setStats(result.data);
       }
     } catch (error) {
-      console.error('Error loading commission stats:', error);
+      console.error('Komisyon istatistikleri yüklenirken hata:', error);
     }
   };
 
@@ -134,7 +134,7 @@ export default function CommissionManager({
         loadStats();
       }
     } catch (error) {
-      console.error('Error processing commission:', error);
+      console.error('Komisyon işlenirken hata:', error);
     }
   };
 

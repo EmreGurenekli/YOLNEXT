@@ -3,7 +3,6 @@ import { Helmet } from 'react-helmet-async';
 import {
   Users,
   Search,
-  Filter,
   MapPin,
   Star,
   Phone,
@@ -48,6 +47,8 @@ import LoadingState from '../../components/common/LoadingState';
 import Modal from '../../components/common/Modal';
 import SuccessMessage from '../../components/common/SuccessMessage';
 import Pagination from '../../components/common/Pagination';
+import RatingModal from '../../components/RatingModal';
+import GuidanceOverlay from '../../components/common/GuidanceOverlay';
 // import { carriersAPI } from '../../services/api';
 // Temporary workaround
 import { createApiUrl } from '../../config/api';
@@ -63,13 +64,13 @@ const carriersAPI = {
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
         const text = await response.text();
-        console.error('Non-JSON response:', text.substring(0, 200));
+        logger.error('JSON dışı yanıt:', text.substring(0, 200));
         return { success: false, data: { carriers: [] }, message: 'Endpoint bulunamadı' };
       }
       
       return response.json();
     } catch (error: any) {
-      console.error('Error fetching carriers:', error);
+      logger.error('Taşıyıcılar alınırken hata:', error);
       return { success: false, data: { carriers: [] }, message: error.message };
     }
   },
@@ -88,7 +89,7 @@ const carriersAPI = {
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
         const text = await response.text();
-        console.error('Non-JSON response:', text.substring(0, 200));
+        logger.error('JSON dışı yanıt:', text.substring(0, 200));
         return { 
           success: false, 
           message: response.status === 404 ? 'Endpoint bulunamadı. Lütfen backend\'i kontrol edin.' : 'Beklenmeyen yanıt formatı',
@@ -98,13 +99,13 @@ const carriersAPI = {
       
       const result = await response.json();
       if (!response.ok) {
-        console.error('API Error:', result);
+        logger.error('API hatası:', result);
         return { ...result, ok: false };
       }
       return { ...result, ok: true };
     } catch (error: any) {
-      console.error('Fetch Error:', error);
-      return { success: false, message: error.message || 'Network error', ok: false };
+      logger.error('İstek hatası:', error);
+      return { success: false, message: error.message || 'Ağ hatası', ok: false };
     }
   },
   unlinkCorporate: async (nakliyeciId: number) => {
@@ -121,7 +122,7 @@ const carriersAPI = {
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
         const text = await response.text();
-        console.error('Non-JSON response:', text.substring(0, 200));
+        logger.error('JSON dışı yanıt:', text.substring(0, 200));
         return { 
           success: false, 
           message: response.status === 404 ? 'Endpoint bulunamadı. Lütfen backend\'i kontrol edin.' : 'Beklenmeyen yanıt formatı',
@@ -131,13 +132,13 @@ const carriersAPI = {
       
       const result = await response.json();
       if (!response.ok) {
-        console.error('API Error:', result);
+        logger.error('API hatası:', result);
         return { ...result, ok: false };
       }
       return { ...result, ok: true };
     } catch (error: any) {
-      console.error('Fetch Error:', error);
-      return { success: false, message: error.message || 'Network error', ok: false };
+      logger.error('İstek hatası:', error);
+      return { success: false, message: error.message || 'Ağ hatası', ok: false };
     }
   }
 };
@@ -180,12 +181,25 @@ export default function CorporateCarriers() {
   // Detay modal için state
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedCarrierForDetail, setSelectedCarrierForDetail] = useState<number | null>(null);
+  const [showReviewsModal, setShowReviewsModal] = useState(false);
+  const [selectedCarrierForReviews, setSelectedCarrierForReviews] = useState<{ id: string; name: string; email: string; type: string } | null>(null);
 
   const handleViewDetails = (carrierId: number) => {
     // Open carrier details modal
     setSelectedCarrierForDetail(carrierId);
     setShowDetailModal(true);
     setSearchParams({ details: carrierId.toString() });
+  };
+
+  const handleViewCarrierReviews = (carrier: any) => {
+    if (!carrier?.id) return;
+    setSelectedCarrierForReviews({
+      id: String(carrier.id),
+      name: carrier.companyName || carrier.fullName || 'Nakliyeci',
+      email: carrier.email || '',
+      type: 'nakliyeci',
+    });
+    setShowReviewsModal(true);
   };
   
   // Open detail modal if details param exists
@@ -267,23 +281,23 @@ export default function CorporateCarriers() {
       
       const data = response;
       
-      console.log('Response data:', data);
+      logger.debug('Response data:', data);
       
       if (!data.ok || data.success === false) {
         const errorMsg = data.message || data.error || 'Nakliyeci eklenemedi';
-        console.error('Error adding carrier:', errorMsg);
+        logger.error('Nakliyeci eklenirken hata:', errorMsg);
         setAddNakliyeciError(errorMsg);
         return;
       }
       
-      setSuccessMessage(data.message || 'Nakliyeci başarıyla eklendi');
+      setSuccessMessage(data.message || '✅ Nakliyeci eklendi!');
       setShowSuccessMessage(true);
       setNakliyeciCode('');
       setAddNakliyeciError(null);
       loadCarriers(); // Reload carriers list
       setShowAddModal(false);
     } catch (error: any) {
-      console.error('Exception in handleAddNakliyeci:', error);
+      logger.error('Nakliyeci ekleme sırasında hata:', error);
       setAddNakliyeciError(error.message || 'Beklenmeyen bir hata oluştu');
     } finally {
       setAddingNakliyeci(false);
@@ -298,20 +312,20 @@ export default function CorporateCarriers() {
       
       if (!response.ok || response.success === false) {
         const errorMsg = response.message || response.error || 'Nakliyeci kaldırılamadı';
-        console.error('Error deleting carrier:', errorMsg);
+        logger.error('Nakliyeci kaldırılırken hata:', errorMsg);
         setSuccessMessage(errorMsg);
         setShowSuccessMessage(true);
         return;
       }
       
-      setSuccessMessage(response.message || 'Nakliyeci başarıyla kaldırıldı');
+      setSuccessMessage(response.message || '✅ Nakliyeci çıkarıldı');
       setShowSuccessMessage(true);
       loadCarriers(); // Reload carriers list
       setShowDeleteConfirm(false);
       setNakliyeciToDelete(null);
     } catch (error: any) {
-      console.error('Exception in handleDeleteNakliyeci:', error);
-      setSuccessMessage(error.message || 'Beklenmeyen bir hata oluştu');
+      logger.error('Nakliyeci silme sırasında hata:', error);
+      setSuccessMessage(error.message || '❌ Bir hata oluştu, tekrar deneyin');
       setShowSuccessMessage(true);
     } finally {
       setDeletingNakliyeciId(null);
@@ -322,6 +336,10 @@ export default function CorporateCarriers() {
   useEffect(() => {
     loadCarriers();
   }, []);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterStatus, searchTerm, sortBy]);
 
   const filteredCarriers = useMemo(() => {
     if (!carriers || !Array.isArray(carriers)) return [];
@@ -351,17 +369,48 @@ export default function CorporateCarriers() {
       matchesSearch = true; // No search term, show all
     }
 
-    // Status filtering - backend doesn't return status, so skip for now
-    const matchesStatus = filterStatus === 'all';
+    // Status filtering - backend doesn't return status, so skip
+    const matchesStatus = true;
 
     return matchesSearch && matchesStatus;
     });
   }, [carriers, searchTerm, filterStatus]);
 
+  const sortedCarriers = useMemo(() => {
+    const getNum = (v: any) => {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : 0;
+    };
+
+    const getName = (c: any) =>
+      String(c?.companyName || c?.fullName || '').trim().toLowerCase();
+
+    return filteredCarriers.slice().sort((a: any, b: any) => {
+      if (sortBy === 'rating') {
+        const d = getNum(b?.averageRating) - getNum(a?.averageRating);
+        if (d !== 0) return d;
+        const sd = getNum(b?.totalShipments) - getNum(a?.totalShipments);
+        if (sd !== 0) return sd;
+        return getName(a).localeCompare(getName(b));
+      }
+
+      if (sortBy === 'shipments') {
+        const d = getNum(b?.totalShipments) - getNum(a?.totalShipments);
+        if (d !== 0) return d;
+        const rd = getNum(b?.averageRating) - getNum(a?.averageRating);
+        if (rd !== 0) return rd;
+        return getName(a).localeCompare(getName(b));
+      }
+
+      // name (default)
+      return getName(a).localeCompare(getName(b));
+    });
+  }, [filteredCarriers, sortBy]);
+
   // Pagination logic
-  const totalPages = Math.ceil(filteredCarriers.length / itemsPerPage);
+  const totalPages = Math.ceil(sortedCarriers.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedCarriers = filteredCarriers.slice(
+  const paginatedCarriers = sortedCarriers.slice(
     startIndex,
     startIndex + itemsPerPage
   );
@@ -436,6 +485,24 @@ export default function CorporateCarriers() {
           </div>
         </div>
 
+        <div className='mb-6'>
+          <GuidanceOverlay
+            storageKey='corporate.carriers'
+            isEmpty={!isLoading && carriers.length === 0}
+            icon={Users}
+            title='Nakliyeci Yönetimi'
+            description='Düzenli çalıştığın nakliyecileri buradan ekle ve yönet. Yeni gönderi oluştururken hızlıca nakliyeci seçip teklif toplayabilirsin.'
+            primaryAction={{
+              label: 'Yeni Nakliyeci Ekle',
+              onClick: () => setShowAddModal(true),
+            }}
+            secondaryAction={{
+              label: 'Gönderi Oluştur',
+              to: '/corporate/create-shipment',
+            }}
+          />
+        </div>
+
         {/* Filters Card - Mobile Optimized */}
         <div className='bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 md:p-8 shadow-xl border border-slate-200 mb-6 sm:mb-8'>
           <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4'>
@@ -453,12 +520,10 @@ export default function CorporateCarriers() {
             <select
               value={filterStatus}
               onChange={e => setFilterStatus(e.target.value)}
-              className='px-3 sm:px-4 py-2 sm:py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base'
+              disabled
+              className='px-3 sm:px-4 py-2 sm:py-3 border border-slate-200 rounded-lg bg-slate-50 text-slate-400 cursor-not-allowed text-sm sm:text-base'
             >
               <option value='all'>Tüm Durumlar</option>
-              <option value='active'>Aktif</option>
-              <option value='inactive'>Pasif</option>
-              <option value='pending'>Beklemede</option>
             </select>
 
             <select
@@ -468,7 +533,6 @@ export default function CorporateCarriers() {
             >
               <option value='rating'>Puana Göre</option>
               <option value='shipments'>Gönderi Sayısına Göre</option>
-              <option value='cost'>Maliyete Göre</option>
               <option value='name'>İsme Göre</option>
             </select>
 
@@ -504,9 +568,17 @@ export default function CorporateCarriers() {
               </button>
             </div>
 
-            <button className='px-3 sm:px-4 py-2 sm:py-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors flex items-center justify-center gap-2 text-sm sm:text-base'>
-              <Filter className='w-4 h-4' />
-              Filtrele
+            <button
+              onClick={() => {
+                setSearchTerm('');
+                setFilterStatus('all');
+                setSortBy('rating');
+                setCurrentPage(1);
+              }}
+              className='px-3 sm:px-4 py-2 sm:py-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors flex items-center justify-center gap-2 text-sm sm:text-base'
+            >
+              <X className='w-4 h-4' />
+              Sıfırla
             </button>
           </div>
         </div>
@@ -713,16 +785,16 @@ export default function CorporateCarriers() {
                             Nakliyeci
                           </th>
                           <th className='text-left py-3 px-4 font-semibold text-slate-700'>
+                            İletişim
+                          </th>
+                          <th className='text-left py-3 px-4 font-semibold text-slate-700'>
                             Puan
                           </th>
                           <th className='text-left py-3 px-4 font-semibold text-slate-700'>
                             Gönderi
                           </th>
                           <th className='text-left py-3 px-4 font-semibold text-slate-700'>
-                            Zamanında Teslimat
-                          </th>
-                          <th className='text-left py-3 px-4 font-semibold text-slate-700'>
-                            Maliyet
+                            Başarı Oranı
                           </th>
                           <th className='text-left py-3 px-4 font-semibold text-slate-700'>
                             Durum
@@ -783,19 +855,28 @@ export default function CorporateCarriers() {
                               )}
                             </td>
                             <td className='py-4 px-4'>
-                              <div className='text-sm text-slate-900'>
-                                -
-                              </div>
+                              {Number.isFinite(Number(carrier.averageRating)) && Number(carrier.averageRating) > 0 ? (
+                                <div className='flex items-center gap-1 text-sm text-slate-900'>
+                                  {Number(carrier.averageRating).toFixed(1)}
+                                  <Star className='w-4 h-4 text-yellow-500 fill-yellow-500' />
+                                </div>
+                              ) : (
+                                <div className='text-sm text-slate-500'>-</div>
+                              )}
                             </td>
                             <td className='py-4 px-4'>
                               <div className='text-sm text-slate-900'>
-                                -
+                                {Math.max(0, Number(carrier.totalShipments) || 0)}
                               </div>
                             </td>
                             <td className='py-4 px-4'>
-                              <div className='text-sm text-slate-900'>
-                                -
-                              </div>
+                              {(() => {
+                                const total = Math.max(0, Number(carrier.totalShipments) || 0);
+                                const completed = Math.max(0, Number(carrier.completedShipments) || 0);
+                                if (total <= 0) return <div className='text-sm text-slate-500'>-</div>;
+                                const pct = Math.round((completed / total) * 100);
+                                return <div className='text-sm text-slate-900'>{pct}%</div>;
+                              })()}
                             </td>
                             <td className='py-4 px-4'>
                               <span
@@ -843,7 +924,7 @@ export default function CorporateCarriers() {
 
             {/* Mobile View */}
             <div className='lg:hidden space-y-4'>
-              {filteredCarriers.map(carrier => (
+              {paginatedCarriers.map(carrier => (
                 <div
                   key={carrier.id}
                   className='bg-white rounded-xl p-4 shadow-lg border border-slate-200 w-full max-w-full overflow-hidden'
@@ -1001,15 +1082,19 @@ export default function CorporateCarriers() {
             )}
           </>
         ) : (
-          <EmptyState
-            icon={Users}
-            title='Nakliyeci bulunamadı'
-            description='Arama kriterlerinize uygun nakliyeci bulunamadı'
-            action={{
-              label: 'Yeni Nakliyeci Ekle',
-              onClick: () => setShowAddModal(true),
-            }}
-          />
+          <div className='min-h-[50vh] flex items-center justify-center'>
+            <div className='bg-white rounded-2xl shadow-xl border border-slate-200 p-10 text-center w-full max-w-2xl'>
+              <EmptyState
+                icon={Users}
+                title='Nakliyeci bulunamadı'
+                description='Arama kriterlerinize uygun nakliyeci bulunamadı'
+                action={{
+                  label: 'Yeni Nakliyeci Ekle',
+                  onClick: () => setShowAddModal(true),
+                }}
+              />
+            </div>
+          </div>
         )}
 
         {/* Success Message */}
@@ -1156,6 +1241,13 @@ export default function CorporateCarriers() {
                 {/* Action Buttons */}
                 <div className="flex gap-3 pt-4 border-t border-slate-200">
                   <button
+                    onClick={() => handleViewCarrierReviews(carrier)}
+                    className="px-4 py-3 bg-yellow-50 hover:bg-yellow-100 text-yellow-800 rounded-lg font-semibold transition-all duration-200 shadow-sm hover:shadow-md border border-yellow-200 flex items-center justify-center gap-2"
+                  >
+                    <Star className="w-5 h-5" />
+                    Yorumları Gör
+                  </button>
+                  <button
                     onClick={() => {
                       setShowDetailModal(false);
                       setSelectedCarrierForDetail(null);
@@ -1185,6 +1277,23 @@ export default function CorporateCarriers() {
           );
         })()}
 
+        {/* Reviews Modal */}
+        {showReviewsModal && selectedCarrierForReviews && (
+          <RatingModal
+            isOpen={showReviewsModal}
+            onClose={() => {
+              setShowReviewsModal(false);
+              setSelectedCarrierForReviews(null);
+            }}
+            mode='view'
+            ratedUser={selectedCarrierForReviews}
+            currentUser={{
+              id: '0',
+              name: 'Kullanıcı',
+            }}
+          />
+        )}
+
         {/* Add Nakliyeci Modal */}
         <Modal
           isOpen={showAddModal}
@@ -1211,7 +1320,7 @@ export default function CorporateCarriers() {
                   setNakliyeciCode(e.target.value);
                   setAddNakliyeciError(null);
                 }}
-                placeholder="Örn: nakliyeci@demo.com veya YN-12345"
+                placeholder="Örn: lojistik@firma.com veya YN-12345"
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
               {addNakliyeciError && (

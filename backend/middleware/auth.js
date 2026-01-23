@@ -28,6 +28,8 @@ function createAuthMiddleware(pool, JWT_SECRET) {
             id: decoded.userId,
             email: decoded.email,
             role: decoded.role,
+            userType: decoded.userType,
+            panel_type: decoded.panel_type || decoded.userType || decoded.role,
             isDemo: true,
           };
           return next();
@@ -35,10 +37,25 @@ function createAuthMiddleware(pool, JWT_SECRET) {
 
         // Get user from database for real users
         if (pool) {
-          const userResult = await pool.query(
-            'SELECT id, email, role, isActive FROM users WHERE id = $1',
-            [decoded.userId]
-          );
+          let userResult;
+          try {
+            userResult = await pool.query(
+              'SELECT id, email, role, "isActive" as "isActive" FROM users WHERE id = $1',
+              [decoded.userId]
+            );
+          } catch (e1) {
+            try {
+              userResult = await pool.query(
+                'SELECT id, email, role, is_active as "isActive" FROM users WHERE id = $1',
+                [decoded.userId]
+              );
+            } catch (e2) {
+              userResult = await pool.query(
+                'SELECT id, email, role FROM users WHERE id = $1',
+                [decoded.userId]
+              );
+            }
+          }
           if (userResult.rows.length === 0) {
             return res.status(403).json({
               success: false,
@@ -46,7 +63,7 @@ function createAuthMiddleware(pool, JWT_SECRET) {
             });
           }
           const dbUser = userResult.rows[0];
-          if (dbUser.isActive === false) {
+          if (Object.prototype.hasOwnProperty.call(dbUser, 'isActive') && dbUser.isActive === false) {
             return res.status(403).json({
               success: false,
               message: 'Invalid or inactive user',
@@ -79,91 +96,3 @@ function createAuthMiddleware(pool, JWT_SECRET) {
 }
 
 module.exports = { createAuthMiddleware };
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || (() => {
-      console.error('JWT_SECRET environment variable is not set!');
-      process.exit(1);
-    })());
-    
-    // Kullanıcıyı veritabanından bul
-    let user = await User.findByPk(decoded.userId);
-    
-    if (!user) {
-      return res.status(401).json({ error: 'User not found' });
-    }
-
-    req.user = user;
-    next();
-  } catch (error) {
-    return res.status(403).json({ error: 'Invalid token' });
-  }
-};
-
-// Kullanıcı tipi kontrolü
-const requireUserType = (userTypes) => {
-  return (req, res, next) => {
-    if (!req.user) {
-      return res.status(401).json({ error: 'Authentication required' });
-    }
-
-    if (!userTypes.includes(req.user.user_type)) {
-      return res.status(403).json({ error: 'Insufficient permissions' });
-    }
-
-    next();
-  };
-};
-
-// Opsiyonel authentication
-const optionalAuth = async (req, res, next) => {
-  try {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
-
-    if (token) {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || (() => {
-      console.error('JWT_SECRET environment variable is not set!');
-      process.exit(1);
-    })());
-      const user = await User.findByPk(decoded.userId);
-      if (user) {
-        req.user = user;
-      }
-    }
-    
-    next();
-  } catch (error) {
-    // Opsiyonel olduğu için hata durumunda devam et
-    next();
-  }
-};
-
-// Yetkilendirme kontrolü
-const authorize = (permissions) => {
-  return (req, res, next) => {
-    if (!req.user) {
-      return res.status(401).json({ error: 'Authentication required' });
-    }
-
-    // Basit yetkilendirme kontrolü
-    if (permissions.includes('admin') && req.user.user_type !== 'admin') {
-      return res.status(403).json({ error: 'Admin access required' });
-    }
-
-    next();
-  };
-};
-
-// Alias'lar
-const auth = authenticateToken;
-const protect = authenticateToken;
-
-module.exports = {
-  authenticateToken,
-  requireUserType,
-  optionalAuth,
-  authorize,
-  auth,
-  protect
-};
-

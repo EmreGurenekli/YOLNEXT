@@ -19,10 +19,11 @@ const LoadingState: React.FC<LoadingStateProps> = ({
   };
 
   return (
-    <div className={`flex items-center justify-center ${className}`}>
+    <div className={`flex items-center justify-center ${className}`} role='status' aria-live='polite' aria-label={message}>
       <div className='text-center'>
         <RefreshCw
           className={`${sizeClasses[size]} text-blue-600 animate-spin mx-auto mb-2`}
+          aria-hidden='true'
         />
         <p className='text-gray-600'>{message}</p>
       </div>

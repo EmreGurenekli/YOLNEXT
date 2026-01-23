@@ -28,6 +28,176 @@ function sanitizeIdentifier(raw) {
 function createDriversRoutes(pool, authenticateToken) {
   const router = express.Router();
 
+  let carrierDriversEnsured = false;
+  const ensureCarrierDriversTable = async () => {
+    if (!pool || carrierDriversEnsured) return;
+    try {
+      await pool.query(
+        `CREATE TABLE IF NOT EXISTS carrier_drivers (
+          id SERIAL PRIMARY KEY,
+          carrier_id INTEGER NOT NULL,
+          driver_id INTEGER NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE (carrier_id, driver_id)
+        )`
+      );
+    } catch (_) {
+      // ignore
+    }
+    carrierDriversEnsured = true;
+  };
+
+  const resolveUsersTable = async () => {
+    const tRes = await pool.query(
+      `SELECT table_schema
+       FROM information_schema.tables
+       WHERE table_name = 'users'
+       ORDER BY (table_schema = 'public') DESC, table_schema ASC
+       LIMIT 1`
+    );
+    const schema = tRes.rows && tRes.rows[0]?.table_schema ? tRes.rows[0].table_schema : 'public';
+    const colsRes = await pool.query(
+      `SELECT column_name FROM information_schema.columns WHERE table_name = 'users' AND table_schema = $1`,
+      [schema]
+    );
+    const cols = new Set((colsRes.rows || []).map(r => r.column_name));
+    const pickCol = (...names) => names.find(n => cols.has(n)) || null;
+    const qCol = (col) => (col && /[A-Z]/.test(col) ? `"${col}"` : col);
+    return {
+      schema,
+      qCol,
+      cols: {
+        id: 'id',
+        email: pickCol('email', 'emailAddress', 'email_address', 'mail') || 'email',
+        fullName: pickCol('fullName', 'full_name', 'name'),
+        phone: pickCol('phone', 'phone_number', 'phoneNumber', 'mobile', 'mobile_phone'),
+        role: pickCol('role', 'panel_type', 'userType', 'user_type') || 'role',
+        driverCode: pickCol('driverCode', 'driver_code', 'code'),
+        city: pickCol('city'),
+        district: pickCol('district'),
+        createdAt: pickCol('createdAt', 'created_at'),
+      },
+    };
+  };
+
+  const resolveRatingsTable = async () => {
+    try {
+      const tRes = await pool.query(
+        `SELECT table_schema
+         FROM information_schema.tables
+         WHERE table_name = 'ratings'
+         ORDER BY (table_schema = 'public') DESC, table_schema ASC
+         LIMIT 1`
+      );
+      const schema = tRes.rows && tRes.rows[0]?.table_schema ? tRes.rows[0].table_schema : null;
+      if (!schema) return null;
+
+      const colsRes = await pool.query(
+        `SELECT column_name FROM information_schema.columns WHERE table_name = 'ratings' AND table_schema = $1`,
+        [schema]
+      );
+      const cols = new Set((colsRes.rows || []).map(r => r.column_name));
+      const pickCol = (...names) => names.find(n => cols.has(n)) || null;
+      const qCol = (col) => (col && /[A-Z]/.test(col) ? `"${col}"` : col);
+
+      const ratedId = pickCol('ratedId', 'rated_id', 'ratedid');
+      const rating = pickCol('rating');
+      if (!ratedId || !rating) return null;
+
+      return { schema, qCol, ratedId, rating };
+    } catch (_) {
+      return null;
+    }
+  };
+
+  const resolveCarrierDriversTable = async () => {
+    await ensureCarrierDriversTable();
+    const tRes = await pool.query(
+      `SELECT table_schema
+       FROM information_schema.tables
+       WHERE table_name = 'carrier_drivers'
+       ORDER BY (table_schema = 'public') DESC, table_schema ASC
+       LIMIT 1`
+    );
+    const schema = tRes.rows && tRes.rows[0]?.table_schema ? tRes.rows[0].table_schema : 'public';
+    const colsRes = await pool.query(
+      `SELECT column_name FROM information_schema.columns WHERE table_name = 'carrier_drivers' AND table_schema = $1`,
+      [schema]
+    );
+    const cols = new Set((colsRes.rows || []).map(r => r.column_name));
+    const pickCol = (...names) => names.find(n => cols.has(n)) || null;
+    const qCol = (col) => (col && /[A-Z]/.test(col) ? `"${col}"` : col);
+    return {
+      schema,
+      qCol,
+      cols: {
+        carrierId: pickCol('carrier_id', 'carrierId', 'carrierid', 'nakliyeci_id', 'nakliyeciId'),
+        driverId: pickCol('driver_id', 'driverId', 'driverid'),
+        createdAt: pickCol('createdAt', 'created_at', 'createdat'),
+        updatedAt: pickCol('updatedAt', 'updated_at', 'updatedat'),
+      },
+    };
+  };
+
+  const resolveVehiclesTable = async () => {
+    try {
+      const tRes = await pool.query(
+        `SELECT table_schema
+         FROM information_schema.tables
+         WHERE table_name = 'vehicles'
+         ORDER BY (table_schema = 'public') DESC, table_schema ASC
+         LIMIT 1`
+      );
+      const schema = tRes.rows && tRes.rows[0]?.table_schema ? tRes.rows[0].table_schema : null;
+      if (!schema) return null;
+
+      const colsRes = await pool.query(
+        `SELECT column_name FROM information_schema.columns WHERE table_name = 'vehicles' AND table_schema = $1`,
+        [schema]
+      );
+      const cols = new Set((colsRes.rows || []).map(r => r.column_name));
+      const pickCol = (...names) => names.find(n => cols.has(n)) || null;
+      const qCol = (col) => (col && /[A-Z]/.test(col) ? `"${col}"` : col);
+
+      const owner_id = pickCol('owner_id', 'owner_id', 'userid', 'user_id');
+      const plate = pickCol('plate_number', 'plateNumber', 'plate', 'plate_no', 'plateNo');
+      const type = pickCol('type', 'vehicle_type', 'vehicleType');
+      if (!owner_id) return null;
+
+      return { schema, qCol, cols: { owner_id, plate, type } };
+    } catch (_) {
+      return null;
+    }
+  };
+
+  const resolveShipmentsTable = async () => {
+    const tRes = await pool.query(
+      `SELECT table_schema
+       FROM information_schema.tables
+       WHERE table_name = 'shipments'
+       ORDER BY (table_schema = 'public') DESC, table_schema ASC
+       LIMIT 1`
+    );
+    const schema = tRes.rows && tRes.rows[0]?.table_schema ? tRes.rows[0].table_schema : 'public';
+    const colsRes = await pool.query(
+      `SELECT column_name FROM information_schema.columns WHERE table_name = 'shipments' AND table_schema = $1`,
+      [schema]
+    );
+    const cols = new Set((colsRes.rows || []).map(r => r.column_name));
+    const pickCol = (...names) => names.find(n => cols.has(n)) || null;
+    const qCol = (col) => (col && /[A-Z]/.test(col) ? `"${col}"` : col);
+    return {
+      schema,
+      qCol,
+      cols: {
+        driver: pickCol('driver_id', 'driverId', 'driverID', 'driverid'),
+        carrier: pickCol('nakliyeci_id', 'carrier_id', 'carrierId', 'carrierid', 'nakliyeciId', 'nakliyeciid'),
+        status: pickCol('status'),
+      },
+    };
+  };
+
   router.get('/lookup/:identifier', authenticateToken, async (req, res) => {
     try {
       if (!pool) {
@@ -40,18 +210,33 @@ function createDriversRoutes(pool, authenticateToken) {
       }
 
       let result;
+      const u = await resolveUsersTable();
+      const emailCol = u.qCol(u.cols.email);
+      const fullNameExpr = u.cols.fullName ? u.qCol(u.cols.fullName) : null;
+      const phoneExpr = u.cols.phone ? u.qCol(u.cols.phone) : null;
+      const roleCol = u.qCol(u.cols.role);
+      const driverCodeExpr = u.cols.driverCode ? u.qCol(u.cols.driverCode) : null;
+
+      const selectParts = [
+        'id',
+        `${emailCol} as email`,
+        fullNameExpr ? `${fullNameExpr} as "fullName"` : 'NULL as "fullName"',
+        phoneExpr ? `${phoneExpr} as phone` : 'NULL as phone',
+        `${roleCol} as role`,
+        driverCodeExpr ? `${driverCodeExpr} as "driverCode"` : 'NULL as "driverCode"',
+      ];
       if (identifier.includes('@')) {
         result = await pool.query(
-          `SELECT id, email, "fullName", phone, role, "driverCode"
-           FROM users
-           WHERE LOWER(email) = $1 AND role = 'tasiyici'`,
+          `SELECT ${selectParts.join(', ')}
+           FROM "${u.schema}".users
+           WHERE LOWER(${emailCol}) = $1 AND ${roleCol} = 'tasiyici'`,
           [identifier]
         );
       } else {
         result = await pool.query(
-          `SELECT id, email, "fullName", phone, role, "driverCode"
-           FROM users
-           WHERE "driverCode" = $1 AND role = 'tasiyici'`,
+          `SELECT ${selectParts.join(', ')}
+           FROM "${u.schema}".users
+           WHERE ${driverCodeExpr ? driverCodeExpr : '"driverCode"'} = $1 AND ${roleCol} = 'tasiyici'`,
           [identifier]
         );
       }
@@ -73,7 +258,13 @@ function createDriversRoutes(pool, authenticateToken) {
       }
 
       const carrierId = req.user?.id;
-      const identifier = sanitizeIdentifier(req.body?.code || req.body?.email || req.body?.identifier);
+      const identifier = sanitizeIdentifier(
+        req.body?.code ||
+          req.body?.driverCode ||
+          req.body?.driver_code ||
+          req.body?.email ||
+          req.body?.identifier
+      );
 
       if (!carrierId) {
         return res.status(401).json({ success: false, message: 'Authentication required' });
@@ -82,22 +273,39 @@ function createDriversRoutes(pool, authenticateToken) {
         return res.status(400).json({ success: false, message: 'Kod veya e-posta gerekli' });
       }
 
-      const roleResult = await pool.query('SELECT role FROM users WHERE id = $1', [carrierId]);
-      if (roleResult.rows.length === 0 || roleResult.rows[0].role !== 'nakliyeci') {
+      const u = await resolveUsersTable();
+      const roleCol = u.qCol(u.cols.role);
+      const roleResult = await pool.query(`SELECT ${roleCol} as role FROM "${u.schema}".users WHERE id = $1`, [carrierId]);
+      if (roleResult.rows.length === 0 || String(roleResult.rows[0].role) !== 'nakliyeci') {
         return res.status(403).json({ success: false, message: 'Sadece nakliyeci taşıyıcı ekleyebilir' });
       }
+
+      const emailCol = u.qCol(u.cols.email);
+      const driverRoleCol = u.qCol(u.cols.role);
+      const fullNameExpr = u.cols.fullName ? u.qCol(u.cols.fullName) : null;
+      const phoneExpr = u.cols.phone ? u.qCol(u.cols.phone) : null;
+      const driverCodeExpr = u.cols.driverCode ? u.qCol(u.cols.driverCode) : null;
+      const selectParts = [
+        'id',
+        `${emailCol} as email`,
+        fullNameExpr ? `${fullNameExpr} as "fullName"` : 'NULL as "fullName"',
+        phoneExpr ? `${phoneExpr} as phone` : 'NULL as phone',
+        driverCodeExpr ? `${driverCodeExpr} as "driverCode"` : 'NULL as "driverCode"',
+      ];
 
       let driverResult;
       if (identifier.includes('@')) {
         driverResult = await pool.query(
-          `SELECT id, email, "fullName", phone, "driverCode" FROM users
-           WHERE LOWER(email) = $1 AND role = 'tasiyici'`,
+          `SELECT ${selectParts.join(', ')} FROM "${u.schema}".users
+           WHERE LOWER(${emailCol}) = $1 AND ${driverRoleCol} = 'tasiyici'`,
           [identifier]
         );
       } else {
+        // Always use the driverCode column if it exists, otherwise fallback to driverCode
+        const codeColumn = driverCodeExpr || '"driverCode"';
         driverResult = await pool.query(
-          `SELECT id, email, "fullName", phone, "driverCode" FROM users
-           WHERE "driverCode" = $1 AND role = 'tasiyici'`,
+          `SELECT ${selectParts.join(', ')} FROM "${u.schema}".users
+           WHERE ${codeColumn} = $1 AND ${driverRoleCol} = 'tasiyici'`,
           [identifier]
         );
       }
@@ -108,17 +316,37 @@ function createDriversRoutes(pool, authenticateToken) {
 
       const driver = driverResult.rows[0];
 
+      const cdMeta = await resolveCarrierDriversTable();
+      if (!cdMeta.cols.carrierId || !cdMeta.cols.driverId) {
+        return res.status(500).json({ success: false, message: 'carrier_drivers şeması uyumsuz' });
+      }
+      const cdTable = `"${cdMeta.schema}".carrier_drivers`;
+      const carrierCol = cdMeta.qCol(cdMeta.cols.carrierId);
+      const driverCol = cdMeta.qCol(cdMeta.cols.driverId);
+
       const existing = await pool.query(
-        'SELECT id FROM carrier_drivers WHERE carrier_id = $1 AND driver_id = $2',
+        `SELECT id FROM ${cdTable} WHERE ${carrierCol} = $1 AND ${driverCol} = $2`,
         [carrierId, driver.id]
       );
       if (existing.rows.length > 0) {
         return res.json({ success: true, message: 'Zaten eklenmiş' });
       }
 
+      const insertCols = [carrierCol, driverCol];
+      const insertVals = ['$1', '$2'];
+      if (cdMeta.cols.createdAt) {
+        insertCols.push(cdMeta.qCol(cdMeta.cols.createdAt));
+        insertVals.push('CURRENT_TIMESTAMP');
+      }
+      // updatedAt is optional and not always present
+      const cdUpdatedAt = cdMeta.qCol(cdMeta.cols.updatedAt || '');
+      if (cdMeta.cols.updatedAt) {
+        insertCols.push(cdUpdatedAt);
+        insertVals.push('CURRENT_TIMESTAMP');
+      }
       await pool.query(
-        `INSERT INTO carrier_drivers (carrier_id, driver_id, "createdAt", "updatedAt")
-         VALUES ($1, $2, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+        `INSERT INTO ${cdTable} (${insertCols.join(', ')})
+         VALUES (${insertVals.join(', ')})`,
         [carrierId, driver.id]
       );
 
@@ -144,115 +372,127 @@ function createDriversRoutes(pool, authenticateToken) {
         return res.status(401).json({ success: false, message: 'Authentication required' });
       }
 
-      // Ensure carrierId is an integer for PostgreSQL
-      const carrierIdInt = parseInt(carrierId, 10);
-      if (isNaN(carrierIdInt)) {
-        return res.status(400).json({ success: false, message: 'Invalid carrier ID' });
-      }
+      const carrierIdText = String(carrierId);
 
       // Debug logging
-      console.log('[DEBUG] /api/drivers/nakliyeci - req.user:', JSON.stringify(req.user), 'carrierId:', carrierId, 'carrierIdInt:', carrierIdInt);
+      console.log('[DEBUG] /api/drivers/nakliyeci - req.user:', JSON.stringify(req.user), 'carrierId:', carrierIdText);
 
-      // Check if carrier_drivers table exists
-      const tableCheck = await pool.query(`
-        SELECT EXISTS (
-          SELECT FROM information_schema.tables 
-          WHERE table_schema = 'public' 
-          AND table_name = 'carrier_drivers'
-        )
-      `);
-
-      console.log('[DEBUG] /api/drivers/nakliyeci - Table exists:', tableCheck.rows[0]?.exists);
-
-      if (!tableCheck.rows[0]?.exists) {
-        // Table doesn't exist, return empty array
-        console.log('[DEBUG] /api/drivers/nakliyeci - Table does not exist, returning empty array');
+      // Resolve carrier_drivers table/schema (do NOT assume public)
+      const cdMeta = await resolveCarrierDriversTable();
+      if (!cdMeta.cols.carrierId || !cdMeta.cols.driverId) {
         return res.json({ success: true, drivers: [] });
       }
+      const carrierCol = cdMeta.qCol(cdMeta.cols.carrierId);
+      const driverCol = cdMeta.qCol(cdMeta.cols.driverId);
+      const cdTable = `"${cdMeta.schema}".carrier_drivers`;
+      const cdCreatedAtCol = cdMeta.cols.createdAt ? cdMeta.qCol(cdMeta.cols.createdAt) : null;
 
       // First, check if there are any linked drivers
       const linkCheck = await pool.query(
-        'SELECT COUNT(*) as count FROM carrier_drivers WHERE carrier_id = $1',
-        [carrierIdInt]
+        `SELECT COUNT(*) as count FROM ${cdTable} WHERE ${carrierCol}::text = $1::text`,
+        [carrierIdText]
       );
       
       console.log('[DEBUG] /api/drivers/nakliyeci - Linked drivers count:', linkCheck.rows[0]?.count);
 
       // Get drivers with performance metrics and vehicle info
+      const u = await resolveUsersTable();
+      const fullNameExpr = u.cols.fullName ? `u.${u.qCol(u.cols.fullName)}` : 'NULL';
+      const emailExpr = u.cols.email ? `u.${u.qCol(u.cols.email)}` : 'NULL';
+      const phoneExpr = u.cols.phone ? `u.${u.qCol(u.cols.phone)}` : 'NULL';
+      const codeExpr = u.cols.driverCode ? `u.${u.qCol(u.cols.driverCode)}` : 'NULL';
+      const cityExpr = u.cols.city ? `u.${u.qCol(u.cols.city)}` : 'NULL';
+      const districtExpr = u.cols.district ? `u.${u.qCol(u.cols.district)}` : 'NULL';
+      const joinDateExpr = u.cols.createdAt ? `u.${u.qCol(u.cols.createdAt)}` : 'CURRENT_TIMESTAMP';
+
+      const s = await resolveShipmentsTable();
+      const shipmentsTable = `"${s.schema}".shipments`;
+      const shipDriverExpr = s.cols.driver ? `s.${s.qCol(s.cols.driver)}` : 'NULL';
+      const shipCarrierExpr = s.cols.carrier ? `s.${s.qCol(s.cols.carrier)}` : 'NULL';
+      const shipStatusExpr = s.cols.status ? `s.${s.qCol(s.cols.status)}` : 'NULL';
+
+      const rMeta = await resolveRatingsTable();
+      const ratingExpr = rMeta
+        ? `COALESCE((SELECT AVG(r.${rMeta.qCol(rMeta.rating)})::NUMERIC(3,1) FROM "${rMeta.schema}".ratings r WHERE r.${rMeta.qCol(rMeta.ratedId)} = u.id), 0)`
+        : '0';
+
+      const vMeta = await resolveVehiclesTable();
+      const vehiclePlateExpr = vMeta && vMeta.cols.plate ? `v.${vMeta.qCol(vMeta.cols.plate)}` : 'NULL';
+      const vehicleTypeExpr = vMeta && vMeta.cols.type ? `v.${vMeta.qCol(vMeta.cols.type)}` : 'NULL';
+      const vehicleJoin = vMeta
+        ? `LEFT JOIN "${vMeta.schema}".vehicles v ON v.${vMeta.qCol(vMeta.cols.owner_id)}::text = u.id::text`
+        : '';
+
       const result = await pool.query(
         `SELECT
            u.id,
-           u."fullName" as name,
-           u.email,
-           u.phone,
-           u."driverCode" as code,
-           u.city,
-           u.district,
-           u."createdAt" as "joinDate",
-           v.plate_number as "vehiclePlate",
-           v.type as "vehicleType",
+           ${fullNameExpr} as name,
+           ${emailExpr} as email,
+           ${phoneExpr} as phone,
+           ${codeExpr} as code,
+           ${cityExpr} as city,
+           ${districtExpr} as district,
+           ${joinDateExpr} as "joinDate",
+           ${vehiclePlateExpr} as "vehiclePlate",
+           ${vehicleTypeExpr} as "vehicleType",
            COALESCE((
              SELECT COUNT(*)::INTEGER
-             FROM shipments s
-             WHERE s.driver_id = u.id AND s."nakliyeci_id" = $1
+             FROM ${shipmentsTable} s
+             WHERE ${shipDriverExpr} = u.id AND ${shipCarrierExpr}::text = $1::text
            ), 0) as "totalJobs",
            COALESCE((
              SELECT COUNT(*)::INTEGER
-             FROM shipments s
-             WHERE s.driver_id = u.id 
-               AND s."nakliyeci_id" = $1 
-               AND s.status = 'delivered'
+             FROM ${shipmentsTable} s
+             WHERE ${shipDriverExpr} = u.id 
+              AND ${shipCarrierExpr}::text = $1::text
+              AND ${shipStatusExpr} = 'delivered'
            ), 0) as "completedJobs",
            COALESCE((
              CASE 
                WHEN (
                  SELECT COUNT(*)::INTEGER
-                 FROM shipments s
-                 WHERE s.driver_id = u.id AND s."nakliyeci_id" = $1
+                 FROM ${shipmentsTable} s
+                 WHERE ${shipDriverExpr} = u.id AND ${shipCarrierExpr}::text = $1::text
                ) > 0 THEN
                  ROUND((
                    SELECT COUNT(*)::INTEGER
-                   FROM shipments s
-                   WHERE s.driver_id = u.id 
-                     AND s."nakliyeci_id" = $1 
-                     AND s.status = 'delivered'
+                   FROM ${shipmentsTable} s
+                   WHERE ${shipDriverExpr} = u.id 
+                    AND ${shipCarrierExpr}::text = $1::text
+                     AND ${shipStatusExpr} = 'delivered'
                  )::NUMERIC / 
                  NULLIF((
                    SELECT COUNT(*)::INTEGER
-                   FROM shipments s
-                   WHERE s.driver_id = u.id AND s."nakliyeci_id" = $1
+                   FROM ${shipmentsTable} s
+                   WHERE ${shipDriverExpr} = u.id AND ${shipCarrierExpr}::text = $1::text
                  ), 0) * 100, 1)
                ELSE 0
              END
            ), 0) as "successRate",
-           COALESCE((
-             SELECT AVG(r.rating)::NUMERIC(3,1)
-             FROM ratings r
-             WHERE r."ratedId" = u.id
-           ), 0) as rating,
+           ${ratingExpr} as rating,
            COALESCE((
              SELECT COUNT(*)::INTEGER
-             FROM shipments s
-             WHERE s.driver_id = u.id 
-               AND s."nakliyeci_id" = $1 
-               AND s.status IN ('accepted', 'in_transit', 'picked_up', 'offer_accepted', 'preparing')
+             FROM ${shipmentsTable} s
+             WHERE ${shipDriverExpr} = u.id 
+              AND ${shipCarrierExpr}::text = $1::text
+              AND ${shipStatusExpr} IN ('accepted', 'in_transit', 'picked_up', 'offer_accepted', 'preparing')
            ), 0) as "activeJobs",
            CASE 
              WHEN (
                SELECT COUNT(*)::INTEGER
-               FROM shipments s
-               WHERE s.driver_id = u.id 
-                 AND s."nakliyeci_id" = $1 
-                 AND s.status IN ('accepted', 'in_transit', 'picked_up', 'offer_accepted', 'preparing')
+               FROM ${shipmentsTable} s
+               WHERE ${shipDriverExpr} = u.id 
+                AND ${shipCarrierExpr}::text = $1::text
+                AND ${shipStatusExpr} IN ('accepted', 'in_transit', 'picked_up', 'offer_accepted', 'preparing')
              ) > 0 THEN 'busy'
              ELSE 'available'
            END as status
-        FROM carrier_drivers cd
-        INNER JOIN users u ON u.id = cd.driver_id
-        LEFT JOIN vehicles v ON v.owner_id = u.id
-        WHERE cd.carrier_id = $1
-        ORDER BY cd."createdAt" DESC`,
-        [carrierIdInt]
+        FROM ${cdTable} cd
+        INNER JOIN "${u.schema}".users u ON u.id::text = cd.${driverCol}::text
+        ${vehicleJoin}
+        WHERE cd.${carrierCol}::text = $1::text
+        ORDER BY ${cdCreatedAtCol ? `cd.${cdCreatedAtCol}` : `cd.${driverCol}`} DESC`,
+        [carrierIdText]
       );
 
       console.log('[DEBUG] /api/drivers/nakliyeci - SQL query result rows:', result.rows.length);
@@ -318,14 +558,23 @@ function createDriversRoutes(pool, authenticateToken) {
       }
 
       // Verify carrier role
-      const roleResult = await pool.query('SELECT role FROM users WHERE id = $1', [carrierId]);
-      if (roleResult.rows.length === 0 || roleResult.rows[0].role !== 'nakliyeci') {
+      const u = await resolveUsersTable();
+      const roleCol = u.qCol(u.cols.role);
+      const roleResult = await pool.query(`SELECT ${roleCol} as role FROM "${u.schema}".users WHERE id = $1`, [carrierId]);
+      if (roleResult.rows.length === 0 || String(roleResult.rows[0].role) !== 'nakliyeci') {
         return res.status(403).json({ success: false, message: 'Sadece nakliyeci taşıyıcı kaldırabilir' });
       }
 
       // Check if relationship exists
+      const cdMeta = await resolveCarrierDriversTable();
+      if (!cdMeta.cols.carrierId || !cdMeta.cols.driverId) {
+        return res.status(404).json({ success: false, message: 'Taşıyıcı bulunamadı' });
+      }
+      const cdTable = `"${cdMeta.schema}".carrier_drivers`;
+      const carrierCol = cdMeta.qCol(cdMeta.cols.carrierId);
+      const driverCol = cdMeta.qCol(cdMeta.cols.driverId);
       const existing = await pool.query(
-        'SELECT id FROM carrier_drivers WHERE carrier_id = $1 AND driver_id = $2',
+        `SELECT id FROM ${cdTable} WHERE ${carrierCol} = $1 AND ${driverCol} = $2`,
         [carrierId, driverId]
       );
 
@@ -335,7 +584,7 @@ function createDriversRoutes(pool, authenticateToken) {
 
       // Delete relationship
       await pool.query(
-        'DELETE FROM carrier_drivers WHERE carrier_id = $1 AND driver_id = $2',
+        `DELETE FROM ${cdTable} WHERE ${carrierCol} = $1 AND ${driverCol} = $2`,
         [carrierId, driverId]
       );
 

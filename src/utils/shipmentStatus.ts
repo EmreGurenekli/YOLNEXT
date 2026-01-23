@@ -16,7 +16,7 @@ export const getStatusInfo = (status: string): StatusInfo => {
     waiting_for_offers: {
       text: 'Teklif Bekliyor',
       color: 'bg-blue-100 text-blue-800 border-blue-200',
-      description: 'Nakliyecilerden teklif bekleniyor',
+      description: 'Taşıyıcılardan teklif bekleniyor',
     },
     offer_accepted: {
       text: 'Teklif Kabul Edildi',
@@ -70,6 +70,7 @@ export const getStatusInfo = (status: string): StatusInfo => {
 export const getStatusDescription = (status: string): string => {
   return getStatusInfo(status).description;
 };
+
 
 
 

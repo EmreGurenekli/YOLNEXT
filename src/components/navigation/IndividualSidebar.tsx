@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   User,
@@ -10,8 +10,9 @@ import {
   MessageSquare,
   Truck,
   FileText,
+  HeadphonesIcon,
+  LifeBuoy,
   Users,
-  Bell,
   Gift,
   PieChart,
   TrendingUp,
@@ -32,6 +33,11 @@ const IndividualSidebar: React.FC<IndividualSidebarProps> = ({ onLogout }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { badgeCounts } = useBadgeCounts();
   const { user } = useAuth();
+
+  useEffect(() => {
+    // Ensure we never leave the mobile overlay open across route transitions
+    setIsMobileMenuOpen(false);
+  }, [location.pathname]);
 
   const menuSections = [
     {
@@ -74,7 +80,7 @@ const IndividualSidebar: React.FC<IndividualSidebarProps> = ({ onLogout }) => {
       title: 'Hesap',
       items: [
         { name: 'Ayarlar', href: '/individual/settings', icon: Settings },
-        { name: 'Yardım', href: '/individual/help', icon: FileText },
+        { name: 'Yardım ve Destek Merkezi', href: '/individual/help', icon: LifeBuoy },
       ],
     },
   ];
@@ -122,7 +128,7 @@ const IndividualSidebar: React.FC<IndividualSidebarProps> = ({ onLogout }) => {
       `}
       >
         {/* Logo */}
-        <div className='border-b border-slate-200 bg-white overflow-hidden flex items-center justify-center h-24 px-2'>
+        <div className='border-b border-slate-200 bg-white overflow-hidden flex items-center justify-between h-20 px-3'>
           <Link
             to='/individual/dashboard'
             className='block focus:outline-none flex items-center justify-center'

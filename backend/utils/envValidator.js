@@ -24,10 +24,7 @@ const optionalEnvVars = {
   SMTP_USER: '',
   SMTP_PASS: '',
   
-  // SMS configuration
-  TWILIO_ACCOUNT_SID: '',
-  TWILIO_AUTH_TOKEN: '',
-  TWILIO_PHONE_NUMBER: '',
+  // SMS configuration - Removed (not needed)
   
   // File upload
   MAX_FILE_SIZE: '10485760', // 10MB
@@ -145,6 +142,7 @@ module.exports = {
   requiredEnvVars,
   optionalEnvVars,
 };
+
 
 
 

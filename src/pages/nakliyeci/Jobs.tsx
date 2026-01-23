@@ -11,8 +11,6 @@ import {
   Search,
   Calendar,
   User,
-  Phone,
-  Mail,
   Eye,
   CheckCircle,
   XCircle,
@@ -25,6 +23,7 @@ import {
   Zap,
   Plus,
   Minus,
+  Shield,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import Breadcrumb from '../../components/common/Breadcrumb';
@@ -32,9 +31,11 @@ import LoadingState from '../../components/common/LoadingState';
 import EmptyState from '../../components/common/EmptyState';
 import Modal from '../../components/common/Modal';
 import SuccessMessage from '../../components/common/SuccessMessage';
-import Pagination from '../../components/common/Pagination';
+import GuidanceOverlay from '../../components/common/GuidanceOverlay';
 import { createApiUrl } from '../../config/api';
-import { formatCurrency, formatDate } from '../../utils/format';
+import { logger } from '../../utils/logger';
+import { formatCurrency, formatDate, sanitizeAddressLabel, sanitizeShipmentTitle } from '../../utils/format';
+import { normalizeTrackingCode } from '../../utils/trackingCode';
 
 interface Job {
   id: number;
@@ -43,10 +44,14 @@ interface Job {
   pickupAddress: string;
   deliveryAddress: string;
   pickupDate: string;
+  deliveryDate?: string;
   weight: number;
   dimensions: string;
+  quantity?: number;
   specialRequirements: string;
+  categoryData?: any;
   price: number;
+  volume?: number;
   status: string;
   createdAt: string;
   shipperName?: string;
@@ -62,13 +67,23 @@ interface Job {
   userType?: string;
   user_type?: string;
   role?: string;
+  isExclusiveToCarrier?: boolean;
+  trackingNumber?: string;
+  trackingCode?: string;
+  shipmentCode?: string;
+  code?: string;
+  metadata?: any;
 }
 
 const Jobs: React.FC = () => {
   const { user } = useAuth();
+  const { token } = useAuth();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lastRequestUrl, setLastRequestUrl] = useState<string>('');
+  const [lastResponseStatus, setLastResponseStatus] = useState<number | null>(null);
+  const [lastBackendTotal, setLastBackendTotal] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterFromCity, setFilterFromCity] = useState('');
   const [filterToCity, setFilterToCity] = useState('');
@@ -81,24 +96,108 @@ const Jobs: React.FC = () => {
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [offerPrice, setOfferPrice] = useState('');
   const [offerMessage, setOfferMessage] = useState('');
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [detailJob, setDetailJob] = useState<Job | null>(null);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  const showApiDebug =
+    !!(import.meta as any)?.env?.DEV &&
+    (() => {
+      try {
+        return localStorage.getItem('debug:api') === '1';
+      } catch {
+        return false;
+      }
+    })();
   const [pagination, setPagination] = useState({
     page: 1,
     pages: 1,
     total: 0,
-    limit: 20,
+    limit: 50,
   });
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   useEffect(() => {
-    loadJobs();
-  }, [pagination.page, statusFilter, searchTerm, filterFromCity, filterToCity]);
+    // Auto-upgrade older sessions that still have a low limit so new jobs don't "disappear" onto page 2.
+    setPagination(prev => (prev.limit < 50 ? { ...prev, limit: 50, page: 1 } : prev));
+  }, []);
 
-  const loadJobs = async () => {
+  useEffect(() => {
+    const userId = (user as any)?.id;
+    const role = String((user as any)?.role || 'nakliyeci').toLowerCase();
+    if (!userId) return;
+    localStorage.setItem(`yolnext:lastSeen:market:${userId}:${role}`, new Date().toISOString());
+    window.dispatchEvent(new Event('yolnext:refresh-badges'));
+  }, [user]);
+
+  useEffect(() => {
+    if (pagination.page === 1) {
+      loadJobs(false);
+    } else {
+      loadJobs(true);
+    }
+  }, [pagination.page]);
+
+  // Reset to page 1 and clear jobs when filters/search change
+  useEffect(() => {
+    setPagination(prev => ({ ...prev, page: 1 }));
+    setJobs([]);
+    setHasMore(true);
+  }, [statusFilter, searchTerm, filterFromCity, filterToCity]);
+
+  // Load jobs when filters/search change (after reset)
+  useEffect(() => {
+    if (pagination.page === 1) {
+      loadJobs(false);
+    }
+  }, [statusFilter, searchTerm, filterFromCity, filterToCity]);
+
+  const loadMore = () => {
+    if (!hasMore || isLoadingMore) return;
+    setPagination(prev => ({ ...prev, page: prev.page + 1 }));
+  };
+
+  const STATUS_LABELS: Record<string, string> = {
+    waiting_for_offers: 'Teklif Bekliyor',
+    open: 'Teklif Bekliyor',
+    pending: 'Beklemede',
+    offer_accepted: 'Teklif Kabul Edildi',
+    accepted: 'Teklif Kabul Edildi',
+    assigned: 'Taşıyıcı Atandı',
+    in_progress: 'Yükleme',
+    picked_up: 'Yük Alındı',
+    in_transit: 'Yolda',
+    delivered: 'Teslim Edildi',
+    completed: 'Tamamlandı',
+    cancelled: 'İptal Edildi',
+  };
+
+  const normalizeStatus = (raw?: any) => {
+    const s = String(raw || '').trim();
+    if (!s) return 'waiting_for_offers';
+    if (s === 'open') return 'waiting_for_offers';
+    return s;
+  };
+
+  const formatStatusText = (raw?: any) => {
+    const key = normalizeStatus(raw);
+    return STATUS_LABELS[key] || key;
+  };
+
+  const loadJobs = async (isLoadMore = false) => {
     try {
-      setLoading(true);
-      setError(null);
-      console.log('[JOBS] Loading jobs...');
+      if (isLoadMore) {
+        setIsLoadingMore(true);
+      } else {
+        setLoading(true);
+        setError(null);
+      }
+      if (showApiDebug) {
+        logger.log('[JOBS] Loading jobs...', isLoadMore ? '(load more)' : '');
+      }
+
+      const authToken = token || localStorage.getItem('authToken') || localStorage.getItem('token') || '';
 
       const params = new URLSearchParams({
         page: pagination.page.toString(),
@@ -126,25 +225,24 @@ const Jobs: React.FC = () => {
 
       let response: Response;
       try {
-        response = await fetch(
-          `${createApiUrl('/api/shipments/open')}?${params.toString()}`,
-          {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem('authToken')}`,
-              'Content-Type': 'application/json; charset=utf-8',
-              'Accept': 'application/json; charset=utf-8',
-            },
-            signal: controller.signal,
-          }
-        );
-
-        clearTimeout(timeoutId);
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('[JOBS] API error response:', errorText);
-          throw new Error(`Gönderiler yüklenemedi: ${response.status} ${response.statusText}`);
+        const requestUrl = `${createApiUrl('/api/shipments/open')}?${params.toString()}`;
+        if (showApiDebug) {
+          logger.debug('[JOBS] Request URL:', requestUrl);
         }
+        setLastRequestUrl(requestUrl);
+        response = await fetch(requestUrl, {
+          headers: {
+            Authorization: authToken ? `Bearer ${authToken}` : '',
+            'Content-Type': 'application/json; charset=utf-8',
+            'Accept': 'application/json; charset=utf-8',
+          },
+          signal: controller.signal,
+        });
+
+        if (showApiDebug) {
+          logger.debug('[JOBS] Response status:', response.status);
+        }
+        setLastResponseStatus(response.status);
       } catch (fetchError: any) {
         clearTimeout(timeoutId);
         if (fetchError.name === 'AbortError') {
@@ -156,21 +254,168 @@ const Jobs: React.FC = () => {
       // Ensure proper UTF-8 decoding
       const responseText = await response.text();
       const data = JSON.parse(responseText);
-      console.log('[JOBS] API response:', data);
+      if (showApiDebug) {
+        logger.debug('[JOBS] API response:', data);
+      }
 
       if (data.success) {
+        if (showApiDebug) {
+          logger.debug('[JOBS] API returned rows:', Array.isArray(data.data) ? data.data.length : 0);
+        }
+        setLastBackendTotal(typeof data?.pagination?.total === 'number' ? data.pagination.total : null);
         // Map API response to include all necessary fields
-        const mappedJobs = (data.data || []).map((job: any) => ({
-          ...job,
-          shipperName: job.senderName || job.shipperName,
-          senderType: job.senderType || job.userType || job.user_type || job.role,
-          pickupCity: job.pickupCity,
-          pickupDistrict: job.pickupDistrict,
-          deliveryCity: job.deliveryCity,
-          deliveryDistrict: job.deliveryDistrict,
-        }));
-        setJobs(mappedJobs);
-        console.log('[JOBS] Jobs loaded:', mappedJobs.length);
+        const mappedJobs = (data.data || []).map((job: any) => {
+          const requesterId = user?.id != null && String(user.id).trim() !== '' ? Number(user.id) : NaN;
+          const pickupCity =
+            job.pickupCity || job.pickup_city || job.pickupcity || job.fromCity || job.from_city || job.fromcity;
+          const pickupDistrict = job.pickupDistrict || job.pickup_district || job.pickupdistrict;
+          const deliveryCity =
+            job.deliveryCity || job.delivery_city || job.deliverycity || job.toCity || job.to_city || job.tocity;
+          const deliveryDistrict = job.deliveryDistrict || job.delivery_district || job.deliverydistrict;
+          const pickupAddress =
+            job.pickupAddress || job.pickup_address || job.pickupaddress || job.from_address || job.fromaddress || '';
+          const deliveryAddress =
+            job.deliveryAddress || job.delivery_address || job.deliveryaddress || job.to_address || job.toaddress || '';
+          const category = job.category || job.cargoType || job.shipmentType || job.categoryType;
+          const description = job.description || job.productDescription || '';
+          const title = sanitizeShipmentTitle(job.title || `${pickupCity || '—'} → ${deliveryCity || '—'}`);
+          const status = normalizeStatus(job.status);
+
+          const trackingNumber =
+            job.trackingNumber || job.tracking_number || job.trackingnumber ||
+            job.trackingCode || job.tracking_code || job.trackingcode ||
+            job.shipmentCode || job.shipment_code || job.shipmentcode ||
+            job.code || job.trackingNo || job.tracking_no || job.tracking;
+
+          let metadata: any = job.metadata ?? job.meta ?? job.shipment_meta ?? job.shipmentMeta;
+          if (typeof metadata === 'string') {
+            try {
+              metadata = JSON.parse(metadata);
+            } catch (_) {
+              // keep as string
+            }
+          }
+
+          const weight =
+            typeof job.weight === 'number'
+              ? job.weight
+              : typeof job.weight_kg === 'number'
+                ? job.weight_kg
+                : parseFloat(String(job.weight ?? job.weight_kg ?? 0)) || 0;
+
+          const dimensions =
+            job.dimensions || job.dimension || job.size || job.dimensions_text || '';
+
+          const quantity =
+            typeof job.quantity === 'number'
+              ? job.quantity
+              : typeof job.quantity_count === 'number'
+                ? job.quantity_count
+                : typeof job.itemCount === 'number'
+                  ? job.itemCount
+                  : typeof job.item_count === 'number'
+                    ? job.item_count
+                    : job.quantity != null
+                      ? Number(job.quantity)
+                      : job.quantity_count != null
+                        ? Number(job.quantity_count)
+                        : job.itemCount != null
+                          ? Number(job.itemCount)
+                          : job.item_count != null
+                            ? Number(job.item_count)
+                            : undefined;
+
+          let categoryData: any = job.categoryData || job.category_data || undefined;
+          if (typeof categoryData === 'string') {
+            try {
+              categoryData = JSON.parse(categoryData);
+            } catch (_) {
+              categoryData = undefined;
+            }
+          }
+
+          const publishTypeRaw =
+            job.publishType || job.publish_type || metadata?.publishType || metadata?.publish_type || null;
+          const publishType = String(publishTypeRaw || '').trim().toLowerCase();
+          const targetIdRaw =
+            job.targetNakliyeciId || job.target_nakliyeci_id || metadata?.targetNakliyeciId || metadata?.target_nakliyeci_id;
+          const targetId = targetIdRaw != null && String(targetIdRaw).trim() !== '' ? Number(targetIdRaw) : null;
+          const exclusiveFallback = publishType === 'specific' && targetId != null && Number.isFinite(requesterId) && requesterId === Number(targetId);
+
+          const volume =
+            typeof job.volume === 'number'
+              ? job.volume
+              : typeof job.volume_m3 === 'number'
+                ? job.volume_m3
+                : typeof job.cbm === 'number'
+                  ? job.cbm
+                  : parseFloat(String(job.volume ?? job.volume_m3 ?? job.cbm ?? '')) || undefined;
+
+          const price =
+            typeof job.price === 'number'
+              ? job.price
+              : typeof job.budget === 'number'
+                ? job.budget
+                : typeof job.targetPrice === 'number'
+                  ? job.targetPrice
+                  : typeof job.expectedPrice === 'number'
+                    ? job.expectedPrice
+                    : typeof job.displayPrice === 'number'
+                      ? job.displayPrice
+                      : parseFloat(
+                          String(
+                            job.price ??
+                              job.budget ??
+                              job.targetPrice ??
+                              job.expectedPrice ??
+                              job.displayPrice ??
+                              ''
+                          ).replace(/[^0-9.,-]/g, '').replace(',', '.')
+                        ) || 0;
+
+          return {
+            ...job,
+            id: job.id,
+            title,
+            description,
+            pickupAddress: sanitizeAddressLabel(pickupAddress),
+            deliveryAddress: sanitizeAddressLabel(deliveryAddress),
+            pickupCity,
+            pickupDistrict,
+            deliveryCity,
+            deliveryDistrict,
+            status,
+            trackingNumber: normalizeTrackingCode(trackingNumber, job.id),
+            trackingCode: normalizeTrackingCode(job.trackingCode || job.tracking_code || job.trackingcode, job.id),
+            shipmentCode: job.shipmentCode || job.shipment_code || job.shipmentcode,
+            code: job.code,
+            metadata,
+            weight,
+            dimensions,
+            quantity,
+            categoryData,
+            volume,
+            price,
+            createdAt: job.createdAt || job.created_at || '',
+            specialRequirements: job.specialRequirements || job.special_requirements || '',
+            shipperName: job.senderName || job.shipperName || job.ownerName || job.owner_name,
+            shipperEmail: job.senderEmail || job.shipperEmail || job.ownerEmail || job.owner_email || job.email,
+            shipperPhone: job.senderPhone || job.shipperPhone || job.ownerPhone || job.owner_phone || job.phone,
+            senderType:
+              job.senderType ||
+              job.userType ||
+              job.user_type ||
+              job.ownerRole ||
+              job.owner_role ||
+              job.role,
+            isExclusiveToCarrier: !!job.isExclusiveToCarrier || exclusiveFallback,
+          };
+        });
+        setJobs(prev => (isLoadMore ? [...prev, ...mappedJobs] : mappedJobs));
+        if (showApiDebug) {
+          logger.debug('[JOBS] Jobs loaded:', mappedJobs.length);
+          logger.debug('[JOBS] Total jobs:', data.pagination.total);
+        }
         if (data.pagination) {
           setPagination(prev => ({
             ...prev,
@@ -178,18 +423,25 @@ const Jobs: React.FC = () => {
             pages: data.pagination.pages,
             total: data.pagination.total,
           }));
+          setHasMore(data.pagination.page < data.pagination.pages);
         }
       } else {
-        throw new Error(data.message || 'Gönderiler yüklenemedi');
+        const errorMessage = data.message || 'İş ilanları yüklenirken bir hata oluştu.';
+        logger.error('[JOBS] API Error:', errorMessage);
+        setError(errorMessage);
+        // Set empty jobs array to show empty state instead of staying in loading
+        setJobs([]);
+        setLastBackendTotal(null);
       }
-    } catch (err) {
-      console.error('Gönderiler yüklenemedi:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Bilinmeyen hata';
+    } catch (err: any) {
+      logger.error('[JOBS] Fetch error:', err);
+      const errorMessage = err.message || 'İş ilanları yüklenirken bir hata oluştu.';
       setError(errorMessage);
-      // Set empty jobs array to show empty state instead of staying in loading
       setJobs([]);
+      setLastBackendTotal(null);
     } finally {
       setLoading(false);
+      setIsLoadingMore(false);
     }
   };
 
@@ -200,6 +452,7 @@ const Jobs: React.FC = () => {
     }
 
     try {
+      const authToken = token || localStorage.getItem('authToken') || localStorage.getItem('token') || '';
       const offerData = {
         shipmentId: selectedJob.id,
         price: parseFloat(trimmedPrice),
@@ -211,33 +464,45 @@ const Jobs: React.FC = () => {
       const response = await fetch(createApiUrl('/api/offers'), {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${localStorage.getItem('authToken')}`,
+          Authorization: authToken ? `Bearer ${authToken}` : '',
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(offerData),
       });
 
-      const data = await response.json();
+      const data = await response.json().catch(() => ({} as any));
       
       if (response.ok) {
+        setSuccessMessage(data?.message || 'Teklifiniz başarıyla iletilmiştir. Gönderici tarafından değerlendirilecektir. Kabul edildiğinde ödeme güvence altına alınır ve bildirim alırsınız.');
+        setShowSuccessMessage(true);
+        setError(null);
+
+        // Remove from current list immediately (so it "pazardan düşer")
+        setJobs(prev => prev.filter(j => j.id !== selectedJob.id));
+
+        // Close & reset modal
         setShowOfferModal(false);
         setOfferPrice('');
         setOfferMessage('');
-        setSuccessMessage(data.message || 'Teklifiniz başarıyla gönderildi!');
-        setShowSuccessMessage(true);
-        setError(null);
-        // Reload jobs to ensure sync with backend
-        await loadJobs();
         setSelectedJob(null);
+
+        // Reload jobs to ensure sync with backend (esp. pagination/filters)
+        await loadJobs();
       } else {
-        const errorMessage = data.message || data.error || 'Teklif gönderilemedi';
+        const errorMessage =
+          data?.message ||
+          data?.error ||
+          data?.details ||
+          (response.status === 402
+            ? 'Teklif oluşturulamadı: Cüzdan bakiyesi yetersiz'
+            : `Teklif gönderilemedi (HTTP ${response.status})`);
         setError(errorMessage);
-        setShowOfferModal(false);
+        // Keep modal open so user can adjust price/message and retry
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Teklif gönderilirken bir hata oluştu';
       setError(errorMessage);
-      setShowOfferModal(false);
+      // Keep modal open to allow retry
     }
   };
 
@@ -245,10 +510,11 @@ const Jobs: React.FC = () => {
     if (!selectedJob || !offerPrice) return;
 
     try {
+      const authToken = token || localStorage.getItem('authToken') || localStorage.getItem('token') || '';
       const response = await fetch(createApiUrl('/api/offers'), {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${localStorage.getItem('authToken')}`,
+          Authorization: authToken ? `Bearer ${authToken}` : '',
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -262,7 +528,7 @@ const Jobs: React.FC = () => {
       });
 
       if (response.ok) {
-        setSuccessMessage('Teklifiniz başarıyla gönderildi!');
+        setSuccessMessage('Teklifiniz gönderildi. Gönderici onayladığında bildirim alacaksınız.');
         setShowSuccessMessage(true);
         setShowOfferModal(false);
         setOfferPrice('');
@@ -274,7 +540,7 @@ const Jobs: React.FC = () => {
         setError('Teklif gönderilirken hata oluştu');
       }
     } catch (err) {
-      console.error('Teklif gönderme hatası:', err);
+      logger.error('Teklif gönderme hatası:', err);
       setError('Teklif gönderilirken hata oluştu');
     }
   };
@@ -351,6 +617,34 @@ const Jobs: React.FC = () => {
       const jv = normalize(job.deliveryAddress || '');
       const pickupCity = normalize(job.pickupCity || '');
       const deliveryCity = normalize(job.deliveryCity || '');
+      const jid = normalize(String(job.id ?? ''));
+      const tracking = normalize(
+        String(
+          normalizeTrackingCode(
+            job.trackingNumber ?? job.trackingCode ?? job.shipmentCode ?? job.code,
+            job.id
+          )
+        )
+      );
+      const metaText = normalize(
+        typeof job.metadata === 'string'
+          ? job.metadata
+          : job.metadata && typeof job.metadata === 'object'
+            ? JSON.stringify(job.metadata)
+            : ''
+      );
+      const freeDigits = free ? String(free).replace(/\D/g, '') : '';
+      const freeDigitsNorm = freeDigits.replace(/^0+/, '');
+      const idNorm = String(job.id ?? '').replace(/^0+/, '');
+      const trackingDigitsNorm = String(
+        normalizeTrackingCode(job.trackingNumber ?? job.trackingCode ?? job.shipmentCode ?? job.code, job.id).replace(/\D/g, '')
+      ).replace(/^0+/, '');
+      const matchesDigits =
+        !freeDigitsNorm ||
+        (idNorm && freeDigitsNorm.includes(idNorm)) ||
+        (trackingDigitsNorm && freeDigitsNorm.includes(trackingDigitsNorm)) ||
+        (idNorm && freeDigitsNorm === idNorm) ||
+        (trackingDigitsNorm && freeDigitsNorm === trackingDigitsNorm);
       
       // Free text search (only if not using city filters from search term)
       const matchesSearch =
@@ -360,7 +654,11 @@ const Jobs: React.FC = () => {
         jp.includes(free) ||
         jv.includes(free) ||
         pickupCity.includes(free) ||
-        deliveryCity.includes(free);
+        deliveryCity.includes(free) ||
+        jid.includes(free) ||
+        tracking.includes(free) ||
+        metaText.includes(free) ||
+        matchesDigits;
 
       const matchesStatus = statusFilter === 'all' || job.status === statusFilter;
 
@@ -381,6 +679,11 @@ const Jobs: React.FC = () => {
       );
     })
     .sort((a, b) => {
+      // Always show "Sana Özel" jobs first
+      const exA = a.isExclusiveToCarrier ? 1 : 0;
+      const exB = b.isExclusiveToCarrier ? 1 : 0;
+      if (exA !== exB) return exB - exA;
+
       let comparison = 0;
       
       if (sortBy === 'date') {
@@ -411,6 +714,12 @@ const Jobs: React.FC = () => {
     
     const categoryMap: { [key: string]: string } = {
       'house_move': 'Ev Taşınması',
+      'warehouse_transfer': 'Depo Transferi',
+      'raw_materials': 'Hammadde',
+      'special_cargo': 'Özel Yük',
+      'chemical_hazardous': 'Kimyasal / Tehlikeli Madde',
+      'automotive_parts': 'Otomotiv Parçaları',
+      'furniture': 'Mobilya',
       'furniture_goods': 'Mobilya Taşıma',
       'electronics': 'Elektronik & Teknoloji',
       'clothing': 'Giyim & Tekstil',
@@ -419,9 +728,269 @@ const Jobs: React.FC = () => {
       'automotive': 'Otomotiv',
       'medical': 'Tıbbi Malzemeler',
       'other': 'Diğer',
+      'general': 'Genel Gönderi',
+      // Kurumsal kategoriler
+      'retail_consumer': 'Perakende & Tüketim Malı',
+      'retail consumer': 'Perakende & Tüketim Malı',
+      'raw_materials_industrial': 'Ham Madde & Endüstriyel Mal',
+      'textile': 'Tekstil & Giyim',
+      'food_beverage': 'Gıda & İçecek',
+      'furniture_home': 'Mobilya & Ev Eşyası',
+      'chemical': 'Kimyasal & Tehlikeli Madde',
+      'document': 'Doküman & Önemli Kargo',
+      'warehouse': 'Depo Transferi',
+      'bulk': 'Dökme Yük',
+      'refrigerated': 'Soğutmalı Yük',
+      'oversized': 'Büyük Boy Yük',
+      'office': 'Ofis Ekipmanı',
+      'machinery': 'Makine & Ekipman',
+      'exhibition': 'Vitrin & Sergi Malzemesi',
     };
-    
-    return categoryMap[category.toLowerCase()] || category;
+
+    const raw = String(category || '').trim();
+    const key = raw.toLowerCase();
+    const mapped = categoryMap[key];
+    if (mapped) return mapped;
+
+    // Fallback: never show raw snake_case / english-ish codes to nakliyeci.
+    const humanize = (s: string) =>
+      s
+        .replace(/[_-]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    const translateTokens: Record<string, string> = {
+      general: 'Genel',
+      shipment: 'Gönderi',
+      cargo: 'Kargo',
+      load: 'Yük',
+      fragile: 'Kırılabilir',
+      heavy: 'Ağır',
+      pallet: 'Palet',
+      parcel: 'Koli/Parça',
+      container: 'Konteyner',
+      food: 'Gıda',
+      textile: 'Tekstil',
+      electronics: 'Elektronik',
+      furniture: 'Mobilya',
+      automotive: 'Otomotiv',
+      chemical: 'Kimyasal',
+      machinery: 'Makine',
+      construction: 'İnşaat',
+      house: 'Ev',
+      move: 'Taşınma',
+      transfer: 'Transfer',
+      warehouse: 'Depo',
+      materials: 'Malzemeler',
+      raw: 'Hammadde',
+      parts: 'Parçaları',
+      medical: 'Tıbbi',
+      clothing: 'Giyim',
+      hazardous: 'Tehlikeli',
+      special: 'Özel',
+      other: 'Diğer',
+    };
+
+    const looksLikeCode = /^[a-z0-9_\-\s]+$/.test(key);
+    if (!looksLikeCode) return raw;
+
+    const tokens = humanize(key).split(' ').filter(Boolean);
+    const translated = tokens.map(t => translateTokens[t] || t);
+    const titled = translated
+      .map(w => (w.length ? w.charAt(0).toUpperCase() + w.slice(1) : w))
+      .join(' ');
+
+    return titled || 'Genel Gönderi';
+  };
+
+  const getCategoryDetailLines = (job: Job): Array<{ label: string; value: string }> => {
+    const cd = job.categoryData && typeof job.categoryData === 'object' ? job.categoryData : null;
+    if (!cd) return [];
+
+    const lines: Array<{ label: string; value: string }> = [];
+    const add = (label: string, v: any) => {
+      if (v == null) return;
+      if (typeof v === 'string' && v.trim() === '') return;
+      if (typeof v === 'boolean') {
+        if (v) lines.push({ label, value: 'Evet' });
+        return;
+      }
+      lines.push({ label, value: String(v) });
+    };
+
+    // These are fields coming from CreateShipment form's categoryData
+    add('Birim Tipi', cd.unitType);
+    add('Malzeme Tipi', cd.materialType);
+    add('Ambalaj Tipi', cd.packagingType);
+    add('Paletli', cd.isPalletized);
+    add('Palet Sayısı', cd.palletCount);
+    add('Tehlike Sınıfı', cd.hazardClass);
+    add('UN No', cd.unNumber);
+    add('MSDS', cd.hasMSDS);
+    add('Son Kullanma', cd.expiryDate);
+    add('Sıcaklık Seti', cd.temperatureSetpoint);
+    add('Soğuk Zincir', cd.coldChainRequired ?? cd.requiresColdChain ?? cd.temperatureControlled);
+    add('Yükleme Ekipmanı', cd.loadingEquipment);
+    add('Depo Tipi', cd.warehouseType);
+    add('Dökme Transfer', cd.isBulkTransfer);
+    add('Dökme Tipi', cd.bulkType);
+    add('Üst Örtü', cd.requiresCover);
+    add('Orijinal Ambalaj', cd.isOriginalPackaging);
+    add('Kırılgan', cd.isFragile);
+    add('Anti-Statik', cd.requiresAntiStatic);
+    add('Malzeme Miktarı', cd.materialQuantity);
+    add('Hava Koşulu Koruma', cd.requiresWeatherProtection);
+    add('Ekipman Tipi', cd.equipmentType);
+    add('Montaj', cd.requiresAssembly);
+    add('Özel Araç', cd.requiresSpecialVehicle);
+    add('Özel İzin', cd.requiresSpecialPermit);
+    add('Sertifika', cd.hasCertification);
+
+    // Araç ve Ekipman Gereksinimleri (vehicleRequirements)
+    if (cd.vehicleRequirements && typeof cd.vehicleRequirements === 'object') {
+      const vr = cd.vehicleRequirements;
+      if (vr.vehicleType) {
+        const vehicleTypeMap: Record<string, string> = {
+          'van': 'Van',
+          'kamyonet': 'Kamyonet',
+          'kamyon': 'Kamyon',
+          'refrigerated': 'Soğutmalı Araç',
+          'open_truck': 'Açık Kasa Kamyon',
+          'closed_truck': 'Kapalı Kasa Kamyon',
+        };
+        add('Araç Tipi', vehicleTypeMap[vr.vehicleType] || vr.vehicleType);
+      }
+      if (vr.trailerType) {
+        const trailerTypeMap: Record<string, string> = {
+          'tenteli': 'Tenteli Dorse',
+          'frigorific': 'Frigorifik Dorse',
+          'lowbed': 'Lowbed Dorse',
+          'kapalı': 'Kapalı Dorse',
+          'açık': 'Açık Dorse',
+          'yok': 'Dorse Gerekmiyor',
+        };
+        add('Dorse Tipi', trailerTypeMap[vr.trailerType] || vr.trailerType);
+      }
+      add('Vinç Gerekli', vr.requiresCrane);
+      add('Forklift Gerekli', vr.requiresForklift);
+      add('Hidrolik Kaldırıcı Gerekli', vr.requiresHydraulicLifter);
+      if (vr.heavyTonage) {
+        add('Ağır Tonaj', vr.heavyTonageAmount ? `${vr.heavyTonageAmount} ton` : '40+ ton');
+      }
+      if (vr.oversizedLoad) {
+        const dims = vr.oversizedDimensions;
+        if (dims && (dims.length || dims.width || dims.height)) {
+          const dimStr = [dims.length, dims.width, dims.height].filter(Boolean).join(' x ');
+          add('Geniş Yük Boyutları', dimStr ? `${dimStr} m` : 'Özel izin gerektiren');
+        } else {
+          add('Geniş Yük', 'Özel izin gerektiren');
+        }
+      }
+      if (vr.temperatureControl) {
+        const tempRange = [vr.temperatureMin, vr.temperatureMax].filter(Boolean).join(' - ');
+        add('Sıcaklık Kontrolü', tempRange ? `${tempRange} ℃` : 'Gerekli');
+      }
+    }
+
+    return lines;
+  };
+
+  const getAllCategoryDataLines = (job: Job): Array<{ label: string; value: string }> => {
+    const cd = job.categoryData && typeof job.categoryData === 'object' ? job.categoryData : null;
+    if (!cd) return [];
+
+    const known = getCategoryDetailLines(job);
+    const knownLabels = new Set(known.map(x => x.label));
+
+    const formatKey = (k: string) => {
+      const s = String(k || '').replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
+      if (!s) return '';
+      return s.charAt(0).toUpperCase() + s.slice(1);
+    };
+
+    const extra: Array<{ label: string; value: string }> = [];
+    const normKey = (k: string) => String(k || '').replace(/[_\s]/g, '').toLowerCase();
+    const skipKeys = new Set(
+      [
+        'unitType',
+        'unNumber',
+        'hazardClass',
+        'hasMsds',
+        'requiresSpecialPermit',
+        'msds',
+      ].map(normKey)
+    );
+    const addExtra = (k: string, v: any) => {
+      if (v == null) return;
+      if (typeof v === 'string' && v.trim() === '') return;
+      if (skipKeys.has(normKey(k))) return;
+      const label = formatKey(k);
+      if (!label) return;
+      if (knownLabels.has(label)) return;
+      if (typeof v === 'boolean') {
+        if (v) extra.push({ label, value: 'Evet' });
+        return;
+      }
+      if (typeof v === 'object') {
+        try {
+          extra.push({ label, value: JSON.stringify(v) });
+        } catch (_) {
+          extra.push({ label, value: String(v) });
+        }
+        return;
+      }
+      extra.push({ label, value: String(v) });
+    };
+
+    Object.keys(cd).forEach((k) => addExtra(k, (cd as any)[k]));
+
+    return [...known, ...extra];
+  };
+
+  const getQuickInfoLines = (job: Job): Array<{ label: string; value: string }> => {
+    const lines: Array<{ label: string; value: string }> = [];
+    const add = (label: string, value: any) => {
+      if (value == null) return;
+      const v = String(value).trim();
+      if (!v) return;
+      lines.push({ label, value: v });
+    };
+
+    add('Başlangıç', [job.pickupCity, job.pickupDistrict].filter(Boolean).join(', '));
+    add('Bitiş', [job.deliveryCity, job.deliveryDistrict].filter(Boolean).join(', '));
+    add('Yükleme Adresi', sanitizeAddressLabel(job.pickupAddress));
+    add('Teslim Adresi', sanitizeAddressLabel(job.deliveryAddress));
+    add('Yükleme Tarihi', job.pickupDate ? formatDate(job.pickupDate, 'long') : '');
+    add('Teslim Tarihi', job.deliveryDate ? formatDate(job.deliveryDate, 'long') : '');
+    add('Ağırlık', job.weight && job.weight > 0 ? `${job.weight} kg` : '');
+    add('Hacim', job.volume && Number(job.volume) > 0 ? `${job.volume}` : '');
+    add('Ölçüler', job.dimensions);
+    add('Adet', job.quantity && Number(job.quantity) > 0 ? `${job.quantity}` : '');
+    add('Özel İstekler', job.specialRequirements);
+    add('Bütçe', job.price && job.price > 0 ? formatPrice(job.price) : '');
+
+    for (const l of getAllCategoryDataLines(job)) {
+      add(l.label, l.value);
+    }
+
+    return lines;
+  };
+
+  const openDetailModal = (job: Job) => {
+    setDetailJob(job);
+    setShowDetailModal(true);
+  };
+
+  const getJobMeta = (job: any): any => {
+    let meta: any = job?.metadata;
+    if (typeof meta === 'string') {
+      try {
+        meta = JSON.parse(meta);
+      } catch (_) {
+        meta = null;
+      }
+    }
+    return meta && typeof meta === 'object' ? meta : null;
   };
 
   const breadcrumbItems = [
@@ -462,6 +1031,24 @@ const Jobs: React.FC = () => {
           <Breadcrumb items={breadcrumbItems} />
         </div>
 
+        <div className='mb-6'>
+          <GuidanceOverlay
+            storageKey='nakliyeci.jobs'
+            isEmpty={!loading && jobs.length === 0}
+            icon={Package}
+            title='İş İlanları'
+            description='Açık gönderiler için teklif verin. Teklif kabul edildiğinde ödeme güvence altına alınır ve işlem başlar. Teklif durumunuzu "Tekliflerim" sayfasından takip edebilirsiniz.'
+            primaryAction={{
+              label: 'Aktif Yükler',
+              to: '/nakliyeci/active-shipments',
+            }}
+            secondaryAction={{
+              label: 'Tekliflerim',
+              to: '/nakliyeci/offers',
+            }}
+          />
+        </div>
+
         {/* Header */}
         <div className='text-center mb-8 sm:mb-12'>
           <div className='flex justify-center mb-4 sm:mb-6'>
@@ -486,12 +1073,15 @@ const Jobs: React.FC = () => {
         <div className='flex justify-center mb-8'>
           <div className='flex flex-wrap gap-2 sm:gap-3'>
             <button
-              onClick={loadJobs}
+              onClick={() => {
+                setPagination(prev => ({ ...prev, page: 1, limit: Math.max(prev.limit, 50) }));
+              }}
               className='flex items-center gap-2 px-4 py-2 bg-white text-slate-700 rounded-lg hover:bg-slate-50 transition-colors shadow-lg border border-slate-200'
             >
               <RefreshCw className='w-4 h-4' />
               Yenile
             </button>
+
             <button
               onClick={() => setShowFilters(!showFilters)}
               className='flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-slate-800 to-blue-900 text-white rounded-lg hover:shadow-lg transition-all duration-200 font-medium'
@@ -501,6 +1091,12 @@ const Jobs: React.FC = () => {
             </button>
           </div>
         </div>
+
+        {showApiDebug && (
+          <div className='text-[11px] text-slate-500 break-all'>
+            API: {lastRequestUrl || '—'} {lastResponseStatus != null ? `(${lastResponseStatus})` : ''}
+          </div>
+        )}
 
         {/* Filters */}
         {showFilters && (
@@ -672,206 +1268,397 @@ const Jobs: React.FC = () => {
 
         {/* Jobs List */}
         {!loading && filteredJobs.length === 0 ? (
-          <EmptyState
-            icon={Package}
-            title='Henüz iş ilanı yok'
-            description='Şu anda görüntülenecek açık gönderi bulunmuyor.'
-            action={{
-              label: 'Yeniden Yükle',
-              onClick: loadJobs,
-            }}
-          />
+          <div className='min-h-[50vh] flex items-center justify-center'>
+            <div className='bg-white rounded-2xl shadow-xl border border-slate-200 p-10 text-center w-full max-w-2xl'>
+              <EmptyState
+                icon={Package}
+                title='Şimdilik iş yok'
+                description='Yeni gönderiler gelince burada görünecek. Filtreleri temizleyip tekrar deneyebilirsiniz.'
+                action={{
+                  label: 'Filtreleri Temizle',
+                  onClick: () => {
+                    setSearchTerm('');
+                    setFilterFromCity('');
+                    setFilterToCity('');
+                    setStatusFilter('all');
+                    setPriceFilter('all');
+                    setSortBy('date');
+                    setSortOrder('desc');
+                  },
+                }}
+              />
+            </div>
+          </div>
         ) : (
-          <div className='grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6'>
-            {filteredJobs.map(job => (
-              <div
-                key={job.id}
-                className='bg-white rounded-xl shadow-lg border border-slate-200 hover:shadow-xl transition-all duration-200 overflow-hidden'
-              >
-                {/* Header */}
-                <div className='p-4 sm:p-6 border-b border-slate-200'>
-                  <div className='flex items-start justify-between mb-3'>
-                    <div className='flex-1'>
-                      <h3 className='text-lg font-bold text-slate-900 mb-1'>
-                        {getCategoryName(job.category)}
-                      </h3>
-                      <p className='text-sm text-slate-600 line-clamp-3 break-words'>
-                        {job.description || job.title || 'Açıklama belirtilmemiş'}
-                      </p>
-                    </div>
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        job.status === 'pending'
-                          ? 'bg-yellow-100 text-yellow-800'
-                          : job.status === 'accepted'
-                            ? 'bg-green-100 text-green-800'
-                            : job.status === 'in_progress'
-                              ? 'bg-blue-100 text-blue-800'
-                              : 'bg-slate-100 text-slate-800'
-                      }`}
-                    >
-                      {job.status === 'pending'
-                        ? 'Bekleyen'
-                        : job.status === 'accepted'
-                          ? 'Kabul Edilen'
-                          : job.status === 'in_progress'
-                            ? 'Devam Eden'
-                            : job.status}
-                    </span>
-                  </div>
+          <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-4'>
+            {filteredJobs.map(job => {
+              const routeText = (job.pickupCity || job.pickupDistrict || job.deliveryCity || job.deliveryDistrict)
+                ? `${[job.pickupCity, job.pickupDistrict].filter(Boolean).join(', ')} → ${[job.deliveryCity, job.deliveryDistrict].filter(Boolean).join(', ')}`
+                : '';
+              const showBudget = job.price > 0;
+              const showPickup = !!job.pickupDate;
+              const categoryName = getCategoryName(job.category);
+              const isExclusive = !!job.isExclusiveToCarrier;
 
-                  <div className='flex items-center gap-2 text-slate-600 mb-3'>
-                    <MapPin className='w-4 h-4' />
-                    <span className='text-sm'>
-                      {(() => {
-                        // Fix common encoding issues for Turkish characters
-                        const fixEncoding = (str: string | null | undefined): string => {
-                          if (!str) return '';
-                          let fixed = str;
-                          
-                          // Remove replacement characters first
-                          fixed = fixed.replace(/\uFFFD/g, '');
-                          fixed = fixed.replace(/�/g, '');
-                          
-                          // Fix common encoding issues (replacement characters)
-                          fixed = fixed.replace(/�/g, 'İ');
-                          fixed = fixed.replace(/�/g, 'ı');
-                          fixed = fixed.replace(/�/g, 'ş');
-                          fixed = fixed.replace(/�/g, 'Ş');
-                          fixed = fixed.replace(/�/g, 'ğ');
-                          fixed = fixed.replace(/�/g, 'Ğ');
-                          fixed = fixed.replace(/�/g, 'ü');
-                          fixed = fixed.replace(/�/g, 'Ü');
-                          fixed = fixed.replace(/�/g, 'ö');
-                          fixed = fixed.replace(/�/g, 'Ö');
-                          fixed = fixed.replace(/�/g, 'ç');
-                          fixed = fixed.replace(/�/g, 'Ç');
-                          
-                          // Fix common city name issues (case-insensitive, with or without Turkish chars)
-                          fixed = fixed.replace(/^stanbul$/i, 'İstanbul');
-                          fixed = fixed.replace(/^Istanbul$/i, 'İstanbul');
-                          fixed = fixed.replace(/^zmir$/i, 'İzmir');
-                          fixed = fixed.replace(/^Izmir$/i, 'İzmir');
-                          fixed = fixed.replace(/^anlurfa$/i, 'Şanlıurfa');
-                          fixed = fixed.replace(/^Sanliurfa$/i, 'Şanlıurfa');
-                          fixed = fixed.replace(/^Diyarbakr$/i, 'Diyarbakır');
-                          fixed = fixed.replace(/^Diyarbakir$/i, 'Diyarbakır');
-                          fixed = fixed.replace(/^Balkesir$/i, 'Balıkesir');
-                          fixed = fixed.replace(/^Balikesir$/i, 'Balıkesir');
-                          fixed = fixed.replace(/^Kahramanmara$/i, 'Kahramanmaraş');
-                          fixed = fixed.replace(/^Kahramanmaras$/i, 'Kahramanmaraş');
-                          fixed = fixed.replace(/^Aydn$/i, 'Aydın');
-                          fixed = fixed.replace(/^Aydin$/i, 'Aydın');
-                          fixed = fixed.replace(/^Tekirda$/i, 'Tekirdağ');
-                          fixed = fixed.replace(/^Tekirdag$/i, 'Tekirdağ');
-                          fixed = fixed.replace(/^Mula$/i, 'Muğla');
-                          fixed = fixed.replace(/^Mugla$/i, 'Muğla');
-                          fixed = fixed.replace(/^Elaz$/i, 'Elazığ');
-                          fixed = fixed.replace(/^Elazig$/i, 'Elazığ');
-                          fixed = fixed.replace(/^Ktahya$/i, 'Kütahya');
-                          fixed = fixed.replace(/^Kutahya$/i, 'Kütahya');
-                          fixed = fixed.replace(/^Uak$/i, 'Uşak');
-                          fixed = fixed.replace(/^Usak$/i, 'Uşak');
-                          fixed = fixed.replace(/^anakkale$/i, 'Çanakkale');
-                          fixed = fixed.replace(/^Canakkale$/i, 'Çanakkale');
-                          fixed = fixed.replace(/^orum$/i, 'Çorum');
-                          fixed = fixed.replace(/^Corum$/i, 'Çorum');
-                          fixed = fixed.replace(/^Nevehir$/i, 'Nevşehir');
-                          fixed = fixed.replace(/^Nevsehir$/i, 'Nevşehir');
-                          fixed = fixed.replace(/^Nide$/i, 'Niğde');
-                          fixed = fixed.replace(/^Nigde$/i, 'Niğde');
-                          fixed = fixed.replace(/^Krehir$/i, 'Kırşehir');
-                          fixed = fixed.replace(/^Kirsehir$/i, 'Kırşehir');
-                          fixed = fixed.replace(/^Kr�ehir$/i, 'Kırşehir');
-                          fixed = fixed.replace(/^Ar$/i, 'Ağrı');
-                          fixed = fixed.replace(/^Agri$/i, 'Ağrı');
-                          fixed = fixed.replace(/^Idr$/i, 'Iğdır');
-                          fixed = fixed.replace(/^Igdir$/i, 'Iğdır');
-                          fixed = fixed.replace(/^Bingl$/i, 'Bingöl');
-                          fixed = fixed.replace(/^Bingol$/i, 'Bingöl');
-                          fixed = fixed.replace(/^Mu(?![ğla])$/i, 'Muş'); // Mu but not Muğla
-                          fixed = fixed.replace(/^Mus$/i, 'Muş');
-                          fixed = fixed.replace(/^rnak$/i, 'Şırnak');
-                          fixed = fixed.replace(/^Sirnak$/i, 'Şırnak');
-                          
-                          return fixed;
-                        };
-                        const from = job.pickupCity 
-                          ? (job.pickupDistrict ? `${fixEncoding(job.pickupCity)}, ${fixEncoding(job.pickupDistrict)}` : fixEncoding(job.pickupCity))
-                          : (job.pickupAddress || 'Adres belirtilmemiş');
-                        const to = job.deliveryCity 
-                          ? (job.deliveryDistrict ? `${fixEncoding(job.deliveryCity)}, ${fixEncoding(job.deliveryDistrict)}` : fixEncoding(job.deliveryCity))
-                          : (job.deliveryAddress || 'Adres belirtilmemiş');
-                        return `${from} → ${to}`;
-                      })()}
-                    </span>
-                  </div>
-
-                  <div className='flex items-center gap-4 text-sm text-slate-600'>
-                    <div className='flex items-center gap-1'>
-                      <Clock className='w-4 h-4' />
-                      <span>{formatDate(job.pickupDate, 'long')}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Content */}
-                <div className='p-4 sm:p-6'>
-                  <div className='flex items-center justify-end mb-4'>
-                    <div className='text-right'>
-                      <div className='text-sm text-slate-600'>Gönderen</div>
-                      <div className='font-medium text-slate-900'>
-                        {(() => {
-                          const senderType = job.senderType || job.userType || job.user_type || job.role;
-                          // Sadece individual veya corporate gönderen olabilir
-                          if (senderType === 'individual') return 'Bireysel Gönderici';
-                          if (senderType === 'corporate') return 'Kurumsal Gönderici';
-                          // Diğer roller (nakliyeci, tasiyici) gönderen olamaz
-                          return 'Bilinmiyor';
-                        })()}
+              return (
+                <div
+                  key={job.id}
+                  className={
+                    isExclusive
+                      ? 'h-full relative rounded-2xl ring-1 ring-amber-300/70 shadow-[0_10px_30px_-18px_rgba(245,158,11,0.65)]'
+                      : 'h-full relative'
+                  }
+                >
+                  <div
+                    className={`h-full bg-white rounded-2xl border overflow-hidden relative ${
+                      isExclusive ? 'border-amber-200/70 shadow-md' : 'border-slate-200 shadow-md'
+                    }`}
+                  >
+                    {isExclusive ? (
+                      <div className='pointer-events-none absolute -top-3 -right-10 rotate-45'>
+                        <div className='bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[11px] font-extrabold px-10 py-1 shadow-lg'>
+                          Sana Özel
+                        </div>
                       </div>
-                    </div>
-                  </div>
-
-                  {job.specialRequirements && (
-                    <div className='mb-4 p-3 bg-slate-50 rounded-lg'>
-                      <div className='text-sm font-medium text-slate-700 mb-1'>
-                        Özel Gereksinimler:
+                    ) : null}
+                    <div className='h-full p-4 flex flex-col'>
+                      <div className='flex items-start justify-between gap-2'>
+                        <div className='min-w-0 flex-1'>
+                          <div className='text-sm font-semibold text-slate-900 truncate'>
+                            {routeText || categoryName}
+                          </div>
+                          <div className='mt-1 flex items-center gap-2 flex-wrap'>
+                            <span className='inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-800 border border-slate-200'>
+                              {categoryName}
+                            </span>
+                            {isExclusive && (
+                              <span className='inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-900 border border-amber-200 shadow-sm'>
+                                Sana Özel
+                              </span>
+                            )}
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${
+                                normalizeStatus(job.status) === 'pending'
+                                  ? 'bg-yellow-100 text-yellow-800'
+                                  : normalizeStatus(job.status) === 'offer_accepted' || normalizeStatus(job.status) === 'accepted'
+                                    ? 'bg-green-100 text-green-800'
+                                    : normalizeStatus(job.status) === 'in_progress' || normalizeStatus(job.status) === 'in_transit'
+                                      ? 'bg-blue-100 text-blue-800'
+                                      : 'bg-slate-100 text-slate-800'
+                              }`}
+                            >
+                              {formatStatusText(job.status)}
+                            </span>
+                          </div>
+                        </div>
                       </div>
-                      <div className='text-sm text-slate-600 break-words whitespace-pre-wrap'>
-                        {job.specialRequirements}
-                      </div>
-                    </div>
-                  )}
 
-                  <div className='flex gap-2'>
-                    <button
-                      onClick={() => openOfferModal(job)}
-                      className='flex-1 bg-gradient-to-r from-slate-800 to-blue-900 text-white py-2 px-4 rounded-lg hover:shadow-lg transition-all duration-200 text-sm font-medium'
-                    >
-                      Teklif Ver
-                    </button>
-                    <button className='p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors'>
-                      <Eye className='w-4 h-4' />
-                    </button>
+                      {isExclusive && (
+                        <div className='mt-2 text-xs font-semibold text-orange-700'>
+                          Bu ilan sadece senin hesabına özel yayınlandı. Diğer nakliyeciler göremez.
+                        </div>
+                      )}
+
+                      {getQuickInfoLines(job).length > 0 ? (
+                        <div className='mt-2 flex-1'>
+                          <div className='text-[11px] font-semibold text-slate-700 mb-1'>Hızlı Bilgiler</div>
+                          <div className='grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-slate-700 max-h-[92px] overflow-auto pr-1'>
+                            {getQuickInfoLines(job)
+                              .slice(0, 16)
+                              .map((line, idx) => (
+                                <div key={idx} className='col-span-1 min-w-0'>
+                                  <span className='text-slate-500'>{line.label}:</span>{' '}
+                                  <span className='font-medium break-words'>{line.value}</span>
+                                </div>
+                              ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className='mt-2 text-xs text-slate-600 line-clamp-3 flex-1'>
+                          {(job.description || '').trim()}
+                        </div>
+                      )}
+
+                      <div className='mt-2 flex items-center gap-3 text-xs text-slate-600 flex-wrap'>
+                        {showPickup && (
+                          <span className='inline-flex items-center gap-1'>
+                            <Clock className='w-3.5 h-3.5' />
+                            {formatDate(job.pickupDate, 'long')}
+                          </span>
+                        )}
+                        {showBudget && (
+                          <span className='inline-flex items-center gap-1'>
+                            <DollarSign className='w-3.5 h-3.5' />
+                            {formatPrice(job.price)}
+                          </span>
+                        )}
+                        {!!job.weight && job.weight > 0 && (
+                          <span className='inline-flex items-center gap-1'>
+                            <Package className='w-3.5 h-3.5' />
+                            {`${job.weight} kg`}
+                          </span>
+                        )}
+                      </div>
+
+                    <div className='mt-auto pt-3 flex items-center gap-2'>
+                      <button
+                        type='button'
+                        onClick={() => openDetailModal(job)}
+                        className='flex-1 px-3 py-2 bg-slate-100 text-slate-800 rounded-lg hover:bg-slate-200 transition-all duration-200 text-xs font-medium'
+                      >
+                        Detay
+                      </button>
+                      <button
+                        onClick={() => openOfferModal(job)}
+                        className='flex-1 px-3 py-2 bg-gradient-to-r from-slate-800 to-blue-900 text-white rounded-lg hover:shadow-lg transition-all duration-200 text-xs font-medium'
+                      >
+                        Teklif Ver
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
-        {/* Pagination */}
-        {!loading && pagination.pages > 1 && (
-          <div className='mt-6 sm:mt-8'>
-            <Pagination
-              currentPage={pagination.page}
-              totalPages={pagination.pages}
-              onPageChange={(page) =>
-                setPagination((prev) => ({ ...prev, page }))
-              }
-            />
+        {/* Infinite Scroll Trigger */}
+        {!loading && hasMore && (
+          <div className='mt-6 sm:mt-8 flex justify-center'>
+            <button
+              onClick={loadMore}
+              disabled={isLoadingMore}
+              className='px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-slate-400 disabled:cursor-not-allowed transition-colors font-medium'
+            >
+              {isLoadingMore ? 'Yükleniyor...' : 'Daha fazla yükle'}
+            </button>
           </div>
+        )}
+        {!loading && !hasMore && jobs.length > 0 && (
+          <div className='mt-6 sm:mt-8 text-center text-slate-500 text-sm'>
+            Tüm ilanlar yüklendi.
+          </div>
+        )}
+
+        {/* Detail Modal */}
+        {showDetailModal && detailJob && (
+          <Modal
+            isOpen={showDetailModal}
+            onClose={() => {
+              setShowDetailModal(false);
+              setDetailJob(null);
+            }}
+            title='İlan Detayı'
+          >
+            <div className='space-y-3'>
+              {detailJob.isExclusiveToCarrier && (
+                <div className='p-3 bg-white rounded-lg border border-slate-200'>
+                  <div className='text-xs font-semibold text-slate-700 mb-2'>Yayın Bilgisi</div>
+                  <div className='text-sm text-slate-700'>Bu ilan sana özel yayınlandı.</div>
+                </div>
+              )}
+
+              {/* Temel Gönderi Bilgileri */}
+              <div className='p-3 bg-white rounded-lg border border-slate-200'>
+                <div className='text-xs font-semibold text-slate-700 mb-2'>Gönderi Bilgileri</div>
+                <div className='space-y-1 text-sm text-slate-700'>
+                  <div>
+                    <span className='font-semibold'>İlan No:</span>{' '}
+                    #{detailJob.id}
+                  </div>
+                  <div>
+                    <span className='font-semibold'>Kategori:</span>{' '}
+                    {detailJob.category || 'Belirtilmemiş'}
+                  </div>
+                  {detailJob.subcategory && (
+                    <div>
+                      <span className='font-semibold'>Alt Kategori:</span>{' '}
+                      {detailJob.subcategory}
+                    </div>
+                  )}
+                  <div>
+                    <span className='font-semibold'>Durum:</span>{' '}
+                    <span className='inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800'>
+                      {detailJob.status === 'pending' ? 'Teklif Bekliyor' : detailJob.status === 'offer_accepted' ? 'Teklif Kabul Edildi' : detailJob.status === 'in_progress' ? 'Devam Ediyor' : detailJob.status === 'delivered' ? 'Teslim Edildi' : detailJob.status}
+                    </span>
+                  </div>
+                  {detailJob.description && (
+                    <div>
+                      <span className='font-semibold'>Açıklama:</span>{' '}
+                      <span className='break-words'>{detailJob.description}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Adres Bilgileri */}
+              {(detailJob.pickupAddress || detailJob.deliveryAddress || detailJob.pickupCity || detailJob.deliveryCity) && (
+                <div className='p-3 bg-slate-50 rounded-lg border border-slate-200'>
+                  <div className='text-xs font-semibold text-slate-700 mb-2'>Adres Bilgileri</div>
+                  <div className='space-y-1 text-sm text-slate-700'>
+                    <div>
+                      <span className='font-semibold'>Yükleme Şehri:</span>{' '}
+                      {detailJob.pickupCity || 'Belirtilmemiş'}
+                    </div>
+                    {detailJob.pickupDistrict && (
+                      <div>
+                        <span className='font-semibold'>Yükleme İlçesi:</span>{' '}
+                        {detailJob.pickupDistrict}
+                      </div>
+                    )}
+                    {detailJob.pickupAddress && (
+                      <div>
+                        <span className='font-semibold'>Yükleme Adresi:</span>{' '}
+                        <span className='break-words'>{sanitizeAddressLabel(detailJob.pickupAddress)}</span>
+                      </div>
+                    )}
+                    <div>
+                      <span className='font-semibold'>Teslimat Şehri:</span>{' '}
+                      {detailJob.deliveryCity || 'Belirtilmemiş'}
+                    </div>
+                    {detailJob.deliveryDistrict && (
+                      <div>
+                        <span className='font-semibold'>Teslimat İlçesi:</span>{' '}
+                        {detailJob.deliveryDistrict}
+                      </div>
+                    )}
+                    {detailJob.deliveryAddress && (
+                      <div>
+                        <span className='font-semibold'>Teslimat Adresi:</span>{' '}
+                        <span className='break-words'>{sanitizeAddressLabel(detailJob.deliveryAddress)}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Zaman Bilgileri */}
+              {(detailJob.pickupDate || detailJob.deliveryDate) && (
+                <div className='p-3 bg-white rounded-lg border border-slate-200'>
+                  <div className='text-xs font-semibold text-slate-700 mb-2'>Zaman Bilgileri</div>
+                  <div className='space-y-1 text-sm text-slate-700'>
+                    {detailJob.pickupDate && (
+                      <div>
+                        <span className='font-semibold'>Yükleme Tarihi:</span>{' '}
+                        {formatDate(detailJob.pickupDate, 'long')}
+                      </div>
+                    )}
+                    {detailJob.deliveryDate && (
+                      <div>
+                        <span className='font-semibold'>Teslimat Tarihi:</span>{' '}
+                        {formatDate(detailJob.deliveryDate, 'long')}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Yük Özellikleri */}
+              {(detailJob.weight || detailJob.dimensions || detailJob.volume || (typeof detailJob.quantity === 'number' && Number.isFinite(detailJob.quantity))) && (
+                <div className='p-3 bg-slate-50 rounded-lg border border-slate-200'>
+                  <div className='text-xs font-semibold text-slate-700 mb-2'>Yük Özellikleri</div>
+                  <div className='space-y-1 text-sm text-slate-700'>
+                    {detailJob.weight && detailJob.weight > 0 && (
+                      <div>
+                        <span className='font-semibold'>Ağırlık:</span>{' '}
+                        {detailJob.weight} kg
+                      </div>
+                    )}
+                    {typeof detailJob.quantity === 'number' && Number.isFinite(detailJob.quantity) && (
+                      <div>
+                        <span className='font-semibold'>Miktar:</span>{' '}
+                        {detailJob.quantity} adet
+                      </div>
+                    )}
+                    {detailJob.volume && detailJob.volume > 0 && (
+                      <div>
+                        <span className='font-semibold'>Hacim:</span>{' '}
+                        {detailJob.volume.toFixed(2)} m³
+                      </div>
+                    )}
+                    {!!detailJob.dimensions && String(detailJob.dimensions).trim() !== '' && (
+                      <div>
+                        <span className='font-semibold'>Ölçüler:</span>{' '}
+                        <span className='break-words'>{String(detailJob.dimensions)}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Fiyat Bilgisi */}
+              {detailJob.price && detailJob.price > 0 && (
+                <div className='p-3 bg-white rounded-lg border border-slate-200'>
+                  <div className='text-xs font-semibold text-slate-700 mb-2'>Fiyat Bilgisi</div>
+                  <div className='space-y-1 text-sm text-slate-700'>
+                    <div>
+                      <span className='font-semibold'>Bütçe:</span>{' '}
+                      <span className='font-bold text-green-600'>₺{detailJob.price.toLocaleString('tr-TR')}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Özel Gereksinimler */}
+              {detailJob.specialRequirements && (
+                <div className='p-3 bg-slate-50 rounded-lg border border-slate-200'>
+                  <div className='text-xs font-semibold text-slate-700 mb-2'>Özel Gereksinimler</div>
+                  <div className='text-sm text-slate-600 break-words whitespace-pre-wrap'>
+                    {detailJob.specialRequirements}
+                  </div>
+                </div>
+              )}
+
+              {/* Formda Doldurulan Ek Bilgiler */}
+              {getAllCategoryDataLines(detailJob).length > 0 && (
+                <div className='p-3 bg-white rounded-lg border border-slate-200'>
+                  <div className='text-xs font-semibold text-slate-700 mb-2'>Ek Bilgiler</div>
+                  <div className='space-y-1 text-sm text-slate-700'>
+                    {getAllCategoryDataLines(detailJob).map((line, idx) => (
+                      <div key={idx} className='flex gap-2'>
+                        <span className='font-semibold text-slate-700 min-w-[110px]'>{line.label}:</span>
+                        <span className='break-words'>{line.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Gönderici Bilgileri */}
+              {detailJob.shipperName && (
+                <div className='p-3 bg-green-50 rounded-lg border border-green-200'>
+                  <div className='text-xs font-semibold text-slate-700 mb-2'>Gönderici Bilgileri</div>
+                  <div className='space-y-1 text-sm text-slate-700'>
+                    <div>
+                      <span className='font-semibold'>Gönderici Adı:</span>{' '}
+                      {detailJob.shipperName}
+                    </div>
+                    {detailJob.shipperEmail && (
+                      <div>
+                        <span className='font-semibold'>E-posta:</span>{' '}
+                        {detailJob.shipperEmail}
+                      </div>
+                    )}
+                  </div>
+                  <div className='mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700'>
+                    <strong>Not:</strong> Gönderici telefon numarası gizlilik nedeniyle gösterilmemektedir. İletişim için "Teklif Ver" butonunu kullanarak mesaj gönderebilirsiniz.
+                  </div>
+                </div>
+              )}
+
+              {/* İletişim Bilgisi */}
+              <div className='p-3 bg-blue-50 rounded-lg border border-blue-200'>
+                <div className='text-xs font-semibold text-slate-700 mb-2'>İletişim</div>
+                <div className='text-sm text-slate-700'>
+                  Göndericiye teklif mesajı üzerinden ulaşabilirsiniz.
+                </div>
+                <div className='mt-2 text-xs text-blue-700'>
+                  İletişim kurmak için "Teklif Ver" butonunu kullanın
+                </div>
+              </div>
+            </div>
+          </Modal>
         )}
 
         {/* Offer Modal */}
@@ -909,21 +1696,24 @@ const Jobs: React.FC = () => {
                   Teklif Fiyatı (₺)
                 </label>
                 <input
-                  type='number'
-                  min='1'
-                  step='1'
+                  type='text'
+                  inputMode='decimal'
+                  autoComplete='off'
                   value={offerPrice}
                   onChange={e => {
-                    const value = e.target.value.trim();
-                    setOfferPrice(value);
+                    // Allow user to type freely (including comma) and validate on blur/submit.
+                    setOfferPrice(e.target.value);
                   }}
                   onBlur={e => {
-                    const value = e.target.value.trim();
-                    if (value && !isNaN(parseFloat(value)) && parseFloat(value) > 0) {
-                      setOfferPrice(value);
+                    const raw = String(e.target.value || '').trim();
+                    if (!raw) return;
+                    const normalized = raw.replace(/\s+/g, '').replace(',', '.').replace(/[^0-9.]/g, '');
+                    const n = parseFloat(normalized);
+                    if (Number.isFinite(n) && n > 0) {
+                      setOfferPrice(String(n));
                     }
                   }}
-                  className='w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500'
+                  className='w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-slate-900 caret-slate-900'
                   placeholder='Teklif fiyatınızı girin'
                 />
               </div>
@@ -936,10 +1726,29 @@ const Jobs: React.FC = () => {
                   value={offerMessage}
                   onChange={e => setOfferMessage(e.target.value.trimStart())}
                   onBlur={e => setOfferMessage(e.target.value.trim())}
-                  className='w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500'
+                  className='w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500 text-slate-900 caret-slate-900'
                   rows={3}
                   placeholder='Göndericiye mesajınızı yazın...'
                 />
+              </div>
+
+              {/* Ödeme Güvencesi Bilgisi */}
+              <div className='p-4 bg-blue-50 border border-blue-200 rounded-lg'>
+                <div className='flex items-start gap-3'>
+                  <Shield className='w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5' />
+                  <div className='flex-1'>
+                    <h4 className='text-sm font-semibold text-blue-900 mb-2'>Ödeme Güvencesi</h4>
+                    <div className='text-xs text-blue-800 leading-relaxed space-y-2'>
+                      <p>
+                        Teklifiniz kabul edildiğinde ödeme tutarı gönderici tarafından güvence altına alınır. 
+                        Teslimat tamamlandığında ve gönderici onayı sonrasında ödemeniz hesabınıza aktarılır.
+                      </p>
+                      <p className='font-semibold mt-2'>
+                        Önemli: Ödeme detaylarını (IBAN, alıcı adı, açıklama) ve yükleme saatini gönderici ile mesajlaşma üzerinden yazılı olarak netleştirmeniz önerilir. Platform sadece tarafları buluşturan bir pazaryeridir, ödeme işlemleri taraflar arasında gerçekleşir.
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div className='flex gap-3 pt-4'>
@@ -980,3 +1789,5 @@ const Jobs: React.FC = () => {
 };
 
 export default Jobs;
+
+

@@ -71,7 +71,7 @@ const AdminLogin: React.FC = () => {
 
           <form onSubmit={handleSubmit} className='space-y-4'>
             <div>
-              <label className='block text-sm font-semibold text-slate-700 mb-2'>Email</label>
+              <label className='block text-sm font-semibold text-slate-700 mb-2'>E-posta</label>
               <div className='relative'>
                 <Mail className='absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400' />
                 <input

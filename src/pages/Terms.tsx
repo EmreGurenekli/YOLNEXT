@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { FileText, ArrowLeft, CheckCircle, AlertTriangle } from 'lucide-react';
 import YolNextLogo from '../components/common/yolnextLogo';
 import Footer from '../components/common/Footer';
+import { LEGAL_CONTACT } from '../config/legal';
 
 const Terms = () => {
   return (
@@ -49,10 +50,9 @@ const Terms = () => {
                 Bu koşulları kabul etmiyorsanız, lütfen platformu kullanmayın.
               </p>
               <p className="text-gray-700">
-                YolNext, lojistik ve kargo hizmetleri için SADECE BİR PAZARYERİ/ARACI PLATFORMdur. 
-                Platform, göndericiler ve nakliyeciler arasında SADECE bağlantı kurar. 
-                YolNext hiçbir taşımacılık hizmetini bizzat sağlamaz, hiçbir sigorta hizmeti vermez 
-                ve hiçbir şekilde sorumluluk kabul etmez.
+                YolNext, lojistik ve kargo hizmetleri alanında kullanıcıları bir araya getiren bir aracı platformdur.
+                Platform; gönderici ile nakliyeci/taşıyıcı arasında iletişim, teklif ve süreç yönetimi için teknik altyapı sağlar.
+                YolNext, taşımacılık hizmetini bizzat sunmaz ve sigorta hizmeti sağlamaz.
               </p>
             </section>
 
@@ -102,7 +102,7 @@ const Terms = () => {
                 <li>Fiyatlar platform üzerinden belirlenir</li>
                 <li>Komisyon oranları platform tarafından belirlenir</li>
                 <li>Ödemeler platform üzerinden güvenli şekilde yapılır</li>
-                <li>İptal ve iade koşulları platform politikalarına tabidir</li>
+                <li>İptal koşulları platform politikalarına tabidir. Mevzuatın izin verdiği ölçüde iptal edilen işlemlerde iade/geri ödeme yapılmaz</li>
               </ul>
             </section>
 
@@ -112,39 +112,26 @@ const Terms = () => {
               <div className="bg-red-50 border-4 border-red-500 rounded-lg p-8 mb-6">
                 <h3 className="text-2xl font-bold text-red-900 mb-4 flex items-center">
                   <AlertTriangle className="w-8 h-8 mr-3" />
-                  KRİTİK UYARI: YolNext SADECE BİR PAZARYERİ/ARACI PLATFORMUDUR
+                  ÖNEMLİ UYARI: YolNext bir aracı platformdur
                 </h3>
                 <p className="text-red-800 font-bold text-lg mb-4">
-                  YolNext, göndericiler ve nakliyeciler arasında bağlantı kuran SADECE BİR ARACI PLATFORMdur. 
-                  YolNext, taşımacılık hizmetlerini BİZZAT SAĞLAMAZ, sigorta hizmeti VERMEZ, hiçbir taşımacılık 
-                  işlemini GERÇEKLEŞTİRMEZ ve HİÇBİR ŞEKİLDE SORUMLULUK KABUL ETMEZ.
+                  YolNext, gönderici ve nakliyeci/taşıyıcı arasında teknik aracılık sağlar. YolNext taşımacılık hizmetini bizzat gerçekleştirmez ve sigorta hizmeti sunmaz.
                 </p>
                 <p className="text-red-700 font-semibold">
-                  Platformu kullanarak, YolNext'in hiçbir durumda sorumlu olmadığını ve tüm risklerin 
-                  gönderici ve nakliyeci arasında olduğunu KESİN OLARAK kabul etmiş sayılırsınız.
+                  Taraflar arasındaki taşıma ilişkisi kapsamında doğabilecek talepler ve uyuşmazlıklarda, YolNext’in sorumluluğu (varsa) yürürlükteki mevzuatın izin verdiği ölçüde sınırlıdır.
                 </p>
               </div>
 
-              <h3 className="text-xl font-semibold text-gray-800 mb-3">5.1. Platform Sorumluluğu KESİNLİKLE YOKTUR</h3>
-              <p className="text-gray-700 mb-4 font-bold text-lg">
-                YolNext aşağıdaki TÜM durumlardan ve bunlarla sınırlı olmamak üzere HER TÜRLÜ durumdan 
-                KESİNLİKLE, MUTLAK SUURETLE ve HİÇBİR ŞEKİLDE sorumlu değildir:
+              <h3 className="text-xl font-semibold text-gray-800 mb-3">5.1. Platformun Rolü ve Sorumluluğun Sınırı</h3>
+              <p className="text-gray-700 mb-4 font-semibold">
+                YolNext, aracı bir platform olarak; kullanıcıların kendi aralarındaki taşıma sözleşmesinin tarafı değildir.
+                YolNext’in sorumluluğu (varsa) yürürlükteki mevzuatın izin verdiği ölçüde ve kusuru oranında doğar.
               </p>
-              <ul className="list-disc pl-6 text-gray-700 space-y-3 mb-4 font-semibold">
-                <li><strong>Kaza, Yaralanma ve Ölüm:</strong> Taşımacılık sırasında veya platform kullanımı sırasında meydana gelen kazalar, yaralanmalar, ölümler, sakatlıklar, maddi ve manevi zararlardan YolNext KESİNLİKLE sorumlu değildir</li>
-                <li><strong>Hırsızlık, Kayıp ve Çalınma:</strong> Gönderilerin çalınması, kaybolması, gasp edilmesi, zarar görmesi, yok edilmesi, tahrip edilmesinden YolNext KESİNLİKLE sorumlu değildir</li>
-                <li><strong>Hasarlar ve Kırılmalar:</strong> Gönderilerin taşıma sırasında veya herhangi bir zamanda zarar görmesi, kırılması, bozulması, deforme olması, değer kaybetmesinden YolNext KESİNLİKLE sorumlu değildir</li>
-                <li><strong>Gecikmeler ve Zaman Kayıpları:</strong> Teslimat gecikmeleri, zaman kayıpları, ticari kayıplar, fırsat maliyetlerinden YolNext KESİNLİKLE sorumlu değildir</li>
-                <li><strong>Mali ve Ticari Kayıplar:</strong> Gönderilerin değer kaybı, ticari kayıplar, kar kayıpları, iş kayıpları, müşteri kayıplarından YolNext KESİNLİKLE sorumlu değildir</li>
-                <li><strong>Yanlış Teslimat ve Hatalı Adres:</strong> Yanlış adrese teslim, eksik teslimat, fazla teslimat, yanlış kişiye teslimden YolNext KESİNLİKLE sorumlu değildir</li>
-                <li><strong>Nakliyeci Davranışları ve Hizmet Kalitesi:</strong> Nakliyecinin davranışları, hizmet kalitesi, yasal uyumsuzlukları, sözleşme ihlalleri, ahlaksız davranışlarından YolNext KESİNLİKLE sorumlu değildir</li>
-                <li><strong>Gönderici Davranışları ve Hataları:</strong> Göndericinin yanlış bilgi vermesi, yasaklı madde göndermesi, eksik bilgi vermesi, yanıltıcı bilgi vermesinden YolNext KESİNLİKLE sorumlu değildir</li>
-                <li><strong>Üçüncü Taraf Hizmetleri:</strong> Ödeme sistemleri, gümrük, bankalar, kargo şirketleri, sigorta şirketleri gibi üçüncü taraf hizmetlerinden YolNext KESİNLİKLE sorumlu değildir</li>
-                <li><strong>Teknik Sorunlar ve Sistem Hataları:</strong> Platformun teknik sorunları, sistem hataları, veri kayıpları, erişim sorunları, güvenlik açıklarından kaynaklanan zararlardan YolNext KESİNLİKLE sorumlu değildir</li>
-                <li><strong>Sigorta ve Güvence:</strong> YolNext hiçbir sigorta hizmeti vermez, sigorta kontrolü yapmaz, sigorta önerisi yapmaz. Sigorta ile ilgili tüm sorumluluk kullanıcılara aittir. Sigorta eksikliğinden kaynaklanan zararlardan YolNext KESİNLİKLE sorumlu değildir</li>
-                <li><strong>Yasal Uyumsuzluklar:</strong> Kullanıcıların yasal uyumsuzlukları, lisans eksiklikleri, belge eksiklikleri, vergi sorunlarından YolNext KESİNLİKLE sorumlu değildir</li>
-                <li><strong>Anlaşmazlıklar ve Uyuşmazlıklar:</strong> Gönderici ve nakliyeci arasındaki anlaşmazlıklar, uyuşmazlıklar, sözleşme ihlalleri, tazminat talepleri, dava süreçlerinden YolNext KESİNLİKLE sorumlu değildir</li>
-                <li><strong>Doğal Afetler ve Mücbir Sebepler:</strong> Deprem, sel, yangın, savaş, terör, salgın hastalık gibi mücbir sebeplerden kaynaklanan zararlardan YolNext KESİNLİKLE sorumlu değildir</li>
+              <ul className="list-disc pl-6 text-gray-700 space-y-3 mb-4">
+                <li><strong>Taşıma hizmetinin ifası:</strong> Taşımanın yapılması, zamanında teslim, yükün korunması ve benzeri ifa yükümlülükleri taşıyıcı/nakliyeciye aittir.</li>
+                <li><strong>Gönderi içeriği ve beyanı:</strong> Gönderinin içeriği, beyanı, paketlenmesi ve teslim koşulları gönderici sorumluluğundadır.</li>
+                <li><strong>Sigorta:</strong> Sigorta yapılması gerekiyorsa, sigorta işlemleri tarafların kendi sorumluluğundadır; YolNext sigorta hizmeti sunmaz.</li>
+                <li><strong>Üçüncü taraf hizmetleri:</strong> Ödeme altyapıları gibi üçüncü taraf hizmetlerde yaşanabilecek aksaklıklarda ilgili sağlayıcının koşulları uygulanır.</li>
               </ul>
               <div className="bg-red-100 border-2 border-red-400 rounded-lg p-4 mb-4">
                 <p className="text-red-900 font-bold">
@@ -184,16 +171,13 @@ const Terms = () => {
 
               <div className="bg-red-100 border-4 border-red-500 rounded-lg p-8 mt-6">
                 <p className="text-red-900 font-bold text-lg mb-4">
-                  ⚠️⚠️⚠️ <strong>KRİTİK UYARI:</strong> Platformu kullanarak, YolNext'in yukarıda belirtilen TÜM durumlardan 
-                  ve bunlarla sınırlı olmamak üzere HER TÜRLÜ durumdan KESİNLİKLE sorumlu olmadığını, 
-                  YolNext'in sadece bir aracı platform olduğunu, hiçbir hizmeti bizzat sağlamadığını, 
-                  hiçbir sigorta hizmeti vermediğini ve TÜM RİSKLERİN kullanıcılara ait olduğunu 
-                  KESİN OLARAK kabul etmiş sayılırsınız.
+                  <strong>ÖNEMLİ:</strong> YolNext bir aracı platformdur. Taşıma hizmetinin ifası ve taraflar arasındaki ilişkiden
+                  doğabilecek talepler bakımından YolNext’in sorumluluğu (varsa) yürürlükteki mevzuatın izin verdiği ölçüde
+                  ve kusuru oranında değerlendirilir.
                 </p>
                 <p className="text-red-800 font-semibold">
-                  YolNext, gönderici ve nakliyeci arasında sadece bir bağlantı kurar. Aranızdaki tüm 
-                  anlaşmalar, anlaşmazlıklar, zararlar, sigorta işlemleri, yasal yükümlülükler TAMAMEN 
-                  sizin sorumluluğunuzdadır. YolNext hiçbir şekilde taraf değildir ve sorumluluk kabul etmez.
+                  YolNext, gönderici ve nakliyeci/taşıyıcı arasında teknik altyapı sağlar. Tarafların yükümlülükleri, yürürlükteki
+                  mevzuat ve aralarındaki sözleşme hükümlerine göre belirlenir.
                 </p>
               </div>
             </section>
@@ -234,9 +218,9 @@ const Terms = () => {
               </p>
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <p className="text-gray-700">
-                  <strong>Email:</strong> destek@yolnext.com<br />
-                  <strong>Telefon:</strong> +90 (212) 123 45 67<br />
-                  <strong>Adres:</strong> İstanbul, Türkiye
+                  <strong>E-posta:</strong> {LEGAL_CONTACT.supportEmail}<br />
+                  <strong>Telefon:</strong> {LEGAL_CONTACT.phone}<br />
+                  <strong>Adres:</strong> {LEGAL_CONTACT.address}
                 </p>
               </div>
             </section>

@@ -1,11 +1,19 @@
 /**
  * Error Logger Utility
  * 
- * Centralized error logging with Sentry integration.
+ * Centralized error logging with optional Sentry integration.
  * Handles both production (Sentry) and development (console) logging.
  */
 
-const Sentry = require('@sentry/node');
+// Sentry - conditional import (only if DSN is provided)
+let Sentry = null;
+if (process.env.SENTRY_DSN) {
+  try {
+    Sentry = require('@sentry/node');
+  } catch (e) {
+    // Sentry not available, continue without it
+  }
+}
 
 /**
  * Centralized error logging utility
@@ -36,7 +44,7 @@ class ErrorLogger {
     }
 
     // Sentry logging (if enabled)
-    if (this.isSentryEnabled) {
+    if (this.isSentryEnabled && Sentry) {
       Sentry.captureException(error, {
         level: 'error',
         tags: {
@@ -65,7 +73,7 @@ class ErrorLogger {
       });
     }
 
-    if (this.isSentryEnabled) {
+    if (this.isSentryEnabled && Sentry) {
       Sentry.captureMessage(message, {
         level: 'warning',
         tags: context,
@@ -86,6 +94,25 @@ class ErrorLogger {
         timestamp: new Date().toISOString(),
       });
     }
+  }
+
+  /**
+   * Alias methods for convenience (error, warn, info)
+   */
+  error(messageOrError, context = {}) {
+    if (messageOrError instanceof Error) {
+      this.logError(messageOrError, context);
+    } else {
+      this.logError(new Error(String(messageOrError)), context);
+    }
+  }
+
+  warn(message, context = {}) {
+    this.logWarning(message, context);
+  }
+
+  info(message, context = {}) {
+    this.logInfo(message, context);
   }
 
   /**

@@ -11,7 +11,7 @@ class StorageService {
       const serializedValue = JSON.stringify(value);
       localStorage.setItem(this.getKey(key), serializedValue);
     } catch (error) {
-      console.error('Error saving to localStorage:', error);
+      console.error('localStorage kaydı sırasında hata:', error);
     }
   }
 
@@ -20,7 +20,7 @@ class StorageService {
       const item = localStorage.getItem(this.getKey(key));
       return item ? JSON.parse(item) : defaultValue || null;
     } catch (error) {
-      console.error('Error reading from localStorage:', error);
+      console.error('localStorage okuma sırasında hata:', error);
       return defaultValue || null;
     }
   }
@@ -29,7 +29,7 @@ class StorageService {
     try {
       localStorage.removeItem(this.getKey(key));
     } catch (error) {
-      console.error('Error removing from localStorage:', error);
+      console.error('localStorage silme sırasında hata:', error);
     }
   }
 
@@ -39,7 +39,7 @@ class StorageService {
       const serializedValue = JSON.stringify(value);
       sessionStorage.setItem(this.getKey(key), serializedValue);
     } catch (error) {
-      console.error('Error saving to sessionStorage:', error);
+      console.error('sessionStorage kaydı sırasında hata:', error);
     }
   }
 
@@ -48,7 +48,7 @@ class StorageService {
       const item = sessionStorage.getItem(this.getKey(key));
       return item ? JSON.parse(item) : defaultValue || null;
     } catch (error) {
-      console.error('Error reading from sessionStorage:', error);
+      console.error('sessionStorage okuma sırasında hata:', error);
       return defaultValue || null;
     }
   }
@@ -57,7 +57,7 @@ class StorageService {
     try {
       sessionStorage.removeItem(this.getKey(key));
     } catch (error) {
-      console.error('Error removing from sessionStorage:', error);
+      console.error('sessionStorage silme sırasında hata:', error);
     }
   }
 
@@ -78,7 +78,7 @@ class StorageService {
         }
       });
     } catch (error) {
-      console.error('Error clearing storage:', error);
+      console.error('Depolama temizlenirken hata:', error);
     }
   }
 
@@ -180,7 +180,7 @@ class StorageService {
         }
       });
     } catch (error) {
-      console.error('Error clearing cache:', error);
+      console.error('Önbellek temizlenirken hata:', error);
     }
   }
 
@@ -206,7 +206,7 @@ class StorageService {
         total,
       };
     } catch (error) {
-      console.error('Error getting storage info:', error);
+      console.error('Depolama bilgisi alınırken hata:', error);
       return { used: 0, available: 0, total: 0 };
     }
   }

@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { toast } from 'react-hot-toast';
+import { useToast } from '../contexts/ToastContext';
 
 export interface ErrorInfo {
   message: string;
@@ -16,10 +16,12 @@ export interface ErrorHandlerOptions {
 }
 
 export const useErrorHandler = () => {
+  const { showToast } = useToast();
+  
   const handleError = useCallback(
     (error: any, options: ErrorHandlerOptions = {}) => {
       const {
-        showToast = true,
+        showToast: shouldShowToast = true,
         logError = true,
         fallbackMessage = 'Beklenmeyen bir hata oluştu',
       } = options;
@@ -35,16 +37,18 @@ export const useErrorHandler = () => {
 
       // Log error to console in development
       if (logError && process.env.NODE_ENV === 'development') {
-        console.error('Error handled:', errorInfo);
-        console.error('Full error object:', error);
+        console.error('Hata işlendi:', errorInfo);
+        console.error('Hata detayı:', error);
       }
 
       // Show toast notification
-      if (showToast) {
+      if (shouldShowToast) {
         const message = getErrorMessage(errorInfo);
-        toast.error(message, {
+        showToast({
+          type: 'error',
+          title: 'Hata',
+          message: message,
           duration: 5000,
-          position: 'top-right',
         });
       }
 

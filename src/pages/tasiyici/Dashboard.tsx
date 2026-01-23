@@ -83,10 +83,20 @@ const TasiyiciDashboard: React.FC = () => {
   }, []);
 
   const loadDashboardData = async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
+    if (!user?.id) {
+      setIsLoading(false);
+      return;
+    }
+    
+    setIsLoading(true);
+    setError(null);
+    
+    // Timeout protection - maksimum 10 saniye bekle
+    const timeoutId = setTimeout(() => {
+      setIsLoading(false);
+    }, 10000);
 
+    try {
       // Get auth token
       const token = localStorage.getItem('authToken');
       if (!token) {
@@ -183,6 +193,7 @@ const TasiyiciDashboard: React.FC = () => {
       });
       setRecentJobs([]);
     } finally {
+      clearTimeout(timeoutId);
       setIsLoading(false);
     }
   };
@@ -262,7 +273,6 @@ const TasiyiciDashboard: React.FC = () => {
                       {user?.firstName ||
                         user?.fullName?.split(' ')[0] ||
                         'Kullanıcı'}
-                      ! 👋
                     </h1>
                     <p className='text-slate-200 text-lg leading-relaxed'>
                       Nakliyecilerden iş alarak kazanç elde edin.

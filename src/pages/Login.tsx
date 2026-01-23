@@ -19,6 +19,8 @@ import {
   Clock,
   DollarSign,
   Globe,
+  AlertTriangle,
+  X
 } from 'lucide-react';
 import YolNextLogo from '../components/common/yolnextLogo';
 import { analytics } from '../services/analytics';
@@ -27,7 +29,6 @@ export default function Login() {
   const [formData, setFormData] = useState({
     email: '',
     password: '',
-    userType: 'individual',
   });
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -39,7 +40,6 @@ export default function Login() {
   useEffect(() => {
     analytics.track('login_view', {
       ab: abVariant,
-      userType: formData.userType,
     });
   }, [abVariant]);
 
@@ -55,51 +55,84 @@ export default function Login() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
     setError('');
+
+    // Form validation
+    if (!formData.email.trim()) {
+      setError('E-posta adresi gereklidir');
+      return;
+    }
+
+    if (!formData.email.includes('@') || !formData.email.includes('.')) {
+      setError('Geçerli bir e-posta adresi giriniz');
+      return;
+    }
+
+    if (!formData.password.trim()) {
+      setError('Şifre gereklidir');
+      return;
+    }
+
+    if (formData.password.length < 8) {
+      setError('Şifre en az 8 karakter olmalıdır');
+      return;
+    }
+
+    setIsLoading(true);
+    const timeoutId = setTimeout(() => {
+      setIsLoading(false);
+      setError('Giriş işlemi zaman aşımına uğradı. Lütfen tekrar deneyin.');
+    }, 10000); // 10 seconds timeout
 
     try {
       const result = await login(formData.email, formData.password);
 
       if (result.success) {
+        clearTimeout(timeoutId);
         analytics.track('login_complete', {
           ab: abVariant,
-          userType: formData.userType,
         });
-        const panelRoute = getPanelRoute(formData.userType);
+        const role = (result as any)?.user?.role || (result as any)?.user?.panel_type || 'individual';
+        const panelRoute = getPanelRoute(role);
         navigate(panelRoute);
       } else {
+        clearTimeout(timeoutId);
         analytics.track('login_error', {
           ab: abVariant,
-          userType: formData.userType,
           reason: 'invalid_credentials',
         });
-        setError('Giriş bilgileri hatalı');
+        setError('E-posta veya şifre hatalı');
       }
     } catch (err) {
+      clearTimeout(timeoutId);
       analytics.track('login_error', {
         ab: abVariant,
-        userType: formData.userType,
         reason: 'exception',
       });
       setError('Giriş yapılırken bir hata oluştu. Lütfen tekrar deneyin.');
     } finally {
+      clearTimeout(timeoutId);
       setIsLoading(false);
     }
   };
 
   const handleDemoLogin = async (userType: string) => {
     if (import.meta.env.MODE === 'production') {
-      setError('Demo giriş production ortamında devre dışı');
+      setError('Hızlı giriş production ortamında devre dışı');
       return;
     }
     setIsLoading(true);
     setError('');
+    const timeoutId = setTimeout(() => {
+      setIsLoading(false);
+      setError('Hızlı giriş işlemi zaman aşımına uğradı. Lütfen tekrar deneyin.');
+    }, 10000); // 10 seconds timeout
 
     try {
       const result = await demoLogin(userType);
 
       if (result.success) {
+        clearTimeout(timeoutId);
         analytics.track('demo_login_complete', {
           ab: abVariant,
           userType,
@@ -119,23 +152,29 @@ export default function Login() {
           navigate(panelRoute, { replace: true });
         }, 100);
       } else {
+        clearTimeout(timeoutId);
         analytics.track('login_error', {
           ab: abVariant,
           userType,
           reason: 'demo_failed',
         });
-        // Demo login failed
-        setError('Demo giriş başarısız');
+        // Demo login failed - show error from result if available
+        const errorMsg = (result as any)?.error || 'Hızlı giriş başarısız';
+        setError(errorMsg);
       }
     } catch (err: any) {
+      clearTimeout(timeoutId);
       analytics.track('login_error', {
         ab: abVariant,
         userType,
         reason: 'demo_exception',
       });
-      // Demo login error handled
-      setError(`Demo giriş yapılırken bir hata oluştu: ${err?.message || 'Bilinmeyen bir hata oluştu'}`);
+      // Demo login error handled - log to console
+      const errorMessage = err?.message || 'Bilinmeyen bir hata oluştu';
+      console.error('Demo login exception:', err);
+      setError(`Hızlı giriş yapılırken bir hata oluştu: ${errorMessage}`);
     } finally {
+      clearTimeout(timeoutId);
       setIsLoading(false);
     }
   };
@@ -144,58 +183,24 @@ export default function Login() {
     {
       value: 'individual',
       label: 'Bireysel Gönderici',
-      description: 'Ev taşıma, kişisel gönderiler',
       icon: <Users className='w-6 h-6' />,
-      color: 'blue',
-      features: ['Ev Taşınması', 'Kişisel Gönderiler', 'Fiyat Karşılaştırma'],
-      stats: { users: '25,000+', savings: '₺2,500' },
     },
     {
       value: 'corporate',
       label: 'Kurumsal Gönderici',
-      description: 'Şirket gönderileri, toplu taşıma',
       icon: <Building2 className='w-6 h-6' />,
-      color: 'purple',
-      features: ['Toplu Gönderi', 'Ekip Yönetimi', 'Raporlama'],
-      stats: { users: '5,000+', savings: '₺15,000' },
     },
     {
       value: 'nakliyeci',
       label: 'Nakliyeci',
-      description: 'Kargo firmaları, lojistik şirketleri',
       icon: <Truck className='w-6 h-6' />,
-      color: 'green',
-      features: ['İş Bul', 'Araç Yönetimi', 'Kazanç Takibi'],
-      stats: { users: '15,000+', earnings: '₺8,000' },
     },
     {
       value: 'tasiyici',
       label: 'Taşıyıcı',
-      description: 'Kamyoncu, şoförler',
       icon: <Package className='w-6 h-6' />,
-      color: 'orange',
-      features: ['İş Kabul Et', 'Konum Güncelle', 'Kazanç Görüntüle'],
-      stats: { users: '8,000+', earnings: '₺5,000' },
     },
   ];
-
-  const getColorClasses = (color: string, isSelected: boolean) => {
-    const colors = {
-      blue: isSelected
-        ? 'bg-blue-100 border-blue-300 text-blue-700'
-        : 'border-slate-300 text-slate-600 hover:border-blue-300',
-      purple: isSelected
-        ? 'bg-purple-100 border-purple-300 text-purple-700'
-        : 'border-slate-300 text-slate-600 hover:border-purple-300',
-      green: isSelected
-        ? 'bg-green-100 border-green-300 text-green-700'
-        : 'border-slate-300 text-slate-600 hover:border-green-300',
-      orange: isSelected
-        ? 'bg-orange-100 border-orange-300 text-orange-700'
-        : 'border-slate-300 text-slate-600 hover:border-orange-300',
-    };
-    return colors[color as keyof typeof colors] || colors.blue;
-  };
 
   return (
     <div className='min-h-screen bg-white'>
@@ -241,7 +246,7 @@ export default function Login() {
             <div className='bg-white/10 backdrop-blur-sm rounded-2xl p-6 mb-8'>
               <div className='text-center'>
                 <div className='text-2xl font-bold text-white mb-2'>
-                  🎉 TAMAMEN ÜCRETSİZ
+                  TAMAMEN ÜCRETSİZ
                 </div>
                 <div className='text-white/90 text-lg'>
                   <span className='font-bold'>%0 üyelik ücreti</span> •
@@ -257,15 +262,15 @@ export default function Login() {
             <div className='grid grid-cols-2 gap-6'>
               <div className='flex items-center gap-3'>
                 <CheckCircle className='w-6 h-6 text-green-400' />
-                <span className='text-slate-200'>30,550+ Kullanıcı</span>
+                <span className='text-slate-200'>53.000+ Kullanıcı</span>
               </div>
               <div className='flex items-center gap-3'>
                 <Shield className='w-6 h-6 text-blue-400' />
-                <span className='text-slate-200'>%99.9 Memnuniyet</span>
+                <span className='text-slate-200'>Yüksek Memnuniyet</span>
               </div>
               <div className='flex items-center gap-3'>
                 <Clock className='w-6 h-6 text-yellow-400' />
-                <span className='text-slate-200'>2 Gün Teslimat</span>
+                <span className='text-slate-200'>Hızlı Teslimat</span>
               </div>
               <div className='flex items-center gap-3'>
                 <Globe className='w-6 h-6 text-green-400' />
@@ -288,14 +293,14 @@ export default function Login() {
                 Hoş Geldiniz
               </h2>
               <p className='text-gray-600'>
-                Hesabınıza giriş yapın veya demo hesapları deneyin
+                Hesabınıza giriş yapın veya hızlı giriş seçeneklerini kullanın
               </p>
             </div>
 
             {/* Demo Login Section */}
             <div className='mb-8'>
               <h3 className='text-lg font-semibold text-gray-900 mb-4'>
-                Demo Hesapları
+                Hızlı Giriş (Demo)
               </h3>
               <div className='grid grid-cols-2 gap-3'>
                 {userTypes.map(userType => (
@@ -311,9 +316,6 @@ export default function Login() {
                     </div>
                     <div className='text-sm font-semibold'>
                       {userType.label}
-                    </div>
-                    <div className='text-xs opacity-90'>
-                      {userType.stats.users}
                     </div>
                   </button>
                 ))}
@@ -353,10 +355,12 @@ export default function Login() {
                     name='email'
                     type='email'
                     required
+                    autoComplete='email'
+                    autoFocus
                     value={formData.email}
                     onChange={handleInputChange}
                     className='w-full pl-10 pr-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
-                    placeholder=''
+                    placeholder='ornek@email.com'
                   />
                 </div>
               </div>
@@ -375,10 +379,11 @@ export default function Login() {
                     name='password'
                     type={showPassword ? 'text' : 'password'}
                     required
+                    autoComplete='current-password'
                     value={formData.password}
                     onChange={handleInputChange}
                     className='w-full pl-10 pr-12 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
-                    placeholder='••••••••'
+                    placeholder='En az 8 karakter'
                   />
                   <button
                     type='button'
@@ -392,28 +397,6 @@ export default function Login() {
                     )}
                   </button>
                 </div>
-              </div>
-
-              <div>
-                <label
-                  htmlFor='userType'
-                  className='block text-sm font-medium text-gray-700 mb-2'
-                >
-                  Kullanıcı Tipi
-                </label>
-                <select
-                  id='userType'
-                  name='userType'
-                  value={formData.userType}
-                  onChange={handleInputChange}
-                  className='w-full px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
-                >
-                  {userTypes.map(userType => (
-                    <option key={userType.value} value={userType.value}>
-                      {userType.label}
-                    </option>
-                  ))}
-                </select>
               </div>
 
               <button
@@ -453,6 +436,9 @@ export default function Login() {
                 >
                   Hemen kayıt olun
                 </Link>
+              </p>
+              <p className='text-xs text-slate-500 mt-2'>
+                Demo giriş üretimde kapalıdır; test ortamında hızlı giriş yapabilirsiniz.
               </p>
             </div>
           </div>

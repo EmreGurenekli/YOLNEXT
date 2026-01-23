@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { Shield, ArrowLeft, Lock } from 'lucide-react';
 import YolNextLogo from '../components/common/yolnextLogo';
 import Footer from '../components/common/Footer';
+import { LEGAL_CONTACT } from '../config/legal';
 
 const Privacy = () => {
   return (
@@ -46,8 +47,8 @@ const Privacy = () => {
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">1. Genel Bilgiler</h2>
               <p className="text-gray-700 mb-4">
                 YolNext olarak, kişisel verilerinizin korunmasına büyük önem veriyoruz. 
-                Bu gizlilik politikası, KVKK (Kişisel Verilerin Korunması Kanunu) ve GDPR 
-                (Genel Veri Koruma Tüzüğü) uyumlu olarak hazırlanmıştır.
+                Bu gizlilik politikası, başta KVKK (6698 sayılı Kanun) olmak üzere yürürlükteki mevzuat ve
+                iyi uygulamalar dikkate alınarak hazırlanmıştır.
               </p>
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
                 <div className="flex items-start">
@@ -55,15 +56,12 @@ const Privacy = () => {
                   <div className="text-sm text-gray-700">
                     <p className="font-semibold mb-2">Veri Sorumlusu Bilgileri:</p>
                     <p>
-                      <strong>Unvan:</strong> YolNext Lojistik Teknolojileri A.Ş.<br />
-                      <strong>Vergi No:</strong> [Vergi numarası bilgisi için lütfen bizimle iletişime geçin]<br />
-                      <strong>Vergi Dairesi:</strong> [Vergi dairesi bilgisi için lütfen bizimle iletişime geçin]<br />
-                      <strong>Adres:</strong> İstanbul, Türkiye<br />
-                      <strong>Telefon:</strong> +90 (212) 123 45 67<br />
-                      <strong>Email:</strong> kvkk@yolnext.com
-                    </p>
-                    <p className="text-xs text-gray-600 mt-2 italic">
-                      Detaylı şirket bilgileri için lütfen bizimle iletişime geçin.
+                      <strong>Unvan:</strong> {LEGAL_CONTACT.companyName}<br />
+                      <strong>Vergi No:</strong> {LEGAL_CONTACT.taxNumber || '—'}<br />
+                      <strong>Vergi Dairesi:</strong> {LEGAL_CONTACT.taxOffice || '—'}<br />
+                      <strong>Adres:</strong> {LEGAL_CONTACT.address}<br />
+                      <strong>Telefon:</strong> {LEGAL_CONTACT.phone}<br />
+                      <strong>E-posta:</strong> {LEGAL_CONTACT.kvkkEmail}
                     </p>
                   </div>
                 </div>
@@ -192,9 +190,9 @@ const Privacy = () => {
               </p>
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <p className="text-gray-700">
-                  <strong>Email:</strong> kvkk@yolnext.com<br />
-                  <strong>Telefon:</strong> +90 (212) 123 45 67<br />
-                  <strong>Adres:</strong> İstanbul, Türkiye
+                  <strong>E-posta:</strong> {LEGAL_CONTACT.kvkkEmail}<br />
+                  <strong>Telefon:</strong> {LEGAL_CONTACT.phone}<br />
+                  <strong>Adres:</strong> {LEGAL_CONTACT.address}
                 </p>
               </div>
             </section>

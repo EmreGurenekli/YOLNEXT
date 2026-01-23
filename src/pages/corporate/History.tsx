@@ -13,16 +13,17 @@ import {
   Eye,
   MessageCircle,
   Plus,
-  Filter,
   Search,
   Download,
   Star,
   DollarSign,
   Building2,
+  X,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createApiUrl } from '../../config/api';
 import Pagination from '../../components/common/Pagination';
+import { logger } from '../../utils/logger';
 
 interface ShipmentHistory {
   id: string;
@@ -55,7 +56,7 @@ const CorporateHistory: React.FC = () => {
   useEffect(() => {
     const loadHistoryData = async () => {
       try {
-        console.log('🔄 Geçmiş gönderiler yükleniyor...');
+        logger.log('🔄 Geçmiş gönderiler yükleniyor...');
         setLoading(true);
         const response = await fetch(createApiUrl('/api/shipments?status=completed'), {
           headers: {
@@ -64,7 +65,7 @@ const CorporateHistory: React.FC = () => {
           },
         });
         if (!response.ok) {
-          throw new Error('Failed to load history data');
+          throw new Error('Geçmiş verileri yüklenemedi');
         }
         const data = await response.json();
         // Format shipments to include city/district information
@@ -86,12 +87,12 @@ const CorporateHistory: React.FC = () => {
           };
         });
         setShipments(formattedShipments);
-        console.log(
+        logger.log(
           '✅ Geçmiş gönderiler yüklendi:',
           formattedShipments.length
         );
       } catch (error) {
-        console.error('❌ Geçmiş gönderiler yüklenirken hata:', error);
+        logger.error('❌ Geçmiş gönderiler yüklenirken hata:', error);
         setShipments([]);
       } finally {
         setLoading(false);
@@ -142,11 +143,48 @@ const CorporateHistory: React.FC = () => {
     return matchesSearch && matchesStatus;
   });
 
+  const sortedShipments = filteredShipments.slice().sort((a, b) => {
+    const getTime = (v: any) => {
+      const t = new Date(v || 0).getTime();
+      return Number.isFinite(t) ? t : 0;
+    };
+
+    const statusRank = (s: ShipmentHistory) => {
+      const v = String(s.status || '').toLowerCase();
+      if (v === 'in_progress') return 1;
+      if (v === 'failed') return 2;
+      if (v === 'cancelled') return 3;
+      if (v === 'delivered') return 4;
+      return 9;
+    };
+
+    if (sortBy === 'status') {
+      const d = statusRank(a) - statusRank(b);
+      if (d !== 0) return d;
+      return getTime(b.createdAt) - getTime(a.createdAt);
+    }
+
+    if (sortBy === 'price') {
+      const d = (Number(b.price) || 0) - (Number(a.price) || 0);
+      if (d !== 0) return d;
+      return getTime(b.createdAt) - getTime(a.createdAt);
+    }
+
+    if (sortBy === 'rating') {
+      const d = (Number(b.rating) || 0) - (Number(a.rating) || 0);
+      if (d !== 0) return d;
+      return getTime(b.createdAt) - getTime(a.createdAt);
+    }
+
+    // date (default)
+    return getTime(b.createdAt) - getTime(a.createdAt);
+  });
+
   // Pagination calculations
-  const totalPages = Math.ceil(filteredShipments.length / itemsPerPage);
+  const totalPages = Math.ceil(sortedShipments.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const paginatedShipments = filteredShipments.slice(startIndex, endIndex);
+  const paginatedShipments = sortedShipments.slice(startIndex, endIndex);
 
   // Reset to page 1 when filters change
   useEffect(() => {
@@ -298,9 +336,17 @@ const CorporateHistory: React.FC = () => {
               <option value='price'>Fiyata Göre</option>
               <option value='rating'>Puana Göre</option>
             </select>
-            <button className='px-4 py-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors flex items-center justify-center gap-2'>
-              <Filter className='w-4 h-4' />
-              Filtrele
+            <button
+              onClick={() => {
+                setSearchTerm('');
+                setStatusFilter('all');
+                setSortBy('date');
+                setCurrentPage(1);
+              }}
+              className='px-4 py-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors flex items-center justify-center gap-2'
+            >
+              <X className='w-4 h-4' />
+              Sıfırla
             </button>
           </div>
         </div>
@@ -436,7 +482,7 @@ const CorporateHistory: React.FC = () => {
           </div>
 
           {/* Pagination */}
-          {filteredShipments.length > itemsPerPage && (
+          {sortedShipments.length > itemsPerPage && (
             <div className='mt-6'>
               <Pagination
                 currentPage={currentPage}
@@ -462,4 +508,6 @@ const CorporateHistory: React.FC = () => {
   );
 };
 
+export default CorporateHistory;
+export default CorporateHistory;
 export default CorporateHistory;

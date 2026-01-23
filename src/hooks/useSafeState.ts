@@ -158,7 +158,7 @@ export const useSafeReducer = <S, A>(
 // Safe context hook
 export const useSafeContext = <T>(
   context: React.Context<T>,
-  errorMessage = 'useSafeContext must be used within a Provider'
+  errorMessage = 'useSafeContext bir Provider içinde kullanılmalıdır'
 ) => {
   const contextValue = React.useContext(context);
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Send, MessageSquare, User, Clock } from 'lucide-react';
 import { createApiUrl } from '../config/api';
+import { sanitizeMessageText, sanitizeShipmentTitle } from '../utils/format';
 
 interface MessagingModalProps {
   isOpen: boolean;
@@ -41,7 +42,22 @@ const MessagingModal: React.FC<MessagingModalProps> = ({
   const [isSending, setIsSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const shipmentRef = shipmentId ? `#${shipmentId}` : '';
+  const displayName = sanitizeShipmentTitle(otherUser?.name);
+  const rawEmail = String(otherUser?.email || '').trim();
+  const displayEmail = rawEmail && !rawEmail.includes('@') ? rawEmail : '';
+
+  const toTrackingCode = (value: any) => {
+    const v = String(value ?? '').trim();
+    if (!v) return '';
+    if (/^TRK/i.test(v)) return v;
+    const n = Number(v);
+    if (Number.isFinite(n) && n > 0) {
+      return `TRK${Math.trunc(n).toString().padStart(6, '0')}`;
+    }
+    return v;
+  };
+
+  const shipmentRef = shipmentId ? toTrackingCode(shipmentId) : '';
 
   const ibanRegex = /\bTR\d{2}(?:\s?\d{4}){1,5}\s?\d{0,2}\b/i;
   const hasIbanInConversation = messages.some(m => ibanRegex.test(String(m.message || '')));
@@ -74,6 +90,21 @@ const MessagingModal: React.FC<MessagingModalProps> = ({
       loadConversation();
     }
   }, [isOpen, otherUser?.id]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [isOpen, onClose]);
 
   useEffect(() => {
     scrollToBottom();
@@ -120,8 +151,8 @@ const MessagingModal: React.FC<MessagingModalProps> = ({
     } catch (error) {
       // Error loading conversation - log removed for performance
       // Only log critical errors in development
-      if (import.meta.env.DEV && error instanceof Error && error.message.includes('500')) {
-        console.error('Critical error loading conversation:', error);
+      if (process.env.NODE_ENV === 'development' && error instanceof Error && error.message.includes('500')) {
+        console.error('Konuşma yüklenirken kritik hata:', error);
       }
       setMessages([]);
     } finally {
@@ -171,15 +202,15 @@ const MessagingModal: React.FC<MessagingModalProps> = ({
         const errorData = await response.json().catch(() => ({}));
         // Failed to send message - log removed for performance
         // Only log critical errors in development
-        if (import.meta.env.DEV && errorData.message?.includes('500')) {
-          console.error('Critical error sending message:', errorData.message);
+        if (process.env.NODE_ENV === 'development' && errorData.message?.includes('500')) {
+          console.error('Mesaj gönderilirken kritik hata:', errorData.message);
         }
       }
     } catch (error) {
       // Error sending message - log removed for performance
       // Only log critical errors in development
-      if (import.meta.env.DEV && error instanceof Error && error.message.includes('500')) {
-        console.error('Critical error sending message:', error);
+      if (process.env.NODE_ENV === 'development' && error instanceof Error && error.message.includes('500')) {
+        console.error('Mesaj gönderilirken kritik hata:', error);
       }
     } finally {
       setIsSending(false);
@@ -203,7 +234,14 @@ const MessagingModal: React.FC<MessagingModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className='fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'>
+    <div
+      className='fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4'
+      onClick={(event) => {
+        if (event.target === event.currentTarget) {
+          onClose();
+        }
+      }}
+    >
       <div className='bg-white rounded-xl shadow-2xl w-full max-w-2xl h-[600px] flex flex-col'>
         {/* Header */}
         <div className='flex items-center justify-between p-6 border-b border-gray-200'>
@@ -213,15 +251,15 @@ const MessagingModal: React.FC<MessagingModalProps> = ({
             </div>
             <div>
               <h2 className='text-lg font-bold text-gray-900'>
-                {otherUser?.name}
+                {displayName || 'Gönderici'}
               </h2>
               <div className='flex flex-wrap items-center gap-2'>
                 <p className='text-sm text-gray-600'>
-                  {otherUser?.type} • {otherUser?.email}
+                  {otherUser?.type}{displayEmail ? ` • ${displayEmail}` : ''}
                 </p>
                 {shipmentId && (
                   <span className='inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200'>
-                    İş No: #{shipmentId}
+                    İş No: {shipmentRef || `#${shipmentId}`}
                   </span>
                 )}
               </div>
@@ -271,7 +309,7 @@ const MessagingModal: React.FC<MessagingModalProps> = ({
                       : 'bg-gray-100 text-gray-900'
                   }`}
                 >
-                  <p className='text-sm'>{message.message}</p>
+                  <p className='text-sm'>{sanitizeMessageText(message.message)}</p>
                   <div className='flex items-center gap-1 mt-1'>
                     <Clock className='w-3 h-3' />
                     <span className='text-xs opacity-75'>

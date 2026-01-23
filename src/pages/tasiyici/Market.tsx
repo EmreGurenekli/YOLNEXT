@@ -1,16 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { MapPin, DollarSign, Truck, ArrowRight, Search, Filter, X, Package } from 'lucide-react';
-import { toast } from 'react-hot-toast';
+import { MapPin, DollarSign, Truck, ArrowRight, Search, X, Package } from 'lucide-react';
+import { useToast } from '../../contexts/ToastContext';
+import { TOAST_MESSAGES, showProfessionalToast } from '../../utils/toastMessages';
 import Breadcrumb from '../../components/common/Breadcrumb';
 import LoadingState from '../../components/common/LoadingState';
+import EmptyState from '../../components/common/EmptyState';
 import Modal from '../../components/common/Modal';
+import GuidanceOverlay from '../../components/common/GuidanceOverlay';
 import { createApiUrl } from '../../config/api';
 
 interface Listing {
   id: number;
   shipmentId: number;
-  minPrice?: number;
+  pickupCity?: string;
+  deliveryCity?: string;
+  carrierBudgetMax?: number; // Taşıyıcı bütçesi (tavan)
   notes?: string;
   createdAt: string;
   title?: string;
@@ -42,89 +47,193 @@ const Market: React.FC = () => {
   const [etaInput, setEtaInput] = useState('');
 
   useEffect(() => {
-    const load = async () => {
-      try {
-        setLoading(true);
-        const token = localStorage.getItem('authToken');
-        const res = await fetch(createApiUrl('/api/carrier-market/available'), {
-          headers: {
-            Authorization: `Bearer ${token || ''}`,
-            'Content-Type': 'application/json',
-          },
-        });
-        if (!res.ok) throw new Error('Açık ilanlar alınamadı');
-        const data = await res.json();
-        const listingsData = (Array.isArray(data) ? data : data.data || []) as Listing[];
-        console.log('🔍 [Market] Loaded listings:', JSON.stringify(listingsData, null, 2));
-        console.log('🔍 [Market] Listings count:', listingsData.length);
-        
-        const getShipmentCategoryData = (shipment: any) => {
-          if (!shipment || typeof shipment !== 'object') return {};
-          if (shipment.categoryData || shipment.category_data) {
-            return shipment.categoryData || shipment.category_data;
-          }
-          let meta = shipment.metadata;
-          if (typeof meta === 'string') {
-            try {
-              meta = JSON.parse(meta);
-            } catch {
-              meta = null;
-            }
-          }
-          if (meta && typeof meta === 'object' && meta.categoryData) {
-            return meta.categoryData;
-          }
-          return {};
-        };
-
-        // Map carrier-market listings to Market component format
-        const mappedListings = listingsData.map((listing: any) => {
-          const shipment = listing.shipment || {};
-          const categoryData = getShipmentCategoryData(shipment);
-          return {
-            id: listing.id,
-            shipmentId: listing.shipmentId,
-            minPrice: listing.minPrice,
-            title: shipment.title || listing.title || `Gönderi #${listing.shipmentId}`,
-            pickupAddress: shipment.pickupAddress || shipment.from || shipment.pickupCity || '',
-            deliveryAddress: shipment.deliveryAddress || shipment.to || shipment.deliveryCity || '',
-            weight: shipment.weight || 0,
-            volume: shipment.volume || 0,
-            unitType: categoryData.unitType || shipment.unitType,
-            temperatureSetpoint:
-              categoryData.temperatureSetpoint ||
-              categoryData.temperature_setpoint ||
-              shipment.temperatureSetpoint ||
-              shipment.temperature_setpoint ||
-              undefined,
-            unNumber:
-              categoryData.unNumber ||
-              categoryData.un_number ||
-              shipment.unNumber ||
-              shipment.un_number ||
-              undefined,
-            loadingEquipment:
-              categoryData.loadingEquipment ||
-              categoryData.loading_equipment ||
-              shipment.loadingEquipment ||
-              shipment.loading_equipment ||
-              undefined,
-            price: listing.minPrice || 0,
-            pickupDate: shipment.pickupDate || '',
-            createdAt: listing.createdAt || '',
-          };
-        });
-        
-        setListings(mappedListings);
-      } catch (e) {
-        if (import.meta.env.DEV) console.error(e);
-        setListings([]);
-      } finally {
-        setLoading(false);
+    try {
+      const raw = localStorage.getItem('user');
+      if (!raw) return;
+      const u = JSON.parse(raw);
+      const userId = u?.id;
+      const role = String(u?.role || 'tasiyici').toLowerCase();
+      if (userId) {
+        localStorage.setItem(`yolnext:lastSeen:market:${userId}:${role}`, new Date().toISOString());
+        window.dispatchEvent(new Event('yolnext:refresh-badges'));
       }
-    };
-    load();
+      const city = (u?.city || u?.profile?.city || '').toString().trim();
+      if (city && !filterFromCity) {
+        setFilterFromCity(city);
+      }
+    } catch {
+      // ignore
+    }
+    // only on mount
   }, []);
+
+  const loadListings = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('authToken');
+
+      const params = new URLSearchParams();
+      if (filterFromCity && filterFromCity.trim()) {
+        params.set('fromCity', filterFromCity.trim());
+      }
+      if (filterToCity && filterToCity.trim()) {
+        params.set('toCity', filterToCity.trim());
+      }
+
+      const url = params.toString()
+        ? `${createApiUrl('/api/carrier-market/available')}?${params.toString()}`
+        : createApiUrl('/api/carrier-market/available');
+
+      const res = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${token || ''}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      if (!res.ok) throw new Error('Açık ilanlar alınamadı');
+      const data = await res.json();
+      const listingsData = (Array.isArray(data) ? data : data.data || []) as Listing[];
+
+      const getShipmentCategoryData = (shipment: any) => {
+        if (!shipment || typeof shipment !== 'object') return {};
+        if (shipment.categoryData || shipment.category_data) {
+          return shipment.categoryData || shipment.category_data;
+        }
+        let meta = shipment.metadata;
+        if (typeof meta === 'string') {
+          try {
+            meta = JSON.parse(meta);
+          } catch {
+            meta = null;
+          }
+        }
+        if (meta && typeof meta === 'object' && meta.categoryData) {
+          return meta.categoryData;
+        }
+        return {};
+      };
+
+      const mappedListings = listingsData.map((listing: any) => {
+        const shipment = listing.shipment || {};
+        const categoryData = getShipmentCategoryData(shipment);
+
+        const pickupCity =
+          shipment.pickupCity ||
+          shipment.pickup_city ||
+          shipment.pickupcity ||
+          shipment.fromCity ||
+          shipment.from_city ||
+          shipment.from_city_name ||
+          shipment.from ||
+          '';
+        const deliveryCity =
+          shipment.deliveryCity ||
+          shipment.delivery_city ||
+          shipment.deliverycity ||
+          shipment.toCity ||
+          shipment.to_city ||
+          shipment.to_city_name ||
+          shipment.to ||
+          '';
+
+        const pickupAddress =
+          shipment.pickupAddress ||
+          shipment.pickup_address ||
+          shipment.pickupaddress ||
+          shipment.from_address ||
+          shipment.fromAddress ||
+          pickupCity ||
+          '';
+        const deliveryAddress =
+          shipment.deliveryAddress ||
+          shipment.delivery_address ||
+          shipment.deliveryaddress ||
+          shipment.to_address ||
+          shipment.toAddress ||
+          deliveryCity ||
+          '';
+
+        const weightRaw = shipment.weight ?? shipment.weight_kg ?? shipment.total_weight;
+        const volumeRaw = shipment.volume ?? shipment.volume_m3;
+        const weight = typeof weightRaw === 'number' ? weightRaw : parseFloat(String(weightRaw || 0)) || 0;
+        const volume = typeof volumeRaw === 'number' ? volumeRaw : parseFloat(String(volumeRaw || 0)) || 0;
+
+        const shipmentId = Number(listing.shipmentId ?? listing.shipment_id ?? shipment.id ?? shipment.shipment_id ?? 0);
+        const createdAt = listing.createdAt || listing.created_at || '';
+
+        const budgetMax = listing.minPrice ?? listing.min_price;
+        const priceRaw =
+          listing.price ??
+          listing.price_try ??
+          listing.total_price ??
+          shipment.displayPrice ??
+          shipment.display_price ??
+          shipment.price ??
+          shipment.value;
+        const price =
+          typeof priceRaw === 'number'
+            ? priceRaw
+            : priceRaw != null && String(priceRaw).trim() !== ''
+              ? Number(priceRaw)
+              : undefined;
+
+        const routeTitle = `${String(pickupCity || '').trim()} → ${String(deliveryCity || '').trim()}`.trim();
+        const rawTitle = String((shipment.title || listing.title || '') ?? '').trim();
+        const shouldPreferRouteTitle =
+          !!routeTitle &&
+          (!rawTitle || /teklif\s*akışı/i.test(rawTitle));
+
+        return {
+          id: listing.id,
+          shipmentId,
+          pickupCity: String(pickupCity || '').trim() || undefined,
+          deliveryCity: String(deliveryCity || '').trim() || undefined,
+          carrierBudgetMax: budgetMax,
+          title:
+            (shouldPreferRouteTitle ? routeTitle : rawTitle) ||
+            `${String(pickupCity || getCityFromAddress(pickupAddress) || '').trim()} → ${String(deliveryCity || getCityFromAddress(deliveryAddress) || '').trim()}`.trim() ||
+            `Gönderi #${shipmentId || listing.shipmentId}`,
+          pickupAddress,
+          deliveryAddress,
+          weight,
+          volume,
+          unitType: categoryData.unitType || shipment.unitType,
+          temperatureSetpoint:
+            categoryData.temperatureSetpoint ||
+            categoryData.temperature_setpoint ||
+            shipment.temperatureSetpoint ||
+            shipment.temperature_setpoint ||
+            undefined,
+          unNumber:
+            categoryData.unNumber ||
+            categoryData.un_number ||
+            shipment.unNumber ||
+            shipment.un_number ||
+            undefined,
+          loadingEquipment:
+            categoryData.loadingEquipment ||
+            categoryData.loading_equipment ||
+            shipment.loadingEquipment ||
+            shipment.loading_equipment ||
+            undefined,
+          price: typeof price === 'number' && Number.isFinite(price) ? price : 0,
+          pickupDate: shipment.pickupDate || shipment.pickup_date || shipment.pickupdate || '',
+          createdAt,
+        };
+      });
+
+      setListings(mappedListings);
+    } catch (e) {
+      if (import.meta.env.DEV) console.error(e);
+      setListings([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadListings();
+  }, [filterFromCity, filterToCity]);
 
   const openBidModal = (listing: Listing) => {
     setSelectedListing(listing);
@@ -142,7 +251,7 @@ const Market: React.FC = () => {
 
   const sendBid = async () => {
     if (!selectedListing || !bidPriceInput || Number(bidPriceInput) <= 0) {
-      toast.error('Lütfen geçerli bir teklif fiyatı girin');
+      showProfessionalToast(showToast, 'INVALID_AMOUNT', 'error');
       return;
     }
 
@@ -167,7 +276,7 @@ const Market: React.FC = () => {
         const errorData = await res.json().catch(() => ({ message: 'Teklif gönderilemedi' }));
         throw new Error(errorData.message || 'Teklif gönderilemedi');
       }
-      toast.success('Teklif başarıyla gönderildi!');
+      showProfessionalToast(showToast, 'OFFER_SENT', 'success');
       setBidPrice(prev => ({ ...prev, [selectedListing.id]: bidPriceInput }));
       if (etaInput) {
         setEta(prev => ({ ...prev, [selectedListing.id]: etaInput }));
@@ -203,7 +312,7 @@ const Market: React.FC = () => {
           return {
             id: listing.id,
             shipmentId: listing.shipmentId,
-            minPrice: listing.minPrice,
+            carrierBudgetMax: listing.minPrice, // Backend'den minPrice geliyor, frontend'de carrierBudgetMax olarak kullanıyoruz
             title: shipment.title || listing.title || `Gönderi #${listing.shipmentId}`,
             pickupAddress: shipment.pickupAddress || shipment.from || shipment.pickupCity || '',
             deliveryAddress: shipment.deliveryAddress || shipment.to || shipment.deliveryCity || '',
@@ -236,7 +345,7 @@ const Market: React.FC = () => {
         setListings(mappedListings);
       }
     } catch (e: any) {
-      toast.error(e.message || 'Teklif gönderilemedi');
+      showProfessionalToast(showToast, 'OPERATION_FAILED', 'error');
     }
   };
 
@@ -277,8 +386,8 @@ const Market: React.FC = () => {
         const dateB = new Date(b.createdAt || 0).getTime();
         comparison = dateA - dateB;
       } else if (sortBy === 'price') {
-        const priceA = a.price || a.minPrice || 0;
-        const priceB = b.price || b.minPrice || 0;
+        const priceA = a.price || a.carrierBudgetMax || 0;
+        const priceB = b.price || b.carrierBudgetMax || 0;
         comparison = priceA - priceB;
       } else if (sortBy === 'distance') {
         // Simple distance approximation - can be enhanced with actual distance calculation
@@ -333,6 +442,24 @@ const Market: React.FC = () => {
               </div>
             </div>
           </div>
+        </div>
+
+        <div className='mb-6'>
+          <GuidanceOverlay
+            storageKey='tasiyici.market'
+            isEmpty={!loading && listings.length === 0}
+            icon={Truck}
+            title='Taşıyıcı Pazarı'
+            description='Pazardaki ilanlara uygun bütçe/tarih kriterleriyle teklif ver. Verdiğin teklifleri “Tekliflerim”den, kabul edilen işleri “Aktif İşler”den yönetebilirsin.'
+            primaryAction={{
+              label: 'Tekliflerim',
+              to: '/tasiyici/my-offers',
+            }}
+            secondaryAction={{
+              label: 'Aktif İşler',
+              to: '/tasiyici/active-jobs',
+            }}
+          />
         </div>
 
         {/* Filters */}
@@ -462,16 +589,29 @@ const Market: React.FC = () => {
         {/* Listings Grid */}
         <div>
             {filteredListings.length === 0 ? (
-              <div className='bg-white rounded-xl shadow-lg border border-gray-100 p-12 text-center'>
-                <Truck className='w-16 h-16 text-gray-400 mx-auto mb-4' />
-                <h3 className='text-lg font-semibold text-gray-900 mb-2'>
-                  {listings.length === 0 ? 'Açık ilan bulunamadı' : 'Filtreye uygun ilan bulunamadı'}
-                </h3>
-                <p className='text-gray-600'>
-                  {listings.length === 0
-                    ? 'Şu anda açık ilan bulunmamaktadır. Daha sonra tekrar kontrol edin.'
-                    : 'Filtreleri değiştirip tekrar deneyin.'}
-                </p>
+              <div className='min-h-[50vh] flex items-center justify-center'>
+                <div className='bg-white rounded-2xl shadow-xl border border-slate-200 p-10 text-center w-full max-w-2xl'>
+                  <EmptyState
+                    icon={Truck}
+                    title={listings.length === 0 ? 'Şimdilik İş Yok' : 'Filtreye Uygun İş Yok'}
+                    description={listings.length === 0
+                      ? 'Şu anda açık ilan bulunmuyor. Birkaç dakika sonra tekrar deneyebilirsin.'
+                      : 'Filtreleri temizleyip tekrar deneyebilirsin.'}
+                    action={listings.length === 0 ? {
+                      label: 'Yenile',
+                      onClick: loadListings,
+                    } : {
+                      label: 'Filtreleri Temizle',
+                      onClick: () => {
+                        setFilterFromCity('');
+                        setFilterToCity('');
+                        setSearchTerm('');
+                        setSortBy('date');
+                        setSortOrder('desc');
+                      },
+                    }}
+                  />
+                </div>
               </div>
             ) : (
               <>
@@ -494,27 +634,63 @@ const Market: React.FC = () => {
                         <div className='flex items-center gap-1 mb-1'>
                           <MapPin className='w-3 h-3 text-blue-600 flex-shrink-0' />
                           <span className='text-xs font-medium text-slate-900 truncate'>
-                            {l.pickupAddress || 'Belirtilmemiş'}
+                            {(l.pickupCity || getCityFromAddress(l.pickupAddress) || l.pickupAddress || 'Belirtilmemiş').toString()}
                           </span>
                         </div>
+                        {l.pickupAddress && (
+                          <div className='text-[10px] text-slate-500 truncate pl-4'>
+                            {l.pickupAddress}
+                          </div>
+                        )}
                         <div className='flex items-center gap-1'>
                           <ArrowRight className='w-2.5 h-2.5 text-slate-400 mx-1.5' />
                           <MapPin className='w-3 h-3 text-green-600 flex-shrink-0' />
                           <span className='text-xs font-medium text-slate-900 truncate'>
-                            {l.deliveryAddress || 'Belirtilmemiş'}
+                            {(l.deliveryCity || getCityFromAddress(l.deliveryAddress) || l.deliveryAddress || 'Belirtilmemiş').toString()}
                           </span>
                         </div>
+                        {l.deliveryAddress && (
+                          <div className='text-[10px] text-slate-500 truncate pl-8'>
+                            {l.deliveryAddress}
+                          </div>
+                        )}
                       </div>
 
-                      <div className='flex items-center justify-between text-xs text-slate-600 mb-2.5'>
-                        <div className='flex items-center gap-1'>
-                          <Package className='w-3 h-3 text-blue-600' />
-                          <span>{(l.weight || 0).toLocaleString('tr-TR')} kg</span>
+                      {/* 🚚 Ağırlık/Hacim Bilgisi - Kamyoncu için kritik */}
+                      <div className='bg-blue-50 border border-blue-200 rounded-lg p-2.5 mb-2.5'>
+                        <div className='flex items-center justify-between text-xs'>
+                          <div className='flex items-center gap-1'>
+                            <Package className='w-3 h-3 text-blue-600' />
+                            <span className='font-semibold text-blue-800'>
+                              {l.weight && l.weight > 0 
+                                ? `${l.weight.toLocaleString('tr-TR')} kg`
+                                : (l.title?.includes('ev') || l.title?.includes('mobilya') 
+                                    ? 'Tahmini 800-1500 kg' 
+                                    : l.title?.includes('kargo') || l.title?.includes('koli')
+                                    ? 'Tahmini 50-200 kg'
+                                    : 'Ağırlık belirtilmemiş')
+                              }
+                            </span>
+                          </div>
+                          <div className='flex items-center gap-1'>
+                            <Package className='w-3 h-3 text-purple-600' />
+                            <span className='font-semibold text-purple-800'>
+                              {l.volume && l.volume > 0 
+                                ? `${l.volume.toLocaleString('tr-TR')} m³`
+                                : (l.title?.includes('ev') || l.title?.includes('mobilya')
+                                    ? 'Tahmini 8-15 m³'
+                                    : l.title?.includes('kargo') || l.title?.includes('koli')
+                                    ? 'Tahmini 1-3 m³'
+                                    : 'Hacim belirtilmemiş')
+                              }
+                            </span>
+                          </div>
                         </div>
-                        <div className='flex items-center gap-1'>
-                          <Package className='w-3 h-3 text-purple-600' />
-                          <span>{(l.volume || 0).toLocaleString('tr-TR')} m³</span>
-                        </div>
+                        {(!l.weight || l.weight === 0) && (!l.volume || l.volume === 0) && (
+                          <p className='text-xs text-blue-600 mt-1 font-medium'>
+                            📞 Teklif kabul edilirse nakliyeci ile direkt konuşarak kesin ölçüler alabilirsiniz
+                          </p>
+                        )}
                       </div>
 
                       {(l.unitType || l.temperatureSetpoint || l.unNumber || l.loadingEquipment) && (
@@ -549,17 +725,17 @@ const Market: React.FC = () => {
                               <div className='text-lg font-bold text-green-600'>
                                 ₺{l.price.toLocaleString('tr-TR')}
                               </div>
-                              {l.minPrice && l.minPrice < l.price && (
+                              {l.carrierBudgetMax && l.carrierBudgetMax < l.price && (
                                 <div className='text-[10px] text-slate-500 mt-0.5'>
-                                  Min: ₺{l.minPrice.toLocaleString('tr-TR')}
+                                  Bütçe (Tavan): ₺{l.carrierBudgetMax.toLocaleString('tr-TR')}
                                 </div>
                               )}
                             </div>
-                          ) : l.minPrice ? (
+                          ) : l.carrierBudgetMax ? (
                             <div>
-                              <div className='text-[10px] text-slate-500 mb-0.5'>Min. Teklif</div>
+                              <div className='text-[10px] text-slate-500 mb-0.5'>Bütçe (Tavan)</div>
                               <div className='text-lg font-bold text-slate-900'>
-                                ₺{l.minPrice.toLocaleString('tr-TR')}
+                                ₺{l.carrierBudgetMax.toLocaleString('tr-TR')}
                               </div>
                             </div>
                           ) : (
@@ -569,7 +745,7 @@ const Market: React.FC = () => {
 
                         <button
                           onClick={() => openBidModal(l)}
-                          className='w-full px-2.5 py-2 bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 text-white rounded-lg text-xs font-medium transition-all duration-300 flex items-center justify-center gap-1.5 shadow-md hover:shadow-lg'
+                          className='w-full px-4 py-4 bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 text-white rounded-lg text-sm font-bold transition-all duration-300 flex items-center justify-center gap-2 shadow-md hover:shadow-lg touch-manipulation min-h-[48px]'
                         >
                           <DollarSign className='w-3 h-3' />
                           Teklif Ver
@@ -600,9 +776,9 @@ const Market: React.FC = () => {
                   <ArrowRight className='w-3 h-3 mx-1' />
                   <span className='font-medium'>{selectedListing.deliveryAddress}</span>
                 </div>
-                {selectedListing.minPrice && (
+                {selectedListing.carrierBudgetMax && (
                   <div className='text-xs text-blue-700 mt-2'>
-                    Minimum Teklif: ₺{selectedListing.minPrice.toLocaleString()}
+                    Bütçe (Tavan): ₺{selectedListing.carrierBudgetMax.toLocaleString()}
                   </div>
                 )}
               </div>
@@ -619,11 +795,11 @@ const Market: React.FC = () => {
                 onChange={(e) => setBidPriceInput(e.target.value)}
                 placeholder='Örn: 3500'
                 className='w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                min={selectedListing.minPrice || 0}
+                max={selectedListing.carrierBudgetMax || undefined}
               />
-              {selectedListing.minPrice && Number(bidPriceInput) < selectedListing.minPrice && (
+              {selectedListing.carrierBudgetMax && Number(bidPriceInput) > selectedListing.carrierBudgetMax && (
                 <p className='text-xs text-red-600 mt-1'>
-                  Minimum {selectedListing.minPrice.toLocaleString()} ₺ olmalı
+                  Teklif {selectedListing.carrierBudgetMax.toLocaleString()} ₺ tavanını aşamaz
                 </p>
               )}
             </div>
@@ -652,7 +828,7 @@ const Market: React.FC = () => {
               </button>
               <button
                 onClick={sendBid}
-                disabled={!bidPriceInput || Number(bidPriceInput) <= 0 || (selectedListing.minPrice !== undefined && selectedListing.minPrice > 0 && Number(bidPriceInput) < selectedListing.minPrice)}
+                disabled={!bidPriceInput || Number(bidPriceInput) <= 0 || (selectedListing.carrierBudgetMax !== undefined && selectedListing.carrierBudgetMax > 0 && Number(bidPriceInput) > selectedListing.carrierBudgetMax)}
                 className='flex-1 px-4 py-2 bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 text-white rounded-lg font-medium transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed'
               >
                 Teklifi Gönder

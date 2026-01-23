@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
+import { Link } from 'react-router-dom';
 import {
   Settings as SettingsIcon,
   User,
@@ -32,6 +33,9 @@ import {
   Trash2,
 } from 'lucide-react';
 import { createApiUrl } from '../../config/api';
+import { authAPI as authService } from '../../services/api';
+import { TOAST_MESSAGES, showProfessionalToast } from '../../utils/toastMessages';
+
 // Temporary workaround
 const kvkkAPI = {
   requestDataAccess: async () => {
@@ -374,6 +378,46 @@ export default function CorporateSettings() {
         </div>
       </div>
 
+      <div className='bg-gradient-to-br from-white to-slate-50 rounded-2xl p-8 border border-slate-200'>
+        <div className='flex items-center gap-4 mb-6'>
+          <div className='w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-xl flex items-center justify-center'>
+            <FileText className='w-6 h-6 text-white' />
+          </div>
+          <div>
+            <h3 className='text-xl font-bold text-slate-900'>Yasal Belgeler</h3>
+            <p className='text-slate-600'>Kullanım Koşulları, Gizlilik, Çerez ve KVKK metinlerine erişin</p>
+          </div>
+        </div>
+
+        <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3'>
+          <Link to='/terms' target='_blank' className='bg-white border-2 border-slate-200 rounded-xl px-4 py-3 hover:border-blue-300 hover:shadow-sm transition-all text-sm font-semibold text-slate-900'>
+            Kullanım Koşulları
+          </Link>
+          <Link to='/privacy' target='_blank' className='bg-white border-2 border-slate-200 rounded-xl px-4 py-3 hover:border-blue-300 hover:shadow-sm transition-all text-sm font-semibold text-slate-900'>
+            Gizlilik Politikası
+          </Link>
+          <Link to='/cookie-policy' target='_blank' className='bg-white border-2 border-slate-200 rounded-xl px-4 py-3 hover:border-blue-300 hover:shadow-sm transition-all text-sm font-semibold text-slate-900'>
+            Çerez Politikası
+          </Link>
+          <button
+            type='button'
+            onClick={() => window.dispatchEvent(new Event('yolnext:cookie-preferences'))}
+            className='bg-white border-2 border-slate-200 rounded-xl px-4 py-3 hover:border-blue-300 hover:shadow-sm transition-all text-sm font-semibold text-slate-900 text-left'
+          >
+            Çerez Tercihleri
+          </button>
+          <Link to='/kvkk-aydinlatma' target='_blank' className='bg-white border-2 border-slate-200 rounded-xl px-4 py-3 hover:border-blue-300 hover:shadow-sm transition-all text-sm font-semibold text-slate-900'>
+            KVKK Aydınlatma Metni
+          </Link>
+          <Link to='/consumer-rights' target='_blank' className='bg-white border-2 border-slate-200 rounded-xl px-4 py-3 hover:border-blue-300 hover:shadow-sm transition-all text-sm font-semibold text-slate-900'>
+            Tüketici Hakları
+          </Link>
+          <Link to='/distance-selling-contract' target='_blank' className='bg-white border-2 border-slate-200 rounded-xl px-4 py-3 hover:border-blue-300 hover:shadow-sm transition-all text-sm font-semibold text-slate-900'>
+            Mesafeli Satış Sözleşmesi
+          </Link>
+        </div>
+      </div>
+
       {/* Account Deletion */}
       <div className='bg-gradient-to-br from-red-50 to-red-100 rounded-2xl p-8 border-2 border-red-200 mt-8'>
         <div className='flex items-center gap-4 mb-6'>
@@ -408,14 +452,16 @@ export default function CorporateSettings() {
                         setIsSaving(true);
                         const response = await authAPI.deleteAccount({ password, reason: 'Kullanıcı talebi' });
                         if (response.success) {
-                          alert('Hesabınız başarıyla silindi. Çıkış yapılıyor...');
-                          localStorage.clear();
-                          window.location.href = '/';
+                          showProfessionalToast(toast, 'ACTION_COMPLETED', 'success');
+                          setTimeout(() => {
+                            localStorage.clear();
+                            window.location.href = '/';
+                          }, 2000);
                         } else {
-                          alert(response.message || 'Hesap silme başarısız');
+                          showProfessionalToast(toast, 'OPERATION_FAILED', 'error');
                         }
                       } catch (err: any) {
-                        alert(err?.response?.data?.message || 'Hesap silme başarısız');
+                        showProfessionalToast(toast, 'OPERATION_FAILED', 'error');
                       } finally {
                         setIsSaving(false);
                       }

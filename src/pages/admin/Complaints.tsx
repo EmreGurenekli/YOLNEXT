@@ -11,7 +11,7 @@ const Complaints: React.FC = () => {
       <div className='container-custom py-6 lg:py-8'>
         <div className='mb-6'>
           <h1 className='text-2xl font-bold text-slate-900'>Şikayetler</h1>
-          <p className='text-slate-600'>pending/reviewing/resolved yönetimi</p>
+          <p className='text-slate-600'>beklemede/inceleniyor/çözüldü yönetimi</p>
         </div>
 
         <div className='card p-6'>

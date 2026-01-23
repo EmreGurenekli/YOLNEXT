@@ -30,7 +30,7 @@ const AdminGuard: React.FC<AdminGuardProps> = ({ children }) => {
     );
   }
 
-  if (user?.role !== 'admin') {
+  if (user?.role !== 'admin' && user?.panel_type !== 'admin') {
     return <Navigate to='/' replace />;
   }
 

@@ -16,6 +16,7 @@ import LoadingState from '../../components/common/LoadingState';
 import RatingModal from '../../components/RatingModal';
 import { Link } from 'react-router-dom';
 import { createApiUrl } from '../../config/api';
+import GuidanceOverlay from '../../components/common/GuidanceOverlay';
 
 interface Job {
   id: number;
@@ -57,7 +58,7 @@ const TasiyiciCompletedJobs: React.FC = () => {
       try {
         userId = userRaw ? JSON.parse(userRaw).id : undefined;
       } catch (error) {
-        console.error('Error parsing user data:', error);
+        console.error('Kullanıcı verisi ayrıştırılırken hata:', error);
         userId = undefined;
       }
       const token = localStorage.getItem('authToken');
@@ -80,18 +81,24 @@ const TasiyiciCompletedJobs: React.FC = () => {
           title: String(s.title || s.shipmentTitle || 'Gönderi'),
           pickupCity: String(s.pickupCity || s.pickup_city || ''),
           deliveryCity: String(s.deliveryCity || s.delivery_city || ''),
-          completedDate: String(s.updatedAt || s.updated_at || s.completedAt || s.completed_at || s.createdAt || s.created_at || ''),
+          completedDate: String(
+            s.actualdeliverydate || s.actualDeliveryDate || s.actual_delivery_date ||
+            s.deliveredAt || s.delivered_at || 
+            s.completedAt || s.completed_at ||
+            s.updatedAt || s.updated_at ||
+            s.createdAt || s.created_at || ''
+          ),
           price: typeof s.price === 'number' ? s.price : parseFloat(String(s.price || s.displayPrice || 0)) || 0,
           rating: typeof s.rating === 'number' ? s.rating : parseFloat(String(s.rating || 0)) || 0,
           carrierId: s.carrierId != null ? Number(s.carrierId) : (s.nakliyeci_id != null ? Number(s.nakliyeci_id) : undefined),
-          carrierName: String(s.carrierName || ''),
+          carrierName: String(s.carrierName || s.carrier_name || s.nakliyeciName || s.nakliyeci_name || s.carrierEmail || s.carrier_email || ''),
           hasRatedCarrier: Boolean(s.hasRatedCarrier || s.has_rated_carrier),
         }));
 
         setJobs(mapped);
       }
     } catch (error) {
-      console.error('Error loading completed jobs:', error);
+      console.error('Tamamlanan işler yüklenirken hata:', error);
     } finally {
       setLoading(false);
     }
@@ -147,6 +154,24 @@ const TasiyiciCompletedJobs: React.FC = () => {
               </div>
             </div>
           </div>
+        </div>
+
+        <div className='mb-6'>
+          <GuidanceOverlay
+            storageKey='tasiyici.completed-jobs'
+            isEmpty={!loading && jobs.length === 0}
+            icon={CheckCircle}
+            title='Tamamlanan İşler'
+            description='Tamamlanan işlerini buradan inceleyebilirsin. Yeni iş almak için “Pazar”a geç; devam eden operasyonlar için “Aktif İşler”e bak.'
+            primaryAction={{
+              label: 'Pazar',
+              to: '/tasiyici/market',
+            }}
+            secondaryAction={{
+              label: 'Aktif İşler',
+              to: '/tasiyici/active-jobs',
+            }}
+          />
         </div>
 
         {/* Jobs List */}
@@ -238,20 +263,23 @@ const TasiyiciCompletedJobs: React.FC = () => {
             ))}
           </div>
         ) : (
-          <div className='bg-white rounded-xl shadow-lg border border-gray-100 p-12 text-center'>
-            <Package className='w-16 h-16 text-gray-400 mx-auto mb-4' />
-            <h3 className='text-lg font-semibold text-gray-900 mb-2'>
-              Tamamlanan işiniz yok
-            </h3>
-            <p className='text-gray-600 mb-4'>
-              Henüz hiç iş tamamlamadınız. Aktif işlerinizi tamamlayarak başlayın.
-            </p>
-            <Link to='/tasiyici/active-jobs' className='inline-block'>
-              <button className='px-6 py-2 bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 text-white rounded-lg font-medium transition-all duration-300 flex items-center gap-2 shadow-lg hover:shadow-xl mx-auto'>
-                <ArrowRight className='w-4 h-4' />
-                Aktif İşlere Git
-              </button>
-            </Link>
+          <div className='min-h-[50vh] flex items-center justify-center'>
+            <div className='bg-white rounded-2xl shadow-xl border border-gray-100 p-12 text-center w-full max-w-2xl'>
+              <Package className='w-16 h-16 text-gray-400 mx-auto mb-4' />
+              <h3 className='text-xl font-bold text-gray-900 mb-2'>
+                Tamamlanan işin yok
+              </h3>
+              <p className='text-gray-600 mb-6'>
+                Tamamlanan işler burada listelenir. Önce “Aktif İşler”den iş alıp tamamlayabilirsin.
+              </p>
+              <div className='flex flex-col sm:flex-row gap-3 justify-center'>
+                <Link to='/tasiyici/active-jobs'>
+                  <button className='px-6 py-3 bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 text-white rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl'>
+                    Aktif İşlere Git
+                  </button>
+                </Link>
+              </div>
+            </div>
           </div>
         )}
 

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useAuth } from '../../contexts/AuthContext';
+import { useToast } from '../../contexts/ToastContext';
 import { dashboardAPI, notificationAPI, shipmentAPI } from '../../services/api';
 import { createApiUrl } from '../../config/api';
 import NotificationModal from '../../components/modals/NotificationModal';
@@ -37,27 +38,40 @@ import {
   Target,
   Zap,
   TrendingDown,
-  UserPlus,
-  TruckIcon,
   Copy,
   CheckCircle,
-  AlertCircle,
 } from 'lucide-react';
 import Breadcrumb from '../../components/common/Breadcrumb';
 import EmptyState from '../../components/common/EmptyState';
 import LoadingState from '../../components/common/LoadingState';
+import { normalizeTrackingCode } from '../../utils/trackingCode';
+import { formatDate } from '../../utils/format';
+import { logger } from '../../utils/logger';
 
 interface Shipment {
-  id: string;
-  trackingNumber: string;
-  date: string;
-  description: string;
+  id: string | number;
+  trackingNumber?: string;
+  date?: string;
+  createdAt?: string;
+  created_at?: string;
+  updatedAt?: string;
+  updated_at?: string;
+  description?: string;
   status: string;
-  from: string;
-  to: string;
-  weight: number;
-  value: number;
-  priority: string;
+  from?: string;
+  to?: string;
+  pickupCity?: string;
+  pickup_city?: string;
+  pickupAddress?: string;
+  pickup_address?: string;
+  deliveryCity?: string;
+  delivery_city?: string;
+  deliveryAddress?: string;
+  delivery_address?: string;
+  weight?: number;
+  price?: number;
+  value?: number;
+  priority?: string;
 }
 
 interface Notification {
@@ -71,6 +85,8 @@ interface Notification {
 
 const Dashboard = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const { showToast } = useToast();
   const [stats, setStats] = useState({
     totalShipments: 0,
     deliveredShipments: 0,
@@ -92,6 +108,29 @@ const Dashboard = () => {
   const [showNotificationModal, setShowNotificationModal] = useState(false);
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
   const [copiedCode, setCopiedCode] = useState(false);
+
+  // Bildirimleri okundu olarak işaretleme fonksiyonu
+  const markNotificationsAsRead = async () => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const userId = user?.id || (localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user') || '{}').id : null);
+      
+      const response = await fetch(createApiUrl('/api/notifications/mark-all-read'), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token || ''}`,
+          'X-User-Id': userId || '',
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (response.ok) {
+        setUnreadCount(0);
+      }
+    } catch (error) {
+      logger.error('Bildirimler okundu olarak işaretlenemedi:', error);
+    }
+  };
 
   // Yeni kullanıcılar için boş veriler
   const emptyData = {
@@ -116,9 +155,19 @@ const Dashboard = () => {
   }, []);
 
   const loadDashboardData = async () => {
+    if (!user?.id) {
+      setIsLoading(false);
+      return;
+    }
+    
+    setIsLoading(true);
+    
+    // Timeout protection - maksimum 10 saniye bekle
+    const timeoutId = setTimeout(() => {
+      setIsLoading(false);
+    }, 10000);
+    
     try {
-      setIsLoading(true);
-
       // Dashboard stats
       try {
         const statsResponse = await dashboardAPI.getStats('nakliyeci');
@@ -142,11 +191,11 @@ const Dashboard = () => {
           setStats(emptyData.stats);
         }
       } catch (error) {
-        console.error('Error loading dashboard stats:', error);
+        logger.error('Error loading dashboard stats:', error);
         setStats(emptyData.stats);
       }
 
-      // Recent shipments - Use nakliyeci-specific endpoint
+      // Recent shipments - Only active shipments for dashboard summary
       try {
         const shipmentsResponse = await shipmentAPI.getNakliyeci();
         if (shipmentsResponse?.success) {
@@ -154,12 +203,28 @@ const Dashboard = () => {
             (Array.isArray(shipmentsResponse.data) ? shipmentsResponse.data : null) ||
             (Array.isArray((shipmentsResponse.data as any)?.shipments) ? (shipmentsResponse.data as any).shipments : null) ||
             [];
-          setRecentShipments(rows);
+          
+          // Filter for active shipments only (not delivered/cancelled)
+          const activeShipments = rows.filter((shipment: any) => {
+            const status = String(shipment.status || '').toLowerCase();
+            return !['delivered', 'completed', 'finished', 'cancelled', 'canceled', 'rejected'].includes(status);
+          });
+          
+          // Sort by creation date (newest first) and limit to 5
+          const sortedActiveShipments = activeShipments
+            .sort((a: any, b: any) => {
+              const dateA = new Date(a.createdAt || a.created_at || a.date || 0);
+              const dateB = new Date(b.createdAt || b.created_at || b.date || 0);
+              return dateB.getTime() - dateA.getTime();
+            })
+            .slice(0, 5);
+          
+          setRecentShipments(sortedActiveShipments);
         } else {
           setRecentShipments(emptyData.recentShipments);
         }
       } catch (error) {
-        console.error('Error loading shipments:', error);
+        logger.error('Error loading shipments:', error);
         setRecentShipments(emptyData.recentShipments);
       }
 
@@ -176,7 +241,7 @@ const Dashboard = () => {
           setUnreadCount(0);
         }
       } catch (error) {
-        console.error('Bildirim sayısı alınamadı:', error);
+        logger.error('Bildirim sayısı alınamadı:', error);
         setUnreadCount(0);
       }
 
@@ -198,27 +263,47 @@ const Dashboard = () => {
           }
         }
       } catch (error) {
-        console.error('Bakiye yüklenemedi:', error);
+        logger.error('Bakiye yüklenemedi:', error);
       }
     } catch (error) {
-      console.error('Error loading dashboard data:', error);
+      logger.error('Error loading dashboard data:', error);
       setStats(emptyData.stats);
       setRecentShipments(emptyData.recentShipments);
       setUnreadCount(0);
     } finally {
+      clearTimeout(timeoutId);
       setIsLoading(false);
     }
   };
 
   const getStatusColor = (status: string) => {
-    switch (status) {
+    const s = String(status || '').toLowerCase();
+    switch (s) {
       case 'pending':
+      case 'waiting_for_offers':
+      case 'open':
+      case 'draft':
         return 'text-yellow-600 bg-yellow-100';
+      case 'assigned':
+      case 'accepted':
+      case 'offer_accepted':
+      case 'confirmed':
+        return 'text-purple-600 bg-purple-100';
+      case 'picked_up':
+      case 'loaded':
+      case 'in_progress':
+        return 'text-indigo-600 bg-indigo-100';
       case 'in_transit':
+      case 'shipping':
+      case 'on_the_way':
         return 'text-blue-600 bg-blue-100';
       case 'delivered':
+      case 'completed':
+      case 'finished':
         return 'text-green-600 bg-green-100';
       case 'cancelled':
+      case 'canceled':
+      case 'rejected':
         return 'text-red-600 bg-red-100';
       default:
         return 'text-gray-600 bg-gray-100';
@@ -226,18 +311,45 @@ const Dashboard = () => {
   };
 
   const getStatusText = (status: string) => {
-    switch (status) {
+    const s = String(status || '').toLowerCase();
+    switch (s) {
       case 'pending':
-        return 'Bekliyor';
+      case 'waiting_for_offers':
+      case 'open':
+        return 'Teklif Bekliyor';
+      case 'assigned':
+        return 'Taşıyıcı Atandı';
+      case 'accepted':
+      case 'offer_accepted':
+      case 'confirmed':
+        return 'Teklif Kabul Edildi';
+      case 'picked_up':
+      case 'loaded':
+        return 'Yük Alındı';
       case 'in_transit':
+      case 'shipping':
+      case 'on_the_way':
         return 'Yolda';
+      case 'in_progress':
+        return 'Devam Ediyor';
       case 'delivered':
+      case 'completed':
+      case 'finished':
         return 'Teslim Edildi';
       case 'cancelled':
+      case 'canceled':
+      case 'rejected':
         return 'İptal Edildi';
+      case 'draft':
+        return 'Taslak';
       default:
-        return status;
+        return status || 'Bilinmiyor';
     }
+  };
+
+  const formatDateSafe = (value: unknown) => {
+    if (!value) return '-';
+    return formatDate(value, 'short');
   };
 
   const getPriorityColor = (priority: string) => {
@@ -295,7 +407,6 @@ const Dashboard = () => {
                       {user?.firstName ||
                         user?.fullName?.split(' ')[0] ||
                         'Kullanıcı'}
-                      ! 👋
                     </h1>
                     <p className='text-slate-200 text-lg leading-relaxed'>
                       Nakliyeci panelinize hoş geldiniz.
@@ -315,30 +426,13 @@ const Dashboard = () => {
                       Çevrimiçi
                     </span>
                   </div>
-                  <div className='bg-white/10 backdrop-blur-sm rounded-2xl px-4 py-2 border border-white/20'>
-                    <span className='text-slate-200 font-medium'>
-                      {stats.totalShipments} Aktif Yük
-                    </span>
-                  </div>
-                  <div className='bg-white/10 backdrop-blur-sm rounded-2xl px-4 py-2 border border-white/20'>
-                    <span className='text-slate-200 font-medium'>
-                      {stats.openListings} Açık İlan
-                    </span>
-                  </div>
-                  {walletBalance !== null && (
-                    <div className='bg-gradient-to-r from-emerald-500/20 to-green-500/20 backdrop-blur-sm rounded-2xl px-4 py-2 border border-emerald-400/30'>
-                      <span className='text-emerald-200 font-semibold'>
-                        💰 {walletBalance.toFixed(2)} TL
-                      </span>
-                    </div>
-                  )}
-                  {(user?.nakliyeciCode || (user as any)?.nakliyecicode) && (
+                  {(user?.nakliyeciCode || (user as any)?.nakliyecicode || user?.id) && (
                     <div className='bg-gradient-to-r from-slate-800/30 to-blue-900/30 backdrop-blur-sm rounded-2xl px-4 py-2 border border-slate-400/30 flex items-center gap-2'>
                       <span className='text-slate-200 font-medium text-sm'>Kodum:</span>
-                      <span className='text-white font-mono font-bold text-base'>{user?.nakliyeciCode || (user as any)?.nakliyecicode}</span>
+                      <span className='text-white font-mono font-bold text-base'>{user?.nakliyeciCode || (user as any)?.nakliyecicode || `NK${user?.id?.toString().padStart(3, '0')}`}</span>
                       <button
                         onClick={() => {
-                          const code = user?.nakliyeciCode || (user as any)?.nakliyecicode;
+                          const code = user?.nakliyeciCode || (user as any)?.nakliyecicode || `NK${user?.id?.toString().padStart(3, '0')}`;
                           if (code) {
                             navigator.clipboard.writeText(code);
                             setCopiedCode(true);
@@ -354,6 +448,72 @@ const Dashboard = () => {
                           <Copy className='w-4 h-4 text-slate-300' />
                         )}
                       </button>
+                      <button
+                        onClick={() => {
+                          const code = user?.nakliyeciCode || (user as any)?.nakliyecicode || `NK${user?.id?.toString().padStart(3, '0')}`;
+                          if (code) {
+                            const shareText = `YolNext Nakliyeci Kodum: ${code}\n\nBu kodla taşıyıcılar benimle kolayca çalışabilir!\n\n🚀 YolNext - Tamamen Ücretsiz Lojistik Platformu`;
+                            
+                            // Web Share API destekliyorsa doğrudan paylaş
+                            if (navigator.share) {
+                              navigator.share({
+                                title: 'YolNext Nakliyeci Kodum',
+                                text: shareText,
+                                url: `https://yolnext.com/nakliyeci/${code}`
+                              });
+                            } else {
+                              // Sosyal medya paylaşım seçenekleri
+                              const encodedText = encodeURIComponent(shareText);
+                              const encodedUrl = encodeURIComponent(`https://yolnext.com/nakliyeci/${code}`);
+                              
+                              // Sosyal medya linkleri
+                              const socialLinks = {
+                                whatsapp: `https://wa.me/?text=${encodedText}`,
+                                facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}&quote=${encodedText}`,
+                                twitter: `https://twitter.com/intent/tweet?text=${encodedText}&url=${encodedUrl}`,
+                                instagram: `https://www.instagram.com/`, // Instagram direkt link desteklemez
+                                telegram: `https://t.me/share/url?url=${encodedUrl}&text=${encodedText}`,
+                                linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`
+                              };
+                              
+                              // Modal oluştur veya seçenek sun
+                              const shareOptions = [
+                                { name: 'WhatsApp', url: socialLinks.whatsapp, icon: '💬' },
+                                { name: 'Facebook', url: socialLinks.facebook, icon: '📘' },
+                                { name: 'Twitter', url: socialLinks.twitter, icon: '🐦' },
+                                { name: 'Telegram', url: socialLinks.telegram, icon: '✈️' },
+                                { name: 'LinkedIn', url: socialLinks.linkedin, icon: '💼' },
+                                { name: 'Panoya Kopyala', url: null, icon: '📋' }
+                              ];
+                              
+                              // Basit seçim modalı
+                              const choice = confirm(
+                                'Nasıl paylaşmak istersiniz?\n\n' +
+                                '1. WhatsApp\n' +
+                                '2. Facebook\n' +
+                                '3. Twitter\n' +
+                                '4. Telegram\n' +
+                                '5. LinkedIn\n' +
+                                '6. Panoya Kopyala\n\n' +
+                                'Tamam için WhatsApp, İptal için Panoya Kopyala'
+                              );
+                              
+                              if (choice) {
+                                // WhatsApp varsayılan
+                                window.open(socialLinks.whatsapp, '_blank');
+                              } else {
+                                // Panoya kopyala
+                                navigator.clipboard.writeText(shareText);
+                                showToast({ type: 'success', title: 'Başarılı', message: 'Kod panoya kopyalandı!' });
+                              }
+                            }
+                          }
+                        }}
+                        className='p-1.5 hover:bg-white/10 rounded-lg transition-colors'
+                        title='Kodu Paylaş'
+                      >
+                        <Users className='w-4 h-4 text-slate-300' />
+                      </button>
                     </div>
                   )}
                 </div>
@@ -361,13 +521,17 @@ const Dashboard = () => {
 
               <div className='flex items-center gap-3'>
                 <button
-                  onClick={() => setShowNotificationModal(true)}
+                  onClick={() => {
+                    setShowNotificationModal(true);
+                    // Bildirimleri okundu olarak işaretle
+                    markNotificationsAsRead();
+                  }}
                   className='relative group min-w-[44px] min-h-[44px] w-12 h-12 bg-white/10 backdrop-blur-sm rounded-2xl flex items-center justify-center hover:bg-white/20 transition-all duration-300 border border-white/20 group-hover:scale-110'
                 >
                   <Bell size={20} className='text-white' />
                   {unreadCount > 0 && (
                     <span className='absolute -top-1 -right-1 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center font-bold shadow-lg'>
-                      {unreadCount}
+                      {unreadCount > 99 ? '99+' : unreadCount}
                     </span>
                   )}
                 </button>
@@ -383,40 +547,9 @@ const Dashboard = () => {
         </div>
 
         {/* Komisyon İade Politikası Bilgilendirmesi */}
-        <div className='bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-300 rounded-xl p-4 mb-6 shadow-lg'>
-          <div className='flex items-start gap-3'>
-            <div className='flex-shrink-0 w-10 h-10 bg-amber-500 rounded-lg flex items-center justify-center'>
-              <AlertCircle className='w-6 h-6 text-white' />
-            </div>
-            <div className='flex-1'>
-              <h3 className='font-bold text-amber-900 mb-2 text-lg'>
-                💰 Komisyon ve İade Politikası
-              </h3>
-              <div className='space-y-2 text-sm text-amber-800'>
-                <p className='font-semibold'>✅ Komisyon Kesme:</p>
-                <ul className='list-disc list-inside ml-2 space-y-1'>
-                  <li>Teklifiniz kabul edildiğinde teklif tutarının <strong>%1'i</strong> cüzdanınızdan otomatik kesilir</li>
-                  <li>Komisyon kesilmeden önce cüzdan bakiyeniz kontrol edilir</li>
-                </ul>
-                <p className='font-semibold mt-3'>⚠️ İade Koşulları (Çok Sınırlı):</p>
-                <ul className='list-disc list-inside ml-2 space-y-1'>
-                  <li><strong>Sadece taşıyıcı atanmadan önce</strong> iptal edilirse iade yapılır</li>
-                  <li><strong>İlk 24 saat içinde</strong> iptal edilirse iade yapılır</li>
-                  <li>İade yapılırsa <strong>işlem maliyeti (min. 2 TL)</strong> kesilir</li>
-                  <li><strong className='text-red-600'>Taşıyıcı atandıktan sonra iade yapılmaz</strong></li>
-                  <li><strong className='text-red-600'>24 saat sonra iade yapılmaz</strong></li>
-                </ul>
-                <p className='mt-3 text-xs bg-amber-100 p-2 rounded border border-amber-200'>
-                  <strong>Not:</strong> Bu politika ödeme altyapı maliyetlerini ve sistemin sürdürülebilirliğini korumak için gereklidir. 
-                  Lütfen teklif verirken dikkatli olun ve sadece kesin işler için teklif verin.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
 
-        {/* Stats Grid - ANA RENK: from-slate-800 to-blue-900 */}
-        <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6'>
+        {/* Stats Grid - 4 Kart: Aktif Yükler, Tamamlanan Yükler, Bekleyen Yükler, Bakiye */}
+        <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6'>
           <div className='bg-white rounded-xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:border-blue-300 transition-all duration-300'>
             <div className='flex items-center justify-between mb-4'>
               <div className='w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center'>
@@ -424,7 +557,7 @@ const Dashboard = () => {
               </div>
               <div className='text-right'>
                 <div className='text-2xl font-bold text-slate-900 mb-1'>
-                  {stats.pendingShipments}
+                  {stats.totalShipments}
                 </div>
                 <div className='flex items-center gap-1'>
                   <svg
@@ -446,11 +579,9 @@ const Dashboard = () => {
                 </div>
               </div>
             </div>
-            <div className='text-slate-700 font-semibold text-sm'>
-              Aktif Yükler
-            </div>
-            <div className='mt-1 text-xs text-slate-500'>
-              Devam eden taşımalar
+            <div>
+              <h3 className='text-lg font-bold text-slate-900 mb-1'>Aktif Yükler</h3>
+              <p className='text-sm text-slate-600'>Devam eden taşımalar</p>
             </div>
           </div>
 
@@ -474,7 +605,7 @@ const Dashboard = () => {
                       strokeLinecap='round'
                       strokeLinejoin='round'
                       strokeWidth={2}
-                      d='M7 17l9.2-9.2M17 17V7H7'
+                      d='M5 13l4 4L19 7'
                     />
                   </svg>
                   <span className='text-xs text-blue-600 font-semibold'>
@@ -483,22 +614,20 @@ const Dashboard = () => {
                 </div>
               </div>
             </div>
-            <div className='text-slate-700 font-semibold text-sm'>
-              Tamamlanan Yükler
-            </div>
-            <div className='mt-1 text-xs text-slate-500'>
-              Teslim edilen gönderiler
+            <div>
+              <h3 className='text-lg font-bold text-slate-900 mb-1'>Tamamlanan Yükler</h3>
+              <p className='text-sm text-slate-600'>Teslim edilen gönderiler</p>
             </div>
           </div>
 
           <div className='bg-white rounded-xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:border-blue-300 transition-all duration-300'>
             <div className='flex items-center justify-between mb-4'>
               <div className='w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center'>
-                <Target className='w-6 h-6 text-white' />
+                <Clock className='w-6 h-6 text-white' />
               </div>
               <div className='text-right'>
                 <div className='text-2xl font-bold text-slate-900 mb-1'>
-                  {stats.openListings}
+                  {stats.pendingShipments}
                 </div>
                 <div className='flex items-center gap-1'>
                   <svg
@@ -511,21 +640,55 @@ const Dashboard = () => {
                       strokeLinecap='round'
                       strokeLinejoin='round'
                       strokeWidth={2}
-                      d='M7 17l9.2-9.2M17 17V7H7'
+                      d='M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z'
                     />
                   </svg>
                   <span className='text-xs text-blue-600 font-semibold'>
-                    Açık
+                    Beklemede
                   </span>
                 </div>
               </div>
             </div>
-            <div className='text-slate-700 font-semibold text-sm'>
-              Yük Pazarı
+            <div>
+              <h3 className='text-lg font-bold text-slate-900 mb-1'>Bekleyen Yükler</h3>
+              <p className='text-sm text-slate-600'>Teklif bekleyen ilanlar</p>
             </div>
-            <div className='mt-1 text-xs text-slate-500'>Açık ilanlar</div>
           </div>
 
+          <div className='bg-white rounded-xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:border-blue-300 transition-all duration-300'>
+            <div className='flex items-center justify-between mb-4'>
+              <div className='w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center'>
+                <TrendingUp className='w-6 h-6 text-white' />
+              </div>
+              <div className='text-right'>
+                <div className='text-2xl font-bold text-slate-900 mb-1'>
+                  {walletBalance !== null ? `₺${walletBalance.toFixed(0)}` : '₺0'}
+                </div>
+                <div className='flex items-center gap-1'>
+                  <svg
+                    className='w-3 h-3 text-blue-600'
+                    fill='none'
+                    stroke='currentColor'
+                    viewBox='0 0 24 24'
+                  >
+                    <path
+                      strokeLinecap='round'
+                      strokeLinejoin='round'
+                      strokeWidth={2}
+                      d='M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z'
+                    />
+                  </svg>
+                  <span className='text-xs text-blue-600 font-semibold'>
+                    Bakiye
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div>
+              <h3 className='text-lg font-bold text-slate-900 mb-1'>Cüzdan Bakiyesi</h3>
+              <p className='text-sm text-slate-600'>Kazancınız</p>
+            </div>
+          </div>
         </div>
 
         {/* Quick Actions */}
@@ -613,14 +776,16 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Son Gönderiler - Tablo Tasarımı */}
+        {/* Son Gönderiler - Aktif Yükler Özeti */}
         <div className='bg-white rounded-2xl p-8 shadow-xl border border-slate-200 mb-8'>
           <div className='flex items-center justify-between mb-6'>
             <div>
               <h2 className='text-2xl font-bold text-slate-900 mb-2'>
-                Son Yükler
+                Aktif Yükler
               </h2>
-              <p className='text-slate-600'>Aktif yüklerinizi takip edin</p>
+              <p className='text-slate-600'>
+                Devam eden yüklerinizin özeti (en son 5)
+              </p>
             </div>
             <Link
               to='/nakliyeci/active-shipments'
@@ -663,8 +828,8 @@ const Dashboard = () => {
                       className='border-b border-slate-100 hover:bg-slate-50 transition-colors'
                     >
                       <td className='py-4 px-4'>
-                        <div className='font-mono text-sm font-semibold text-slate-800'>
-                          {shipment.trackingNumber}
+                        <div className='text-sm text-slate-900'>
+                          #{normalizeTrackingCode(shipment.trackingNumber, shipment.id)}
                         </div>
                       </td>
                       <td className='py-4 px-4'>
@@ -676,27 +841,37 @@ const Dashboard = () => {
                       </td>
                       <td className='py-4 px-4'>
                         <div className='text-sm text-slate-900'>
-                          {shipment.from} → {shipment.to}
+                          {(shipment.pickupCity || shipment.pickup_city || shipment.from || 'İstanbul')} → {(shipment.deliveryCity || shipment.delivery_city || shipment.to || 'Ankara')}
                         </div>
                       </td>
                       <td className='py-4 px-4'>
                         <div className='text-sm font-semibold text-slate-900'>
-                          ₺{shipment.value.toLocaleString()}
+                          ₺{(shipment.price || shipment.value || 0).toLocaleString()}
                         </div>
                       </td>
                       <td className='py-4 px-4'>
                         <div className='text-sm text-slate-500'>
-                          {new Date(shipment.date).toLocaleDateString('tr-TR')}
+                          {formatDateSafe(shipment.createdAt || shipment.created_at || shipment.date || shipment.updatedAt || shipment.updated_at)}
                         </div>
                       </td>
                       <td className='py-4 px-4'>
                         <div className='flex items-center gap-2'>
-                          <button className='text-blue-600 hover:text-blue-700 text-sm font-medium'>
+                          <Link 
+                            to={`/nakliyeci/active-shipments`}
+                            className='text-blue-600 hover:text-blue-700 text-sm font-medium'
+                            title='Aktif Yükler sayfasına git'
+                          >
                             <Eye className='w-4 h-4' />
-                          </button>
-                          <button className='text-slate-600 hover:text-slate-700 text-sm font-medium'>
-                            <Edit className='w-4 h-4' />
-                          </button>
+                          </Link>
+                          {shipment.status === 'pending' && (
+                            <Link 
+                              to={`/nakliyeci/jobs/${shipment.id}`}
+                              className='text-slate-600 hover:text-slate-700 text-sm font-medium'
+                              title='Yük detaylarını düzenle'
+                            >
+                              <Edit className='w-4 h-4' />
+                            </Link>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -707,11 +882,11 @@ const Dashboard = () => {
           ) : (
             <EmptyState
               icon={Package}
-              title='Henüz yük yok'
-              description='İlk yükünüzü almak için yük pazarını ziyaret edin.'
+              title='Aktif yük bulunmuyor'
+              description='Devam eden yükünüz yok. Yük pazarından yeni yükler alabilirsiniz.'
               action={{
                 label: 'Yük Pazarı',
-                onClick: () => (window.location.href = '/nakliyeci/jobs'),
+                onClick: () => navigate('/nakliyeci/jobs'),
               }}
             />
           )}
@@ -721,7 +896,11 @@ const Dashboard = () => {
       {/* Notification Modal */}
       <NotificationModal
         isOpen={showNotificationModal}
-        onClose={() => setShowNotificationModal(false)}
+        onClose={() => {
+          setShowNotificationModal(false);
+          // Modal kapatıldığında bildirimleri okundu olarak işaretle
+          markNotificationsAsRead();
+        }}
       />
     </div>
   );

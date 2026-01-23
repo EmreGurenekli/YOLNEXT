@@ -9,6 +9,11 @@ dist/**
 coverage/**
 build/**
 
+# E2E artifacts - IGNORE ALL
+playwright-report/**
+.playwright-mcp/**
+test-results/**
+
 # Build outputs - IGNORE ALL
 *.min.js
 *.bundle.js

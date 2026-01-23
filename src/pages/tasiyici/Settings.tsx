@@ -1,7 +1,11 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useToast } from '../../contexts/ToastContext';
 import { Helmet } from 'react-helmet-async';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { createApiUrl } from '../../config/api';
+import { authAPI as authService } from '../../services/api';
+import { TOAST_MESSAGES, showProfessionalToast } from '../../utils/toastMessages';
 import {
   Settings,
   Bell,
@@ -25,6 +29,7 @@ import {
   CheckCircle,
   AlertCircle,
   Copy,
+  FileText,
 } from 'lucide-react';
 import Breadcrumb from '../../components/common/Breadcrumb';
 import EmptyState from '../../components/common/EmptyState';
@@ -162,7 +167,7 @@ export default function TasiyiciSettings() {
   const handleSave = () => {
     setIsLoading(true);
     setTimeout(() => {
-      setSuccessMessage('Ayarlar başarıyla kaydedildi!');
+      setSuccessMessage('Ayarlar başarıyla kaydedildi');
       setShowSuccessMessage(true);
       setIsLoading(false);
     }, 1000);
@@ -427,6 +432,40 @@ export default function TasiyiciSettings() {
                       </div>
                     </div>
 
+                    <div className='bg-white border border-slate-200 rounded-xl p-4 sm:p-5 shadow-sm'>
+                      <div className='flex items-center gap-2 mb-3'>
+                        <FileText className='w-5 h-5 text-slate-900' />
+                        <h4 className='text-sm font-semibold text-slate-900'>Yasal Belgeler</h4>
+                      </div>
+                      <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2'>
+                        <Link to='/terms' target='_blank' className='bg-slate-50 border border-gray-200 rounded-lg px-3 py-2 hover:border-blue-300 hover:bg-white transition-colors text-sm font-semibold text-slate-900'>
+                          Kullanım Koşulları
+                        </Link>
+                        <Link to='/privacy' target='_blank' className='bg-slate-50 border border-gray-200 rounded-lg px-3 py-2 hover:border-blue-300 hover:bg-white transition-colors text-sm font-semibold text-slate-900'>
+                          Gizlilik Politikası
+                        </Link>
+                        <Link to='/cookie-policy' target='_blank' className='bg-slate-50 border border-gray-200 rounded-lg px-3 py-2 hover:border-blue-300 hover:bg-white transition-colors text-sm font-semibold text-slate-900'>
+                          Çerez Politikası
+                        </Link>
+                        <button
+                          type='button'
+                          onClick={() => window.dispatchEvent(new Event('yolnext:cookie-preferences'))}
+                          className='bg-slate-50 border border-gray-200 rounded-lg px-3 py-2 hover:border-blue-300 hover:bg-white transition-colors text-sm font-semibold text-slate-900 text-left'
+                        >
+                          Çerez Tercihleri
+                        </button>
+                        <Link to='/kvkk-aydinlatma' target='_blank' className='bg-slate-50 border border-gray-200 rounded-lg px-3 py-2 hover:border-blue-300 hover:bg-white transition-colors text-sm font-semibold text-slate-900'>
+                          KVKK Aydınlatma Metni
+                        </Link>
+                        <Link to='/consumer-rights' target='_blank' className='bg-slate-50 border border-gray-200 rounded-lg px-3 py-2 hover:border-blue-300 hover:bg-white transition-colors text-sm font-semibold text-slate-900'>
+                          Tüketici Hakları
+                        </Link>
+                        <Link to='/distance-selling-contract' target='_blank' className='bg-slate-50 border border-gray-200 rounded-lg px-3 py-2 hover:border-blue-300 hover:bg-white transition-colors text-sm font-semibold text-slate-900'>
+                          Mesafeli Satış Sözleşmesi
+                        </Link>
+                      </div>
+                    </div>
+
                     {/* Account Deletion */}
                     <div className='mt-8 pt-8 border-t border-red-200'>
                       <h3 className='text-lg font-semibold text-red-900 mb-4 flex items-center gap-2'>
@@ -451,14 +490,16 @@ export default function TasiyiciSettings() {
                                   setIsLoading(true);
                                   const response = await authAPI.deleteAccount({ password, reason: 'Kullanıcı talebi' });
                                   if (response.success) {
-                                    alert('Hesabınız başarıyla silindi. Çıkış yapılıyor...');
-                                    localStorage.clear();
-                                    window.location.href = '/';
+                                    showProfessionalToast(showToast, 'ACTION_COMPLETED', 'success');
+                                    setTimeout(() => {
+                                      localStorage.clear();
+                                      window.location.href = '/';
+                                    }, 2000);
                                   } else {
-                                    alert(response.message || 'Hesap silme başarısız');
+                                    showProfessionalToast(showToast, 'OPERATION_FAILED', 'error');
                                   }
                                 } catch (err: any) {
-                                  alert(err?.response?.data?.message || 'Hesap silme başarısız');
+                                  showProfessionalToast(toast, 'OPERATION_FAILED', 'error');
                                 } finally {
                                   setIsLoading(false);
                                 }
@@ -601,14 +642,16 @@ export default function TasiyiciSettings() {
                                     setIsLoading(true);
                                     const response = await authAPI.deleteAccount({ password, reason: 'Kullanıcı talebi' });
                                     if (response.success) {
-                                      alert('Hesabınız başarıyla silindi. Çıkış yapılıyor...');
-                                      localStorage.clear();
-                                      window.location.href = '/';
+                                      showProfessionalToast(showToast, 'ACTION_COMPLETED', 'success');
+                                      setTimeout(() => {
+                                        localStorage.clear();
+                                        window.location.href = '/';
+                                      }, 2000);
                                     } else {
-                                      alert(response.message || 'Hesap silme başarısız');
+                                      showProfessionalToast(showToast, 'OPERATION_FAILED', 'error');
                                     }
                                   } catch (err: any) {
-                                    alert(err?.response?.data?.message || 'Hesap silme başarısız');
+                                    showProfessionalToast(showToast, 'OPERATION_FAILED', 'error');
                                   } finally {
                                     setIsLoading(false);
                                   }

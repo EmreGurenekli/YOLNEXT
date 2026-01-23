@@ -35,7 +35,7 @@ export const useFormValidation = (rules: ValidationRules) => {
         rule.required &&
         (!value || (typeof value === 'string' && value.trim() === ''))
       ) {
-        return rule.message || `${name} alanı zorunludur`;
+        return rule.message || 'Bu alan zorunludur';
       }
 
       // Skip other validations if value is empty and not required
@@ -50,7 +50,7 @@ export const useFormValidation = (rules: ValidationRules) => {
         value.length < rule.minLength
       ) {
         return (
-          rule.message || `${name} en az ${rule.minLength} karakter olmalıdır`
+          rule.message || `En az ${rule.minLength} karakter olmalıdır`
         );
       }
 
@@ -175,6 +175,8 @@ export const useFormValidation = (rules: ValidationRules) => {
 
 // Common validation rules
 export const commonValidationRules = {
+  
+  
   email: {
     required: true,
     pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
@@ -189,8 +191,23 @@ export const commonValidationRules = {
   },
   phone: {
     required: true,
-    pattern: /^(\+90|0)?[5][0-9]{9}$/,
-    message: 'Geçerli bir telefon numarası girin (örn: 0555 123 45 67)',
+    custom: (value: any) => {
+      const raw = String(value ?? '').trim();
+      if (!raw) return 'Telefon numarası zorunludur';
+
+      const digits = raw.replace(/\D/g, '');
+      let normalized = digits;
+      if (normalized.startsWith('90')) normalized = normalized.slice(2);
+      if (normalized.startsWith('0')) normalized = normalized.slice(1);
+
+      if (normalized.length !== 10) {
+        return 'Geçerli bir telefon numarası girin (örn: 0555 123 45 67)';
+      }
+      if (!normalized.startsWith('5')) {
+        return 'Geçerli bir telefon numarası girin (örn: 0555 123 45 67)';
+      }
+      return null;
+    },
   },
   name: {
     required: true,
@@ -227,7 +244,8 @@ export const commonValidationRules = {
   weight: {
     required: true,
     custom: (value: any) => {
-      const num = parseFloat(value);
+      const s = String(value ?? '').replace(/[^0-9.,-]/g, '').replace(',', '.');
+      const num = parseFloat(s);
       if (isNaN(num) || num <= 0) {
         return "Ağırlık 0'dan büyük bir sayı olmalıdır";
       }
@@ -240,7 +258,8 @@ export const commonValidationRules = {
   volume: {
     custom: (value: any) => {
       if (!value) return null;
-      const num = parseFloat(value);
+      const s = String(value ?? '').replace(/[^0-9.,-]/g, '').replace(',', '.');
+      const num = parseFloat(s);
       if (isNaN(num) || num <= 0) {
         return "Hacim 0'dan büyük bir sayı olmalıdır";
       }
@@ -253,7 +272,8 @@ export const commonValidationRules = {
   price: {
     required: true,
     custom: (value: any) => {
-      const num = parseFloat(value);
+      const s = String(value ?? '').replace(/[^0-9.,-]/g, '').replace(',', '.');
+      const num = parseFloat(s);
       if (isNaN(num) || num <= 0) {
         return "Fiyat 0'dan büyük bir sayı olmalıdır";
       }

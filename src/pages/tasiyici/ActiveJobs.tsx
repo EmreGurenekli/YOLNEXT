@@ -3,10 +3,13 @@ import { createApiUrl } from '../../config/api';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import { Clock, MapPin, DollarSign, Truck, CheckCircle, ArrowRight, Package, Search, CheckCircle2, Navigation, Wifi, WifiOff, XCircle } from 'lucide-react';
-import { toast } from 'react-hot-toast';
+import { useToast } from '../../contexts/ToastContext';
+import { TOAST_MESSAGES, showProfessionalToast } from '../../utils/toastMessages';
 import Breadcrumb from '../../components/common/Breadcrumb';
 import LoadingState from '../../components/common/LoadingState';
 import Modal from '../../components/common/Modal';
+import GuidanceOverlay from '../../components/common/GuidanceOverlay';
+import TrackingModal from '../../components/TrackingModal';
 
 const ActiveJobs: React.FC = () => {
   const [jobs, setJobs] = useState<any[]>([]);
@@ -18,6 +21,75 @@ const ActiveJobs: React.FC = () => {
   const [selectedJobToReject, setSelectedJobToReject] = useState<number | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [isRejecting, setIsRejecting] = useState(false);
+  const [showTrackingModal, setShowTrackingModal] = useState(false);
+  const [selectedTrackingJob, setSelectedTrackingJob] = useState<any | null>(null);
+
+  const loadActiveJobs = async () => {
+    try {
+      setLoading(true);
+      const userRaw = localStorage.getItem('user');
+      const userId = userRaw ? JSON.parse(userRaw || '{}').id : undefined;
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(createApiUrl('/api/shipments/tasiyici'), {
+        headers: {
+          Authorization: `Bearer ${token || ''}`,
+          'X-User-Id': userId || '',
+          'Content-Type': 'application/json',
+        },
+      });
+      if (!response.ok) throw new Error('Aktif işler alınamadı');
+      const data = await response.json();
+      const rows = (Array.isArray(data) ? data : data.data || []) as any[];
+      const activeStatuses = new Set([
+        'offer_accepted',
+        'accepted',
+        'assigned',
+        'in_progress',
+        'picked_up',
+        'in_transit',
+        'delivered',
+      ]);
+      const mapped = rows.map(row => {
+        const categoryData = getCategoryData(row);
+        return {
+          id: row.id,
+          title: row.title || `${row.pickupCity || ''} → ${row.deliveryCity || ''}`,
+          from: row.pickupAddress || row.pickupCity || '-',
+          to: row.deliveryAddress || row.deliveryCity || '-',
+          pickupCity: row.pickupCity || '',
+          deliveryCity: row.deliveryCity || '',
+          price:
+            typeof row.price === 'number'
+              ? row.price
+              : parseFloat(row.price?.replace(/[^0-9.,]/g, '').replace(',', '.')) || 0,
+          status: row.status || 'offer_accepted',
+          estimatedTime: row.deliveryDate || '-',
+          pickupDate: row.pickupDate,
+          weight: row.weight,
+          volume: row.volume,
+          unitType: row.unitType || row.unit_type || categoryData?.unitType || categoryData?.unit_type,
+          temperatureSetpoint:
+            row.temperatureSetpoint ||
+            row.temperature_setpoint ||
+            categoryData?.temperatureSetpoint ||
+            categoryData?.temperature_setpoint,
+          unNumber: row.unNumber || row.un_number || categoryData?.unNumber || categoryData?.un_number,
+          loadingEquipment:
+            row.loadingEquipment ||
+            row.loading_equipment ||
+            categoryData?.loadingEquipment ||
+            categoryData?.loading_equipment,
+        };
+      });
+      const activeOnly = mapped.filter((j) => activeStatuses.has(String(j.status || '')));
+      setJobs(activeOnly);
+    } catch (e) {
+      if (import.meta.env.DEV) console.error(e);
+      setJobs([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getCategoryData = (row: any) => {
     if (!row) return undefined;
@@ -32,6 +104,25 @@ const ActiveJobs: React.FC = () => {
       // ignore
     }
     return undefined;
+  };
+
+  const getCurrentUserForTracking = () => {
+    try {
+      const raw = localStorage.getItem('user');
+      if (!raw) return null;
+      const u = JSON.parse(raw);
+      const id = u?.id != null ? String(u.id) : '';
+      const name = String(u?.fullName || u?.name || `${u?.firstName || ''} ${u?.lastName || ''}`.trim() || 'Taşıyıcı').trim();
+      if (!id) return null;
+      return { id, name };
+    } catch {
+      return null;
+    }
+  };
+
+  const openTracking = (job: any) => {
+    setSelectedTrackingJob(job);
+    setShowTrackingModal(true);
   };
 
   // Offline/Online durumu takibi
@@ -57,69 +148,35 @@ const ActiveJobs: React.FC = () => {
           await sendStatusUpdate(update.jobId, update.status, true);
         });
         localStorage.removeItem('tasiyici_pending_updates');
-        toast.success('Kaydedilen güncellemeler gönderildi!');
+        showProfessionalToast(toast, 'SYNC_COMPLETED', 'success');
       }
     }
   }, [isOnline]);
 
   useEffect(() => {
-    const loadActiveJobs = async () => {
-      try {
-        setLoading(true);
-        const userRaw = localStorage.getItem('user');
-        const userId = userRaw ? JSON.parse(userRaw || '{}').id : undefined;
-        const token = localStorage.getItem('authToken');
-        const response = await fetch(createApiUrl('/api/shipments/tasiyici'), {
-          headers: {
-            Authorization: `Bearer ${token || ''}`,
-            'X-User-Id': userId || '',
-            'Content-Type': 'application/json',
-          },
-        });
-        if (!response.ok) throw new Error('Aktif işler alınamadı');
-        const data = await response.json();
-        const rows = (Array.isArray(data) ? data : data.data || []) as any[];
-        const mapped = rows.map(row => {
-          const categoryData = getCategoryData(row);
-          return {
-            id: row.id,
-            title: row.title || `${row.pickupCity || ''} → ${row.deliveryCity || ''}`,
-            from: row.pickupAddress || row.pickupCity || '-',
-            to: row.deliveryAddress || row.deliveryCity || '-',
-            pickupCity: row.pickupCity || '',
-            deliveryCity: row.deliveryCity || '',
-            price:
-              typeof row.price === 'number'
-                ? row.price
-                : parseFloat(row.price?.replace(/[^0-9.,]/g, '').replace(',', '.')) || 0,
-            status: row.status === 'offer_accepted' ? 'accepted' : (row.status || 'accepted'),
-            estimatedTime: row.deliveryDate || '-',
-            pickupDate: row.pickupDate,
-            weight: row.weight,
-            volume: row.volume,
-            unitType: row.unitType || row.unit_type || categoryData?.unitType || categoryData?.unit_type,
-            temperatureSetpoint:
-              row.temperatureSetpoint ||
-              row.temperature_setpoint ||
-              categoryData?.temperatureSetpoint ||
-              categoryData?.temperature_setpoint,
-            unNumber: row.unNumber || row.un_number || categoryData?.unNumber || categoryData?.un_number,
-            loadingEquipment:
-              row.loadingEquipment ||
-              row.loading_equipment ||
-              categoryData?.loadingEquipment ||
-              categoryData?.loading_equipment,
-          };
-        });
-        setJobs(mapped);
-      } catch (e) {
-        if (import.meta.env.DEV) console.error(e);
-        setJobs([]);
-      } finally {
-        setLoading(false);
+    loadActiveJobs();
+  }, []);
+
+  useEffect(() => {
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        loadActiveJobs();
       }
     };
-    loadActiveJobs();
+
+    const handleGlobalRefresh = () => {
+      loadActiveJobs();
+    };
+
+    window.addEventListener('focus', handleVisibilityOrFocus);
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    window.addEventListener('yolnext:refresh-badges', handleGlobalRefresh);
+
+    return () => {
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      window.removeEventListener('yolnext:refresh-badges', handleGlobalRefresh);
+    };
   }, []);
 
   // Extract city names from addresses
@@ -151,18 +208,18 @@ const ActiveJobs: React.FC = () => {
         const responseData = await response.json();
         if (responseData.success) {
           // Başarılı - iş listesini güncelle
-          const uiStatus = newStatus === 'picked_up' ? 'in_progress' : newStatus;
+          const uiStatus = newStatus;
           setJobs(prev => prev.map(job => 
             job.id === jobId ? { ...job, status: uiStatus } : job
           ));
           
           if (!isRetry) {
             const statusMessages: Record<string, string> = {
-              'picked_up': '✅ Testimi aldım!',
-              'in_transit': '🚚 Yoldayım!',
-              'delivered': '📦 Teslim ettim!',
+              'picked_up': 'Yük alındı',
+              'in_transit': 'Yolda',
+              'delivered': 'Teslim edildi',
             };
-            toast.success(statusMessages[newStatus] || 'Durum güncellendi!');
+            showProfessionalToast(toast, 'STATUS_UPDATED', 'success');
           }
           return true;
         }
@@ -197,7 +254,7 @@ const ActiveJobs: React.FC = () => {
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
-          toast.success('✅ Teslimat başarıyla onaylandı!');
+          showProfessionalToast(toast, 'DELIVERY_CONFIRMED', 'success');
           // İş listesini yeniden yükle
           const loadResponse = await fetch(createApiUrl('/api/shipments/tasiyici'), {
             headers: {
@@ -244,14 +301,14 @@ const ActiveJobs: React.FC = () => {
             setJobs(mapped);
           }
         } else {
-          toast.error(data.message || 'Teslimat onaylanamadı');
+          showProfessionalToast(showToast, 'OPERATION_FAILED', 'error');
         }
       } else {
         const errorData = await response.json();
-        toast.error(errorData.message || 'Teslimat onaylanamadı');
+        showProfessionalToast(toast, 'OPERATION_FAILED', 'error');
       }
     } catch (error) {
-      toast.error('Teslimat onaylanırken bir hata oluştu');
+      showProfessionalToast(toast, 'NETWORK_ERROR', 'error');
     } finally {
       setUpdatingStatus(prev => ({ ...prev, [jobId]: false }));
     }
@@ -286,22 +343,22 @@ const ActiveJobs: React.FC = () => {
       });
 
       if (response.ok) {
-        toast.success('İş başarıyla reddedildi');
+        showProfessionalToast(showToast, 'JOB_REJECTED', 'success');
         setShowRejectModal(false);
         setSelectedJobToReject(null);
         setRejectReason('');
         // Reload jobs
-        window.location.reload();
+        await loadActiveJobs();
       } else {
         const errorData = await response.json().catch(() => ({ message: 'İş reddedilemedi' }));
-        toast.error(errorData.message || 'İş reddedilemedi');
+        showProfessionalToast(toast, 'OPERATION_FAILED', 'error');
       }
     } catch (error: any) {
       const errorMessage = error?.message || 'İş reddedilirken bir hata oluştu';
       if (errorMessage.includes('Network') || errorMessage.includes('fetch')) {
-        toast.error('İnternet bağlantısı yok. Lütfen bağlantınızı kontrol edin.');
+        showProfessionalToast(showToast, 'NETWORK_ERROR', 'error');
       } else {
-        toast.error(errorMessage);
+        showProfessionalToast(toast, 'OPERATION_FAILED', 'error');
       }
     } finally {
       setIsRejecting(false);
@@ -324,9 +381,7 @@ const ActiveJobs: React.FC = () => {
           job.id === jobId ? { ...job, status: newStatus } : job
         ));
         
-        toast.success('✅ Kaydedildi! İnternet gelince gönderilecek.', {
-          icon: <WifiOff className="w-5 h-5" />,
-        });
+        showProfessionalToast(toast, 'OFFLINE_SAVED', 'success');
         setUpdatingStatus(prev => ({ ...prev, [jobId]: false }));
         return;
       }
@@ -344,12 +399,10 @@ const ActiveJobs: React.FC = () => {
           job.id === jobId ? { ...job, status: newStatus } : job
         ));
         
-        toast.success('✅ Kaydedildi! İnternet gelince gönderilecek.', {
-          icon: <WifiOff className="w-5 h-5" />,
-        });
+        showProfessionalToast(toast, 'OFFLINE_SAVED', 'success');
       }
     } catch (error) {
-      toast.error('Bir hata oluştu, lütfen tekrar deneyin.');
+      showProfessionalToast(toast, 'OPERATION_FAILED', 'error');
     } finally {
       setUpdatingStatus(prev => ({ ...prev, [jobId]: false }));
     }
@@ -421,6 +474,24 @@ const ActiveJobs: React.FC = () => {
           </div>
         </div>
 
+        <div className='mb-6'>
+          <GuidanceOverlay
+            storageKey='tasiyici.active-jobs'
+            isEmpty={!loading && jobs.length === 0}
+            icon={Truck}
+            title='Aktif İşler'
+            description='Kabul edilen işlerinizi burada takip edebilirsiniz: durum güncellemeleri, rota ve teslimat bilgileri. Yeni iş almak için "Pazar" sayfasına, teklif geçmişiniz için "Tekliflerim" sayfasına geçebilirsiniz.'
+            primaryAction={{
+              label: 'Pazar',
+              to: '/tasiyici/market',
+            }}
+            secondaryAction={{
+              label: 'Tekliflerim',
+              to: '/tasiyici/my-offers',
+            }}
+          />
+        </div>
+
         {/* Search */}
         {jobs.length > 0 && (
           <div className='bg-white rounded-xl p-4 shadow-lg border border-gray-100 mb-6'>
@@ -439,36 +510,43 @@ const ActiveJobs: React.FC = () => {
 
         {/* Jobs List */}
         {jobs.length === 0 ? (
-          <div className='bg-white rounded-xl shadow-lg border border-gray-100 p-12 text-center'>
-            <Truck className='w-16 h-16 text-gray-400 mx-auto mb-4' />
-            <h3 className='text-lg font-semibold text-gray-900 mb-2'>
-              Aktif iş bulunmuyor
-            </h3>
-            <p className='text-gray-600 mb-4'>
-              Henüz aktif bir işiniz bulunmamaktadır. Yeni iş fırsatları için pazara göz atın.
-            </p>
-            <Link to='/tasiyici/market'>
-              <button className='px-6 py-2 bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 text-white rounded-lg font-medium transition-all duration-300 flex items-center gap-2 shadow-lg hover:shadow-xl mx-auto'>
-                <ArrowRight className='w-4 h-4' />
-                Pazara Git
-              </button>
-            </Link>
+          <div className='min-h-[50vh] flex items-center justify-center'>
+            <div className='bg-white rounded-2xl shadow-xl border border-gray-100 p-12 text-center w-full max-w-2xl'>
+              <Truck className='w-16 h-16 text-gray-400 mx-auto mb-4' />
+              <h3 className='text-xl font-bold text-gray-900 mb-2'>
+                Aktif işin yok
+              </h3>
+              <p className='text-gray-600 mb-6'>
+                Yeni iş almak için İş Pazarına gidip uygun ilanlara teklif verebilirsin.
+              </p>
+              <div className='flex flex-col sm:flex-row gap-3 justify-center'>
+                <Link to='/tasiyici/market'>
+                  <button className='px-6 py-3 bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 text-white rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl'>
+                    Pazara Git
+                  </button>
+                </Link>
+              </div>
+            </div>
           </div>
         ) : filteredJobs.length === 0 ? (
-          <div className='bg-white rounded-xl shadow-lg border border-gray-100 p-12 text-center'>
-            <Search className='w-16 h-16 text-gray-400 mx-auto mb-4' />
-            <h3 className='text-lg font-semibold text-gray-900 mb-2'>
-              Arama sonucu bulunamadı
-            </h3>
-            <p className='text-gray-600 mb-4'>
-              Arama kriterlerinize uygun aktif iş bulunamadı.
-            </p>
-            <button
-              onClick={() => setSearchTerm('')}
-              className='px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-all duration-300'
-            >
-              Aramayı Temizle
-            </button>
+          <div className='min-h-[50vh] flex items-center justify-center'>
+            <div className='bg-white rounded-2xl shadow-xl border border-gray-100 p-12 text-center w-full max-w-2xl'>
+              <Search className='w-16 h-16 text-gray-400 mx-auto mb-4' />
+              <h3 className='text-xl font-bold text-gray-900 mb-2'>
+                Sonuç bulunamadı
+              </h3>
+              <p className='text-gray-600 mb-6'>
+                Arama kriterlerine uygun aktif iş yok. Aramayı temizleyip tekrar deneyebilirsin.
+              </p>
+              <div className='flex flex-col sm:flex-row gap-3 justify-center'>
+                <button
+                  onClick={() => setSearchTerm('')}
+                  className='px-6 py-3 bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 text-white rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl'
+                >
+                  Aramayı Temizle
+                </button>
+              </div>
+            </div>
           </div>
         ) : (
           <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3'>
@@ -560,16 +638,21 @@ const ActiveJobs: React.FC = () => {
                   <div className='mb-2.5'>
                     <span className='inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800 border border-green-200'>
                       <CheckCircle className='w-3 h-3 mr-1' />
-                      {job.status === 'accepted' ? 'Kabul Edildi' : 
-                       job.status === 'in_progress' ? 'Devam Ediyor' :
-                       job.status === 'in_transit' ? 'Yolda' : 'Aktif'}
+                      {job.status === 'assigned' ? 'Atandı' :
+                       job.status === 'in_progress' ? 'Atandı' :
+                       job.status === 'picked_up' ? 'Yük Alındı' :
+                       job.status === 'in_transit' ? 'Yolda' :
+                       job.status === 'delivered' ? 'Teslim Edildi' :
+                       job.status === 'completed' ? 'Tamamlandı' :
+                       job.status === 'cancelled' ? 'İptal Edildi' :
+                       job.status === 'offer_accepted' || job.status === 'accepted' ? 'Kabul Edildi' : 'Aktif'}
                     </span>
                   </div>
 
                   {/* Durum Butonları - Basit ve Büyük */}
                   <div className='space-y-2'>
                     {/* İşi Reddet - sadece accepted/assigned durumunda */}
-                    {(job.status === 'accepted' || job.status === 'in_progress' || job.status === 'assigned' || job.status === 'pending' || !job.status) && (
+                    {(job.status === 'assigned' || job.status === 'in_progress' || job.status === 'offer_accepted') && (
                       <button
                         onClick={() => handleRejectClick(job.id)}
                         disabled={updatingStatus[job.id] || isRejecting}
@@ -580,32 +663,32 @@ const ActiveJobs: React.FC = () => {
                       </button>
                     )}
                     
-                    {/* Testimi Aldım - sadece accepted/pending durumunda */}
-                    {(job.status === 'accepted' || job.status === 'pending' || !job.status || job.status === 'test') && (
+                    {/* Yükü Aldım - sadece assigned durumunda */}
+                    {(job.status === 'assigned' || job.status === 'in_progress') && (
                       <button
                         onClick={() => updateJobStatus(job.id, 'picked_up')}
                         disabled={updatingStatus[job.id]}
                         className='w-full px-3 py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg font-bold text-sm transition-all duration-300 flex items-center justify-center gap-2 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed'
                       >
                         <CheckCircle2 className='w-5 h-5' />
-                        ✅ Testimi Aldım
+                        ✅ Yükü Aldım
                       </button>
                     )}
                     
-                    {/* Yoldayım - picked_up veya in_progress durumunda */}
-                    {(job.status === 'picked_up' || job.status === 'in_progress') && (
+                    {/* Yoldayım - picked_up durumunda */}
+                    {job.status === 'picked_up' && (
                       <button
                         onClick={() => updateJobStatus(job.id, 'in_transit')}
                         disabled={updatingStatus[job.id]}
                         className='w-full px-3 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg font-bold text-sm transition-all duration-300 flex items-center justify-center gap-2 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed'
                       >
                         <Navigation className='w-5 h-5' />
-                        🚚 Yoldayım
+                        Yoldayım
                       </button>
                     )}
                     
                     {/* Teslim Ettim - in_transit durumunda */}
-                    {(job.status === 'in_transit' || job.status === 'in_progress') && (
+                    {job.status === 'in_transit' && (
                       <button
                         onClick={() => updateJobStatus(job.id, 'delivered')}
                         disabled={updatingStatus[job.id]}
@@ -615,16 +698,15 @@ const ActiveJobs: React.FC = () => {
                         📦 Teslim Ettim
                       </button>
                     )}
-                    
-                    {/* Teslimatı Onayla - delivered durumunda */}
-                    {job.status === 'delivered' && (
+
+                    {/* Konum / ETA Güncelle - operasyon boyunca */}
+                    {(job.status === 'assigned' || job.status === 'picked_up' || job.status === 'in_transit' || job.status === 'delivered') && (
                       <button
-                        onClick={() => handleConfirmDelivery(job.id)}
-                        disabled={updatingStatus[job.id]}
-                        className='w-full px-3 py-3 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-lg font-bold text-sm transition-all duration-300 flex items-center justify-center gap-2 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed'
+                        onClick={() => openTracking(job)}
+                        className='w-full px-3 py-2 bg-white border border-blue-200 text-blue-700 hover:bg-blue-50 rounded-lg font-bold text-xs transition-all duration-300 flex items-center justify-center gap-2 shadow-sm hover:shadow'
                       >
-                        <CheckCircle2 className='w-5 h-5' />
-                        ✅ Teslimatı Onayla
+                        <MapPin className='w-4 h-4' />
+                        Konum / ETA Güncelle
                       </button>
                     )}
                     
@@ -700,6 +782,32 @@ const ActiveJobs: React.FC = () => {
           </div>
         </div>
       </Modal>
+
+      {showTrackingModal && selectedTrackingJob && (() => {
+        const currentUser = getCurrentUserForTracking();
+        if (!currentUser) return null;
+
+        const pickupCity = selectedTrackingJob.pickupCity || getCity(selectedTrackingJob.from, selectedTrackingJob.pickupCity);
+        const deliveryCity = selectedTrackingJob.deliveryCity || getCity(selectedTrackingJob.to, selectedTrackingJob.deliveryCity);
+
+        return (
+          <TrackingModal
+            isOpen={showTrackingModal}
+            onClose={() => {
+              setShowTrackingModal(false);
+              setSelectedTrackingJob(null);
+            }}
+            shipment={{
+              id: String(selectedTrackingJob.id),
+              title: String(selectedTrackingJob.title || `Gönderi #${selectedTrackingJob.id}`),
+              from_city: String(pickupCity || ''),
+              to_city: String(deliveryCity || ''),
+              status: String(selectedTrackingJob.status || ''),
+            }}
+            currentUser={currentUser}
+          />
+        );
+      })()}
     </div>
   );
 };

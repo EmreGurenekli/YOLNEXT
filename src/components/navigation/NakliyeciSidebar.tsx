@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   User,
@@ -7,11 +7,11 @@ import {
   Settings,
   LogOut,
   Plus,
+  FilePlus2,
   MessageSquare,
   Truck,
   FileText,
   Users,
-  Bell,
   Gift,
   PieChart,
   TrendingUp,
@@ -23,6 +23,7 @@ import {
   Map,
   Wallet,
   HelpCircle,
+  LifeBuoy,
 } from 'lucide-react';
 import YolNextLogo from '../common/yolnextLogo';
 import { useBadgeCounts } from '../../hooks/useBadgeCounts';
@@ -38,6 +39,11 @@ const NakliyeciSidebar: React.FC<NakliyeciSidebarProps> = ({ onLogout }) => {
   const { badgeCounts } = useBadgeCounts();
   const { user } = useAuth();
 
+  useEffect(() => {
+    // Ensure we never leave the mobile overlay open across route transitions
+    setIsMobileMenuOpen(false);
+  }, [location.pathname]);
+
     const menuSections = [
     {
       title: 'Ana Menü',
@@ -51,6 +57,7 @@ const NakliyeciSidebar: React.FC<NakliyeciSidebarProps> = ({ onLogout }) => {
         },
         { name: 'Aktif Yükler', href: '/nakliyeci/active-shipments', icon: Activity },
         { name: 'Tekliflerim', href: '/nakliyeci/offers', icon: FileText },
+        { name: 'Taşıyıcı İlanlarım', href: '/nakliyeci/listings', icon: FilePlus2 },
         { name: 'Taşıyıcılarım', href: '/nakliyeci/drivers', icon: Users },
         { name: 'Akıllı Rota', href: '/nakliyeci/route-planner', icon: Map },
       ],
@@ -80,7 +87,7 @@ const NakliyeciSidebar: React.FC<NakliyeciSidebarProps> = ({ onLogout }) => {
       title: 'Hesap & Ayarlar',
       items: [
         { name: 'Ayarlar', href: '/nakliyeci/settings', icon: Settings },
-        { name: 'Yardım', href: '/nakliyeci/help', icon: HelpCircle },
+        { name: 'Yardım ve Destek Merkezi', href: '/nakliyeci/help', icon: LifeBuoy },
       ],
     },
   ];
@@ -128,7 +135,7 @@ const NakliyeciSidebar: React.FC<NakliyeciSidebarProps> = ({ onLogout }) => {
       `}
       >
         {/* Logo */}
-        <div className='border-b border-slate-200 bg-white overflow-hidden flex items-center justify-center h-24 px-2'>
+        <div className='border-b border-slate-200 bg-white overflow-hidden flex items-center justify-between h-20 px-3'>
           <Link
             to='/nakliyeci/dashboard'
             className='block focus:outline-none flex items-center justify-center'

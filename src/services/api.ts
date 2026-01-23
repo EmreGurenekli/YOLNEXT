@@ -73,8 +73,8 @@ const apiRequest = async <T = any>(
   };
 
   // Add auth token if available
-  const token = localStorage.getItem('authToken');
-  if (token) {
+  const token = localStorage.getItem('authToken') || localStorage.getItem('token');
+  if (token && token !== 'null' && token !== 'undefined') {
     defaultHeaders['Authorization'] = `Bearer ${token}`;
   }
 
@@ -110,6 +110,25 @@ const apiRequest = async <T = any>(
         errorData = { message: response.statusText };
       }
 
+      try {
+        const msg = String(errorData?.message || errorData?.error?.message || '').toLowerCase();
+        const isAuthInvalid =
+          (response.status === 401 || response.status === 403) &&
+          (msg.includes('invalid or expired token') || msg.includes('invalid token') || msg.includes('expired token'));
+        if (isAuthInvalid && typeof window !== 'undefined') {
+          try {
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+          } catch (_) {
+            // ignore
+          }
+          window.dispatchEvent(new Event('auth:logout'));
+        }
+      } catch (_) {
+        // ignore
+      }
+
       const error = new ApiError(
         errorData.details ||
           errorData.message ||
@@ -127,7 +146,7 @@ const apiRequest = async <T = any>(
       const text = await response.text();
       if (!text || text.trim().length === 0) {
         // Empty response - return empty success object instead of throwing
-        return { success: false, message: 'Empty server response' };
+        return { success: false, message: 'Sunucudan boş yanıt alındı' };
       }
       data = JSON.parse(text);
     } catch (parseError) {
@@ -135,7 +154,7 @@ const apiRequest = async <T = any>(
       // This prevents React from crashing
       return {
         success: false,
-        error: `Invalid server response: ${parseError instanceof Error ? parseError.message : 'Parse error'}`,
+        error: `Geçersiz sunucu yanıtı: ${parseError instanceof Error ? parseError.message : 'Ayrıştırma hatası'}`,
         status: response.status,
       };
     }
@@ -149,24 +168,24 @@ const apiRequest = async <T = any>(
     }
 
     if (error instanceof Error && error.name === 'AbortError') {
-      throw new ApiError('Request timeout', 408);
+      throw new ApiError('İstek zaman aşımına uğradı', 408);
     }
 
     // Handle JSON parse errors (e.g., empty response, HTML error pages)
     if (error instanceof TypeError && error.message.includes('JSON')) {
-      throw new ApiError('Invalid server response', 500);
+      throw new ApiError('Geçersiz sunucu yanıtı', 500);
     }
 
     throw new ApiError(
-      error instanceof Error ? error.message : 'Network error',
+      error instanceof Error ? error.message : 'Ağ hatası',
       0
     );
   }
 };
 
 const isDemoToken = () => {
-  const token = localStorage.getItem('authToken');
-  return !!token && token.startsWith('demo-token-');
+  const token = localStorage.getItem('authToken') || localStorage.getItem('token');
+  return !!token && token !== 'null' && token !== 'undefined' && token.startsWith('demo-token-');
 };
 
 // API methods
@@ -273,6 +292,8 @@ export const messageAPI = {
     return api.get('/messages');
   },
   send: (messageData: any) => api.post('/messages', messageData),
+  delete: (id: string) => api.delete(`/messages/${id}`),
+  deleteConversation: (otherUserId: string | number) => api.delete(`/messages/conversation/${otherUserId}`),
 };
 
 export const kvkkAPI = {

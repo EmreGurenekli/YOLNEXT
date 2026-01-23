@@ -82,7 +82,7 @@ const WalletModal: React.FC<WalletModalProps> = ({
         setTransactions(transactionsData);
       }
     } catch (error) {
-      console.error('Error loading wallet data:', error);
+      console.error('Cüzdan verileri yüklenirken hata:', error);
     } finally {
       setIsLoading(false);
     }
@@ -101,7 +101,7 @@ const WalletModal: React.FC<WalletModalProps> = ({
       setIsDepositing(true);
       const token = localStorage.getItem('authToken');
 
-      const response = await fetch(createApiUrl('/api/wallet/deposit'), {
+      const intentRes = await fetch(createApiUrl('/api/wallet/topup/intent'), {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -110,18 +110,40 @@ const WalletModal: React.FC<WalletModalProps> = ({
         body: JSON.stringify({ amount }),
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        setBalance(prev => prev + amount);
+      const intentJson = await intentRes.json().catch(() => null);
+      if (!intentRes.ok || !intentJson?.success) {
+        alert(intentJson?.message || 'Para yatırılamadı');
+        return;
+      }
+
+      const provider = intentJson?.data?.provider;
+      const providerIntentId = intentJson?.data?.providerIntentId;
+
+      if (provider === 'mock' && providerIntentId) {
+        const confirmRes = await fetch(createApiUrl('/api/wallet/topup/confirm'), {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ providerIntentId }),
+        });
+
+        const confirmJson = await confirmRes.json().catch(() => null);
+        if (!confirmRes.ok || !confirmJson?.success) {
+          alert(confirmJson?.message || 'Ödeme doğrulanamadı');
+          return;
+        }
+
         setDepositAmount('');
         loadWalletData(); // Reload transactions
         alert('Para başarıyla yatırıldı!');
-      } else {
-        const error = await response.json();
-        alert(error.error || 'Para yatırılamadı');
+        return;
       }
+
+      alert('Ödeme adımı gerekli. Lütfen ödeme ekranını tamamlayın.');
     } catch (error) {
-      console.error('Error depositing money:', error);
+      console.error('Para yatırma sırasında hata:', error);
       alert('Para yatırılamadı');
     } finally {
       setIsDepositing(false);

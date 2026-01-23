@@ -4,6 +4,106 @@ const express = require('express');
 function createCarrierRoutes(pool, authenticateToken) {
   const router = express.Router();
 
+  const resolveTable = async (tableName) => {
+    const tRes = await pool.query(
+      `SELECT table_schema
+       FROM information_schema.tables
+       WHERE table_name = $1
+       ORDER BY (table_schema = 'public') DESC, table_schema ASC
+       LIMIT 1`,
+      [tableName]
+    );
+    const schema = tRes.rows && tRes.rows[0]?.table_schema ? tRes.rows[0].table_schema : 'public';
+    const colsRes = await pool.query(
+      `SELECT column_name FROM information_schema.columns WHERE table_name = $1 AND table_schema = $2`,
+      [tableName, schema]
+    );
+    const cols = new Set((colsRes.rows || []).map(r => r.column_name));
+    const pickCol = (...names) => names.find(n => cols.has(n)) || null;
+    const qCol = (col) => (col && /[A-Z]/.test(col) ? `"${col}"` : col);
+    return { schema, cols, pickCol, qCol };
+  };
+
+  let cachedUsersCols = undefined;
+  const resolveUsersCols = async () => {
+    if (cachedUsersCols !== undefined) return cachedUsersCols;
+    try {
+      const meta = await resolveTable('users');
+      cachedUsersCols = {
+        schema: meta.schema,
+        qCol: meta.qCol,
+        fullName: meta.pickCol('fullName', 'full_name', 'name'),
+        companyName: meta.pickCol('companyName', 'company_name'),
+        email: meta.pickCol('email', 'emailAddress', 'email_address', 'mail'),
+        phone: meta.pickCol('phone', 'phone_number', 'phoneNumber', 'mobile', 'mobile_phone'),
+        city: meta.pickCol('city'),
+        district: meta.pickCol('district'),
+        nakliyeciCode: meta.pickCol('nakliyeciCode', 'nakliyeci_code'),
+      };
+    } catch (_) {
+      cachedUsersCols = {
+        schema: 'public',
+        qCol: (c) => (c && /[A-Z]/.test(c) ? `"${c}"` : c),
+        fullName: null,
+        companyName: null,
+        email: 'email',
+        phone: null,
+        city: null,
+        district: null,
+        nakliyeciCode: null,
+      };
+    }
+    return cachedUsersCols;
+  };
+
+  let cachedCcCols = undefined;
+  const resolveCorporateCarriersCols = async () => {
+    if (cachedCcCols !== undefined) return cachedCcCols;
+    try {
+      const meta = await resolveTable('corporate_carriers');
+      cachedCcCols = {
+        schema: meta.schema,
+        qCol: meta.qCol,
+        corporateId: meta.pickCol(
+          'corporate_id',
+          'corporateId',
+          'corporateid',
+          'corporate_user_id',
+          'corporateUserId',
+          'corporateuserid',
+          'company_id',
+          'companyId',
+          'user_id',
+          'userId'
+        ),
+        nakliyeciId: meta.pickCol(
+          'nakliyeci_id',
+          'nakliyeciId',
+          'nakliyeciid',
+          'nakliyeci_user_id',
+          'nakliyeciUserId',
+          'carrier_id',
+          'carrierId',
+          'carrierid',
+          'user_id2',
+          'user2_id'
+        ),
+        createdAt: meta.pickCol('createdAt', 'created_at', 'createdat'),
+        updatedAt: meta.pickCol('updatedAt', 'updated_at', 'updatedat'),
+      };
+    } catch (_) {
+      cachedCcCols = {
+        schema: 'public',
+        qCol: (c) => (c && /[A-Z]/.test(c) ? `"${c}"` : c),
+        corporateId: 'corporate_id',
+        nakliyeciId: 'nakliyeci_id',
+        createdAt: null,
+        updatedAt: null,
+      };
+    }
+    return cachedCcCols;
+  };
+
   // Carrier route management (frontend CarrierManagementModal compatibility)
   router.get('/:carrierId/route', authenticateToken, async (req, res) => {
     return res.json([]);
@@ -27,13 +127,15 @@ function createCarrierRoutes(pool, authenticateToken) {
         });
       }
 
+      const wantDebug = String(req.query?.debug || '') === '1' && process.env.NODE_ENV !== 'production';
+
       const userId = req.user.id;
 
+      const usersMeta = await resolveUsersCols();
+      const ccMeta = await resolveCorporateCarriersCols();
+
       // Verify user is corporate
-      const userResult = await pool.query(
-        'SELECT role FROM users WHERE id = $1',
-        [userId]
-      );
+      const userResult = await pool.query(`SELECT role FROM "${usersMeta.schema}".users WHERE id = $1`, [userId]);
 
       if (userResult.rows.length === 0) {
         return res.status(404).json({
@@ -55,30 +157,37 @@ function createCarrierRoutes(pool, authenticateToken) {
       // Get favori nakliyeciler with performance stats - return empty array if table doesn't exist or no carriers
       let carriersResult;
       try {
-        carriersResult = await pool.query(
-          `SELECT 
-            u.id, 
-            u."fullName", 
-            u."companyName", 
-            u.email, 
-            u.phone, 
-            u.city, 
-            u.district, 
-            u."nakliyeciCode",
-            -- Performance stats with this corporate user
-            COUNT(DISTINCT s.id) FILTER (WHERE s."user_id" = $1 AND s."nakliyeci_id" = u.id) as "totalShipments",
-            COUNT(DISTINCT s.id) FILTER (WHERE s."user_id" = $1 AND s."nakliyeci_id" = u.id AND s.status = 'delivered') as "completedShipments",
-            COALESCE(AVG(r.rating) FILTER (WHERE r."ratedId" = u.id AND r."raterId" = $1), 0) as "averageRating",
-            MAX(s."updatedAt") FILTER (WHERE s."user_id" = $1 AND s."nakliyeci_id" = u.id) as "lastActivity"
-           FROM users u
-           INNER JOIN corporate_carriers cc ON u.id = cc."nakliyeci_id"
-           LEFT JOIN shipments s ON s."nakliyeci_id" = u.id AND s."user_id" = $1
-           LEFT JOIN ratings r ON r."ratedId" = u.id AND r."raterId" = $1
-           WHERE cc."corporate_id" = $1 AND u.role = 'nakliyeci'
-           GROUP BY u.id, u."fullName", u."companyName", u.email, u.phone, u.city, u.district, u."nakliyeciCode", cc."createdAt"
-           ORDER BY cc."createdAt" DESC`,
-          [userId]
-        );
+        if (!ccMeta.corporateId || !ccMeta.nakliyeciId) {
+          carriersResult = { rows: [] };
+        } else {
+          const uFullName = usersMeta.fullName ? `u.${usersMeta.qCol(usersMeta.fullName)}` : 'NULL';
+          const uCompany = usersMeta.companyName ? `u.${usersMeta.qCol(usersMeta.companyName)}` : 'NULL';
+          const uEmail = usersMeta.email ? `u.${usersMeta.qCol(usersMeta.email)}` : 'NULL';
+          const uPhone = usersMeta.phone ? `u.${usersMeta.qCol(usersMeta.phone)}` : 'NULL';
+          const uCity = usersMeta.city ? `u.${usersMeta.qCol(usersMeta.city)}` : 'NULL';
+          const uDistrict = usersMeta.district ? `u.${usersMeta.qCol(usersMeta.district)}` : 'NULL';
+          const uCode = usersMeta.nakliyeciCode ? `u.${usersMeta.qCol(usersMeta.nakliyeciCode)}` : 'NULL';
+          const orderExpr = ccMeta.createdAt ? `cc.${ccMeta.qCol(ccMeta.createdAt)}` : 'cc.id';
+
+          carriersResult = await pool.query(
+            `SELECT
+              u.id,
+              ${uFullName} as "fullName",
+              ${uCompany} as "companyName",
+              ${uEmail} as email,
+              ${uPhone} as phone,
+              ${uCity} as city,
+              ${uDistrict} as district,
+              ${uCode} as "nakliyeciCode"
+             FROM "${usersMeta.schema}".users u
+             INNER JOIN "${ccMeta.schema}".corporate_carriers cc
+               ON u.id = cc.${ccMeta.qCol(ccMeta.nakliyeciId)}
+             WHERE cc.${ccMeta.qCol(ccMeta.corporateId)} = $1
+               AND u.role = 'nakliyeci'
+             ORDER BY ${orderExpr} DESC`,
+            [userId]
+          );
+        }
       } catch (dbError) {
         console.error('Database error fetching carriers:', dbError.message);
         // If table doesn't exist or other DB error, return empty array
@@ -90,6 +199,19 @@ function createCarrierRoutes(pool, authenticateToken) {
         success: true,
         data: {
           carriers: carriersResult.rows,
+          ...(wantDebug
+            ? {
+                meta: {
+                  corporateCarriers: {
+                    schema: ccMeta.schema,
+                    corporateId: ccMeta.corporateId,
+                    nakliyeciId: ccMeta.nakliyeciId,
+                    createdAt: ccMeta.createdAt,
+                    updatedAt: ccMeta.updatedAt,
+                  },
+                },
+              }
+            : {}),
         },
       });
     } catch (error) {
@@ -113,8 +235,13 @@ function createCarrierRoutes(pool, authenticateToken) {
         });
       }
 
+      const wantDebug = String(req.query?.debug || '') === '1' && process.env.NODE_ENV !== 'production';
+
       const userId = req.user.id;
       const { code, email } = req.body;
+
+      const usersMeta = await resolveUsersCols();
+      const ccMeta = await resolveCorporateCarriersCols();
 
       if (!code && !email) {
         return res.status(400).json({
@@ -125,7 +252,7 @@ function createCarrierRoutes(pool, authenticateToken) {
 
       // Verify user is corporate
       const userResult = await pool.query(
-        'SELECT role FROM users WHERE id = $1',
+        `SELECT role FROM "${usersMeta.schema}".users WHERE id = $1`,
         [userId]
       );
 
@@ -153,10 +280,24 @@ function createCarrierRoutes(pool, authenticateToken) {
       if (searchTerm.includes('@')) {
         // Search by email
         const searchLower = searchTerm.toLowerCase();
+        const emailCol = usersMeta.email ? usersMeta.qCol(usersMeta.email) : 'email';
+        const fullNameCol = usersMeta.fullName ? usersMeta.qCol(usersMeta.fullName) : null;
+        const companyCol = usersMeta.companyName ? usersMeta.qCol(usersMeta.companyName) : null;
+        const phoneCol = usersMeta.phone ? usersMeta.qCol(usersMeta.phone) : null;
+        const codeCol = usersMeta.nakliyeciCode ? usersMeta.qCol(usersMeta.nakliyeciCode) : null;
+        const selectParts = [
+          'id',
+          fullNameCol ? `${fullNameCol} as "fullName"` : 'NULL as "fullName"',
+          companyCol ? `${companyCol} as "companyName"` : 'NULL as "companyName"',
+          `${emailCol} as email`,
+          phoneCol ? `${phoneCol} as phone` : 'NULL as phone',
+          'role',
+          codeCol ? `${codeCol} as "nakliyeciCode"` : 'NULL as "nakliyeciCode"',
+        ];
         const nakliyeciResult = await pool.query(
-          `SELECT id, "fullName", "companyName", email, phone, role, "nakliyeciCode"
-           FROM users
-           WHERE LOWER(email) = $1 AND role = 'nakliyeci'`,
+          `SELECT ${selectParts.join(', ')}
+           FROM "${usersMeta.schema}".users
+           WHERE LOWER(${emailCol}) = $1 AND role = 'nakliyeci'`,
           [searchLower]
         );
 
@@ -172,17 +313,29 @@ function createCarrierRoutes(pool, authenticateToken) {
         if (!isNaN(parsedId) && parsedId.toString() === searchTerm) {
           // It's a valid integer ID
           nakliyeciResult = await pool.query(
-            `SELECT id, "fullName", "companyName", email, phone, role, "nakliyeciCode"
-             FROM users
+            `SELECT id
+                    ${usersMeta.fullName ? `, ${usersMeta.qCol(usersMeta.fullName)} as "fullName"` : ', NULL as "fullName"'}
+                    ${usersMeta.companyName ? `, ${usersMeta.qCol(usersMeta.companyName)} as "companyName"` : ', NULL as "companyName"'}
+                    , ${usersMeta.email ? `${usersMeta.qCol(usersMeta.email)} as email` : 'NULL as email'}
+                    ${usersMeta.phone ? `, ${usersMeta.qCol(usersMeta.phone)} as phone` : ', NULL as phone'}
+                    , role
+                    ${usersMeta.nakliyeciCode ? `, ${usersMeta.qCol(usersMeta.nakliyeciCode)} as "nakliyeciCode"` : ', NULL as "nakliyeciCode"'}
+             FROM "${usersMeta.schema}".users
              WHERE id = $1 AND role = 'nakliyeci'`,
             [parsedId]
           );
         } else {
           // Search by nakliyeciCode (string)
           nakliyeciResult = await pool.query(
-            `SELECT id, "fullName", "companyName", email, phone, role, "nakliyeciCode"
-             FROM users
-             WHERE "nakliyeciCode" = $1 AND role = 'nakliyeci'`,
+            `SELECT id
+                    ${usersMeta.fullName ? `, ${usersMeta.qCol(usersMeta.fullName)} as "fullName"` : ', NULL as "fullName"'}
+                    ${usersMeta.companyName ? `, ${usersMeta.qCol(usersMeta.companyName)} as "companyName"` : ', NULL as "companyName"'}
+                    , ${usersMeta.email ? `${usersMeta.qCol(usersMeta.email)} as email` : 'NULL as email'}
+                    ${usersMeta.phone ? `, ${usersMeta.qCol(usersMeta.phone)} as phone` : ', NULL as phone'}
+                    , role
+                    ${usersMeta.nakliyeciCode ? `, ${usersMeta.qCol(usersMeta.nakliyeciCode)} as "nakliyeciCode"` : ', NULL as "nakliyeciCode"'}
+             FROM "${usersMeta.schema}".users
+             WHERE ${usersMeta.nakliyeciCode ? usersMeta.qCol(usersMeta.nakliyeciCode) : '"nakliyeciCode"'} = $1 AND role = 'nakliyeci'`,
             [searchTerm]
           );
         }
@@ -200,8 +353,29 @@ function createCarrierRoutes(pool, authenticateToken) {
       }
 
       // Check if already linked
+      if (!ccMeta.corporateId || !ccMeta.nakliyeciId) {
+        return res.status(500).json({
+          success: false,
+          message: 'corporate_carriers şeması uyumsuz',
+          ...(wantDebug
+            ? {
+                meta: {
+                  corporateCarriers: {
+                    schema: ccMeta.schema,
+                    corporateId: ccMeta.corporateId,
+                    nakliyeciId: ccMeta.nakliyeciId,
+                    createdAt: ccMeta.createdAt,
+                    updatedAt: ccMeta.updatedAt,
+                  },
+                },
+              }
+            : {}),
+        });
+      }
+
       const existingLink = await pool.query(
-        'SELECT id FROM corporate_carriers WHERE "corporate_id" = $1 AND "nakliyeci_id" = $2',
+        `SELECT id FROM "${ccMeta.schema}".corporate_carriers
+         WHERE ${ccMeta.qCol(ccMeta.corporateId)} = $1 AND ${ccMeta.qCol(ccMeta.nakliyeciId)} = $2`,
         [userId, nakliyeciUser.id]
       );
 
@@ -213,9 +387,19 @@ function createCarrierRoutes(pool, authenticateToken) {
       }
 
       // Create corporate-nakliyeci relationship
+      const insertCols = [ccMeta.qCol(ccMeta.corporateId), ccMeta.qCol(ccMeta.nakliyeciId)];
+      const insertVals = ['$1', '$2'];
+      if (ccMeta.createdAt) {
+        insertCols.push(ccMeta.qCol(ccMeta.createdAt));
+        insertVals.push('CURRENT_TIMESTAMP');
+      }
+      if (ccMeta.updatedAt) {
+        insertCols.push(ccMeta.qCol(ccMeta.updatedAt));
+        insertVals.push('CURRENT_TIMESTAMP');
+      }
       await pool.query(
-        `INSERT INTO corporate_carriers ("corporate_id", "nakliyeci_id", "createdAt", "updatedAt")
-         VALUES ($1, $2, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+        `INSERT INTO "${ccMeta.schema}".corporate_carriers (${insertCols.join(', ')})
+         VALUES (${insertVals.join(', ')})`,
         [userId, nakliyeciUser.id]
       );
 
@@ -259,6 +443,9 @@ function createCarrierRoutes(pool, authenticateToken) {
       const userId = req.user.id;
       const nakliyeciId = parseInt(req.params.nakliyeciId);
 
+      const usersMeta = await resolveUsersCols();
+      const ccMeta = await resolveCorporateCarriersCols();
+
       if (!nakliyeciId || isNaN(nakliyeciId)) {
         return res.status(400).json({
           success: false,
@@ -268,7 +455,7 @@ function createCarrierRoutes(pool, authenticateToken) {
 
       // Verify user is corporate
       const userResult = await pool.query(
-        'SELECT role FROM users WHERE id = $1',
+        `SELECT role FROM "${usersMeta.schema}".users WHERE id = $1`,
         [userId]
       );
 
@@ -290,8 +477,13 @@ function createCarrierRoutes(pool, authenticateToken) {
       }
 
       // Check if link exists
+      if (!ccMeta.corporateId || !ccMeta.nakliyeciId) {
+        return res.status(500).json({ success: false, message: 'corporate_carriers şeması uyumsuz' });
+      }
+
       const existingLink = await pool.query(
-        'SELECT id FROM corporate_carriers WHERE "corporate_id" = $1 AND "nakliyeci_id" = $2',
+        `SELECT id FROM "${ccMeta.schema}".corporate_carriers
+         WHERE ${ccMeta.qCol(ccMeta.corporateId)} = $1 AND ${ccMeta.qCol(ccMeta.nakliyeciId)} = $2`,
         [userId, nakliyeciId]
       );
 
@@ -304,7 +496,8 @@ function createCarrierRoutes(pool, authenticateToken) {
 
       // Delete the link
       await pool.query(
-        'DELETE FROM corporate_carriers WHERE "corporate_id" = $1 AND "nakliyeci_id" = $2',
+        `DELETE FROM "${ccMeta.schema}".corporate_carriers
+         WHERE ${ccMeta.qCol(ccMeta.corporateId)} = $1 AND ${ccMeta.qCol(ccMeta.nakliyeciId)} = $2`,
         [userId, nakliyeciId]
       );
 

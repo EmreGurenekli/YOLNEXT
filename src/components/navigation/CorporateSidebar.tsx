@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   Building2,
@@ -11,9 +11,9 @@ import {
   Truck,
   FileText,
   Users,
-  Bell,
   Gift,
   BookOpen,
+  LifeBuoy,
   PieChart,
   TrendingUp,
   Menu,
@@ -34,6 +34,11 @@ const CorporateSidebar: React.FC<CorporateSidebarProps> = ({ onLogout }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { badgeCounts } = useBadgeCounts();
   const { user } = useAuth();
+
+  useEffect(() => {
+    // Ensure we never leave the mobile overlay open across route transitions
+    setIsMobileMenuOpen(false);
+  }, [location.pathname]);
 
   const menuSections = [
     {
@@ -83,7 +88,10 @@ const CorporateSidebar: React.FC<CorporateSidebarProps> = ({ onLogout }) => {
     },
     {
       title: 'Hesap & Ayarlar',
-      items: [{ name: 'Ayarlar', href: '/corporate/settings', icon: Settings }],
+      items: [
+        { name: 'Ayarlar', href: '/corporate/settings', icon: Settings },
+        { name: 'Yardım ve Destek Merkezi', href: '/corporate/help', icon: LifeBuoy },
+      ],
     },
   ];
 
@@ -126,7 +134,7 @@ const CorporateSidebar: React.FC<CorporateSidebarProps> = ({ onLogout }) => {
       `}
       >
         {/* Logo */}
-        <div className='border-b border-slate-200 bg-white overflow-hidden flex items-center justify-center h-24 px-2'>
+        <div className='border-b border-slate-200 bg-white overflow-hidden flex items-center justify-between h-20 px-3'>
           <Link
             to='/corporate/dashboard'
             className='block focus:outline-none flex items-center justify-center'

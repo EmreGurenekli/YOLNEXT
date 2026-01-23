@@ -13,6 +13,8 @@ import {
 import Breadcrumb from '../../components/common/Breadcrumb';
 import LoadingState from '../../components/common/LoadingState';
 import { Link } from 'react-router-dom';
+import GuidanceOverlay from '../../components/common/GuidanceOverlay';
+import { createApiUrl } from '../../config/api';
 
 interface CarrierOffer {
   id: number;
@@ -31,54 +33,91 @@ const MyOffers: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const loadOffers = async () => {
-      try {
-        setLoading(true);
-        const token = localStorage.getItem('authToken');
-        const userRaw = localStorage.getItem('user');
-        const userId = userRaw ? JSON.parse(userRaw || '{}').id : undefined;
-        const url = '/api/carrier-market/bids?mine=1';
-        const headers = {
-          Authorization: `Bearer ${token || ''}`,
-          'X-User-Id': userId || '',
-          'Content-Type': 'application/json',
-        };
+    try {
+      const raw = localStorage.getItem('user');
+      const parsed = raw ? JSON.parse(raw) : null;
+      const userId = parsed?.id;
+      const role = String(parsed?.role || 'tasiyici').toLowerCase();
+      if (!userId) return;
+      localStorage.setItem(`yolnext:lastSeen:offers:${userId}:${role}`, new Date().toISOString());
+      window.dispatchEvent(new Event('yolnext:refresh-badges'));
+    } catch {
+      // ignore
+    }
+  }, []);
 
-        const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+  const loadOffers = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('authToken');
+      const userRaw = localStorage.getItem('user');
+      const userId = userRaw ? JSON.parse(userRaw || '{}').id : undefined;
+      const url = createApiUrl('/api/carrier-market/bids?mine=1');
+      const headers = {
+        Authorization: `Bearer ${token || ''}`,
+        'X-User-Id': userId || '',
+        'Content-Type': 'application/json',
+      };
 
-        let res = await fetch(url, { headers });
-        if (res.status === 429) {
-          await sleep(800);
-          res = await fetch(url, { headers });
-        }
-        if (!res.ok) throw new Error('Teklifler alınamadı');
-        const data = await res.json();
-        const rows = (
-          Array.isArray(data) ? data : data.data || data.offers || []
-        ) as any[];
+      const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-        const filteredRows = rows;
-        setOffers(
-          filteredRows.map(row => ({
-            id: row.id,
-            shipmentId: row.shipmentId,
-            price: row.bidPrice || row.price || 0,
-            status: row.status || 'pending',
-            createdAt: row.createdAt || '',
-            shipmentTitle: row.shipmentTitle || row.title,
-            pickupAddress: row.pickupAddress,
-            deliveryAddress: row.deliveryAddress,
-            weight: row.weight,
-          }))
-        );
-      } catch (e) {
-        if (import.meta.env.DEV) console.error(e);
-        setOffers([]);
-      } finally {
-        setLoading(false);
+      let res = await fetch(url, { headers });
+      if (res.status === 429) {
+        await sleep(800);
+        res = await fetch(url, { headers });
+      }
+      if (!res.ok) throw new Error('Teklifler alınamadı');
+      const data = await res.json();
+      const rows = (Array.isArray(data)
+        ? data
+        : (data?.data?.bids || data?.data || data?.offers || data?.bids || [])) as any[];
+
+      const filteredRows = rows;
+      setOffers(
+        filteredRows.map(row => ({
+          id: row.id,
+          shipmentId: Number(row.shipmentId || row.shipment_id || row.listingId || row.listing_id || 0),
+          price: row.bidPrice || row.price || 0,
+          status: row.status || 'pending',
+          createdAt: row.createdAt || '',
+          shipmentTitle: row.shipmentTitle || row.title,
+          pickupAddress: row.pickupAddress || row.pickup_address,
+          deliveryAddress: row.deliveryAddress || row.delivery_address,
+          weight: row.weight,
+        }))
+      );
+    } catch (e) {
+      if (import.meta.env.DEV) console.error(e);
+      setOffers([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadOffers();
+  }, []);
+
+  useEffect(() => {
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        loadOffers();
       }
     };
-    loadOffers();
+
+    const handleGlobalRefresh = () => {
+      loadOffers();
+    };
+
+    window.addEventListener('focus', handleVisibilityOrFocus);
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    window.addEventListener('yolnext:refresh-badges', handleGlobalRefresh);
+
+    return () => {
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      window.removeEventListener('yolnext:refresh-badges', handleGlobalRefresh);
+    };
   }, []);
 
   const statusPill = (status: string) => {
@@ -146,34 +185,55 @@ const MyOffers: React.FC = () => {
           </div>
         </div>
 
+        <div className='mb-6'>
+          <GuidanceOverlay
+            storageKey='tasiyici.my-offers'
+            isEmpty={!loading && offers.length === 0}
+            icon={DollarSign}
+            title='Tekliflerim'
+            description='Verdiğin tekliflerin durumunu buradan takip et. Kabul edilen işleri “Aktif İşler”de yönet; yeni iş almak için “Pazar”a dön.'
+            primaryAction={{
+              label: 'Aktif İşler',
+              to: '/tasiyici/active-jobs',
+            }}
+            secondaryAction={{
+              label: 'Pazar',
+              to: '/tasiyici/market',
+            }}
+          />
+        </div>
+
         {/* Offers List */}
         {offers.length === 0 ? (
-          <div className='bg-white rounded-xl shadow-lg border border-gray-100 p-12 text-center'>
-            <Truck className='w-16 h-16 text-gray-400 mx-auto mb-4' />
-            <h3 className='text-lg font-semibold text-gray-900 mb-2'>
-              Henüz teklif bulunmuyor
-            </h3>
-            <p className='text-gray-600 mb-4'>
-              Açık işlere teklif vererek başlayın ve yeni iş fırsatları yakalayın.
-            </p>
-            <Link to='/tasiyici/market' className='inline-block'>
-              <button className='px-6 py-2 bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 text-white rounded-lg font-medium transition-all duration-300 flex items-center gap-2 shadow-lg hover:shadow-xl mx-auto'>
-                <ArrowRight className='w-4 h-4' />
-                Pazara Git
-              </button>
-            </Link>
+          <div className='min-h-[50vh] flex items-center justify-center'>
+            <div className='bg-white rounded-2xl shadow-xl border border-gray-100 p-12 text-center w-full max-w-2xl'>
+              <DollarSign className='w-16 h-16 text-gray-400 mx-auto mb-4' />
+              <h3 className='text-xl font-bold text-gray-900 mb-2'>
+                💰 Henüz teklif vermedin
+              </h3>
+              <p className='text-gray-600 mb-6'>
+                Pazarda uygun işlere teklif ver, kabul edilince kazanmaya başla!
+              </p>
+              <div className='flex flex-col sm:flex-row gap-3 justify-center'>
+                <Link to='/tasiyici/market'>
+                  <button className='px-6 py-3 bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 text-white rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl'>
+                    Pazara Git
+                  </button>
+                </Link>
+              </div>
+            </div>
           </div>
         ) : (
           <div className='space-y-4'>
-            {offers.map(o => (
+            {offers.map(offer => (
               <div
-                key={o.id}
+                key={offer.id}
                 className='bg-white rounded-xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:border-blue-300 transition-all duration-300'
               >
                 <div className='flex items-start justify-between mb-4'>
                   <div className='flex-1'>
-                    <h3 className='text-xl font-bold text-slate-900 mb-3'>
-                      {o.shipmentTitle || `Gönderi #${o.shipmentId}`}
+                    <h3 className='text-lg font-semibold text-slate-900 mb-3'>
+                      {offer.shipmentTitle || `Gönderi #${offer.shipmentId}`}
                     </h3>
                     <div className='grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-slate-600'>
                       <div className='flex items-center gap-2'>
@@ -183,54 +243,43 @@ const MyOffers: React.FC = () => {
                         <div>
                           <div className='text-xs text-slate-500'>Rota</div>
                           <div className='font-medium text-slate-900'>
-                            {o.pickupAddress} → {o.deliveryAddress}
+                            {offer.pickupAddress || '—'} → {offer.deliveryAddress || '—'}
                           </div>
                         </div>
                       </div>
-                      {typeof o.weight === 'number' && (
-                        <div className='flex items-center gap-2'>
-                          <div className='w-10 h-10 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center'>
-                            <Truck className='w-5 h-5 text-white' />
-                          </div>
-                          <div>
-                            <div className='text-xs text-slate-500'>Ağırlık</div>
-                            <div className='font-medium text-slate-900'>{o.weight}kg</div>
+                      <div className='flex items-center gap-2'>
+                        <div className='w-10 h-10 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center'>
+                          <DollarSign className='w-5 h-5 text-white' />
+                        </div>
+                        <div>
+                          <div className='text-xs text-slate-500'>Teklif</div>
+                          <div className='font-medium text-slate-900'>
+                            ₺{offer.price.toLocaleString('tr-TR')}
                           </div>
                         </div>
-                      )}
+                      </div>
                     </div>
                   </div>
-                  <div className='text-right ml-4'>
-                    <div className='text-2xl font-bold text-slate-900 mb-2 inline-flex items-center gap-1'>
-                      <DollarSign className='w-5 h-5' />
-                      {o.price.toLocaleString('tr-TR')}
-                    </div>
-                    <div>{statusPill(o.status)}</div>
-                  </div>
+                  <span className='px-4 py-2 bg-slate-100 text-slate-800 rounded-full text-sm font-semibold border border-slate-200'>
+                    {statusPill(offer.status)}
+                  </span>
                 </div>
-                <div className='pt-4 border-t border-gray-200 flex gap-2'>
-                  {o.status === 'pending' && (
+
+                <div className='flex items-center justify-between pt-4 border-t border-gray-200'>
+                  <span className='text-sm text-slate-500'>#{offer.id}{offer.shipmentId ? ` • İş #${offer.shipmentId}` : ''}</span>
+                  {offer.shipmentId ? (
                     <Link
-                      to={`/tasiyici/market`}
-                      className='px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-all duration-300 flex items-center gap-2'
-                    >
-                      <ArrowRight className='w-4 h-4' />
-                      İlanı Gör
-                    </Link>
-                  )}
-                  {o.status === 'accepted' && (
-                    <Link
-                      to={`/tasiyici/active-jobs`}
+                      to={`/tasiyici/jobs/${offer.shipmentId}`}
                       className='px-4 py-2 bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 text-white rounded-lg font-medium transition-all duration-300 flex items-center gap-2 shadow-lg hover:shadow-xl'
                     >
-                      <ArrowRight className='w-4 h-4' />
-                      İşe Git
+                      <Eye className='w-4 h-4' />
+                      Detayları Gör
                     </Link>
+                  ) : (
+                    <span className='px-4 py-2 bg-slate-100 text-slate-500 rounded-lg font-medium border border-slate-200'>
+                      Detay Hazırlanıyor
+                    </span>
                   )}
-                  <button className='px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-all duration-300 flex items-center gap-2'>
-                    <Eye className='w-4 h-4' />
-                    Detaylar
-                  </button>
                 </div>
               </div>
             ))}

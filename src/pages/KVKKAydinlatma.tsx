@@ -2,6 +2,7 @@ import React from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import { Shield, FileText, Lock, Eye, Trash2, Download, AlertCircle } from 'lucide-react';
+import { LEGAL_CONTACT } from '../config/legal';
 
 const KVKKAydinlatma: React.FC = () => {
   return (
@@ -41,28 +42,28 @@ const KVKKAydinlatma: React.FC = () => {
               </h2>
               <div className='space-y-2 text-sm text-slate-700'>
                 <p>
-                  <strong>Şirket Unvanı:</strong> [ŞİRKET UNVANI BURAYA EKLENECEK]
+                  <strong>Şirket Unvanı:</strong> {LEGAL_CONTACT.companyName}
                 </p>
                 <p>
-                  <strong>Vergi No:</strong> [VERGİ NUMARASI BURAYA EKLENECEK]
+                  <strong>Vergi No:</strong> {LEGAL_CONTACT.taxNumber || '—'}
                 </p>
                 <p>
-                  <strong>Vergi Dairesi:</strong> [VERGİ DAİRESİ BURAYA EKLENECEK]
+                  <strong>Vergi Dairesi:</strong> {LEGAL_CONTACT.taxOffice || '—'}
                 </p>
                 <p>
-                  <strong>Ticaret Sicil No:</strong> [TİCARET SİCİL NUMARASI BURAYA EKLENECEK]
+                  <strong>Ticaret Sicil No:</strong> {LEGAL_CONTACT.tradeRegistryNumber || '—'}
                 </p>
                 <p>
-                  <strong>Mersis No:</strong> [MERSİS NUMARASI BURAYA EKLENECEK]
+                  <strong>Mersis No:</strong> {LEGAL_CONTACT.mersis || '—'}
                 </p>
                 <p>
-                  <strong>Adres:</strong> [TAM ADRES BURAYA EKLENECEK]
+                  <strong>Adres:</strong> {LEGAL_CONTACT.address}
                 </p>
                 <p>
-                  <strong>Telefon:</strong> [TELEFON NUMARASI BURAYA EKLENECEK]
+                  <strong>Telefon:</strong> {LEGAL_CONTACT.phone}
                 </p>
                 <p>
-                  <strong>E-posta:</strong> destek@yolnext.com
+                  <strong>E-posta:</strong> {LEGAL_CONTACT.kvkkEmail}
                 </p>
               </div>
             </section>
@@ -319,13 +320,13 @@ const KVKKAydinlatma: React.FC = () => {
                   geçebilirsiniz:
                 </p>
                 <p>
-                  <strong>E-posta:</strong> destek@yolnext.com
+                  <strong>E-posta:</strong> {LEGAL_CONTACT.kvkkEmail}
                 </p>
                 <p>
-                  <strong>Adres:</strong> [TAM ADRES BURAYA EKLENECEK]
+                  <strong>Adres:</strong> {LEGAL_CONTACT.address}
                 </p>
                 <p>
-                  <strong>Telefon:</strong> [TELEFON NUMARASI BURAYA EKLENECEK]
+                  <strong>Telefon:</strong> {LEGAL_CONTACT.phone}
                 </p>
               </div>
             </section>

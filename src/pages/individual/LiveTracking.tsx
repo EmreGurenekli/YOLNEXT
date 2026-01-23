@@ -1,8 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { createApiUrl } from '../../config/api';
 import { useAuth } from '../../contexts/AuthContext';
+// Socket.io removed - using REST API polling instead
+import { resolveShipmentRoute } from '../../utils/shipmentRoute';
+import CarrierInfoCard from '../../components/CarrierInfoCard';
+import { normalizeTrackingCode } from '../../utils/trackingCode';
+import { logger } from '../../utils/logger';
+import Breadcrumb from '../../components/common/Breadcrumb';
 import { 
   MapPin, 
   Search, 
@@ -37,7 +43,7 @@ interface Shipment {
   trackingNumber: string;
   trackingCode?: string;
   title: string;
-  status: 'offer_accepted' | 'in_transit' | 'accepted' | 'in_progress' | 'assigned' | 'picked_up';
+  status: 'pending' | 'waiting_for_offers' | 'preparing' | 'offer_accepted' | 'in_transit' | 'accepted' | 'in_progress' | 'assigned' | 'picked_up' | 'delivered' | 'completed';
   currentLocation: string;
   estimatedDelivery: string;
   carrier: {
@@ -49,6 +55,10 @@ interface Shipment {
     totalShipments: number;
     successRate: number;
     id?: string;
+    carrierRating?: number;
+    carrierReviews?: number;
+    carrierVerified?: boolean;
+    completedJobs?: number;
   };
   driver?: {
     name: string;
@@ -81,15 +91,181 @@ const IndividualLiveTracking: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'date' | 'status' | 'carrier'>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [filterStatus, setFilterStatus] = useState<'all' | 'offer_accepted' | 'in_transit' | 'in_progress' | 'accepted'>('all');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'offer_accepted' | 'in_transit' | 'in_progress' | 'accepted' | 'delivered' | 'completed'>('all');
   const [expandedTimeline, setExpandedTimeline] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const formatKpiCount = (n: number) => (n > 0 ? String(n) : '—');
+
+  const toTrkCode = normalizeTrackingCode;
+
+  const getSmartEstimatedDelivery = (shipment: Shipment): string => {
+    const status = shipment.status;
+    const today = new Date();
+    let estimatedDays = 2; // Default 2 days
+
+    // Status-based smart estimation
+    if (status === 'pending' || status === 'waiting_for_offers') {
+      estimatedDays = 3; // Waiting for offers + 2 days delivery
+    } else if (status === 'offer_accepted' || status === 'accepted') {
+      estimatedDays = 2; // Ready to start + 1-2 days
+    } else if (status === 'in_progress' || status === 'assigned') {
+      estimatedDays = 1; // Driver assigned, starting soon
+    } else if (status === 'picked_up' || status === 'in_transit') {
+      // Calculate based on distance (mock estimation)
+      const origin = shipment.route.origin.toLowerCase();
+      const destination = shipment.route.destination.toLowerCase();
+      
+      if (origin.includes('istanbul') && destination.includes('ankara')) {
+        estimatedDays = 1; // Same day or next day
+      } else if (origin.includes('istanbul') || destination.includes('istanbul')) {
+        estimatedDays = 1; // Major city connections
+      } else {
+        estimatedDays = 2; // Inter-city delivery
+      }
+    }
+
+    const estimatedDate = new Date(today);
+    estimatedDate.setDate(today.getDate() + estimatedDays);
+    
+    return estimatedDate.toLocaleDateString('tr-TR', { 
+      day: 'numeric', 
+      month: 'long',
+      weekday: 'short'
+    });
+  };
+
+  const fetchTrackingHistory = async (shipmentId: string): Promise<TrackingEvent[]> => {
+    const token = localStorage.getItem('authToken');
+    if (!token || !shipmentId) return [];
+
+    const resp = await fetch(createApiUrl(`/api/shipments/${shipmentId}/tracking`), {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!resp.ok) return [];
+
+    const data = await resp.json();
+    const rows = Array.isArray(data) ? data : (Array.isArray(data?.data) ? data.data : []);
+    const mapped = (rows || []).map((r: any, idx: number) => {
+      const ts = String(r.created_at || r.createdAt || new Date().toISOString());
+      const status = String(r.status || '');
+      return {
+        id: String(r.id || `${shipmentId}-${idx}`),
+        location: String(r.location || ''),
+        timestamp: ts,
+        description: String(r.notes || r.note || r.description || status || 'Güncelleme'),
+        status: status === 'delivered' || status === 'completed' ? 'completed' : 'in-progress',
+      } as TrackingEvent;
+    });
+
+    return mapped;
+  };
+
+  const applyTrackingUpdateToShipment = (prev: Shipment, update: any): Shipment => {
+    const ts = String(update?.timestamp || update?.created_at || update?.createdAt || new Date().toISOString());
+    const loc = String(update?.location || prev.currentLocation || '');
+    const status = String(update?.status || prev.status);
+    const notes = String(update?.notes || update?.note || '');
+    const newEvent: TrackingEvent = {
+      id: String(update?.id || `live-${Date.now()}`),
+      location: loc,
+      timestamp: ts,
+      description: notes || status,
+      status: status === 'delivered' || status === 'completed' ? 'completed' : 'in-progress',
+    };
+
+    const mergedTimeline = [newEvent, ...(Array.isArray(prev.timeline) ? prev.timeline : [])].reduce(
+      (acc: TrackingEvent[], e: TrackingEvent) => {
+        if (!acc.find(x => x.id === e.id)) acc.push(e);
+        return acc;
+      },
+      []
+    );
+
+    return {
+      ...prev,
+      status: status as Shipment['status'],
+      currentLocation: loc,
+      lastUpdate: ts,
+      isLive: status === 'in_transit' || status === 'picked_up',
+      timeline: mergedTimeline,
+    };
+  };
 
   useEffect(() => {
     if (user?.id) {
       loadShipments();
     }
   }, [user?.id]);
+
+  useEffect(() => {
+    let mounted = true;
+    const shipmentId = selectedShipment?.id;
+    if (!shipmentId) return;
+
+    const onUpdate = (payload: any) => {
+      const pId = String(payload?.shipmentId || payload?.shipment_id || payload?.id || '');
+      if (!pId || pId !== shipmentId) return;
+      if (!mounted) return;
+
+      setSelectedShipment(prev => {
+        if (!prev) return prev;
+        return applyTrackingUpdateToShipment(prev, payload);
+      });
+      setShipments(prev =>
+        prev.map(s => (String(s.id) === shipmentId ? applyTrackingUpdateToShipment(s, payload) : s))
+      );
+    };
+
+    // Socket.io removed - using REST API polling instead
+    (async () => {
+      try {
+        // Load initial tracking history
+        const history = await fetchTrackingHistory(shipmentId);
+        if (mounted && history.length > 0) {
+          setSelectedShipment(prev => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              timeline: [...history, ...(Array.isArray(prev.timeline) ? prev.timeline : [])].reduce(
+                (acc: TrackingEvent[], e: TrackingEvent) => {
+                  if (!acc.find(x => x.id === e.id)) acc.push(e);
+                  return acc;
+                },
+                []
+              ),
+              currentLocation: history[0]?.location || prev.currentLocation,
+              lastUpdate: history[0]?.timestamp || prev.lastUpdate,
+            };
+          });
+        }
+      } catch (_) {
+        // ignore
+      }
+    })();
+
+    // Poll for updates every 10 seconds
+    const pollInterval = setInterval(async () => {
+      if (!mounted || !shipmentId) return;
+      try {
+        const history = await fetchTrackingHistory(shipmentId);
+        if (mounted && history.length > 0) {
+          onUpdate(history[0]);
+        }
+      } catch (_) {
+        // ignore
+      }
+    }, 10000);
+
+    return () => {
+      mounted = false;
+      clearInterval(pollInterval);
+    };
+  }, [selectedShipment?.id]);
 
   // Auto-refresh every 30 seconds
   useEffect(() => {
@@ -117,8 +293,13 @@ const IndividualLiveTracking: React.FC = () => {
       if (!userId) {
         setShipments([]);
         setLoading(false);
+        setRefreshing(false);
         return;
       }
+      
+      // Timeout protection - maksimum 10 saniye bekle
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
       
       const params = new URLSearchParams({
         page: '1',
@@ -131,7 +312,10 @@ const IndividualLiveTracking: React.FC = () => {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         throw new Error('Gönderiler yüklenemedi');
@@ -140,12 +324,11 @@ const IndividualLiveTracking: React.FC = () => {
       const data = await response.json();
       const allShipments = data.data?.shipments || data.shipments || (Array.isArray(data.data) ? data.data : []) || [];
       
-      // Filter for active shipments that can be tracked
+      // Canlı Takip ekranı: sadece "aktif" değil, delivered/completed gibi kapanmış işleri de görüntüleyebilmeli.
+      // Bu sayede shipmentId query param ile açılan işler ve arama ile bulunan işler tutarlı görünür.
       const activeShipments = allShipments.filter((s: Record<string, unknown>) => {
-        const status = String(s.status || '');
-        return ['offer_accepted', 'in_transit', 'accepted', 'in_progress', 'assigned', 'picked_up'].includes(status) && 
-               status !== 'delivered' && 
-               status !== 'cancelled';
+        const status = String(s.status || '').trim().toLowerCase();
+        return status !== 'cancelled' && status !== 'canceled';
       });
 
       // Load timeline and map shipments
@@ -170,8 +353,18 @@ const IndividualLiveTracking: React.FC = () => {
             }
           }
         } catch (err) {
-          console.error('Error loading shipment details:', err);
+          logger.error('Gönderi detayları yüklenirken hata:', err);
         }
+
+        const normalizedStatus = String(shipmentDetails.status || '').trim().toLowerCase();
+        const resolvedDeliveryCity = String(
+          shipmentDetails.deliveryCity ||
+            shipmentDetails.delivery_city ||
+            shipmentDetails.toCity ||
+            shipmentDetails.to_city ||
+            ''
+        );
+        const resolvedDeliveryDate = shipmentDetails.deliveryDate || shipmentDetails.delivery_date || shipmentDetails.estimatedDelivery || shipmentDetails.estimated_delivery;
 
         return {
           id: shipmentDetails.id?.toString() || '',
@@ -186,8 +379,12 @@ const IndividualLiveTracking: React.FC = () => {
             email: '',
             rating: Number(shipmentDetails.carrierRating || 0),
             totalShipments: Number(shipmentDetails.carrierTotalShipments || 0),
-            successRate: Number(shipmentDetails.carrierSuccessRate || 0),
+            successRate: Number(shipmentDetails.successRate || shipmentDetails.carrierSuccessRate || 0),
             id: String(shipmentDetails.carrierId || shipmentDetails.nakliyeci_id || ''),
+            carrierRating: Number(shipmentDetails.carrierRating || 0),
+            carrierReviews: Number(shipmentDetails.carrierReviews || 0),
+            carrierVerified: Boolean(shipmentDetails.carrierVerified || false),
+            completedJobs: Number(shipmentDetails.completedJobs || 0),
           },
           driver: shipmentDetails.driverName ? {
             name: String(shipmentDetails.driverName || ''),
@@ -196,14 +393,20 @@ const IndividualLiveTracking: React.FC = () => {
             id: String(shipmentDetails.driverId || shipmentDetails.driver_id || ''),
           } : undefined,
           route: {
-            origin: String(shipmentDetails.pickupCity || shipmentDetails.fromCity || shipmentDetails.pickup_address || shipmentDetails.pickupCity || ''),
-            destination: String(shipmentDetails.deliveryCity || shipmentDetails.toCity || shipmentDetails.delivery_address || shipmentDetails.deliveryCity || ''),
+            origin: resolveShipmentRoute(shipmentDetails).from,
+            destination: resolveShipmentRoute(shipmentDetails).to,
             estimatedTime: String(shipmentDetails.estimatedDelivery || shipmentDetails.deliveryDate || ''),
           },
           lastUpdate: shipmentDetails.updatedAt || shipmentDetails.updated_at || shipmentDetails.createdAt || shipmentDetails.created_at || new Date().toISOString(),
-          isLive: shipmentDetails.status === 'in_transit' || shipmentDetails.status === 'picked_up',
-          estimatedDelivery: shipmentDetails.deliveryDate || shipmentDetails.estimatedDelivery || '',
-          currentLocation: String(shipmentDetails.currentLocation || (shipmentDetails.status === 'in_transit' ? 'Yolda' : '')),
+          isLive: normalizedStatus === 'in_transit' || normalizedStatus === 'picked_up',
+          estimatedDelivery: String(resolvedDeliveryDate || ''),
+          currentLocation: String(
+            shipmentDetails.currentLocation ||
+              shipmentDetails.current_location ||
+              ((normalizedStatus === 'delivered' || normalizedStatus === 'completed')
+                ? (resolvedDeliveryCity || resolveShipmentRoute(shipmentDetails).to)
+                : (normalizedStatus === 'in_transit' ? 'Yolda' : ''))
+          ),
           timeline,
           value: typeof shipmentDetails.price === 'string' ? parseFloat(shipmentDetails.price) || 0 : (shipmentDetails.price || 0),
           specialRequirements: Array.isArray(shipmentDetails.specialRequirements) ? shipmentDetails.specialRequirements : 
@@ -230,9 +433,14 @@ const IndividualLiveTracking: React.FC = () => {
         // İlk gönderiyi otomatik seç
         setSelectedShipment(mappedShipments[0]);
       }
-    } catch (error) {
-      console.error('Error loading shipments for tracking:', error);
-      setError(error instanceof Error ? error.message : 'Gönderiler yüklenirken bir hata oluştu');
+    } catch (error: any) {
+      logger.error('Takip için gönderiler yüklenirken hata:', error);
+      // Timeout veya network hatası kontrolü
+      if (error?.name === 'AbortError' || error?.message?.includes('fetch')) {
+        setError('İnternet bağlantınızı kontrol edin veya birkaç dakika sonra tekrar deneyin.');
+      } else {
+        setError(error instanceof Error ? error.message : 'Gönderiler yüklenirken bir hata oluştu');
+      }
       setShipments([]);
     } finally {
       setLoading(false);
@@ -245,6 +453,7 @@ const IndividualLiveTracking: React.FC = () => {
     const now = new Date().toISOString();
     const status = String(shipment.status || '');
     const pickupCity = String(shipment.pickupCity || shipment.fromCity || shipment.pickupCity || '');
+    const deliveryCity = String(shipment.deliveryCity || shipment.toCity || shipment.deliveryCity || '');
 
     // Gönderi oluşturuldu
     timeline.push({
@@ -310,17 +519,70 @@ const IndividualLiveTracking: React.FC = () => {
       });
     }
 
+    // Teslim edildi (delivered)
+    if (status === 'delivered' || status === 'completed') {
+      if (!timeline.find(e => e.id === 'picked_up')) {
+        timeline.push({
+          id: 'picked_up',
+          location: pickupCity,
+          timestamp: String(shipment.updatedAt || shipment.updated_at || now),
+          description: 'Yük alındı - Taşıyıcı yükü teslim aldı',
+          status: 'completed',
+        });
+      }
+
+      if (!timeline.find(e => e.id === 'in_transit')) {
+        timeline.push({
+          id: 'in_transit',
+          location: String(shipment.currentLocation || 'Yolda'),
+          timestamp: String(shipment.updatedAt || shipment.updated_at || now),
+          description: 'Yolda - Gönderi teslimat noktasına doğru ilerliyor',
+          status: 'completed',
+        });
+      }
+
+      timeline.push({
+        id: 'delivered',
+        location: deliveryCity || String(shipment.currentLocation || ''),
+        timestamp: String(shipment.deliveryDate || shipment.delivery_date || shipment.updatedAt || shipment.updated_at || now),
+        description: 'Teslim edildi',
+        status: 'completed',
+      });
+    }
+
+    // Tamamlandı (completed)
+    if (status === 'completed') {
+      timeline.push({
+        id: 'completed',
+        location: deliveryCity || String(shipment.currentLocation || ''),
+        timestamp: String(shipment.completedAt || shipment.completed_at || shipment.updatedAt || shipment.updated_at || now),
+        description: 'Teslimat onaylandı - Gönderi tamamlandı',
+        status: 'completed',
+      });
+    }
+
     return timeline;
   };
 
   const filteredAndSortedShipments = shipments
     .filter((shipment: Shipment) => {
       const searchLower = (searchTerm || '').toLowerCase();
-      const matchesSearch = (shipment.trackingNumber || '').toLowerCase().includes(searchLower) ||
-                           (shipment.trackingCode || '').toLowerCase().includes(searchLower) ||
-                           (shipment.title || '').toLowerCase().includes(searchLower) ||
-                           (shipment.carrier?.name || '').toLowerCase().includes(searchLower) ||
-                           (shipment.carrier?.company || '').toLowerCase().includes(searchLower);
+      const derivedTrkFromId = toTrkCode(shipment.id);
+      const derivedTrkFromTracking = toTrkCode(shipment.trackingNumber || shipment.trackingCode);
+      const searchKeys = [
+        shipment.id,
+        shipment.trackingNumber,
+        shipment.trackingCode,
+        derivedTrkFromId,
+        derivedTrkFromTracking,
+        shipment.title,
+        shipment.carrier?.name,
+        shipment.carrier?.company,
+      ]
+        .filter(Boolean)
+        .map(v => String(v).toLowerCase());
+
+      const matchesSearch = searchLower.length === 0 || searchKeys.some(k => k.includes(searchLower));
       const matchesStatus = filterStatus === 'all' || shipment.status === filterStatus;
       return matchesSearch && matchesStatus;
     })
@@ -347,15 +609,21 @@ const IndividualLiveTracking: React.FC = () => {
 
   const getStatusIcon = (status: Shipment['status']) => {
     switch (status) {
+      case 'pending':
+      case 'waiting_for_offers':
       case 'offer_accepted':
       case 'accepted':
         return <Clock3 className="w-6 h-6 text-yellow-500" />;
+      case 'preparing':
       case 'in_progress':
       case 'assigned':
         return <Truck className="w-6 h-6 text-blue-500" />;
       case 'picked_up':
       case 'in_transit':
         return <Truck className="w-6 h-6 text-blue-500 animate-pulse" />;
+      case 'delivered':
+      case 'completed':
+        return <Package className="w-6 h-6 text-emerald-600" />;
       default:
         return <Package className="w-6 h-6 text-slate-500" />;
     }
@@ -363,6 +631,12 @@ const IndividualLiveTracking: React.FC = () => {
 
   const getStatusText = (status: Shipment['status']) => {
     switch (status) {
+      case 'pending':
+        return 'Beklemede';
+      case 'waiting_for_offers':
+        return 'Teklif Bekliyor';
+      case 'preparing':
+        return 'Hazırlanıyor';
       case 'offer_accepted':
         return 'Teklif Kabul Edildi';
       case 'accepted':
@@ -374,6 +648,10 @@ const IndividualLiveTracking: React.FC = () => {
         return 'Yük Alındı';
       case 'in_transit':
         return 'Yolda';
+      case 'delivered':
+        return 'Teslim Edildi';
+      case 'completed':
+        return 'Tamamlandı';
       default:
         return 'Bilinmiyor';
     }
@@ -381,15 +659,22 @@ const IndividualLiveTracking: React.FC = () => {
 
   const getStatusColor = (status: Shipment['status']) => {
     switch (status) {
+      case 'pending':
+      case 'waiting_for_offers':
       case 'offer_accepted':
       case 'accepted':
         return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'preparing':
       case 'in_progress':
       case 'assigned':
         return 'bg-blue-100 text-blue-800 border-blue-200';
       case 'picked_up':
       case 'in_transit':
         return 'bg-green-100 text-green-800 border-green-200';
+      case 'delivered':
+        return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+      case 'completed':
+        return 'bg-gray-100 text-gray-800 border-gray-200';
       default:
         return 'bg-gray-100 text-gray-800 border-gray-200';
     }
@@ -408,8 +693,13 @@ const IndividualLiveTracking: React.FC = () => {
 
   const isMessagingEnabledForShipment = (status: any) => {
     const s = String(status || '').trim();
-    return s === 'offer_accepted' || s === 'accepted' || s === 'in_transit' || s === 'delivered';
+    return s === 'offer_accepted' || s === 'accepted' || s === 'in_transit' || s === 'delivered' || s === 'completed';
   };
+
+  const breadcrumbItems = [
+    { label: 'Ana Sayfa', href: '/individual/dashboard' },
+    { label: 'Canlı Takip', icon: <Navigation className='w-4 h-4' /> },
+  ];
 
   if (loading) {
     return (
@@ -428,11 +718,16 @@ const IndividualLiveTracking: React.FC = () => {
   return (
     <div className="min-h-screen bg-white">
       <Helmet>
-        <title>Canlı Takip - YolNet</title>
+        <title>Canlı Takip - YolNext Bireysel</title>
         <meta name="description" content="Gönderilerinizi gerçek zamanlı olarak takip edin" />
       </Helmet>
 
       <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
+        {/* Breadcrumb */}
+        <div className='mb-4'>
+          <Breadcrumb items={breadcrumbItems} />
+        </div>
+        
         {/* Hero Section */}
         <div className="text-center mb-12">
           <div className="flex justify-center mb-6">
@@ -449,6 +744,34 @@ const IndividualLiveTracking: React.FC = () => {
           <p className="text-xl text-slate-600 max-w-3xl mx-auto">
             Gönderilerinizi gerçek zamanlı olarak takip edin ve anlık güncellemeler alın
           </p>
+        </div>
+
+        {/* Acil Durum Bilgilendirmesi */}
+        <div className="bg-red-50 border-2 border-red-300 rounded-xl p-6 mb-8">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-red-900 mb-3">Acil Durumlar ve Sorumluluk</h3>
+              <div className="space-y-3 text-sm text-red-800">
+                <p className="font-semibold">
+                  YolNext bir pazaryeri platformudur. Hiçbir sorumluluk almaz.
+                </p>
+                <p>
+                  <strong>Kaza, yangın, çalınma gibi durumlarda:</strong> Doğrudan nakliyeci ve taşıyıcı ile iletişime geçin. 
+                  Tüm sorunlar taraflar arasında çözülmelidir. Platform sadece tarafları buluşturan bir aracıdır.
+                </p>
+                <p>
+                  <strong>Yükünüzün konumu:</strong> Gönderi detaylarında taşıyıcı ve nakliyeci bilgileri görüntülenir. 
+                  Acil durumlarda onlarla doğrudan iletişime geçin.
+                </p>
+                <p className="text-xs text-red-700 mt-3">
+                  <Link to="/terms" target="_blank" className="underline font-medium">
+                    Detaylı bilgi için Kullanım Koşulları&apos;nı inceleyin
+                  </Link>
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Statistics Cards */}
@@ -471,8 +794,18 @@ const IndividualLiveTracking: React.FC = () => {
                 <Truck className="w-6 h-6 text-white" />
               </div>
               <div>
-                <div className="text-2xl font-bold text-slate-900">{shipments.filter(s => s.status === 'in_transit' || s.status === 'picked_up').length}</div>
-                <div className="text-sm text-slate-600">Yolda</div>
+                {(() => {
+                  const count = shipments.filter(
+                    s => s.status === 'in_transit' || s.status === 'picked_up'
+                  ).length;
+                  const isZero = count === 0;
+                  return (
+                    <>
+                      <div className={`text-2xl font-bold ${isZero ? 'text-slate-400' : 'text-slate-900'}`}>{formatKpiCount(count)}</div>
+                      <div className={`text-sm ${isZero ? 'text-slate-400' : 'text-slate-600'}`}>Yolda</div>
+                    </>
+                  );
+                })()}
               </div>
             </div>
           </div>
@@ -483,8 +816,18 @@ const IndividualLiveTracking: React.FC = () => {
                 <Clock className="w-6 h-6 text-white" />
               </div>
               <div>
-                <div className="text-2xl font-bold text-slate-900">{shipments.filter(s => s.status === 'offer_accepted' || s.status === 'accepted').length}</div>
-                <div className="text-sm text-slate-600">Beklemede</div>
+                {(() => {
+                  const count = shipments.filter(
+                    s => s.status === 'offer_accepted' || s.status === 'accepted'
+                  ).length;
+                  const isZero = count === 0;
+                  return (
+                    <>
+                      <div className={`text-2xl font-bold ${isZero ? 'text-slate-400' : 'text-slate-900'}`}>{formatKpiCount(count)}</div>
+                      <div className={`text-sm ${isZero ? 'text-slate-400' : 'text-slate-600'}`}>Beklemede</div>
+                    </>
+                  );
+                })()}
               </div>
             </div>
           </div>
@@ -495,8 +838,16 @@ const IndividualLiveTracking: React.FC = () => {
                 <Navigation className="w-6 h-6 text-white" />
               </div>
               <div>
-                <div className="text-2xl font-bold text-slate-900">{shipments.filter(s => s.isLive).length}</div>
-                <div className="text-sm text-slate-600">Canlı Takip</div>
+                {(() => {
+                  const count = shipments.filter(s => s.isLive).length;
+                  const isZero = count === 0;
+                  return (
+                    <>
+                      <div className={`text-2xl font-bold ${isZero ? 'text-slate-400' : 'text-slate-900'}`}>{formatKpiCount(count)}</div>
+                      <div className={`text-sm ${isZero ? 'text-slate-400' : 'text-slate-600'}`}>Canlı Takip</div>
+                    </>
+                  );
+                })()}
               </div>
             </div>
           </div>
@@ -523,7 +874,7 @@ const IndividualLiveTracking: React.FC = () => {
             <div className="flex gap-2 flex-wrap">
               <select
                 value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value as 'all' | 'offer_accepted' | 'in_transit' | 'in_progress' | 'accepted')}
+                onChange={(e) => setFilterStatus(e.target.value as 'all' | 'offer_accepted' | 'in_transit' | 'in_progress' | 'accepted' | 'delivered' | 'completed')}
                 className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-white"
               >
                 <option value="all">Tüm Durumlar</option>
@@ -531,6 +882,8 @@ const IndividualLiveTracking: React.FC = () => {
                 <option value="accepted">Kabul Edildi</option>
                 <option value="in_progress">Yükleme</option>
                 <option value="in_transit">Yolda</option>
+                <option value="delivered">Teslim Edildi</option>
+                <option value="completed">Tamamlandı</option>
               </select>
 
               <select
@@ -573,8 +926,8 @@ const IndividualLiveTracking: React.FC = () => {
         {shipments.length === 0 && !loading && (
           <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-12 text-center">
             <Package className="w-16 h-16 text-slate-400 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-slate-900 mb-2">Takip edilecek gönderi yok</h3>
-            <p className="text-slate-600">Şu anda aktif gönderiniz bulunmuyor.</p>
+            <h3 className="text-lg font-semibold text-slate-900 mb-2">📦 Takip edilecek gönderi yok</h3>
+            <p className="text-slate-600">Gönderi oluştur, buradan canlı takip et!</p>
           </div>
         )}
 
@@ -590,7 +943,7 @@ const IndividualLiveTracking: React.FC = () => {
                 <div className="max-h-96 overflow-y-auto">
                   {filteredAndSortedShipments.length === 0 ? (
                     <div className="p-4 text-center text-slate-500 text-sm">
-                      Arama kriterlerinize uygun gönderi bulunamadı
+                      🔍 Filtreye uygun gönderi yok
                     </div>
                   ) : (
                     filteredAndSortedShipments.map((shipment) => (
@@ -662,12 +1015,12 @@ const IndividualLiveTracking: React.FC = () => {
                       <div className="flex items-center gap-2 text-slate-900">
                         <MapPin className="w-4 h-4 text-slate-500" />
                         <span className="font-medium">Mevcut Konum:</span>
-                        <span className="text-slate-600">{selectedShipment.currentLocation || (selectedShipment.status === 'in_transit' ? 'Yolda' : 'Bilinmiyor')}</span>
+                        <span className="text-slate-600">{selectedShipment.currentLocation || (selectedShipment.status === 'in_transit' ? 'Yolda - Güzergah takip ediliyor' : 'Güzergah hazırlanıyor')}</span>
                       </div>
                       <div className="flex items-center gap-2 text-slate-900">
                         <Calendar className="w-4 h-4 text-slate-500" />
                         <span className="font-medium">Tahmini Teslimat:</span>
-                        <span className="text-slate-600">{selectedShipment.estimatedDelivery ? new Date(selectedShipment.estimatedDelivery).toLocaleDateString('tr-TR') : 'Belirtilmemiş'}</span>
+                        <span className="text-slate-600">{selectedShipment.estimatedDelivery ? new Date(selectedShipment.estimatedDelivery).toLocaleDateString('tr-TR') : getSmartEstimatedDelivery(selectedShipment)}</span>
                       </div>
                       <div className="flex items-center gap-2 text-slate-900">
                         <Route className="w-4 h-4 text-slate-500" />
@@ -718,51 +1071,30 @@ const IndividualLiveTracking: React.FC = () => {
                     )}
 
                     {/* Carrier Info */}
-                    <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-full flex items-center justify-center">
-                            <Truck className="w-6 h-6 text-white" />
-                          </div>
-                          <div>
-                            <h3 className="font-semibold text-slate-900">{selectedShipment.carrier?.name || 'Nakliyeci'}</h3>
-                            <p className="text-sm text-slate-600">{selectedShipment.carrier?.company || 'Şirket bilgisi yok'}</p>
-                            <div className="flex items-center gap-2 mt-1">
-                              {selectedShipment.carrier?.rating && selectedShipment.carrier.rating > 0 && (
-                                <>
-                                  <div className="flex items-center gap-1">
-                                    <Star className="w-3 h-3 text-yellow-500" />
-                                    <span className="text-sm text-slate-700">{selectedShipment.carrier.rating}/5</span>
-                                  </div>
-                                  <span className="text-xs text-slate-500">•</span>
-                                </>
-                              )}
-                              <span className="text-xs text-slate-500">{selectedShipment.carrier?.totalShipments || 0} gönderi</span>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          {selectedShipment.carrier?.id && isMessagingEnabledForShipment(selectedShipment.status) && (
-                            <button 
-                              onClick={() => handleMessage(selectedShipment)} 
-                              className="p-2 hover:bg-gray-200 rounded-lg transition-colors" 
-                              title="Mesaj"
-                            >
-                              <MessageSquare className="w-4 h-4 text-slate-600" />
-                            </button>
-                          )}
-                          {selectedShipment.carrier?.id && isMessagingEnabledForShipment(selectedShipment.status) && (
-                            <button 
-                              onClick={() => handleMessage(selectedShipment)} 
-                              className="p-2 hover:bg-gray-200 rounded-lg transition-colors" 
-                              title="Mesaj"
-                            >
-                              <MessageSquare className="w-4 h-4 text-slate-600" />
-                            </button>
-                          )}
+                    {selectedShipment.carrier?.id && selectedShipment.carrier?.name ? (
+                      <CarrierInfoCard
+                        carrierId={selectedShipment.carrier.id}
+                        carrierName={selectedShipment.carrier.name}
+                        companyName={selectedShipment.carrier.company}
+                        carrierRating={selectedShipment.carrier.carrierRating || selectedShipment.carrier.rating || 0}
+                        carrierReviews={selectedShipment.carrier.carrierReviews || 0}
+                        carrierVerified={selectedShipment.carrier.carrierVerified || false}
+                        successRate={selectedShipment.carrier.successRate || 0}
+                        completedJobs={selectedShipment.carrier.completedJobs || selectedShipment.carrier.totalShipments || 0}
+                        variant="detailed"
+                        showMessaging={isMessagingEnabledForShipment(selectedShipment.status)}
+                        messagingEnabled={isMessagingEnabledForShipment(selectedShipment.status)}
+                        onMessageClick={() => handleMessage(selectedShipment)}
+                        className="mb-4"
+                      />
+                    ) : (
+                      <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                        <div className="flex items-center gap-2 text-amber-600 bg-amber-50 rounded-lg p-3 border border-amber-200">
+                          <AlertCircle className="w-5 h-5" />
+                          <p className="font-medium">Nakliyeci bekleniyor</p>
                         </div>
                       </div>
-                    </div>
+                    )}
 
                     {/* Driver Info */}
                     {selectedShipment.driver && (
@@ -798,6 +1130,112 @@ const IndividualLiveTracking: React.FC = () => {
                         {selectedShipment.timeline.length > 3 && (
                           <button
                             onClick={() => setExpandedTimeline(!expandedTimeline)}
+                            className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                          >
+                            {expandedTimeline ? 'Daha Az Göster' : 'Tümünü Göster'}
+                            {expandedTimeline ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                          </button>
+                        )}
+                      </div>
+                      <div className="space-y-4">
+                        {(expandedTimeline ? selectedShipment.timeline : selectedShipment.timeline.slice(0, 3)).map((event, index) => (
+                          <div key={event.id} className="flex items-start gap-4">
+                            <div className="flex flex-col items-center">
+                              <div className={`w-4 h-4 rounded-full ${
+                                event.status === 'completed' ? 'bg-green-500' :
+                                event.status === 'in-progress' ? 'bg-blue-500 animate-pulse' :
+                                event.status === 'delayed' ? 'bg-red-500' :
+                                'bg-gray-300'
+                              }`}></div>
+                              {index < (expandedTimeline ? selectedShipment.timeline.length - 1 : Math.min(2, selectedShipment.timeline.length - 1)) && (
+                                <div className="w-px h-8 bg-gray-300 mt-2"></div>
+                              )}
+                            </div>
+                            <div className="flex-1">
+                              <p className="font-medium text-slate-900">{event.description}</p>
+                              <p className="text-sm text-slate-600">{event.location}</p>
+                              <p className="text-xs text-slate-500 mt-1">
+                                {new Date(event.timestamp).toLocaleString('tr-TR')}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="bg-white rounded-xl shadow-lg border border-gray-200 h-96 flex items-center justify-center">
+                  <div className="text-center">
+                    <Navigation className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-slate-900 mb-2">Gönderi Seçin</h3>
+                    <p className="text-slate-600">Detayları görüntülemek için sol taraftan bir gönderi seçin</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default IndividualLiveTracking;
+
+                            className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                          >
+                            {expandedTimeline ? 'Daha Az Göster' : 'Tümünü Göster'}
+                            {expandedTimeline ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                          </button>
+                        )}
+                      </div>
+                      <div className="space-y-4">
+                        {(expandedTimeline ? selectedShipment.timeline : selectedShipment.timeline.slice(0, 3)).map((event, index) => (
+                          <div key={event.id} className="flex items-start gap-4">
+                            <div className="flex flex-col items-center">
+                              <div className={`w-4 h-4 rounded-full ${
+                                event.status === 'completed' ? 'bg-green-500' :
+                                event.status === 'in-progress' ? 'bg-blue-500 animate-pulse' :
+                                event.status === 'delayed' ? 'bg-red-500' :
+                                'bg-gray-300'
+                              }`}></div>
+                              {index < (expandedTimeline ? selectedShipment.timeline.length - 1 : Math.min(2, selectedShipment.timeline.length - 1)) && (
+                                <div className="w-px h-8 bg-gray-300 mt-2"></div>
+                              )}
+                            </div>
+                            <div className="flex-1">
+                              <p className="font-medium text-slate-900">{event.description}</p>
+                              <p className="text-sm text-slate-600">{event.location}</p>
+                              <p className="text-xs text-slate-500 mt-1">
+                                {new Date(event.timestamp).toLocaleString('tr-TR')}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="bg-white rounded-xl shadow-lg border border-gray-200 h-96 flex items-center justify-center">
+                  <div className="text-center">
+                    <Navigation className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-slate-900 mb-2">Gönderi Seçin</h3>
+                    <p className="text-slate-600">Detayları görüntülemek için sol taraftan bir gönderi seçin</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default IndividualLiveTracking;
+
                             className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"
                           >
                             {expandedTimeline ? 'Daha Az Göster' : 'Tümünü Göster'}

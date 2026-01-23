@@ -39,9 +39,9 @@ const YolNextLogo: React.FC<YolNextLogoProps> = ({
     // For now, use the original PNG for all sizes
     // Later, you can add optimized versions for each size
     if (variant === 'banner') {
-      return '/img/yolnext-logo-original.png';
+      return '/img/Logo.png';
     }
-    return '/img/yolnext-logo-original.png';
+    return '/img/Logo.png';
   };
 
   if (variant === 'banner') {

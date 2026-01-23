@@ -89,7 +89,20 @@ export const CreateShipmentFormSchema = z.object({
   contactPerson: z
     .string()
     .min(2, 'İletişim kişisi en az 2 karakter olmalıdır'),
-  phone: z.string().min(10, 'Telefon numarası en az 10 karakter olmalıdır'),
+  phone: z
+    .string()
+    .min(1, 'Telefon numarası zorunludur')
+    .refine((value) => {
+      const raw = String(value ?? '').trim();
+      if (!raw) return false;
+      const digits = raw.replace(/\D/g, '');
+      let normalized = digits;
+      if (normalized.startsWith('90')) normalized = normalized.slice(2);
+      if (normalized.startsWith('0')) normalized = normalized.slice(1);
+      if (normalized.length !== 10) return false;
+      if (!normalized.startsWith('5')) return false;
+      return true;
+    }, 'Geçerli bir telefon numarası giriniz'),
   email: z.string().email('Geçerli bir email adresi giriniz'),
 });
 
@@ -110,7 +123,7 @@ export const validateUser = (data: unknown): ValidationResult => {
     }
     return {
       isValid: false,
-      errors: [{ field: 'unknown', message: 'Validation error' }],
+      errors: [{ field: 'unknown', message: 'Doğrulama hatası' }],
     };
   }
 };
@@ -131,7 +144,7 @@ export const validateShipment = (data: unknown): ValidationResult => {
     }
     return {
       isValid: false,
-      errors: [{ field: 'unknown', message: 'Validation error' }],
+      errors: [{ field: 'unknown', message: 'Doğrulama hatası' }],
     };
   }
 };
@@ -152,7 +165,7 @@ export const validateOffer = (data: unknown): ValidationResult => {
     }
     return {
       isValid: false,
-      errors: [{ field: 'unknown', message: 'Validation error' }],
+      errors: [{ field: 'unknown', message: 'Doğrulama hatası' }],
     };
   }
 };
@@ -173,7 +186,7 @@ export const validateApiResponse = (data: unknown): ValidationResult => {
     }
     return {
       isValid: false,
-      errors: [{ field: 'unknown', message: 'Validation error' }],
+      errors: [{ field: 'unknown', message: 'Doğrulama hatası' }],
     };
   }
 };
@@ -196,7 +209,7 @@ export const validateCreateShipmentForm = (
     }
     return {
       isValid: false,
-      errors: [{ field: 'unknown', message: 'Validation error' }],
+      errors: [{ field: 'unknown', message: 'Doğrulama hatası' }],
     };
   }
 };

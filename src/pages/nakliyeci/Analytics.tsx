@@ -42,13 +42,26 @@ type PerformanceData = {
   monthlyPerformance: Array<{ month: string; offers: number; accepted: number; averageOffer: number }>;
 };
 
+const getPeriodLabel = (p: Period) => {
+  switch (p) {
+    case '7days':
+      return '7 Gün';
+    case '30days':
+      return '30 Gün';
+    case '90days':
+      return '90 Gün';
+    case '1year':
+      return '1 Yıl';
+    default:
+      return String(p);
+  }
+};
+
+import { formatCurrency as formatCurrencyBase } from '../../utils/format';
+
 const formatCurrency = (value: number) => {
   try {
-    return new Intl.NumberFormat('tr-TR', {
-      style: 'currency',
-      currency: 'TRY',
-      maximumFractionDigits: 0,
-    }).format(value || 0);
+    return formatCurrencyBase(value || 0, 'TRY');
   } catch {
     return `₺${Math.round(value || 0)}`;
   }
@@ -148,8 +161,8 @@ const NakliyeciAnalytics: React.FC = () => {
                 </div>
                 <div>
                   <h1 className='text-2xl sm:text-3xl font-bold text-slate-900'>
-                    Analitik
-                    <span className='ml-2 text-transparent bg-clip-text bg-gradient-to-r from-slate-800 to-blue-900'>
+                    Analitik{' '}
+                    <span className='text-transparent bg-clip-text bg-gradient-to-r from-slate-800 to-blue-900'>
                       Dashboard
                     </span>
                   </h1>
@@ -197,7 +210,7 @@ const NakliyeciAnalytics: React.FC = () => {
                 <Truck className='w-6 h-6 text-slate-800' />
               </div>
               <div className='text-xs font-semibold text-slate-600 bg-slate-100 px-2 py-1 rounded-lg'>
-                {period}
+                {getPeriodLabel(period)}
               </div>
             </div>
             <div className='text-3xl font-bold text-slate-900'>
@@ -278,7 +291,7 @@ const NakliyeciAnalytics: React.FC = () => {
 
             <div className='h-56 flex items-end gap-2'>
               {dailyBars.length === 0 ? (
-                <div className='text-sm text-slate-500'>Veri bulunamadı</div>
+                <div className='text-sm text-slate-500'>Henüz veri yok - iş kabul edin</div>
               ) : (
                 dailyBars.map((d, idx) => {
                   const height = Math.max(6, Math.round((d.count / maxDaily) * 100));
@@ -311,7 +324,7 @@ const NakliyeciAnalytics: React.FC = () => {
 
             <div className='space-y-3'>
               {(dashboard?.topRoutes || []).length === 0 ? (
-                <div className='text-sm text-slate-500'>Veri bulunamadı</div>
+                <div className='text-sm text-slate-500'>Henüz veri yok - iş kabul edin</div>
               ) : (
                 (dashboard?.topRoutes || []).map((r, idx) => (
                   <div key={`${r.fromCity}-${r.toCity}-${idx}`} className='flex items-center justify-between'>

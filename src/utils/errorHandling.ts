@@ -28,7 +28,7 @@ export class AppError extends Error {
 export const handleApiError = (error: any): ApiError => {
   // Only log in development
   if (import.meta.env.DEV) {
-    console.error('API Error:', error);
+    console.error('API hatası:', error);
   }
 
   if (error instanceof AppError) {
@@ -109,7 +109,7 @@ export const getRetryDelay = (attempt: number): number => {
 
 // Error boundary helper
 export const logError = (error: Error, errorInfo?: any) => {
-  console.error('Error Boundary caught an error:', error, errorInfo);
+  console.error('Hata sınırı bir hata yakaladı:', error, errorInfo);
 
   // In production, you might want to send this to an error reporting service
   if (process.env.NODE_ENV === 'production') {
@@ -173,7 +173,7 @@ export const withRetry = async <T>(
 
       const delay = getRetryDelay(attempt);
       if (import.meta.env.DEV) {
-        console.log(`Retry attempt ${attempt + 1} in ${delay}ms`);
+        console.log(`Yeniden deneme ${attempt + 1}: ${delay}ms sonra`);
       }
       await new Promise(resolve => setTimeout(resolve, delay));
     }

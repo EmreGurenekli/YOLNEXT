@@ -104,7 +104,7 @@ class Logger {
       });
     } catch (error) {
       // Fallback to console in case of network issues
-      console.error('Failed to send log to server:', error);
+      console.error('Log sunucuya gönderilemedi:', error);
     }
   }
 

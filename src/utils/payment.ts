@@ -105,15 +105,13 @@ export const processRefund = async (
   };
 };
 
-// Format currency
+// Format currency - Re-export from format.ts for backward compatibility
+import { formatCurrency as formatCurrencyBase } from './format';
 export const formatCurrency = (
   amount: number,
   currency: string = 'TRY'
 ): string => {
-  return new Intl.NumberFormat('tr-TR', {
-    style: 'currency',
-    currency: currency,
-  }).format(amount);
+  return formatCurrencyBase(amount, currency);
 };
 
 // Validate payment amount

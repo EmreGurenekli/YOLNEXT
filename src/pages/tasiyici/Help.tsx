@@ -1,333 +1,353 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import {
   HelpCircle,
+  Package,
   Truck,
   MapPin,
   DollarSign,
   Shield,
   MessageCircle,
   FileText,
+  LifeBuoy,
   ArrowRight,
   CheckCircle,
   Clock,
   Search,
-  Bell,
-  BarChart3,
-  Users,
-  Settings,
-  AlertCircle,
-  Info,
-  Zap,
-  Target,
+  Phone,
+  Mail,
   ChevronDown,
   ChevronUp,
   Star,
-  TrendingUp,
-  Briefcase,
-  User,
-  Award,
-  Route,
-  Navigation,
-  Calendar,
-  FileCheck,
-  Filter,
+  Users,
+  AlertCircle,
+  AlertTriangle,
+  Info,
+  Plus,
+  Paperclip,
+  X,
+  MessageSquare,
 } from 'lucide-react';
 import Breadcrumb from '../../components/common/Breadcrumb';
+import { createApiUrl } from '../../config/api';
+import { showProfessionalToast } from '../../utils/toastMessages';
+
+// Ticket system interfaces
+interface SupportTicket {
+  id: number;
+  ticket_number: string;
+  category: string;
+  priority: string;
+  subject: string;
+  description: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface SupportCategory {
+  id: number;
+  name: string;
+  description: string;
+}
 
 const TasiyiciHelp = () => {
   const [openFAQ, setOpenFAQ] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [isSupportOpen, setIsSupportOpen] = useState(false);
+  
+  // Ticket system states
+  const [tickets, setTickets] = useState<SupportTicket[]>([]);
+  const [categories, setCategories] = useState<SupportCategory[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    category: '',
+    priority: 'medium',
+    subject: '',
+    description: '',
+    relatedShipmentId: '',
+  });
 
   const breadcrumbItems = [
     { label: 'Ana Sayfa', href: '/tasiyici/dashboard' },
-    { label: 'Yardım', href: '/tasiyici/help' },
+    { label: 'Yardım ve Destek Merkezi', href: '/tasiyici/help' },
   ];
 
   const quickActions = [
     {
-      title: 'İş Pazarı',
-      description: 'Açık ilanları görüntüleyin ve başvurun',
-      icon: Briefcase,
+      title: 'Pazar Yeri',
+      description: 'Açık işleri görüntüleyin ve teklif verin',
+      icon: Package,
       link: '/tasiyici/market',
     },
     {
-      title: 'Aktif İşler',
-      description: 'Atanmış görevlerinizi takip edin',
+      title: 'Aktif İşlerim',
+      description: 'Kabul ettiğiniz işleri yönetin ve teslim edin',
       icon: Truck,
-      link: '/tasiyici/active-jobs',
+      link: '/tasiyici/jobs',
     },
     {
-      title: 'Ayarlar',
-      description: 'Profil ve belgelerinizi yönetin',
-      icon: Settings,
-      link: '/tasiyici/settings',
+      title: 'Gelir Takibi',
+      description: 'Kazancınızı ve hakediş durumunuzu takip edin',
+      icon: DollarSign,
+      link: '/tasiyici/wallet',
+    },
+    {
+      title: 'Araç Yönetimi',
+      description: 'Araçlarınızı ve sürücülerinizi yönetin',
+      icon: MapPin,
+      link: '/tasiyici/vehicles',
     },
   ];
 
   const guideSteps = [
     {
       step: 1,
-      title: 'Hesap Oluşturun',
-      description: 'Taşıyıcı hesabı oluşturun ve belgelerinizi yükleyin',
-      icon: User,
+      title: 'Profil ve Araç Bilgileri',
+      description: 'Araç bilgilerinizi ve gerekli belgeleri ekleyerek hesabınızı tamamlayın',
+      icon: Users,
     },
     {
       step: 2,
-      title: 'İş Pazarını İnceleyin',
-      description: 'Açık ilanları görüntüleyin ve uygun işleri bulun',
-      icon: Briefcase,
+      title: 'İşleri Görüntüleyin',
+      description: 'Size uygun işleri inceleyin veya atanan işleri kontrol edin',
+      icon: Package,
     },
     {
       step: 3,
-      title: 'Başvuru Yapın',
-      description: 'İlgilendiğiniz işlere başvuru yapın',
-      icon: CheckCircle,
+      title: 'İşi Kabul Edin',
+      description: 'İş detaylarını kontrol edin ve kabul ederek süreci başlatın',
+      icon: Star,
     },
     {
       step: 4,
-      title: 'Görevi Tamamlayın',
-      description: 'Atanan görevleri tamamlayın ve durum güncellemesi yapın',
-      icon: Truck,
+      title: 'Yükleme ve Takip',
+      description: 'Alım/teslim süreçlerinde durum güncellemelerini yapın',
+      icon: MapPin,
+    },
+    {
+      step: 5,
+      title: 'Teslimat ve Kazanç',
+      description: 'Teslimatı tamamlayın, kazancınızı cüzdandan takip edin',
+      icon: DollarSign,
     },
   ];
 
   const faqCategories = [
     {
       category: 'Başlangıç',
-      icon: Zap,
+      icon: Info,
       items: [
         {
-          question: 'Taşıyıcı hesabı nasıl oluşturulur?',
-          answer: 'Kayıt sayfasından "Taşıyıcı" seçeneğini seçin. Kişisel bilgilerinizi girin:\n• Ad, soyad\n• Telefon numarası\n• E-posta adresi\n• Adres bilgileri\n• Araç bilgileri (plaka, model, tip)\n\nBelgelerinizi yükleyin:\n• Ehliyet\n• Araç ruhsatı\n• Kimlik belgesi\n\nHesabınız doğrulandıktan sonra işlere başvurmaya başlayabilirsiniz. Doğrulama genellikle 1-2 iş günü içinde tamamlanır.',
-          keywords: ['hesap', 'taşıyıcı', 'oluştur', 'kayıt', 'belge'],
+          question: 'Taşıyıcı paneli ne işe yarar?',
+          answer: 'Taşıyıcı paneli, kabul ettiğiniz işleri yönetmenizi, alım/teslim adımlarını takip etmenizi ve kazanç/hakediş durumunuzu görmenizi sağlar.',
         },
         {
-          question: 'Taşıyıcı olmanın avantajları nelerdir?',
-          answer: 'Taşıyıcı olarak:\n• Esnek çalışma saatleri\n• Çeşitli iş fırsatları\n• Güvenli ödeme sistemi\n• Performans bazlı kazanç\n• Nakliyeci ile doğrudan iletişim\n• Kolay görev yönetimi\n• Performans takibi ve puan sistemi\n• Düzenli iş fırsatları\n\nPlatform tamamen ücretsizdir. Ödemeler nakliyeci ile anlaşmanıza göre yapılır.',
-          keywords: ['avantaj', 'özellik', 'taşıyıcı', 'fayda'],
+          question: 'Hesap oluşturmak ücretsiz mi?',
+          answer: 'Evet, hesap oluşturma ücretsizdir. Komisyon ve kazanç/hakediş detayları iş türü ve süreç koşullarına göre değişebilir.',
         },
         {
-          question: 'Hangi belgeler gereklidir?',
-          answer: 'Zorunlu belgeler:\n• Ehliyet (geçerli)\n• Araç ruhsatı\n• Kimlik belgesi\n\nİsteğe bağlı belgeler:\n• Taşımacılık belgesi (varsa)\n• Sigorta belgesi\n• Araç fotoğrafları\n\nBelgeleriniz doğrulandıktan sonra işlere başvurabilirsiniz. Belgelerinizi Ayarlar sayfasından güncelleyebilirsiniz.',
-          keywords: ['belge', 'ehliyet', 'ruhsat', 'kimlik', 'gerekli'],
-        },
-        {
-          question: 'Belge doğrulama süresi ne kadar?',
-          answer: 'Belgeleriniz yüklendikten sonra:\n• İlk kontrol: 24 saat içinde\n• Doğrulama: 1-2 iş günü içinde\n• Onay: E-posta ile bildirilir\n\nDoğrulama sonrası işlere başvurabilirsiniz. Belgelerinizde sorun varsa size bildirilir ve düzeltmeniz istenir.',
-          keywords: ['doğrulama', 'süre', 'belge', 'onay'],
+          question: 'Hangi işler bana uygun?',
+          answer: 'Araç tipi, rota ve tarih kriterlerine göre uygun işleri listeleyebilir veya size atanan işleri görüntüleyebilirsiniz.',
         },
       ],
     },
     {
-      category: 'İş Başvurusu',
-      icon: Briefcase,
+      category: 'İş Kabulü',
+      icon: Package,
       items: [
         {
-          question: 'İşlere nasıl başvururum?',
-          answer: 'İş Pazarı sayfasından açık ilanları görüntüleyin:\n1. İlgilendiğiniz işe tıklayın\n2. İş detaylarını inceleyin (rota, adres, özel gereksinimler, ödeme)\n3. "Başvur" butonuna basın\n4. Başvurunuz nakliyeciye iletilecektir\n\nNakliyeci başvurunuzu inceler ve kabul eder veya reddeder. Kabul edildiğinde size bildirim gönderilir.',
-          keywords: ['başvuru', 'iş', 'ilan', 'nasıl'],
+          question: 'Bir işi nasıl kabul ederim?',
+          answer: 'İş detayına girip şartları kontrol edin. Uygunsa kabul ederek işi aktif listenize alabilirsiniz.',
         },
         {
-          question: 'Kaç işe aynı anda başvurabilirim?',
-          answer: 'Aynı anda birden fazla işe başvurabilirsiniz. Ancak:\n• Kabul edilen işleri zamanında tamamlamanız önemlidir\n• Çok fazla başvuru yapıp az kabul almak yerine, uygun işlere odaklanın\n• Başvuru kabul oranınız performans puanınızı etkiler\n\nAktif işlerinizi yönetebilir ve kapasitenize göre başvuru yapabilirsiniz.',
-          keywords: ['başvuru', 'kaç', 'sınırsız', 'limit'],
+          question: 'İşi kabul etmeden önce soru sorabilir miyim?',
+          answer: 'Evet. İş detayından mesajlaşarak yük, adres, teslimat zamanı ve evrak detaylarını netleştirebilirsiniz.',
         },
         {
-          question: 'Başvurumu iptal edebilir miyim?',
-          answer: 'Nakliyeci kabul etmeden önce başvurunuzu iptal edebilirsiniz:\n• İş Pazarı sayfasından başvurduğunuz işi bulun\n• "Başvuruyu İptal Et" butonuna tıklayın\n• Onaylayın\n\nAncak kabul edilen başvurular için iptal koşulları nakliyeci ile anlaşmanıza bağlıdır. İptal etmek isterseniz nakliyeci ile iletişime geçmeniz gerekir.',
-          keywords: ['iptal', 'başvuru', 'vazgeç'],
+          question: 'İş detaylarında nelere dikkat etmeliyim?',
+          answer: 'Adresler, zaman aralığı, yük tipi/ölçüleri, araç gereksinimi ve özel talimatları kontrol edin. Uygun olmayan koşullarda işi kabul etmeden önce mutlaka mesajlaşın.',
         },
         {
-          question: 'Başvurum ne zaman kabul edilir?',
-          answer: 'Başvuru süreci:\n1. Başvurunuz nakliyeciye iletilecektir\n2. Nakliyeci başvurunuzu inceler\n3. Kabul edildiğinde size bildirim gönderilir\n4. İş "Aktif İşler" sayfanıza eklenir\n\nKabul süresi nakliyeciye bağlıdır. Genellikle birkaç saat içinde yanıt alırsınız. Uzun süre yanıt gelmezse başka işlere başvurabilirsiniz.',
-          keywords: ['kabul', 'süre', 'yanıt', 'bildirim'],
-        },
-        {
-          question: 'Başvuru kabul oranını nasıl artırabilirim?',
-          answer: 'Başvuru kabul oranını artırmak için:\n• Yüksek performans puanına sahip olun\n• Profil bilgilerinizi tam ve güncel tutun\n• Belgelerinizi eksiksiz yükleyin\n• Uygun işlere başvurun (araç tipinize, deneyiminize uygun)\n• Zamanında teslimat yaparak güven oluşturun\n• Nakliyeci ile iletişime geçin\n\nYüksek kabul oranı daha fazla iş ve daha iyi puan anlamına gelir.',
-          keywords: ['kabul', 'oran', 'artır', 'başarı', 'performans'],
+          question: 'Aktif işlerimi nereden yönetirim?',
+          answer: 'Panelinizdeki “Aktif İşlerim” alanından kabul ettiğiniz işleri görüntüleyip süreç adımlarını yönetebilirsiniz.',
         },
       ],
     },
     {
-      category: 'Görev Yönetimi',
-      icon: Truck,
-      items: [
-        {
-          question: 'Atanan görevleri nasıl görüntülerim?',
-          answer: 'Aktif İşler sayfasından tüm atanmış görevlerinizi görüntüleyebilirsiniz:\n• Görev listesi\n• Görev durumları\n• Rota bilgileri\n• Adres bilgileri\n• Özel gereksinimler\n• Ödeme bilgileri\n\nGörev detaylarına tıklayarak tüm bilgileri görebilirsiniz. Harita üzerinde rota bilgisini görüntüleyebilirsiniz.',
-          keywords: ['görev', 'aktif', 'görüntüle', 'liste'],
-        },
-        {
-          question: 'Görev durumunu nasıl güncellerim?',
-          answer: 'Görev durumunu güncelleme:\n1. Aktif İşler sayfasından görevi seçin\n2. Görev detay sayfasına gidin\n3. Durum butonlarını kullanın:\n   • "Yükü Aldım": Gönderiyi toplama adresinden aldınız\n   • "Yoldayım": Gönderi ile yola çıktınız\n   • "Teslim Ettim": Gönderiyi teslim ettiniz\n\nDurum güncellemeleri otomatik olarak nakliyeciye bildirilir. İnternet olmasa bile butonlar çalışır, internet gelince otomatik gönderilir.',
-          keywords: ['durum', 'güncelle', 'yükü aldım', 'yoldayım', 'teslim ettim'],
-        },
-        {
-          question: 'İnternet olmadan durum güncellemesi yapabilir miyim?',
-          answer: 'Evet, internet olmadan da durum güncellemesi yapabilirsiniz:\n• Durum butonları offline modda çalışır\n• Güncellemeler yerel olarak kaydedilir\n• İnternet geldiğinde otomatik olarak gönderilir\n• Hiçbir bilgi kaybolmaz\n\nBu özellik sayesinde internet bağlantısı olmayan bölgelerde de çalışabilirsiniz.',
-          keywords: ['offline', 'internet', 'yok', 'çalışır'],
-        },
-        {
-          question: 'Görevi nasıl tamamlarım?',
-          answer: 'Görevi tamamlama:\n1. Gönderiyi teslim adresine götürün\n2. Teslimatı gerçekleştirin\n3. Görev detay sayfasından "Teslim Ettim" butonuna basın\n4. Nakliyeci teslimat durumunu kontrol eder ve süreci kapatır\n\nGörev tamamlandıktan sonra ödeme süreci başlar. Ödeme nakliyeci ile anlaşmanıza göre yapılır.',
-          keywords: ['tamamla', 'teslim', 'onay', 'ödeme'],
-        },
-        {
-          question: 'Rota bilgisini nasıl görüntülerim?',
-          answer: 'Rota bilgisi:\n• Görev detay sayfasından harita görüntüleyebilirsiniz\n• Toplama ve teslimat adresleri harita üzerinde gösterilir\n• Navigasyon uygulamanızı açabilirsiniz\n• Mesafe ve tahmini süre bilgisi görüntülenir\n\nHarita üzerinden direkt navigasyon başlatabilirsiniz.',
-          keywords: ['rota', 'harita', 'navigasyon', 'adres'],
-        },
-        {
-          question: 'Birden fazla görevi aynı anda yönetebilir miyim?',
-          answer: 'Evet, birden fazla görevi aynı anda yönetebilirsiniz:\n• Aktif İşler sayfasından tüm görevlerinizi görüntüleyebilirsiniz\n• Her görev için ayrı durum güncellemesi yapabilirsiniz\n• Rota planlama ile birden fazla görevi optimize edebilirsiniz\n\nAncak görevleri zamanında tamamlamanız önemlidir. Geç teslimat performans puanınızı düşürür.',
-          keywords: ['çoklu', 'birden fazla', 'yönet', 'rota'],
-        },
-      ],
-    },
-    {
-      category: 'Belgeler ve Profil',
-      icon: FileCheck,
-      items: [
-        {
-          question: 'Belgelerimi nasıl güncellerim?',
-          answer: 'Ayarlar sayfasından "Belgeler" sekmesine gidin:\n• Yeni belge yüklemek için "Belge Ekle" butonuna tıklayın\n• Mevcut belgeleri güncelleyebilir veya silebilirsiniz\n• Belge türünü seçin (ehliyet, ruhsat, kimlik vb.)\n• Belgeyi yükleyin\n• Kaydedin\n\nBelgeleriniz güncellendikten sonra tekrar doğrulanır. Doğrulama 1-2 iş günü sürer.',
-          keywords: ['belge', 'güncelle', 'yükle', 'ayarlar'],
-        },
-        {
-          question: 'Profil bilgilerimi nasıl düzenlerim?',
-          answer: 'Ayarlar sayfasından "Profil" sekmesine gidin:\n• Kişisel bilgilerinizi güncelleyebilirsiniz (ad, soyad, telefon, e-posta)\n• İletişim bilgilerinizi düzenleyebilirsiniz\n• Araç bilgilerinizi güncelleyebilirsiniz (plaka, model, tip)\n• Adres bilgilerinizi düzenleyebilirsiniz\n\nProfil bilgileriniz nakliyecilerle paylaşılır, bu yüzden güncel tutmanız önemlidir.',
-          keywords: ['profil', 'güncelle', 'düzenle', 'bilgi'],
-        },
-        {
-          question: 'Araç bilgilerimi nasıl güncellerim?',
-          answer: 'Ayarlar sayfasından "Araç" sekmesine gidin:\n• Araç plakasını güncelleyebilirsiniz\n• Araç modelini değiştirebilirsiniz\n• Araç tipini seçebilirsiniz (kamyon, kamyonet, tır vb.)\n• Araç fotoğrafları ekleyebilirsiniz\n• Ruhsat bilgilerini güncelleyebilirsiniz\n\nAraç bilgileriniz iş başvurularında görüntülenir.',
-          keywords: ['araç', 'plaka', 'model', 'güncelle'],
-        },
-        {
-          question: 'Belge süresi doldu, ne yapmalıyım?',
-          answer: 'Belge süresi dolduğunda:\n1. Ayarlar sayfasından belgeyi güncelleyin\n2. Yeni belgeyi yükleyin\n3. Belge doğrulaması beklenir (1-2 iş günü)\n4. Doğrulama tamamlanana kadar yeni işlere başvurabilirsiniz, ancak bazı işler için belge gerekebilir\n\nBelgelerinizi süresi dolmadan önce güncellemeniz önerilir.',
-          keywords: ['belge', 'süre', 'doldu', 'güncelle'],
-        },
-      ],
-    },
-    {
-      category: 'Performans ve Puan',
-      icon: Award,
-      items: [
-        {
-          question: 'Puan sistemi nasıl çalışır?',
-          answer: 'Puan sistemi:\n• Tamamlanan her görev için nakliyeci size puan verir (1-5 yıldız)\n• Ortalama puanınız profil sayfanızda görüntülenir\n• Yüksek puan daha fazla iş başvurusu kabul şansı sağlar\n• Puanlar görev tamamlandıktan sonra verilir\n\nPuanınız iş başvurularında önemlidir. Yüksek puanlı taşıyıcılar daha fazla iş alır.',
-          keywords: ['puan', 'yıldız', 'performans', 'değerlendirme'],
-        },
-        {
-          question: 'Puanımı nasıl yükseltebilirim?',
-          answer: 'Puanınızı yükseltmek için:\n• Görevleri zamanında tamamlayın\n• Müşteri memnuniyetine önem verin\n• Profesyonel davranın\n• İletişim kurun\n• Gönderileri dikkatli taşıyın\n• Özel gereksinimlere dikkat edin\n• Sorun durumunda hemen iletişime geçin\n\nYüksek puan daha fazla iş ve daha iyi kazanç anlamına gelir.',
-          keywords: ['puan', 'yükselt', 'artır', 'başarı'],
-        },
-        {
-          question: 'Performans raporlarını nasıl görüntülerim?',
-          answer: 'Ana Sayfa\'dan performans istatistiklerinizi görebilirsiniz:\n• Tamamlanan görev sayısı\n• Ortalama puan\n• Toplam kazanç\n• Başvuru kabul oranı\n• Aktif görev sayısı\n• Aylık kazanç grafiği\n\nBu bilgiler iş performansınızı değerlendirmenize yardımcı olur.',
-          keywords: ['performans', 'rapor', 'istatistik', 'ana sayfa'],
-        },
-        {
-          question: 'Puanım düşükse ne yapmalıyım?',
-          answer: 'Puanınız düşükse:\n• Görevleri daha dikkatli tamamlayın\n• Müşteri iletişimini iyileştirin\n• Zamanında teslimat yapın\n• Sorun durumunda hemen iletişime geçin\n• Profesyonel davranın\n• Özel gereksinimlere dikkat edin\n\nZamanla puanınız yükselir. Yeni görevlerde daha iyi performans göstererek puanınızı artırabilirsiniz.',
-          keywords: ['puan', 'düşük', 'artır', 'iyileştir'],
-        },
-      ],
-    },
-    {
-      category: 'Ödeme ve Kazanç',
+      category: 'Teslimat Süreci',
       icon: DollarSign,
       items: [
         {
-          question: 'Ödemeleri nasıl alırım?',
-          answer: 'Tamamlanan görevler için ödemeler nakliyeci tarafından yapılır:\n• Görev tamamlandıktan sonra\n• Nakliyeci süreci kapattıktan sonra\n• Ödeme tutarı görev başında belirtilir\n• Ödeme nakliyeci ile anlaşmanıza göre yapılır\n\nÖdeme detayları görev sayfasından görüntülenebilir.',
-          keywords: ['ödeme', 'al', 'nakliyeci', 'görev'],
+          question: 'Durum güncellemelerini nasıl yaparım?',
+          answer: 'Aktif iş detayından süreç adımlarını takip ederek durum güncellemelerini yapabilirsiniz. Bu sayede gönderici/nakliyeci süreci anlık izler.',
         },
         {
-          question: 'Ödeme ne zaman yapılır?',
-          answer: 'Ödeme zamanlaması:\n• Görev tamamlandıktan sonra\n• Nakliyeci süreci kapattıktan sonra\n• Nakliyeci ile anlaşmanıza göre\n• Genellikle 24 saat içinde\n\nÖdeme gecikirse nakliyeci ile iletişime geçebilir veya destek ekibimizle iletişime geçebilirsiniz.',
-          keywords: ['ödeme', 'zaman', 'ne zaman', 'süre'],
+          question: 'Teslimat kanıtı gerekiyor mu?',
+          answer: 'Bazı işler için teslimat doğrulaması veya evrak gerekebilir. İş detayındaki talimatları takip edin.',
         },
         {
-          question: 'Ödeme geçmişini nasıl görüntülerim?',
-          answer: 'Ödeme geçmişi:\n• Aktif İşler sayfasından tamamlanan görevlerinizi görebilirsiniz\n• Görev bazlı ödeme detayları\n• Tarih ve tutar bilgileri\n\nAna Sayfa\'dan toplam kazanç ve aylık kazanç grafiğini görebilirsiniz.',
-          keywords: ['ödeme', 'geçmiş', 'rapor', 'görev'],
+          question: 'Teslimat süresi ne kadar?',
+          answer: 'Teslimat süresi mesafe ve teslimat planına göre değişir. İş detayında tahmini süre/plan bilgisi yer alır.',
+        },
+        {
+          question: 'İş sırasında problem olursa ne yapmalıyım?',
+          answer: 'Önce mesajlaşma üzerinden bilgilendirme yapın. Çözülemezse destek talebi oluşturarak süreci kayıt altına alabilirsiniz.',
         },
       ],
     },
     {
-      category: 'Sorunlar ve İptal',
+      category: 'Kazanç ve Cüzdan',
+      icon: DollarSign,
+      items: [
+        {
+          question: 'Kazancımı nereden takip ederim?',
+          answer: 'Cüzdan/Gelir ekranından kazanç ve hakediş durumunuzu takip edebilirsiniz.',
+        },
+        {
+          question: 'Kazanç ne zaman görünür?',
+          answer: 'Kazanç görünürlüğü teslimat doğrulaması ve süreç koşullarına göre değişebilir. Durumu cüzdan ekranından takip edebilirsiniz.',
+        },
+        {
+          question: 'Kesinti/komisyon var mı?',
+          answer: 'Komisyon ve kesintiler iş türü ve süreç koşullarına göre değişebilir. Detay için iş/sözleşme koşullarını inceleyebilirsiniz.',
+        },
+      ],
+    },
+    {
+      category: 'İptal',
       icon: AlertCircle,
       items: [
         {
-          question: 'Görevi iptal edebilir miyim?',
-          answer: 'Kabul edilen görevler için iptal koşulları nakliyeci ile anlaşmanıza bağlıdır:\n• Görevi henüz almadıysanız: Nakliyeci ile iletişime geçin\n• Görevi aldıysanız: Acil durumlarda nakliyeci ile iletişime geçerek iptal talebinde bulunabilirsiniz\n• İptal durumunda performans puanınız etkilenebilir\n\nİptal etmek isterseniz görev detay sayfasından nakliyeci ile iletişime geçin.',
-          keywords: ['iptal', 'görev', 'vazgeç'],
+          question: 'İş iptal edilebilir mi?',
+          answer: 'İş, taşıma başlamadan önce uygun durumdayken iptal edilebilir. Taşıma başladıktan sonra iptal koşulları değişebilir.',
         },
         {
-          question: 'Sorun yaşarsam ne yapmalıyım?',
-          answer: 'Herhangi bir sorun yaşarsanız:\n• Görev detay sayfasından nakliyeci ile iletişime geçin\n• Mesaj göndererek sorunu açıklayın\n• Acil durumlarda telefon ile iletişime geçin\n• Destek ekibimizle iletişime geçin\n• Şikayet sayfasından sorununuzu bildirin\n\nTüm iletişimler kayıt altına alınır ve değerlendirilir.',
-          keywords: ['sorun', 'şikayet', 'iletişim', 'destek'],
-        },
-        {
-          question: 'Gönderi hasar gördüyse ne yapmalıyım?',
-          answer: 'Gönderi hasar gördüyse:\n1. Hemen nakliyeci ile iletişime geçin\n2. Durumu bildirin\n3. Hasar fotoğrafları çekin\n4. Görev detay sayfasından mesaj gönderin\n5. Destek ekibimizle iletişime geçin\n\nHasar durumunda çözüm süreçleri nakliyeci tarafından yönetilir. Dürüstlük ve hızlı iletişim önemlidir.',
-          keywords: ['hasar', 'bozuk', 'sorun', 'sigorta'],
-        },
-        {
-          question: 'Yanlış adrese gittim, ne yapmalıyım?',
-          answer: 'Yanlış adrese gittiyseniz:\n1. Hemen nakliyeci ile iletişime geçin\n2. Doğru adresi öğrenin\n3. Gönderiyi doğru adrese teslim edin\n\nYanlış adres durumunda ek ücret talep edilemez. Doğru adrese teslim etmek sizin sorumluluğunuzdadır.',
-          keywords: ['yanlış adres', 'hata', 'düzelt'],
+          question: 'İptal durumunda ne yapmalıyım?',
+          answer: 'İptal sebebini iş kaydı üzerinden paylaşın ve gerekirse destek talebi oluşturun. Süreç koşullarına göre değerlendirme yapılır.',
         },
       ],
     },
   ];
 
-  const allFAQs = faqCategories.flatMap(cat => cat.items);
 
-  const filteredFAQs = useMemo(() => {
-    if (!searchTerm.trim()) {
-      if (selectedCategory) {
-        const category = faqCategories.find(cat => cat.category === selectedCategory);
-        return category ? category.items : [];
+  // Ticket system functions
+  const loadTickets = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('authToken') || localStorage.getItem('token');
+      const response = await fetch(createApiUrl('/api/support/tickets'), {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const resolvedTickets = data?.data?.tickets || data?.data || data?.tickets || [];
+        setTickets(Array.isArray(resolvedTickets) ? resolvedTickets : []);
       }
-      return allFAQs;
+    } catch (error) {
+      console.error('Error loading tickets:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadCategories = async () => {
+    try {
+      const response = await fetch(createApiUrl('/api/support/categories'));
+      if (response.ok) {
+        const data = await response.json();
+        const resolvedCategories = data?.data || data?.categories || [];
+        setCategories(Array.isArray(resolvedCategories) ? resolvedCategories : []);
+      }
+    } catch (error) {
+      console.error('Error loading categories:', error);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!formData.category || !formData.subject || !formData.description) {
+      showProfessionalToast(toast, 'REQUIRED_FIELDS', 'error');
+      return;
     }
 
-    const searchLower = searchTerm.toLowerCase();
-    return allFAQs.filter(faq => {
-      const questionMatch = faq.question.toLowerCase().includes(searchLower);
-      const answerMatch = faq.answer.toLowerCase().includes(searchLower);
-      const keywordMatch = faq.keywords?.some(keyword => keyword.toLowerCase().includes(searchLower));
-      return questionMatch || answerMatch || keywordMatch;
-    });
-  }, [searchTerm, selectedCategory, allFAQs, faqCategories]);
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('authToken') || localStorage.getItem('token');
+      const formDataObj = new FormData();
+      
+      formDataObj.append('category', formData.category);
+      formDataObj.append('priority', formData.priority);
+      formDataObj.append('subject', formData.subject);
+      formDataObj.append('description', formData.description);
+      
+      if (formData.relatedShipmentId) {
+        formDataObj.append('relatedShipmentId', formData.relatedShipmentId);
+      }
+
+      const response = await fetch(createApiUrl('/api/support/tickets'), {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formDataObj,
+      });
+
+      if (response.ok) {
+        showProfessionalToast(toast, 'SUPPORT_TICKET_CREATED', 'success');
+        setFormData({
+          category: '',
+          priority: 'medium',
+          subject: '',
+          description: '',
+          relatedShipmentId: '',
+        });
+        loadTickets();
+      } else {
+        const errorPayload = await response.json().catch(() => null);
+        showProfessionalToast(
+          toast,
+          'OPERATION_FAILED',
+          'error',
+          errorPayload?.message || 'Destek talebi oluşturulurken bir hata oluştu. Lütfen tekrar deneyin.'
+        );
+      }
+    } catch (error) {
+      showProfessionalToast(toast, 'NETWORK_ERROR', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadCategories();
+    loadTickets();
+  }, []);
+
+  const openSupport = useCallback(() => {
+    setIsSupportOpen(true);
+    window.setTimeout(() => {
+      document.getElementById('support-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      (document.getElementById('support-category') as HTMLSelectElement | null)?.focus();
+    }, 50);
+  }, []);
+
+  const allFAQs = faqCategories.flatMap(cat => cat.items);
+
+  const filteredFAQs = allFAQs.filter(faq =>
+    faq.question.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    faq.answer.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const toggleFAQ = (index: number) => {
     setOpenFAQ(openFAQ === index ? null : index);
   };
 
-  const handleCategoryClick = (category: string) => {
-    setSelectedCategory(selectedCategory === category ? null : category);
-    setSearchTerm('');
-    const categoryIndex = faqCategories.findIndex(cat => cat.category === category);
-    if (categoryIndex !== -1) {
-      const firstFAQIndex = faqCategories.slice(0, categoryIndex).reduce((acc, cat) => acc + cat.items.length, 0);
-      setOpenFAQ(firstFAQIndex);
-    }
-  };
-
   return (
     <div className='min-h-screen bg-white'>
       <Helmet>
-        <title>Yardım ve Destek - Taşıyıcı | YolNext</title>
-        <meta name="description" content="YolNext taşıyıcı yardım ve destek sayfası. Taşıyıcılar için özel rehber ve SSS." />
+        <title>Yardım ve Destek Merkezi - Taşıyıcı | YolNext</title>
+        <meta name="description" content="YolNext Yardım ve Destek Merkezi - SSS, kapsamlı rehberler ve profesyonel destek talebi hizmetleri" />
       </Helmet>
 
       <div className='max-w-5xl mx-auto px-3 sm:px-4 py-4 sm:py-6'>
@@ -342,14 +362,15 @@ const TasiyiciHelp = () => {
           <div className='relative z-10'>
             <div className='flex items-center gap-4 mb-6'>
               <div className='w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl flex items-center justify-center shadow-xl border border-white/20'>
-                <Truck className='w-8 h-8 text-white' />
+                <HelpCircle className='w-8 h-8 text-white' />
               </div>
               <div className='flex-1'>
                 <h1 className='text-3xl font-bold mb-2 bg-gradient-to-r from-white to-blue-200 bg-clip-text text-transparent'>
-                  Taşıyıcı Yardım Merkezi
+                  YolNext Yardım ve Destek Merkezi
                 </h1>
                 <p className='text-slate-200 text-lg leading-relaxed'>
-                  Taşıyıcı olarak platformu nasıl kullanacağınız hakkında kapsamlı bilgiler. Sorularınızın cevaplarını burada bulabilirsiniz.
+                  Türkiye'nin lider lojistik platformunda size yardımcı olmak için buradayız. 
+                  Hızlı cevaplar, kapsamlı rehberler ve profesyonel destek hizmetlerimizden faydalanın.
                 </p>
               </div>
             </div>
@@ -360,25 +381,18 @@ const TasiyiciHelp = () => {
                 <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-300 w-5 h-5" />
                 <input
                   type="text"
-                  placeholder="Sorunuzu yazın ve arayın... (örn: iş nasıl bulunur, görev nasıl tamamlanır)"
+                  placeholder="Sorunuzu arayın..."
                   value={searchTerm}
-                  onChange={(e) => {
-                    setSearchTerm(e.target.value);
-                    setSelectedCategory(null);
-                  }}
+                  onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full pl-12 pr-4 py-3.5 border border-white/20 bg-white/10 backdrop-blur-sm rounded-xl focus:border-white/40 focus:ring-2 focus:ring-white/20 outline-none transition-all text-white placeholder:text-slate-300"
                 />
               </div>
-              {searchTerm && (
-                <div className="mt-2 text-sm text-slate-300">
-                  <strong>{filteredFAQs.length}</strong> sonuç bulundu
-                </div>
-              )}
             </div>
           </div>
         </div>
 
         {/* Quick Actions */}
+        {false && (
         <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6'>
           {quickActions.map((action, index) => {
             const Icon = action.icon;
@@ -404,20 +418,21 @@ const TasiyiciHelp = () => {
             );
           })}
         </div>
+        )}
 
         {/* Getting Started Guide */}
         <div className='bg-white rounded-xl p-6 shadow-lg border border-gray-100 mb-6'>
           <div className='flex items-center gap-3 mb-6'>
             <div className='w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center'>
-              <Zap className='w-6 h-6 text-white' />
+              <Info className='w-6 h-6 text-white' />
             </div>
             <div>
-              <h2 className='text-2xl font-bold text-slate-900'>Taşıyıcı Kullanım Rehberi</h2>
-              <p className='text-slate-600'>4 adımda taşıyıcı olarak platformu kullanmaya başlayın</p>
+              <h2 className='text-2xl font-bold text-slate-900'>Hızlı Başlangıç Rehberi</h2>
+              <p className='text-slate-600'>5 adımda YolNext'i kullanmaya başlayın</p>
             </div>
           </div>
 
-          <div className='grid grid-cols-1 md:grid-cols-4 gap-4'>
+          <div className='grid grid-cols-1 md:grid-cols-5 gap-4'>
             {guideSteps.map((step, index) => {
               const Icon = step.icon;
               return (
@@ -454,21 +469,24 @@ const TasiyiciHelp = () => {
             <h2 className='text-2xl font-bold text-slate-900'>Sık Sorulan Sorular</h2>
           </div>
 
-          {!searchTerm && (
+          {searchTerm ? (
+            <div className='mb-4 text-slate-600 text-sm'>
+              <strong>{filteredFAQs.length}</strong> sonuç bulundu
+            </div>
+          ) : (
             <div className='mb-6'>
               <div className='flex flex-wrap gap-2'>
                 {faqCategories.map((category, index) => {
                   const Icon = category.icon;
-                  const isSelected = selectedCategory === category.category;
                   return (
                     <button
                       key={index}
-                      onClick={() => handleCategoryClick(category.category)}
-                      className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors text-sm font-medium ${
-                        isSelected
-                          ? 'bg-blue-50 text-blue-700 border-blue-300'
-                          : 'bg-slate-50 text-slate-700 border-gray-200 hover:bg-slate-100'
-                      }`}
+                      onClick={() => {
+                        const categoryIndex = faqCategories.findIndex(cat => cat.category === category.category);
+                        const firstFAQIndex = faqCategories.slice(0, categoryIndex).reduce((acc, cat) => acc + cat.items.length, 0);
+                        setOpenFAQ(firstFAQIndex);
+                      }}
+                      className='flex items-center gap-2 px-3 py-2 bg-slate-50 text-slate-700 rounded-lg hover:bg-slate-100 border border-gray-200 transition-colors text-sm font-medium'
                     >
                       <Icon className='w-4 h-4' />
                       {category.category}
@@ -480,7 +498,7 @@ const TasiyiciHelp = () => {
           )}
 
           <div className='space-y-3'>
-            {filteredFAQs.map((item, index) => {
+            {(searchTerm ? filteredFAQs : allFAQs).map((item, index) => {
               const isOpen = openFAQ === index;
               return (
                 <div
@@ -512,7 +530,7 @@ const TasiyiciHelp = () => {
                   {isOpen && (
                     <div className='px-4 pb-4 pt-0 border-t border-gray-200'>
                       <div className='pl-11 pt-3'>
-                        <p className='text-slate-600 leading-relaxed text-sm whitespace-pre-line'>{item.answer}</p>
+                        <p className='text-slate-600 leading-relaxed text-sm'>{item.answer}</p>
                       </div>
                     </div>
                   )}
@@ -524,11 +542,235 @@ const TasiyiciHelp = () => {
           {searchTerm && filteredFAQs.length === 0 && (
             <div className='text-center py-12'>
               <Search className='w-12 h-12 text-slate-300 mx-auto mb-4' />
-              <p className='text-slate-600 mb-2'>Aradığınız soru bulunamadı.</p>
-              <p className='text-slate-500 text-sm'>Lütfen farklı bir arama terimi deneyin veya yukarıdaki kategorilere bakın.</p>
+              <p className='text-slate-600'>Aradığınız soru bulunamadı. Lütfen farklı bir arama terimi deneyin.</p>
             </div>
           )}
         </div>
+
+        {false && (
+          <div className='bg-white rounded-xl p-6 shadow-lg border border-gray-100 mb-6'>
+            <div className='flex items-center gap-3 mb-4'>
+              <FileText className='w-6 h-6 text-slate-900' />
+              <h2 className='text-2xl font-bold text-slate-900'>Yasal Belgeler</h2>
+            </div>
+            <p className='text-slate-600 text-sm mb-4'>
+              Kullanım Koşulları, Gizlilik Politikası, Çerez Politikası ve KVKK Aydınlatma Metni’ne buradan ulaşabilirsiniz.
+            </p>
+            <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3'>
+              <Link to='/terms' target='_blank' className='bg-slate-50 border border-gray-200 rounded-lg px-4 py-3 hover:border-blue-300 hover:bg-white transition-colors text-sm font-semibold text-slate-900'>
+                Kullanım Koşulları
+              </Link>
+              <Link to='/privacy' target='_blank' className='bg-slate-50 border border-gray-200 rounded-lg px-4 py-3 hover:border-blue-300 hover:bg-white transition-colors text-sm font-semibold text-slate-900'>
+                Gizlilik Politikası
+              </Link>
+              <Link to='/cookie-policy' target='_blank' className='bg-slate-50 border border-gray-200 rounded-lg px-4 py-3 hover:border-blue-300 hover:bg-white transition-colors text-sm font-semibold text-slate-900'>
+                Çerez Politikası
+              </Link>
+              <button
+                type='button'
+                onClick={() => window.dispatchEvent(new Event('yolnext:cookie-preferences'))}
+                className='bg-slate-50 border border-gray-200 rounded-lg px-4 py-3 hover:border-blue-300 hover:bg-white transition-colors text-sm font-semibold text-slate-900 text-left'
+              >
+                Çerez Tercihleri
+              </button>
+              <Link to='/kvkk-aydinlatma' target='_blank' className='bg-slate-50 border border-gray-200 rounded-lg px-4 py-3 hover:border-blue-300 hover:bg-white transition-colors text-sm font-semibold text-slate-900'>
+                KVKK Aydınlatma Metni
+              </Link>
+              <Link to='/consumer-rights' target='_blank' className='bg-slate-50 border border-gray-200 rounded-lg px-4 py-3 hover:border-blue-300 hover:bg-white transition-colors text-sm font-semibold text-slate-900'>
+                Tüketici Hakları
+              </Link>
+              <Link to='/distance-selling-contract' target='_blank' className='bg-slate-50 border border-gray-200 rounded-lg px-4 py-3 hover:border-blue-300 hover:bg-white transition-colors text-sm font-semibold text-slate-900'>
+                Mesafeli Satış Sözleşmesi
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {/* Support Options */}
+        {false && (
+        <div className='grid grid-cols-1 md:grid-cols-3 gap-4 mb-6'>
+          <div className='bg-white rounded-xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:border-blue-300 transition-all duration-300'>
+            <div className='w-10 h-10 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center mb-4'>
+              <MessageCircle className='w-5 h-5 text-white' />
+            </div>
+            <h3 className='text-base font-semibold text-slate-900 mb-2'>Canlı Destek</h3>
+            <p className='text-slate-600 mb-4 text-sm'>
+              7/24 canlı destek hattımızdan anında yardım alın
+            </p>
+            <button
+              type='button'
+              onClick={openSupport}
+              className='inline-flex items-center text-slate-900 font-medium text-sm hover:gap-2 transition-all'
+            >
+              Başlat <ArrowRight className='w-4 h-4 ml-1' />
+            </button>
+          </div>
+
+          <div className='bg-white rounded-xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:border-blue-300 transition-all duration-300'>
+            <div className='w-10 h-10 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center mb-4'>
+              <Mail className='w-5 h-5 text-white' />
+            </div>
+            <h3 className='text-base font-semibold text-slate-900 mb-2'>Email Desteği</h3>
+            <p className='text-slate-600 mb-4 text-sm'>
+              Sorularınızı email ile gönderin, 24 saat içinde yanıt alın
+            </p>
+            <button
+              type='button'
+              onClick={openSupport}
+              className='inline-flex items-center text-slate-900 font-medium text-sm hover:gap-2 transition-all'
+            >
+              E-posta ile Destek <ArrowRight className='w-4 h-4 ml-1' />
+            </button>
+          </div>
+
+          <div className='bg-white rounded-xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:border-blue-300 transition-all duration-300'>
+            <div className='w-10 h-10 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center mb-4'>
+              <Phone className='w-5 h-5 text-white' />
+            </div>
+            <h3 className='text-base font-semibold text-slate-900 mb-2'>Telefon Desteği</h3>
+            <p className='text-slate-600 mb-4 text-sm'>
+              Hafta içi 09:00-18:00 arası telefon desteği
+            </p>
+            <button
+              type='button'
+              onClick={openSupport}
+              className='inline-flex items-center text-slate-900 font-medium text-sm hover:gap-2 transition-all'
+            >
+              Destek Talebi Oluştur <ArrowRight className='w-4 h-4 ml-1' />
+            </button>
+          </div>
+        </div>
+        )}
+
+        {/* Professional Support Section */}
+        {isSupportOpen && (
+        <div
+          id='support-section'
+          className='relative overflow-hidden bg-gradient-to-br from-slate-800 via-blue-900 to-indigo-900 rounded-3xl p-8 mb-8 text-white shadow-2xl'
+        >
+          <div className='absolute inset-0 bg-gradient-to-br from-white/5 to-transparent'></div>
+          <div className='absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-blue-400/10 to-indigo-400/10 rounded-full -translate-y-32 translate-x-32'></div>
+
+          <div className='relative z-10 text-center mb-8'>
+            <div className='w-16 h-16 bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg'>
+              <LifeBuoy className='w-8 h-8 text-white' />
+            </div>
+            <h2 className='text-3xl font-bold mb-3'>Profesyonel Destek Hizmeti</h2>
+            <p className='text-slate-200 max-w-2xl mx-auto text-lg'>
+              FAQ bölümünde aradığınızı bulamadınız mı? Uzman destek ekibimizden kişiselleştirilmiş yardım alın.
+            </p>
+          </div>
+
+          <div className='relative z-10 grid md:grid-cols-2 gap-8'>
+            {/* Existing Tickets */}
+            <div className='bg-white rounded-2xl p-6 shadow-lg border border-slate-100'>
+              <h3 className='text-xl font-bold text-slate-900 mb-4 flex items-center gap-2'>
+                <MessageSquare className='w-5 h-5 text-slate-900' />
+                Mevcut Destek Talepleriniz ({tickets.length})
+              </h3>
+              
+              {loading ? (
+                <div className='text-center py-8'>
+                  <div className='animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-3'></div>
+                  <p className='text-slate-600'>Destek talepleri yükleniyor...</p>
+                </div>
+              ) : tickets.length === 0 ? (
+                <div className='text-center py-8'>
+                  <AlertTriangle className='w-12 h-12 text-slate-400 mx-auto mb-3' />
+                  <h4 className='font-semibold text-slate-900 mb-2'>Henüz destek talebiniz bulunmuyor</h4>
+                  <p className='text-slate-600'>İlk destek talebinizi oluşturarak başlayabilirsiniz.</p>
+                </div>
+              ) : (
+                <div className='space-y-4 max-h-80 overflow-y-auto'>
+                  {tickets.map((ticket) => (
+                    <div key={ticket.id} className='border border-slate-200 rounded-lg p-4 hover:bg-slate-50 transition-colors'>
+                      <div className='flex items-start justify-between mb-2'>
+                        <h4 className='font-medium text-slate-900 text-sm'>{ticket.subject}</h4>
+                        <span className='text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded-full'>
+                          #{ticket.ticket_number}
+                        </span>
+                      </div>
+                      <p className='text-slate-600 text-sm mb-2 line-clamp-2'>{ticket.description}</p>
+                      <div className='flex items-center gap-2 text-xs text-slate-500'>
+                        <Clock className='w-3 h-3' />
+                        {new Date(ticket.created_at).toLocaleDateString('tr-TR')}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Create New Ticket */}
+            <div id='new-ticket-form' className='bg-white rounded-2xl p-6 shadow-lg border border-slate-100'>
+              <h3 className='text-xl font-bold text-slate-900 mb-4 flex items-center gap-2'>
+                <Plus className='w-5 h-5 text-slate-900' />
+                Yeni Destek Talebi Oluştur
+              </h3>
+
+              <form onSubmit={handleSubmit} className='space-y-4'>
+                <div>
+                  <label className='block text-sm font-medium text-slate-900 mb-2'>Kategori *</label>
+                  <select
+                    id='support-category'
+                    value={formData.category}
+                    onChange={(e) => setFormData({...formData, category: e.target.value})}
+                    className='w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all bg-white text-slate-900'
+                    required
+                  >
+                    <option value="">Kategori seçin</option>
+                    {categories.map((cat) => (
+                      <option key={cat.id} value={cat.name}>{cat.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className='block text-sm font-medium text-slate-900 mb-2'>Konu *</label>
+                  <input
+                    type="text"
+                    value={formData.subject}
+                    onChange={(e) => setFormData({...formData, subject: e.target.value})}
+                    className='w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all bg-white text-slate-900'
+                    placeholder="Destek talebinizin konusu"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className='block text-sm font-medium text-slate-900 mb-2'>Açıklama *</label>
+                  <textarea
+                    value={formData.description}
+                    onChange={(e) => setFormData({...formData, description: e.target.value})}
+                    rows={4}
+                    className='w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all resize-none bg-white text-slate-900'
+                    placeholder="Sorununuzu detaylı olarak açıklayın"
+                    required
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className='w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-3 px-4 rounded-lg font-medium hover:from-blue-700 hover:to-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2'
+                >
+                  {loading ? (
+                    <>
+                      <div className='animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full'></div>
+                      Gönderiliyor...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className='w-4 h-4' />
+                      Destek Talebi Oluştur
+                    </>
+                  )}
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+        )}
 
         {/* Contact CTA */}
         <div className='relative overflow-hidden bg-gradient-to-br from-slate-800 via-blue-900 to-indigo-900 rounded-3xl p-8 text-white shadow-2xl'>
@@ -543,13 +785,14 @@ const TasiyiciHelp = () => {
               Sorularınız için bizimle iletişime geçebilirsiniz. Destek ekibimiz size yardımcı olmaktan mutluluk duyar.
             </p>
             <div className='flex flex-col sm:flex-row items-center justify-center gap-4'>
-              <Link
-                to='/contact'
+              <button
+                type='button'
+                onClick={openSupport}
                 className='bg-white text-slate-900 px-6 py-3 rounded-lg font-semibold hover:bg-slate-100 transition-colors flex items-center gap-2 shadow-lg'
               >
-                <MessageCircle className='w-5 h-5' />
-                İletişime Geç
-              </Link>
+                <Plus className='w-5 h-5' />
+                Destek Talebi Oluştur
+              </button>
             </div>
           </div>
         </div>

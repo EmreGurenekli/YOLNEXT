@@ -2,7 +2,7 @@
 
 // API services
 export * from './api';
-export * from './realApi';
+// realApi.ts removed - using api.ts only
 
 // Analytics services
 export * from './analytics';
@@ -20,8 +20,7 @@ export * from './cache';
 // Storage services
 export * from './storage';
 
-// Socket services
-export * from './socket';
+// Socket services removed - using REST API only
 
 // Logger services
 export * from './logger';

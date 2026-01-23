@@ -40,19 +40,33 @@ class MigrationRunner {
       const migCountRes = await this.pool.query('SELECT COUNT(*)::int as count FROM migrations');
       const migCount = (migCountRes.rows && migCountRes.rows[0] && migCountRes.rows[0].count) || 0;
 
-      if (Number(migCount) === 0) {
-        const usersTableRes = await this.pool.query(
-          `SELECT to_regclass('public.users') as exists`
-        );
-        const hasUsersTable = Boolean(usersTableRes.rows?.[0]?.exists);
+      const hasTable = async (regclass) => {
+        try {
+          const r = await this.pool.query('SELECT to_regclass($1) as exists', [regclass]);
+          return Boolean(r.rows?.[0]?.exists);
+        } catch {
+          return false;
+        }
+      };
 
+      // If the DB was bootstrapped outside of migrations (legacy scripts), we may already have core tables.
+      // In that case, baseline only the core schema migrations that would otherwise fail.
+      // IMPORTANT: do NOT baseline legal compliance migration unless its tables already exist.
+      if (Number(migCount) === 0) {
+        const hasUsersTable = await hasTable('public.users');
         if (hasUsersTable) {
           const baseline = [
             { version: '001', filename: '001_initial_schema.sql' },
             { version: '002', filename: '002_postgresql_schema.sql' },
-            { version: '003', filename: '003_legal_compliance.sql' },
             { version: '004', filename: '004_add_district_columns.sql' },
           ];
+
+          // Baseline 003 only if its critical tables already exist.
+          const hasConsents = await hasTable('public.user_consents');
+          const hasSignatures = await hasTable('public.contract_signatures');
+          if (hasConsents && hasSignatures) {
+            baseline.push({ version: '003', filename: '003_legal_compliance.sql' });
+          }
 
           for (const b of baseline) {
             await this.pool.query(
@@ -60,8 +74,26 @@ class MigrationRunner {
               [b.version, b.filename]
             );
           }
-          logger.info('Detected existing schema; baselined migrations 001-004');
+          logger.info('Detected existing schema; baselined migrations (core)');
         }
+      }
+
+      // Self-healing: if legal migration was recorded but tables are missing, force it to rerun.
+      try {
+        const recorded003 = await this.pool.query(
+          "SELECT 1 FROM migrations WHERE version = '003' LIMIT 1"
+        );
+        const has003 = (recorded003.rows || []).length > 0;
+        if (has003) {
+          const hasConsents = await hasTable('public.user_consents');
+          const hasSignatures = await hasTable('public.contract_signatures');
+          if (!hasConsents || !hasSignatures) {
+            await this.pool.query("DELETE FROM migrations WHERE version = '003'");
+            logger.warn('Legal compliance tables missing; unmarked migration 003 to rerun');
+          }
+        }
+      } catch (e) {
+        logger.warn('Could not verify legal compliance tables', { error: e?.message });
       }
       
       logger.info('Migration system initialized');

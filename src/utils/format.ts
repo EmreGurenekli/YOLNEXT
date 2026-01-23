@@ -1,12 +1,14 @@
 // Currency formatting
 export const formatCurrency = (
-  amount: number,
+  amount: any,
   currency: string = 'TRY'
 ): string => {
+  const n = Number(amount);
+  const safe = Number.isFinite(n) ? n : 0;
   return new Intl.NumberFormat('tr-TR', {
     style: 'currency',
     currency: currency,
-  }).format(amount);
+  }).format(safe);
 };
 
 export const formatNumber = (number: number, decimals: number = 0): string => {
@@ -18,10 +20,12 @@ export const formatNumber = (number: number, decimals: number = 0): string => {
 
 // Date formatting
 export const formatDate = (
-  date: string | Date,
+  date: any,
   format: 'short' | 'long' | 'time' = 'short'
 ): string => {
-  const dateObj = typeof date === 'string' ? new Date(date) : date;
+  if (!date) return '';
+  const dateObj = typeof date === 'string' || typeof date === 'number' ? new Date(date) : date;
+  if (!(dateObj instanceof Date) || !Number.isFinite(dateObj.getTime())) return '';
 
   const options: Intl.DateTimeFormatOptions = {
     short: { day: '2-digit', month: '2-digit', year: 'numeric' },
@@ -219,4 +223,91 @@ export const formatAddress = (address: {
   ].filter(Boolean);
 
   return parts.join(', ');
+};
+
+export const sanitizeShipmentTitle = (value: unknown): string => {
+  const raw = String(value ?? '').trim();
+  if (!raw) return '';
+
+  const cleaned = raw
+    .replace(/^\s*AUTO\s+PW-EXCL-\d+\s*/i, '')
+    .replace(/\bPW-EXCL-\d+\b/gi, '')
+    .replace(/^\s*MCP(\s+Ultra)?\s*-\s*/i, '')
+    .replace(/^\s*MCP\s+/i, '')
+    .replace(/^\s*Ultra\s*[-\u2010\u2011\u2012\u2013\u2014\u2212:]\s*/i, '')
+    .replace(/^\s*Ultra\b\s*/i, '')
+    .replace(/^\s*Kapsamlı\s+İş\s+Akışı\s+Testi\s*-\s*/i, '')
+    .replace(/^\s*4-Panel\s+Flow\s*/i, '')
+    .replace(/\bUI\s+Regression\s+Shipment\b/gi, '')
+    .replace(/\bComms\/Tracking\b/gi, '')
+    .replace(/\bRegression\b/gi, '')
+    .replace(/\bShipment\b/gi, '')
+    .replace(/\bTest\b/gi, '')
+    .replace(/\bDeneme\b/gi, '')
+    .replace(/\bWorkflow\b/gi, '')
+    .replace(/^\s*[-\u2010\u2011\u2012\u2013\u2014\u2212]\s*/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!cleaned) return 'Gönderi';
+  if (/^individual\s+shipment$/i.test(cleaned)) return 'Genel Gönderi';
+  if (/^shipment$/i.test(cleaned)) return 'Gönderi';
+
+  return cleaned;
+};
+
+export const sanitizeMessageText = (value: unknown): string => {
+  const raw = String(value ?? '').trim();
+  if (!raw) return '';
+
+  const cleaned = raw
+    .replace(/\bmesajla(?:s|ş)ma\s+sistemi\s+test\s+ediliyor\b\.?/gi, '')
+    .replace(/\bmesajla(?:s|ş)ma\s+sistemi\s+ediliyor\b\.?/gi, '')
+    .replace(/\bkapsamlı\s+iş\s+akışı\s+testi\s+devam\s+ediyor\b\.?/gi, '')
+    .replace(/\bmesaj\s+testi\b/gi, '')
+    .replace(/\breceiver\s+auto\s*\d*\b/gi, '')
+    .replace(/\(\s*fix\d+\s*\)/gi, '')
+    .replace(/^\s*(E2E)\s*[:\-–—]\s*/i, '')
+    .replace(/^\s*(Test|Deneme)\s+(Mesaj[ıi]?|Message)\s*[:\-–—]\s*/i, '')
+    .replace(/^\s*(Test|Deneme)\s*[:\-–—]\s*/i, '')
+    .replace(/^\s*MCP\s*[:\-–—]\s*/i, '')
+    .replace(/^\s*(AUTO\s+)?PW-EXCL-\d+\s*[:\-–—]?\s*/i, '')
+    .replace(/\bPW-EXCL-\d+\b/gi, '')
+    .replace(/\b(E2E|MCP|Regression)\b/gi, '')
+    .replace(/\btest\b/gi, '')
+    .replace(/\bdeneme\b/gi, '')
+    .replace(/\btest\s+ediliyor\b\.?/gi, '')
+    .replace(/\(\s*\)/g, '')
+    .replace(/\s*[-–—]+\s*$/g, '')
+    .replace(/\.\s*#/g, ' #')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!cleaned) return '';
+  if (/^mesaj(\s*\([^)]*\))?\s*[:\-–—]*$/i.test(cleaned)) return '';
+
+  return cleaned;
+};
+
+export const sanitizeAddressLabel = (value: unknown): string => {
+  const raw = String(value ?? '').trim();
+  if (!raw) return '';
+
+  const cleaned = raw
+    .replace(/\bPW-EXCL-\d+\b/gi, '')
+    .replace(/\bAUTO\b/gi, '')
+    .replace(/\bMCP\b/gi, '')
+    .replace(/\bTest\b/gi, '')
+    .replace(/\bDeneme\b/gi, '')
+    .replace(/\bRegression\b/gi, '')
+    .replace(/\bShipment\b/gi, '')
+    .replace(/\bpickup\b/gi, 'Alım')
+    .replace(/\bdelivery\b/gi, 'Teslim')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!cleaned) return '';
+  if (/^(Alım|Teslim)$/i.test(cleaned)) return '';
+
+  return cleaned;
 };

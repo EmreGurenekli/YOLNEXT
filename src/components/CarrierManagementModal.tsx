@@ -106,7 +106,7 @@ const CarrierManagementModal: React.FC<CarrierManagementModalProps> = ({
         setSuggestions(suggestionsData);
       }
     } catch (error) {
-      console.error('Error loading carrier data:', error);
+      console.error('Taşıyıcı verileri yüklenirken hata:', error);
     } finally {
       setIsLoading(false);
     }
@@ -139,7 +139,7 @@ const CarrierManagementModal: React.FC<CarrierManagementModalProps> = ({
         alert(error.error || 'Yük atanamadı');
       }
     } catch (error) {
-      console.error('Error assigning load:', error);
+      console.error('Yük atanırken hata:', error);
       alert('Yük atanamadı');
     }
   };

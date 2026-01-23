@@ -123,7 +123,7 @@ export default function StatusManager({
         setStatusHistory(result.data || []);
       }
     } catch (error) {
-      console.error('Error loading status history:', error);
+      console.error('Durum geçmişi yüklenirken hata:', error);
     } finally {
       setIsLoading(false);
     }
@@ -156,7 +156,7 @@ export default function StatusManager({
         loadStatusHistory();
       }
     } catch (error) {
-      console.error('Error updating status:', error);
+      console.error('Durum güncellenirken hata:', error);
     } finally {
       setIsUpdating(false);
     }

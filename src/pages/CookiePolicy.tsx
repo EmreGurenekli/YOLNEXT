@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { Cookie, ArrowLeft, Settings } from 'lucide-react';
 import YolNextLogo from '../components/common/yolnextLogo';
 import Footer from '../components/common/Footer';
+import { LEGAL_CONTACT } from '../config/legal';
 
 const CookiePolicy = () => {
   return (
@@ -119,7 +120,7 @@ const CookiePolicy = () => {
                 Platform, aşağıdaki üçüncü taraf hizmetleri kullanır:
               </p>
               <ul className="list-disc pl-6 text-gray-700 space-y-2">
-                <li><strong>Google Analytics:</strong> Kullanım analizi (opsiyonel)</li>
+                <li><strong>Analitik (opsiyonel):</strong> Kullanım analizi (analitik çerezler, tercihlerinize göre etkinleştirilebilir)</li>
                 <li><strong>Ödeme İşlemcileri:</strong> Güvenli ödeme için gerekli çerezler</li>
               </ul>
             </section>
@@ -140,8 +141,8 @@ const CookiePolicy = () => {
               </p>
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <p className="text-gray-700">
-                  <strong>Email:</strong> destek@yolnext.com<br />
-                  <strong>Telefon:</strong> +90 (212) 123 45 67
+                  <strong>Email:</strong> {LEGAL_CONTACT.supportEmail}<br />
+                  <strong>Telefon:</strong> {LEGAL_CONTACT.phone}
                 </p>
               </div>
             </section>

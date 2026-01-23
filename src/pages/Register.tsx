@@ -98,11 +98,14 @@ const Register = () => {
     }
 
     if (name === 'phone' && value) {
-      const cleanPhone = value.replace(/\D/g, '');
-      if (!/^(\+90|0)?[5][0-9]{9}$/.test(cleanPhone)) {
+      const digits = value.replace(/\D/g, '');
+      let normalized = digits;
+      if (normalized.startsWith('90')) normalized = normalized.slice(2);
+      if (normalized.startsWith('0')) normalized = normalized.slice(1);
+      if (normalized.length !== 10 || !normalized.startsWith('5')) {
         setError('Geçersiz telefon numarası formatı');
       } else {
-        setError(''); // Format doğruysa hatayı temizle
+        setError('');
       }
     }
 
@@ -154,6 +157,7 @@ const Register = () => {
           'licenseNumber',
           'vehicleCount',
           'serviceAreas',
+          'city',
         ];
       case 'tasiyici':
         return [
@@ -175,7 +179,7 @@ const Register = () => {
     // 2. GERÇEK DOĞRULAMA - API çağrısı (şirket adı ile)
     // Demo modda backend zaten true döndüğü için algoritma kontrolünü atlıyoruz
     try {
-      const response = await fetch(createApiUrl('/api/verify/tax-number'), {
+      const response = await fetch(createApiUrl('/api/auth/verify/tax-number'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -215,18 +219,21 @@ const Register = () => {
 
   const verifyPhoneNumber = async (phone: string) => {
     // 1. Format kontrolü
-    const cleanPhone = phone.replace(/\D/g, '');
-    if (!/^(\+90|0)?[5][0-9]{9}$/.test(cleanPhone)) {
+    const digits = String(phone || '').replace(/\D/g, '');
+    let normalized = digits;
+    if (normalized.startsWith('90')) normalized = normalized.slice(2);
+    if (normalized.startsWith('0')) normalized = normalized.slice(1);
+    if (normalized.length !== 10 || !normalized.startsWith('5')) {
       setError('Geçersiz telefon numarası formatı');
       return false;
     }
 
     // 2. GERÇEK DOĞRULAMA - SMS doğrulama
     try {
-      const response = await fetch(createApiUrl('/api/verify/phone'), {
+      const response = await fetch(createApiUrl('/api/auth/verify/phone'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: cleanPhone }),
+        body: JSON.stringify({ phone: normalized }),
       });
 
       if (!response.ok) {
@@ -281,7 +288,7 @@ const Register = () => {
 
     // 2. GERÇEK DOĞRULAMA - E-posta doğrulama
     try {
-      const response = await fetch(createApiUrl('/api/verify/email'), {
+      const response = await fetch(createApiUrl('/api/auth/verify/email'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
@@ -289,7 +296,7 @@ const Register = () => {
 
       if (!response.ok) {
         // API hatası durumunda sadece format kontrolü yapıldıysa devam et
-        console.warn('Email verification API failed:', response.status);
+        console.warn('E-posta doğrulama API isteği başarısız:', response.status);
         // Format doğruysa devam et, backend çalışmıyor olabilir
         setError('');
         return true;
@@ -343,8 +350,8 @@ const Register = () => {
     try {
       const endpoint =
         codeType === 'email'
-          ? createApiUrl('/api/verify/email/verify-code')
-          : createApiUrl('/api/verify/phone/verify-code');
+          ? createApiUrl('/api/auth/verify/email/verify-code')
+          : createApiUrl('/api/auth/verify/phone/verify-code');
       const data =
         codeType === 'email'
           ? { email: formData.email, code: verificationCode }
@@ -477,11 +484,6 @@ const Register = () => {
       return false;
     }
 
-    if (!formData.acceptCookies) {
-      setError('Çerez Politikasını kabul etmelisiniz');
-      return false;
-    }
-
     if (!formData.acceptKVKK) {
       setError('KVKK Aydınlatma Metni\'ni okudum ve anladım onayını vermelisiniz');
       return false;
@@ -503,40 +505,48 @@ const Register = () => {
     setIsLoading(true);
     setError('');
     setVerificationStatus('pending');
+    const timeoutId = setTimeout(() => {
+      setIsLoading(false);
+      setError('Kayıt işlemi zaman aşımına uğradı. Lütfen tekrar deneyin.');
+      setVerificationStatus('rejected');
+    }, 30000); // 30 seconds timeout (longer for registration with verification)
 
-    // Fix: Ensure city and district are set if they're visible in the DOM but not in state
-    const cityInput = document.querySelector('input[name="city"]') as HTMLInputElement;
-    const districtInput = document.querySelector('input[name="district"]') as HTMLInputElement;
-    if (cityInput && cityInput.value && !formData.city) {
-      setFormData(prev => ({ ...prev, city: cityInput.value }));
-    }
-    if (districtInput && districtInput.value && !formData.district) {
-      setFormData(prev => ({ ...prev, district: districtInput.value }));
-    }
+    try {
+      // Fix: Ensure city and district are set if they're visible in the DOM but not in state
+      const cityInput = document.querySelector('input[name="city"]') as HTMLInputElement;
+      const districtInput = document.querySelector('input[name="district"]') as HTMLInputElement;
+      if (cityInput && cityInput.value && !formData.city) {
+        setFormData(prev => ({ ...prev, city: cityInput.value }));
+      }
+      if (districtInput && districtInput.value && !formData.district) {
+        setFormData(prev => ({ ...prev, district: districtInput.value }));
+      }
 
-    // E-posta doğrulaması (submit sırasında)
-    if (formData.email) {
-      const emailValid = await verifyEmail(formData.email);
-      if (!emailValid) {
+      // E-posta doğrulaması (submit sırasında)
+      if (formData.email) {
+        const emailValid = await verifyEmail(formData.email);
+        if (!emailValid) {
+          clearTimeout(timeoutId);
+          setIsLoading(false);
+          return;
+        }
+      }
+
+      // Form validasyonu
+      if (!validateForm()) {
+        clearTimeout(timeoutId);
         setIsLoading(false);
         return;
       }
-    }
 
-    // Form validasyonu
-    if (!validateForm()) {
-      setIsLoading(false);
-      return;
-    }
+      // Evrak doğrulama
+      const isVerified = await verifyDocuments();
+      if (!isVerified) {
+        clearTimeout(timeoutId);
+        setIsLoading(false);
+        return;
+      }
 
-    // Evrak doğrulama
-    const isVerified = await verifyDocuments();
-    if (!isVerified) {
-      setIsLoading(false);
-      return;
-    }
-
-    try {
       // Type assertion for userType to match RegisterUserData interface
       const registerData = {
         ...formData,
@@ -545,6 +555,7 @@ const Register = () => {
       const result = await register(registerData);
 
       if (result.success && result.user) {
+        clearTimeout(timeoutId);
         analytics.track('signup_complete', {
           ab: abVariant,
           userType: formData.userType,
@@ -574,6 +585,7 @@ const Register = () => {
           }
         }
       } else {
+        clearTimeout(timeoutId);
         analytics.track('signup_error', {
           ab: abVariant,
           userType: formData.userType,
@@ -582,14 +594,16 @@ const Register = () => {
         setError(result.error || 'Kayıt başarısız');
       }
     } catch (error) {
+      clearTimeout(timeoutId);
       analytics.track('signup_error', {
         ab: abVariant,
         userType: formData.userType,
         reason: 'exception',
       });
       setError('Kayıt başarısız. Lütfen tekrar deneyin.');
-      console.error('Registration error:', error);
+      console.error('Kayıt sırasında hata:', error);
     } finally {
+      clearTimeout(timeoutId);
       setIsLoading(false);
     }
   };
@@ -638,7 +652,7 @@ const Register = () => {
             <div className='bg-white/10 backdrop-blur-sm rounded-2xl p-6 mb-8'>
               <div className='text-center'>
                 <div className='text-2xl font-bold text-white mb-2'>
-                  🎉 TAMAMEN ÜCRETSİZ
+                  TAMAMEN ÜCRETSİZ
                 </div>
                 <div className='text-white/90 text-lg'>
                   <span className='font-bold'>%0 üyelik ücreti</span> •
@@ -1158,6 +1172,23 @@ const Register = () => {
                     </div>
                   </div>
                   <div>
+                    <label className='text-gray-700 text-sm font-medium flex items-center gap-2'>
+                      Şehir
+                      <span className='text-xs text-amber-600'>
+                        ⚠️ Sadece bu şehirdeki ilanlara teklif verebilirsiniz
+                      </span>
+                    </label>
+                    <input
+                      type='text'
+                      name='city'
+                      value={formData.city}
+                      onChange={handleInputChange}
+                      className='w-full mt-1 px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                      placeholder='Malatya'
+                      required
+                    />
+                  </div>
+                  <div>
                     <label className='text-gray-700 text-sm font-medium'>
                       Hizmet Verilen Bölgeler
                     </label>
@@ -1271,7 +1302,6 @@ const Register = () => {
                     checked={formData.acceptCookies}
                     onChange={handleInputChange}
                     className='mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500'
-                    required
                   />
                   <span className='text-sm text-gray-700 group-hover:text-gray-900'>
                     <Link to='/cookie-policy' target='_blank' className='text-blue-600 hover:text-blue-700 underline font-medium'>
@@ -1299,14 +1329,14 @@ const Register = () => {
                 </label>
 
                 <p className='text-xs text-gray-500 mt-2'>
-                  * Tüm yasal onaylar zorunludur. Hesap oluşturmak için lütfen tüm koşulları kabul edin.
+                  * Hesap oluşturmak için Kullanım Koşulları, Gizlilik Politikası ve KVKK Aydınlatma Metni onayları zorunludur.
                 </p>
               </div>
 
               {/* Submit Button */}
               <button
                 type='submit'
-                disabled={isLoading || !formData.acceptTerms || !formData.acceptPrivacy || !formData.acceptCookies || !formData.acceptKVKK}
+                disabled={isLoading || !formData.acceptTerms || !formData.acceptPrivacy || !formData.acceptKVKK}
                 className='w-full bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-3 px-4 rounded-lg transition-all duration-300 transform hover:scale-105 disabled:transform-none flex items-center justify-center gap-2'
               >
                 {isLoading ? (
