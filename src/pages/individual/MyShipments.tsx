@@ -47,7 +47,7 @@ interface Shipment {
   title: string;
   from: string;
   to: string;
-  status: 'preparing' | 'waiting' | 'waiting_for_offers' | 'offer_accepted' | 'accepted' | 'in_transit' | 'delivered' | 'completed' | 'cancelled';
+  status: 'preparing' | 'waiting' | 'waiting_for_offers' | 'offer_accepted' | 'accepted' | 'in_progress' | 'picked_up' | 'in_transit' | 'delivered' | 'completed' | 'cancelled';
   createdAt: string;
   estimatedDelivery: string;
   actualDelivery?: string;

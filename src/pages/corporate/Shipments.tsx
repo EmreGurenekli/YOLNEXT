@@ -298,9 +298,10 @@ export default function CorporateShipments() {
     }
   };
 
-  const handleTrackShipment = (shipmentId: number) => {
+  const handleTrackShipment = (shipment: Shipment | number) => {
+    const id = typeof shipment === 'number' ? shipment : shipment.id;
     // Gönderi takip sayfasına yönlendir
-    navigate(`/corporate/live-tracking?shipmentId=${shipmentId}`);
+    navigate(`/corporate/live-tracking?shipmentId=${id}`);
   };
 
   const handleMessage = (shipment: Shipment) => {
@@ -849,7 +850,7 @@ export default function CorporateShipments() {
           sortBy={sortBy}
           onSearchChange={setSearchTerm}
           onStatusFilterChange={setFilterStatus}
-          onSortByChange={setSortBy}
+          onSortByChange={(value: string) => setSortBy(value as 'date' | 'price' | 'status')}
           onReset={() => {
             setSearchTerm('');
             setFilterStatus('all');
@@ -958,8 +959,8 @@ export default function CorporateShipments() {
                   onMessage={handleMessage}
                   isMessagingEnabled={isMessagingEnabledForStatus}
                   getStatusStyle={getStatusStyle}
-                  onShowTracking={(shipmentId) => {
-                    setSelectedShipmentForTracking(shipmentId);
+                  onShowTracking={(shipment: Shipment) => {
+                    setSelectedShipmentForTracking(shipment);
                     setShowTrackingModal(true);
                   }}
                 />
@@ -1016,7 +1017,7 @@ export default function CorporateShipments() {
                         <h3 className='text-xl font-bold text-gray-900'>
                           {
                             shipments.find(
-                              s => s.id === selectedShipmentForTracking
+                              s => s.id === selectedShipmentForTracking?.id
                             )?.title
                           }
                         </h3>
@@ -1249,7 +1250,7 @@ export default function CorporateShipments() {
                           className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusStyle(shipment.status)}`}
                         >
                           {getStatusIcon(shipment.status)}
-                          {acceptedShipmentId === shipment.trackingCode
+                          {acceptedShipmentId === shipment.id || (acceptedShipmentId && shipment.trackingCode && String(acceptedShipmentId) === shipment.trackingCode.replace('YOL', ''))
                             ? 'Kabul Edildi'
                             : shipment.statusText}
                         </span>
@@ -1683,7 +1684,7 @@ export default function CorporateShipments() {
               id: user.id || '',
               name: user.fullName || 'Kullanıcı',
             }}
-          shipmentId={selectedShipmentId || undefined}
+          shipmentId={selectedShipmentId ? String(selectedShipmentId) : undefined}
         />
         )}
 

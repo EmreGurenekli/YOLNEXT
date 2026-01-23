@@ -477,7 +477,6 @@ export default function CreateShipment() {
             handleInputChange={handleInputChange}
             errors={errors}
             setErrors={setErrors}
-            parseISODateStrict={parseISODateStrict}
           />
         );
 
@@ -485,9 +484,10 @@ export default function CreateShipment() {
         return (
           <CreateShipmentStep3
             formData={formData}
-            mainCategories={mainCategories}
             errors={errors}
+            isLoading={isLoading}
             handleInputChange={handleInputChange}
+            handlePublish={handlePublish}
           />
         );
 

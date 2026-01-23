@@ -105,7 +105,7 @@ export default function CorporateShipmentsCard({
 
       <div className='flex gap-2'>
         <button
-          onClick={() => onShowTracking(shipment.id)}
+          onClick={() => onShowTracking(shipment)}
           className='flex-1 px-3 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs font-medium rounded-lg transition-colors'
         >
           Takip Et

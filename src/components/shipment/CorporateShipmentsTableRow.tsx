@@ -34,7 +34,7 @@ interface Shipment {
 
 interface CorporateShipmentsTableRowProps {
   shipment: Shipment;
-  acceptedShipmentId?: string;
+  acceptedShipmentId?: string | number;
   onViewDetails: (shipmentId: number) => void;
   onTrack: (shipmentId: number) => void;
   onMessage: (shipment: Shipment) => void;
@@ -104,13 +104,13 @@ export default function CorporateShipmentsTableRow({
       <td className='py-4 px-4'>
         <span
           className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-            acceptedShipmentId === shipment.trackingCode
+            (acceptedShipmentId && (String(acceptedShipmentId) === String(shipment.id) || String(acceptedShipmentId) === shipment.trackingCode?.replace('YOL', '')))
               ? 'bg-emerald-100 text-emerald-800 animate-pulse'
               : getStatusStyle(shipment.status)
           }`}
         >
           {getStatusIcon(shipment.status)}
-          {acceptedShipmentId === shipment.trackingCode
+          {(acceptedShipmentId && (String(acceptedShipmentId) === String(shipment.id) || String(acceptedShipmentId) === shipment.trackingCode?.replace('YOL', '')))
             ? 'Kabul Edildi'
             : shipment.statusText}
         </span>

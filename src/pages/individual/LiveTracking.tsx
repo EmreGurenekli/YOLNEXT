@@ -224,21 +224,22 @@ const IndividualLiveTracking: React.FC = () => {
     // Socket.io removed - using REST API polling instead
     (async () => {
       try {
-        // Load initial tracking history        const history = await fetchTrackingHistory(shipmentId);
-        if (mounted && history.length > 0) {
+        // Load initial tracking history
+        const trackingHistory = await fetchTrackingHistory(shipmentId);
+        if (mounted && trackingHistory.length > 0) {
           setSelectedShipment(prev => {
             if (!prev) return prev;
             return {
               ...prev,
-              timeline: [...history, ...(Array.isArray(prev.timeline) ? prev.timeline : [])].reduce(
+              timeline: [...trackingHistory, ...(Array.isArray(prev.timeline) ? prev.timeline : [])].reduce(
                 (acc: TrackingEvent[], e: TrackingEvent) => {
                   if (!acc.find(x => x.id === e.id)) acc.push(e);
                   return acc;
                 },
                 []
               ),
-              currentLocation: history[0]?.location || prev.currentLocation,
-              lastUpdate: history[0]?.timestamp || prev.lastUpdate,
+              currentLocation: trackingHistory[0]?.location || prev.currentLocation,
+              lastUpdate: trackingHistory[0]?.timestamp || prev.lastUpdate,
             };
           });
         }
@@ -251,9 +252,9 @@ const IndividualLiveTracking: React.FC = () => {
     const pollInterval = setInterval(async () => {
       if (!mounted || !shipmentId) return;
       try {
-        const history = await fetchTrackingHistory(shipmentId);
-        if (mounted && history.length > 0) {
-          onUpdate(history[0]);
+        const trackingHistory = await fetchTrackingHistory(shipmentId);
+        if (mounted && trackingHistory.length > 0) {
+          onUpdate(trackingHistory[0]);
         }
       } catch (_) {
         // ignore
