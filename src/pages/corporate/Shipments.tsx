@@ -899,7 +899,10 @@ export default function CorporateShipments() {
                       key={shipment.id}
                       shipment={shipment}
                       acceptedShipmentId={acceptedShipmentId ? String(acceptedShipmentId) : undefined}
-                      onViewDetails={handleViewDetails}
+                      onViewDetails={(shipmentId: number) => {
+                        const shipment = shipments.find(s => s.id === shipmentId);
+                        if (shipment) handleViewDetails(shipment);
+                      }}
                       onTrack={handleTrackShipment}
                       onMessage={handleMessage}
                       onConfirmDelivery={handleConfirmDelivery}
