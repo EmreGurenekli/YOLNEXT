@@ -904,8 +904,8 @@ export default function CorporateShipments() {
                         if (shipment) handleViewDetails(shipment);
                       }}
                       onTrack={handleTrackShipment}
-                      onMessage={(shipment: Shipment) => handleMessage(shipment)}
-                      onConfirmDelivery={(shipment: Shipment) => handleConfirmDelivery(shipment)}
+                      onMessage={(shipment: any) => handleMessage(shipment as Shipment)}
+                      onConfirmDelivery={(shipment: any) => handleConfirmDelivery(shipment as Shipment)}
                       onRateCarrier={(shipment) => {
                         setSelectedCarrier({
                           id: shipment.carrierId?.toString() || '',
