@@ -53,10 +53,5 @@
     "**/*.spec.ts",
     "**/*.spec.tsx",
     "**/*.cjs"
-  ],
-  "references": [
-    {
-      "path": "./tsconfig.node.json"
-    }
   ]
 }
