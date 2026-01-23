@@ -108,13 +108,22 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
 
   // Initialize push notifications
   useEffect(() => {
-    const token = localStorage.getItem('authToken');
-    if (token) {
-      notificationService.initialize();
+    if (typeof window === 'undefined' || !window.localStorage) return;
+    try {
+      const token = localStorage.getItem('authToken');
+      if (token) {
+        notificationService.initialize();
+      }
+    } catch (error) {
+      console.warn('Failed to initialize notifications:', error);
     }
 
     return () => {
-      notificationService.disconnect();
+      try {
+        notificationService.disconnect();
+      } catch (error) {
+        console.warn('Failed to disconnect notifications:', error);
+      }
     };
   }, []);
 

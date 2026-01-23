@@ -17,16 +17,26 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
   const [actualTheme, setActualTheme] = useState<'light' | 'dark'>('light');
 
   useEffect(() => {
-    // Load theme from localStorage
-    const savedTheme = localStorage.getItem('theme') as Theme;
-    if (savedTheme && ['light', 'dark', 'system'].includes(savedTheme)) {
-      setTheme(savedTheme);
+    // Load theme from localStorage (only in browser)
+    if (typeof window === 'undefined' || !window.localStorage) return;
+    try {
+      const savedTheme = localStorage.getItem('theme') as Theme;
+      if (savedTheme && ['light', 'dark', 'system'].includes(savedTheme)) {
+        setTheme(savedTheme);
+      }
+    } catch (error) {
+      console.warn('Failed to load theme from localStorage:', error);
     }
   }, []);
 
   useEffect(() => {
-    // Save theme to localStorage
-    localStorage.setItem('theme', theme);
+    // Save theme to localStorage (only in browser)
+    if (typeof window === 'undefined' || !window.localStorage) return;
+    try {
+      localStorage.setItem('theme', theme);
+    } catch (error) {
+      console.warn('Failed to save theme to localStorage:', error);
+    }
   }, [theme]);
 
   useEffect(() => {
