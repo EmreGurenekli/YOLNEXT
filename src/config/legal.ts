@@ -22,13 +22,21 @@ function env(key: string): string | undefined {
 function requireEnv(key: string, placeholderValues: string[] = [], fallback?: string): string {
   const value = env(key);
   if (!value) {
-    if (fallback && import.meta.env.DEV) {
-      console.warn(`[DEV] Using fallback for missing env: ${key}`);
+    if (fallback) {
+      if (import.meta.env.DEV) {
+        console.warn(`[DEV] Using fallback for missing env: ${key}`);
+      }
       return fallback;
     }
     throw new Error(`Missing required env: ${key}`);
   }
   if (placeholderValues.includes(value)) {
+    if (fallback) {
+      if (import.meta.env.DEV) {
+        console.warn(`[DEV] Invalid placeholder value for env: ${key}, using fallback`);
+      }
+      return fallback;
+    }
     throw new Error(`Invalid placeholder value for env: ${key}`);
   }
   return value;
