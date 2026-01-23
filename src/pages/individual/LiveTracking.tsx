@@ -1179,7 +1179,6 @@ const IndividualLiveTracking: React.FC = () => {
 };
 
 export default IndividualLiveTracking;
-<<<<<<< HEAD
 
                             className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"
                           >
@@ -1286,5 +1285,3 @@ export default IndividualLiveTracking;
 };
 
 export default IndividualLiveTracking;
-=======
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11

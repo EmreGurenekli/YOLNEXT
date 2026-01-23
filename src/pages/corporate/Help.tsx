@@ -802,7 +802,3 @@ const CorporateHelp = () => {
 
 export default CorporateHelp;
 
-<<<<<<< HEAD
-=======
-
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11

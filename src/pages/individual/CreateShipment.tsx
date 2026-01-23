@@ -1707,7 +1707,6 @@ export default function CreateShipment() {
     </div>
   );
 }
-<<<<<<< HEAD
 
                 <button
                   onClick={() => setShowLimitModal(false)}
@@ -1738,5 +1737,3 @@ export default function CreateShipment() {
     </div>
   );
 }
-=======
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11

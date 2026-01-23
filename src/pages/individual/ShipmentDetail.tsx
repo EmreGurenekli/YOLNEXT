@@ -1,7 +1,4 @@
 import React, { useState, useEffect, useCallback } from 'react';
-=======
-import { toast } from 'react-hot-toast';
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
 import {
   Package,
   MapPin,
@@ -414,7 +411,6 @@ const IndividualShipmentDetail: React.FC = () => {
 
       if (response.ok) {
         await loadShipmentDetail();
-<<<<<<< HEAD
         showProfessionalToast(showToast, 'OFFER_ACCEPTED', 'success');        // Navigate to shipments page
         navigate('/individual/my-shipments');
       } else {
