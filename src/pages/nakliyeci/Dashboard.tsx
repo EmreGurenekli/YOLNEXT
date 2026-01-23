@@ -500,8 +500,6 @@ const Dashboard = () => {
           )}
         </div>
       </div>
-      </div>
-
       {/* Notification Modal */}
       <NotificationModal
         isOpen={showNotificationModal}
