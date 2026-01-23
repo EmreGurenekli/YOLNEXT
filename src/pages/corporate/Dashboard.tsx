@@ -337,15 +337,17 @@ const Dashboard = () => {
             }
             // Count unique carriers from ALL shipments, not just recent ones
             const names = new Set<string>();
-            for (const sh of formattedShipments) {
-              const name = String(sh.carrierName || '').trim();
-              if (name && name !== 'Atanmamış') names.add(name);
-            }
-            // Also count carriers from offers
-            if (recentOffers && recentOffers.length > 0) {
-              for (const offer of recentOffers) {
-                const name = String(offer.carrierName || offer.carrier || '').trim();
+            if (names && typeof names.add === 'function') {
+              for (const sh of formattedShipments) {
+                const name = String(sh.carrierName || '').trim();
                 if (name && name !== 'Atanmamış') names.add(name);
+              }
+              // Also count carriers from offers
+              if (recentOffers && recentOffers.length > 0) {
+                for (const offer of recentOffers) {
+                  const name = String(offer.carrierName || offer.carrier || '').trim();
+                  if (name && name !== 'Atanmamış') names.add(name);
+                }
               }
             }
             return { ...prev, activeCarriers: names.size };

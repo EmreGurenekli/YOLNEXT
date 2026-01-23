@@ -85,14 +85,31 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
 
   useEffect(() => {
     // Apply theme to document (only in browser)
-    if (typeof document === 'undefined' || !document.documentElement) return;
+    if (typeof document === 'undefined') return;
     try {
       const root = document.documentElement;
-      if (!root || !root.classList) return;
+      if (!root) return;
+      
+      // Check if classList exists and is a DOMTokenList
+      if (!root.classList || typeof root.classList.add !== 'function') {
+        // Fallback: use className directly
+        root.className = root.className.replace(/\b(light|dark)\b/g, '').trim() + ' ' + actualTheme;
+        return;
+      }
+      
       root.classList.remove('light', 'dark');
       root.classList.add(actualTheme);
     } catch (error) {
       console.warn('Failed to apply theme to document:', error);
+      // Fallback: try className directly
+      try {
+        const root = document.documentElement;
+        if (root) {
+          root.className = root.className.replace(/\b(light|dark)\b/g, '').trim() + ' ' + actualTheme;
+        }
+      } catch (fallbackError) {
+        console.warn('Fallback theme application also failed:', fallbackError);
+      }
     }
   }, [actualTheme]);
 
