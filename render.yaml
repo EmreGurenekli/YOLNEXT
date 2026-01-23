@@ -3,7 +3,7 @@
 
 services:
   # PostgreSQL Database
-  - type: pspg
+  - type: postgres
     name: yolnext-database
     databaseName: yolnext
     user: yolnext_user
