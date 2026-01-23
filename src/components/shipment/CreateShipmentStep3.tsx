@@ -30,8 +30,8 @@ export default function CreateShipmentStep3({
   return (
     <div className="space-y-6">
       <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold text-slate-900 mb-2">Gönderi Özeti</h2>
-        <p className="text-slate-600">Bilgilerinizi kontrol edin ve gönderiyi yayınlayın</p>
+        <h2 className="text-2xl font-bold text-slate-900 mb-2">Gönderi Özeti ve Onay</h2>
+        <p className="text-slate-600">Lütfen tüm bilgilerinizi kontrol ediniz. Bilgilerin doğruluğu, hızlı ve güvenli taşımacılık için çok önemlidir.</p>
       </div>
       
       <div className="bg-slate-50 rounded-xl p-6 space-y-6">
@@ -222,30 +222,35 @@ export default function CreateShipmentStep3({
       )}
 
       {/* Önemli Bilgilendirme - Sorumluluk Reddi */}
-      <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-6 space-y-3">
+      <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-6 space-y-4 shadow-sm">
         <div className="flex items-start gap-3">
-          <AlertTriangle className="w-6 h-6 text-amber-600 flex-shrink-0 mt-0.5" />
+          <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center flex-shrink-0">
+            <AlertTriangle className="w-5 h-5 text-white" />
+          </div>
           <div className="flex-1">
-            <h3 className="text-lg font-semibold text-amber-900 mb-3">Önemli Bilgilendirme - Sorumluluk Reddi</h3>
-            <div className="space-y-3 text-sm text-amber-800">
-              <p className="font-semibold">
-                YolNext bir pazaryeri platformudur. Hiçbir sorumluluk almaz.
+            <h3 className="text-lg font-bold text-slate-900 mb-3">Önemli Bilgilendirme ve Sorumluluk Reddi</h3>
+            <div className="space-y-3 text-sm text-slate-700 leading-relaxed">
+              <p className="font-semibold text-slate-900">
+                YolNext, göndericiler ve nakliyeciler arasında güvenli bağlantı kuran dijital bir pazaryeri platformudur.
               </p>
               <p>
-                YolNext, göndericiler ve nakliyeciler arasında bağlantı kuran bir aracı platformdur. 
-                Taşımacılık hizmetlerini bizzat sağlamaz ve sigorta hizmeti vermez.
+                Platformumuz, taşımacılık hizmetlerini doğrudan sağlamaz. YolNext, sadece göndericiler ve 
+                sertifikalı nakliyeciler arasında aracılık yapan bir dijital platformdur. Taşımacılık hizmeti, 
+                seçtiğiniz nakliyeci tarafından sağlanmaktadır.
               </p>
-              <p className="font-medium">
-                Tüm riskler gönderici ve nakliyeci arasındadır. Kaza, yangın, çalınma gibi durumlarda 
-                taraflar arasında çözülmelidir. Platform sadece tarafları buluşturan bir aracıdır.
-              </p>
-              <p>
-                <strong>Sigorta:</strong> İhtiyaç duyuyorsanız, kendi sigortanızı yaptırmak TAMAMEN sizin sorumluluğunuzdadır. 
-                YolNext hiçbir sigorta hizmeti vermez.
+              <p className="font-medium text-slate-900">
+                Sorumluluk ve Riskler: Taşımacılık sürecindeki tüm riskler (kaza, yangın, çalınma, hasar vb.) 
+                gönderici ve nakliyeci arasındadır. Bu tür durumlarda çözüm, taraflar arasında yapılacak 
+                anlaşma ile sağlanmalıdır.
               </p>
               <p>
-                <Link to="/terms" target="_blank" className="text-amber-900 underline font-medium hover:text-amber-700">
-                  Detaylı bilgi için Kullanım Koşulları&apos;nı inceleyebilirsiniz
+                <strong className="text-slate-900">Sigorta:</strong> İhtiyaç duyduğunuz sigorta hizmetlerini, 
+                kendi sorumluluğunuzda ve nakliyeci ile yapacağınız anlaşma çerçevesinde temin etmeniz gerekmektedir. 
+                YolNext, sigorta hizmeti sağlamamaktadır.
+              </p>
+              <p className="pt-2 border-t border-blue-200">
+                <Link to="/terms" target="_blank" className="text-blue-700 underline font-semibold hover:text-blue-900 transition-colors">
+                  Detaylı bilgi için Kullanım Koşulları ve Gizlilik Politikası&apos;nı inceleyebilirsiniz →
                 </Link>
               </p>
             </div>
@@ -253,10 +258,14 @@ export default function CreateShipmentStep3({
         </div>
       </div>
 
-      <div className="bg-white rounded-xl p-6 border border-slate-200">
-        <h3 className="text-lg font-semibold text-slate-900 mb-4">Yayınlama Tercihi</h3>
+      <div className="bg-white rounded-xl p-6 border-2 border-slate-200 shadow-sm">
+        <h3 className="text-lg font-semibold text-slate-900 mb-2">Yayınlama Tercihi</h3>
+        <p className="text-sm text-slate-600 mb-4">
+          Gönderinizin hangi nakliyeciler tarafından görülebileceğini seçiniz. Tüm nakliyecilere açık yayınlama, 
+          daha fazla teklif almanızı ve en uygun fiyatı bulmanızı sağlar.
+        </p>
         <div className="space-y-4">
-          <div className="flex items-center">
+          <div className="flex items-start p-4 border-2 border-blue-200 rounded-xl bg-blue-50">
             <input
               type="radio"
               id="all"
@@ -264,27 +273,46 @@ export default function CreateShipmentStep3({
               value="all"
               checked={formData.publishType === 'all'}
               onChange={(e) => handleInputChange('publishType', e.target.value)}
-              className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+              className="w-5 h-5 text-blue-600 border-gray-300 focus:ring-blue-500 mt-0.5"
             />
-            <label htmlFor="all" className="ml-3 text-sm font-medium text-slate-700">
-              Tüm nakliyecilere açık (Önerilen)
+            <label htmlFor="all" className="ml-3 flex-1">
+              <span className="block text-sm font-semibold text-slate-900">Tüm Nakliyecilere Açık</span>
+              <span className="block text-xs text-slate-600 mt-1">
+                Platformdaki tüm sertifikalı nakliyeciler gönderinizi görebilir ve teklif sunabilir. 
+                Bu seçenek, en rekabetçi fiyatları almanızı sağlar. (Önerilen)
+              </span>
             </label>
           </div>
         </div>
       </div>
 
       {/* Yayınla Butonu */}
-      <div className="flex justify-end gap-4">
+      <div className="flex flex-col items-end gap-3">
+        <div className="text-right">
+          <p className="text-xs text-slate-500 mb-2">
+            Gönderinizi yayınladığınızda, platformdaki nakliyeciler gönderinizi görebilecek ve size teklif sunabilecektir.
+          </p>
+        </div>
         <button
           onClick={handlePublish}
           disabled={isLoading}
-          className={`px-8 py-3 rounded-xl font-semibold text-white transition-all duration-200 shadow-lg hover:shadow-xl ${
+          className={`px-8 py-4 rounded-xl font-semibold text-white transition-all duration-300 shadow-lg hover:shadow-xl ${
             isLoading
               ? 'bg-gray-400 cursor-not-allowed'
-              : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800'
+              : 'bg-gradient-to-r from-slate-800 via-blue-900 to-indigo-900 hover:from-slate-700 hover:via-blue-800 hover:to-indigo-800'
           }`}
         >
-          {isLoading ? 'Yayınlanıyor...' : 'Gönderiyi Yayınla'}
+          {isLoading ? (
+            <span className="flex items-center gap-2">
+              <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Gönderi yayınlanıyor...
+            </span>
+          ) : (
+            'Gönderiyi Yayınla ve Teklifleri Bekle'
+          )}
         </button>
       </div>
     </div>

@@ -70,8 +70,20 @@ function createDatabasePool(connectionString, nodeEnv = 'development') {
   });
   
   pool.on('error', (err) => {
-    console.error('❌ PostgreSQL pool error:', err);
+    console.error('❌ PostgreSQL pool error:', err.message);
+    // In development, don't crash on connection errors
+    if (nodeEnv === 'production') {
+      console.error('CRITICAL: Database connection failed in production');
+    }
   });
+  
+  // Test connection in development
+  if (nodeEnv === 'development') {
+    pool.query('SELECT 1').catch((err) => {
+      console.warn('⚠️  Database connection test failed (backend will continue but may not function correctly):', err.message);
+      console.warn('   Make sure PostgreSQL is running and DATABASE_URL is correct');
+    });
+  }
   
   return pool;
 }

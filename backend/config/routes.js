@@ -64,6 +64,7 @@ function setupRoutes(app, pool, middleware, services, guards) {
   const createSupportRoutes = require('../routes/v1/support');
   const createAdminSupportRoutes = require('../routes/v1/admin-support');
   const createAuditTrailRoutes = require('../routes/v1/audit-trail');
+  const createAnalyticsRoutes = require('../routes/v1/analytics');
 
   // Create route instances
   const jwtSecret = process.env.JWT_SECRET || '';
@@ -96,6 +97,7 @@ function setupRoutes(app, pool, middleware, services, guards) {
   const supportRoutes = createSupportRoutes(pool, authenticateToken);
   const adminSupportRoutes = createAdminSupportRoutes(pool, authenticateToken, requireAdmin);
   const auditTrailRoutes = createAuditTrailRoutes(pool, authenticateToken, requireAdmin);
+  const analyticsRoutes = createAnalyticsRoutes(pool, authenticateToken);
 
   // Register routes with rate limiting
   app.use('/api/auth', authLimiter, authRoutes);
@@ -127,6 +129,7 @@ function setupRoutes(app, pool, middleware, services, guards) {
   app.use('/api/support', generalLimiter, supportRoutes);
   app.use('/api/admin-support', generalLimiter, adminSupportRoutes);
   app.use('/api/audit-trail', generalLimiter, auditTrailRoutes);
+  app.use('/api/analytics', generalLimiter, analyticsRoutes);
 
   errorLogger.info('All routes registered successfully');
 }

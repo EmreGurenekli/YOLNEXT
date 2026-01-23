@@ -11,13 +11,18 @@ const logger = {
 };
 
 class MigrationRunner {
-  constructor() {
-    this.pool = new Pool({
-      connectionString:
-        process.env.DATABASE_URL ||
-        process.env.DB_URL ||
-        'postgresql://postgres:2563@localhost:5432/yolnext',
-    });
+  constructor(pool = null) {
+    // Use provided pool if available, otherwise create new one
+    if (pool) {
+      this.pool = pool;
+    } else {
+      this.pool = new Pool({
+        connectionString:
+          process.env.DATABASE_URL ||
+          process.env.DB_URL ||
+          'postgresql://postgres:2563@localhost:5432/yolnext',
+      });
+    }
     this.migrationsPath = __dirname;
   }
 
@@ -142,9 +147,9 @@ class MigrationRunner {
       // Execute migration
       await client.query(sql);
       
-      // Record migration
+      // Record migration (ignore if already exists)
       await client.query(
-        'INSERT INTO migrations (version, filename) VALUES ($1, $2)',
+        'INSERT INTO migrations (version, filename) VALUES ($1, $2) ON CONFLICT (version) DO NOTHING',
         [migration.version, migration.filename]
       );
       

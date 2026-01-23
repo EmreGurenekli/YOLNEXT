@@ -21,8 +21,8 @@ export default function CreateShipmentStep2({
   return (
     <div className="space-y-6">
       <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold text-slate-900 mb-2">Adres & İletişim Bilgileri</h2>
-        <p className="text-slate-600">Toplama ve teslimat bilgilerini girin</p>
+        <h2 className="text-2xl font-bold text-slate-900 mb-2">Adres ve Tarih Bilgileri</h2>
+        <p className="text-slate-600">Lütfen toplama ve teslimat adreslerinizi eksiksiz olarak giriniz. Doğru adres bilgileri, hızlı ve güvenli taşımacılık için kritik öneme sahiptir.</p>
       </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -33,7 +33,7 @@ export default function CreateShipmentStep2({
             </div>
             <div>
               <h3 className="text-lg font-semibold text-slate-900">Toplama Adresi</h3>
-              <p className="text-sm text-slate-600">Gönderiyi nereden alacağız?</p>
+              <p className="text-sm text-slate-600">Yükünüzün alınacağı tam adres bilgilerini giriniz</p>
             </div>
           </div>
           
@@ -135,7 +135,7 @@ export default function CreateShipmentStep2({
                 className={`w-full p-4 border-2 rounded-xl focus:ring-2 transition-all duration-200 bg-white shadow-sm hover:shadow-md text-slate-700 resize-none ${
                   errors.pickupAddress ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-slate-200 focus:ring-blue-500 focus:border-blue-500'
                 }`}
-                placeholder="Mahalle, sokak, bina no, daire no vb. detaylı adres bilgilerini girin..."
+                placeholder="Mahalle, sokak, bina numarası, daire numarası ve varsa kat bilgisi gibi tüm detayları eksiksiz olarak giriniz..."
               />
               {errors.pickupAddress && (
                 <p id="pickupAddress-error" className="mt-2 text-sm text-red-600" role="alert">{errors.pickupAddress}</p>
@@ -180,7 +180,7 @@ export default function CreateShipmentStep2({
             </div>
             <div>
               <h3 className="text-lg font-semibold text-slate-900">Teslimat Adresi</h3>
-              <p className="text-sm text-slate-600">Gönderiyi nereye teslim edeceğiz?</p>
+              <p className="text-sm text-slate-600">Yükünüzün teslim edileceği tam adres bilgilerini giriniz</p>
             </div>
           </div>
           
@@ -278,7 +278,7 @@ export default function CreateShipmentStep2({
                 className={`w-full p-4 border-2 rounded-xl focus:ring-2 transition-all duration-200 bg-white shadow-sm hover:shadow-md text-slate-700 resize-none ${
                   errors.deliveryAddress ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-slate-200 focus:ring-emerald-500 focus:border-emerald-500'
                 }`}
-                placeholder="Mahalle, sokak, bina no, daire no vb. detaylı adres bilgilerini girin..."
+                placeholder="Mahalle, sokak, bina numarası, daire numarası ve varsa kat bilgisi gibi tüm detayları eksiksiz olarak giriniz..."
               />
               {errors.deliveryAddress && (
                 <p className="mt-2 text-sm text-red-600">{errors.deliveryAddress}</p>

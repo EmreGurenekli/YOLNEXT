@@ -34,10 +34,17 @@ export default function CreateShipmentStep1({
   return (
     <div className="space-y-6">
       <div>
-        <label className="block text-lg font-semibold text-slate-900 mb-4">
-          <Package className="w-5 h-5 inline mr-2" />
-          Ne taşıyacaksınız? (Kategori seçin - nakliyeciler size özel teklif verecek) *
+        <label className="block text-lg font-semibold text-slate-900 mb-2">
+          <Package className="w-5 h-5 inline mr-2 text-blue-600" />
+          Yük Kategorisi *
         </label>
+        <div className="bg-blue-50 border-l-4 border-blue-600 rounded-r-lg p-4 mb-4">
+          <p className="text-sm text-slate-700 leading-relaxed">
+            <strong className="text-slate-900">Önemli:</strong> Lütfen taşınacak yükünüzün kategorisini doğru seçiniz. 
+            Doğru kategori seçimi, nakliyecilerin size en uygun ve rekabetçi fiyat tekliflerini sunabilmesi için kritik öneme sahiptir. 
+            Yanlış kategori seçimi, yanlış fiyat teklifleri almanıza neden olabilir.
+          </p>
+        </div>
         <select
           value={formData.mainCategory ?? ''}
           onChangeCapture={(e) => {
@@ -60,7 +67,7 @@ export default function CreateShipmentStep1({
             errors.mainCategory ? 'border-red-500 focus:border-red-500' : 'border-slate-200 focus:border-blue-500'
           }`}
         >
-          <option value="">Seçin - doğru kategori = doğru fiyat</option>
+          <option value="">Kategori seçiniz</option>
           {mainCategories.map((category) => (
             <option key={category.id} value={category.id}>
               {category.name}
@@ -77,10 +84,13 @@ export default function CreateShipmentStep1({
           <div className="bg-gray-50 rounded-xl p-6 space-y-4">
             {/* Yük Açıklaması - Her kategori için zorunlu */}
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-3">
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
                 <FileText className="w-4 h-4 inline mr-2" />
                 Yük Açıklaması *
               </label>
+              <p className="text-xs text-slate-500 mb-3">
+                Taşınacak eşyalarınız hakkında detaylı bilgi veriniz. Bu bilgiler, nakliyecilerin size en doğru fiyat teklifini sunabilmesi için gereklidir.
+              </p>
               <textarea
                 value={formData.productDescription ?? ''}
                 onChange={(e) => {
@@ -96,7 +106,7 @@ export default function CreateShipmentStep1({
                 className={`w-full p-4 border-2 rounded-xl focus:ring-2 transition-all duration-200 bg-white shadow-sm hover:shadow-md text-slate-700 resize-none ${
                   errors.productDescription ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-gray-200 focus:ring-blue-500 focus:border-blue-500'
                 }`}
-                placeholder="Taşınacak eşyalar hakkında detaylı bilgi verin (örn: 3+1 ev eşyası, büyük eşyalar: koltuk, yatak, buzdolabı)"
+                placeholder="Örnek: 3+1 daire eşyası, büyük eşyalar (koltuk takımı, yatak odası takımı, buzdolabı, çamaşır makinesi), küçük eşyalar (kutu, çanta vb.)"
               />
               {errors.productDescription && (
                 <p className="mt-2 text-sm text-red-600">{errors.productDescription}</p>

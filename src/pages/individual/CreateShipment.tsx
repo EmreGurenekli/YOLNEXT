@@ -17,7 +17,8 @@ import {
   Clock,
   Plus,
   FileText,
-  X
+  X,
+  ShoppingCart
 } from 'lucide-react';
 import Breadcrumb from '../../components/common/Breadcrumb';
 import SuccessMessage from '../../components/common/SuccessMessage';
@@ -96,9 +97,9 @@ export default function CreateShipment() {
   });
 
   const steps = [
-    { id: 1, title: 'Yük Bilgileri', icon: <Package size={20} /> },
-    { id: 2, title: 'Adres Bilgileri', icon: <MapPin size={20} /> },
-    { id: 3, title: 'Yayınla & Önizleme', icon: <Send size={20} /> }
+    { id: 1, title: 'Form Doldurma', subtitle: 'Yük Bilgileri', icon: <Package size={20} /> },
+    { id: 2, title: 'Adres ve Tarih', subtitle: 'Adres Bilgileri', icon: <MapPin size={20} /> },
+    { id: 3, title: 'Ön İzleme ve Yayınlama', subtitle: 'Yayınla & Önizleme', icon: <Send size={20} /> }
   ];
 
   const mainCategories = [
@@ -147,16 +148,16 @@ export default function CreateShipment() {
 
     // Only check truly essential fields to reduce friction
     if (!formData.mainCategory) {
-      newErrors.mainCategory = 'Yük kategorisi seç';
+      newErrors.mainCategory = 'Lütfen yük kategorisini seçiniz';
     }
     if (!formData.productDescription?.trim()) {
-      newErrors.productDescription = 'Yükünü kısaca açıkla (nakliyeciler anlayacak)';
+      newErrors.productDescription = 'Lütfen yük açıklamasını giriniz';
     }
     if (!formData.pickupCity) {
-      newErrors.pickupCity = 'Nereden alınacak? (il seç)';
+      newErrors.pickupCity = 'Lütfen toplama ilini seçiniz';
     }
     if (!formData.deliveryCity) {
-      newErrors.deliveryCity = 'Nereye gidecek? (il seç)';
+      newErrors.deliveryCity = 'Lütfen teslimat ilini seçiniz';
     }
 
     setErrors(newErrors);
@@ -169,57 +170,57 @@ export default function CreateShipment() {
     if (step === 1) {
       // Step 1: Yük Bilgileri validasyonu
       if (!formData.mainCategory) {
-        newErrors.mainCategory = 'Nakliyecilerin size doğru teklif verebilmesi için kategori seçimi çok önemli';
+        newErrors.mainCategory = 'Yük kategorisi seçimi zorunludur. Doğru kategori seçimi, size en uygun fiyat tekliflerinin alınması için kritik öneme sahiptir.';
       }
       if (!formData.productDescription || formData.productDescription.trim() === '') {
-        newErrors.productDescription = 'Nakliyeciler ne taşıyacak? Kısaca açıkla';
+        newErrors.productDescription = 'Yük açıklaması zorunludur. Lütfen taşınacak eşyalar hakkında detaylı bilgi veriniz.';
       }
 
       // Kategoriye göre özel validasyonlar
       if (formData.mainCategory === 'house_move') {
         if (!formData.roomCount) {
-          newErrors.roomCount = 'Kaç odalı eviniz var? Bu bilgi fiyat için çok önemli';
+          newErrors.roomCount = 'Oda sayısı bilgisi zorunludur. Bu bilgi, fiyat tekliflerinin doğruluğu için gereklidir.';
         }
         if (!formData.buildingType) {
-          newErrors.buildingType = 'Bina tipini belirtirseniz daha doğru fiyat alırsınız';
+          newErrors.buildingType = 'Bina tipi bilgisi zorunludur. Bu bilgi, daha doğru fiyat teklifleri almanızı sağlar.';
         }
         if (!formData.pickupFloor || formData.pickupFloor.trim() === '') {
-          newErrors.pickupFloor = 'Hangi kattan alınacak? (Asansör varsa daha ucuz olabilir)';
+          newErrors.pickupFloor = 'Toplama adresi kat bilgisi zorunludur. Asansör durumu fiyatı etkileyebilir.';
         }
         if (!formData.deliveryFloor || formData.deliveryFloor.trim() === '') {
-          newErrors.deliveryFloor = 'Hangi kata teslim edilecek? (Kat bilgisi fiyatı etkiler)';
+          newErrors.deliveryFloor = 'Teslimat adresi kat bilgisi zorunludur. Kat bilgisi, fiyat hesaplamasında önemlidir.';
         }
       } else if (formData.mainCategory === 'furniture_goods') {
         if (!formData.furniturePieces) {
-          newErrors.furniturePieces = 'Kaç parça mobilya var? Bu fiyat için önemli';
+          newErrors.furniturePieces = 'Mobilya parça sayısı bilgisi zorunludur. Bu bilgi, fiyat tekliflerinin doğruluğu için gereklidir.';
         }
       } else if (formData.mainCategory === 'special_cargo') {
         if (!formData.weight || formData.weight.trim() === '') {
-          newErrors.weight = 'Yaklaşık ağırlık çok önemli - nakliyeciler buna göre teklif verecek';
+          newErrors.weight = 'Ağırlık bilgisi zorunludur. Nakliyeciler, ağırlık bilgisine göre size en uygun teklifi sunacaktır.';
         }
       }
     } else if (step === 2) {
       // Step 2: Adres Bilgileri validasyonu
       if (!formData.pickupCity) {
-        newErrors.pickupCity = 'Nereden alınacak? (il seç)';
+        newErrors.pickupCity = 'Toplama ili seçimi zorunludur. Lütfen yükünüzün alınacağı ili seçiniz.';
       }
       if (!formData.pickupDistrict) {
-        newErrors.pickupDistrict = 'İlçe seç (mesafe hesabı için gerekli)';
+        newErrors.pickupDistrict = 'Toplama ilçesi seçimi zorunludur. Mesafe hesaplaması için ilçe bilgisi gereklidir.';
       }
       if (!formData.pickupAddress || formData.pickupAddress.trim() === '') {
-        newErrors.pickupAddress = 'Tam adres önemli - nakliyeci nereye gelecek?';
+        newErrors.pickupAddress = 'Toplama adresi zorunludur. Lütfen tam adres bilgilerini giriniz.';
       }
       if (!formData.deliveryCity) {
-        newErrors.deliveryCity = 'Nereye gidecek? (il seç)';
+        newErrors.deliveryCity = 'Teslimat ili seçimi zorunludur. Lütfen yükünüzün teslim edileceği ili seçiniz.';
       }
       if (!formData.deliveryDistrict) {
-        newErrors.deliveryDistrict = 'İlçe seç (mesafe hesabı için gerekli)';
+        newErrors.deliveryDistrict = 'Teslimat ilçesi seçimi zorunludur. Mesafe hesaplaması için ilçe bilgisi gereklidir.';
       }
       if (!formData.deliveryAddress || formData.deliveryAddress.trim() === '') {
-        newErrors.deliveryAddress = 'Tam teslimat adresi - nakliyeci nereye gidecek?';
+        newErrors.deliveryAddress = 'Teslimat adresi zorunludur. Lütfen tam adres bilgilerini giriniz.';
       }
       if (!formData.pickupDate) {
-        newErrors.pickupDate = 'Ne zaman alınmasını istiyorsunuz?';
+        newErrors.pickupDate = 'Toplama tarihi seçimi zorunludur. Lütfen yükünüzün alınmasını istediğiniz tarihi seçiniz.';
       } else {
         const pickupDate = parseISODateStrict(formData.pickupDate);
         const today = new Date();
@@ -384,7 +385,7 @@ export default function CreateShipment() {
         const trackingNumber = normalizeTrackingCode(rawTracking, shipment?.id);
         const trackingText = trackingNumber ? `Takip kodunuz: ${trackingNumber}` : '';
         // Professional but warm success feedback
-        setSuccessMessage(`Gönderiniz başarıyla yayınlandı. ${trackingText ? trackingText + '. ' : ''}Nakliyecilerden teklifler gelmeye başlayacak. Ortalama bekleme süresi 5-15 dakikadır. 24 saat içinde teklif gelmezse otomatik bildirim alırsınız. Teklifler sayfasına yönlendiriliyorsunuz...`);
+        setSuccessMessage(`Gönderiniz başarıyla yayınlandı. ${trackingText ? trackingText + '. ' : ''}Platformdaki sertifikalı nakliyeciler gönderinizi inceleyecek ve size teklif sunmaya başlayacaktır. Ortalama bekleme süresi 5-15 dakikadır. 24 saat içinde teklif gelmezse otomatik olarak bilgilendirileceksiniz. Teklifler sayfasına yönlendiriliyorsunuz...`);
         setShowSuccessMessage(true);
         
         // Quick transition - direct to offers for immediate engagement
@@ -497,12 +498,137 @@ export default function CreateShipment() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
       <Helmet>
         <title>Gönderi Oluştur - YolNext</title>
       </Helmet>
-      <div className="container mx-auto px-4 py-8">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-6">
         <Breadcrumb items={[{ label: 'Ana Sayfa', href: '/individual/dashboard' }, { label: 'Gönderi Oluştur', href: '/individual/create-shipment' }]} />
+        
+        {/* Page Header */}
+        <div className="mb-8 text-center">
+          <div className="flex flex-col items-center justify-center">
+            <div className="w-16 h-16 bg-gradient-to-br from-slate-800 via-blue-900 to-indigo-900 rounded-xl flex items-center justify-center shadow-lg mb-4">
+              <Package className="w-8 h-8 text-white" />
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-slate-800 via-blue-900 to-indigo-900 bg-clip-text text-transparent">
+              Gönderi Oluştur
+            </h1>
+          </div>
+        </div>
+        
+        {/* Step Indicator */}
+        <div className="mb-8">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-6">
+            {/* Desktop View */}
+            <div className="hidden md:flex items-center justify-between">
+              {steps.map((step, index) => (
+                <React.Fragment key={step.id}>
+                  <div className="flex flex-col items-center flex-1">
+                    <div className={`relative flex items-center justify-center w-12 h-12 rounded-full mb-3 transition-all duration-300 ${
+                      currentStep === step.id
+                        ? 'bg-gradient-to-br from-slate-800 via-blue-900 to-indigo-900 text-white shadow-lg scale-110'
+                        : currentStep > step.id
+                        ? 'bg-gradient-to-br from-slate-700 to-blue-800 text-white'
+                        : 'bg-gray-200 text-gray-500'
+                    }`}>
+                      {currentStep > step.id ? (
+                        <Check size={20} className="text-white" />
+                      ) : (
+                        step.icon
+                      )}
+                    </div>
+                    <div className="text-center">
+                      <div className={`text-sm font-semibold mb-1 ${
+                        currentStep === step.id
+                          ? 'text-slate-800'
+                          : currentStep > step.id
+                          ? 'text-gray-700'
+                          : 'text-gray-400'
+                      }`}>
+                        {step.title}
+                      </div>
+                      <div className={`text-xs ${
+                        currentStep === step.id
+                          ? 'text-blue-600'
+                          : currentStep > step.id
+                          ? 'text-gray-600'
+                          : 'text-gray-400'
+                      }`}>
+                        {step.subtitle}
+                      </div>
+                    </div>
+                  </div>
+                  {index < steps.length - 1 && (
+                    <div className={`flex-1 h-0.5 mx-4 mt-[-24px] transition-all duration-300 ${
+                      currentStep > step.id
+                        ? 'bg-gradient-to-r from-slate-800 to-blue-900'
+                        : 'bg-gray-200'
+                    }`} />
+                  )}
+                </React.Fragment>
+              ))}
+            </div>
+            
+            {/* Mobile View */}
+            <div className="md:hidden">
+              <div className="flex items-center justify-between mb-4">
+                {steps.map((step, index) => (
+                  <React.Fragment key={step.id}>
+                    <div className="flex flex-col items-center flex-1">
+                      <div className={`relative flex items-center justify-center w-10 h-10 rounded-full mb-2 transition-all duration-300 ${
+                        currentStep === step.id
+                          ? 'bg-gradient-to-br from-slate-800 via-blue-900 to-indigo-900 text-white shadow-lg scale-110'
+                          : currentStep > step.id
+                          ? 'bg-gradient-to-br from-slate-700 to-blue-800 text-white'
+                          : 'bg-gray-200 text-gray-500'
+                      }`}>
+                        {currentStep > step.id ? (
+                          <Check size={18} className="text-white" />
+                        ) : (
+                          <div className="scale-75">{step.icon}</div>
+                        )}
+                      </div>
+                      <div className="text-center">
+                        <div className={`text-xs font-semibold ${
+                          currentStep === step.id
+                            ? 'text-slate-800'
+                            : currentStep > step.id
+                            ? 'text-gray-700'
+                            : 'text-gray-400'
+                        }`}>
+                          {index + 1}. Adım
+                        </div>
+                      </div>
+                    </div>
+                    {index < steps.length - 1 && (
+                      <div className={`flex-1 h-0.5 mx-2 mt-[-20px] transition-all duration-300 ${
+                        currentStep > step.id
+                          ? 'bg-gradient-to-r from-slate-800 to-blue-900'
+                          : 'bg-gray-200'
+                      }`} />
+                    )}
+                  </React.Fragment>
+                ))}
+              </div>
+              <div className="text-center mt-2">
+                <div className={`text-sm font-semibold ${
+                  currentStep === steps[0].id
+                    ? 'text-slate-800'
+                    : currentStep === steps[1].id
+                    ? 'text-blue-700'
+                    : 'text-indigo-700'
+                }`}>
+                  {steps[currentStep - 1].title}
+                </div>
+                <div className="text-xs text-gray-600 mt-1">
+                  {steps[currentStep - 1].subtitle}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {renderStepContent()}
 
         <div className="flex justify-between mt-8">
@@ -518,8 +644,10 @@ export default function CreateShipment() {
           {currentStep < steps.length && (
             <button
               onClick={handleNext}
-              className={`flex items-center px-6 py-3 rounded-xl text-white transition-colors duration-200 ${
-                isLoading ? 'bg-blue-300 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
+              className={`flex items-center px-6 py-3 rounded-xl text-white transition-all duration-300 shadow-lg hover:shadow-xl ${
+                isLoading 
+                  ? 'bg-gray-400 cursor-not-allowed' 
+                  : 'bg-gradient-to-r from-slate-800 via-blue-900 to-indigo-900 hover:from-slate-700 hover:via-blue-800 hover:to-indigo-800'
               } ml-auto`}
               disabled={isLoading}
             >
@@ -530,8 +658,10 @@ export default function CreateShipment() {
           {currentStep === steps.length && (
             <button
               onClick={handlePublish}
-              className={`flex items-center px-6 py-3 rounded-xl text-white transition-colors duration-200 ${
-                isLoading ? 'bg-green-300 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'
+              className={`flex items-center px-6 py-3 rounded-xl text-white transition-all duration-300 shadow-lg hover:shadow-xl ${
+                isLoading 
+                  ? 'bg-gray-400 cursor-not-allowed' 
+                  : 'bg-gradient-to-r from-slate-800 via-blue-900 to-indigo-900 hover:from-slate-700 hover:via-blue-800 hover:to-indigo-800'
               } ml-auto`}
               disabled={isLoading}
             >

@@ -120,22 +120,56 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
       <Helmet>
         <title>Nakliyeci Dashboard - YolNext</title>
       </Helmet>
-      <div className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h1 className="text-3xl font-bold text-slate-900">Dashboard</h1>
-              <p className="text-slate-600 mt-1">Hoş geldiniz, {user?.firstName || user?.email}</p>
-            </div>
-            <div className="flex items-center gap-3">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-6">
+        {/* Professional Header - Hoş Geldin Kartı */}
+        <div className="relative overflow-hidden bg-gradient-to-br from-slate-800 via-blue-900 to-indigo-900 rounded-3xl p-6 text-white shadow-2xl mb-8">
+          <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent"></div>
+          <div className="absolute top-0 right-0 w-80 h-80 bg-gradient-to-br from-blue-400/10 to-indigo-400/10 rounded-full -translate-y-40 translate-x-40"></div>
+          <div className="absolute bottom-0 left-0 w-64 h-64 bg-gradient-to-tr from-slate-400/10 to-blue-400/10 rounded-full translate-y-32 -translate-x-32"></div>
+          
+          <div className="relative z-10">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="w-16 h-16 bg-gradient-to-br from-slate-800 to-blue-900 rounded-2xl flex items-center justify-center shadow-xl border border-white/20">
+                    <Truck className="w-8 h-8 text-white" />
+                  </div>
+                  <div>
+                    <h1 className="text-3xl font-bold mb-2 bg-gradient-to-r from-white to-blue-200 bg-clip-text text-transparent">
+                      Merhaba {user?.firstName || user?.fullName?.split(' ')[0] || 'Nakliyeci'}! 👋
+                    </h1>
+                    <p className="text-slate-200 text-lg leading-relaxed">
+                      Yüklerinizi kolayca yönetin ve kazancınızı artırın. 
+                      <br />
+                      <span className="text-blue-300 font-semibold">Profesyonel, güvenilir ve karlı</span> taşımacılık hizmetleriyle yanınızdayız.
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="flex flex-wrap items-center gap-4">
+                  <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-2xl px-4 py-2 border border-white/20">
+                    <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse shadow-lg"></div>
+                    <span className="text-slate-200 font-medium">Çevrimiçi</span>
+                  </div>
+                  <div className="bg-white/10 backdrop-blur-sm rounded-2xl px-4 py-2 border border-white/20">
+                    <span className="text-slate-200 font-medium">{stats.totalShipments} Aktif Yük</span>
+                  </div>
+                  {walletBalance !== null && (
+                    <div className="bg-white/10 backdrop-blur-sm rounded-2xl px-4 py-2 border border-white/20">
+                      <span className="text-slate-200 font-medium">₺{walletBalance.toFixed(0)} Bakiye</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              <div className="flex items-stretch sm:items-center gap-3 w-full sm:w-auto">
                 <button
                   onClick={() => {
                     setShowNotificationModal(true);
-                    // Bildirimleri okundu olarak işaretle
                     markNotificationsAsRead();
                   }}
                   className='relative group min-w-[44px] min-h-[44px] w-12 h-12 bg-white/10 backdrop-blur-sm rounded-2xl flex items-center justify-center hover:bg-white/20 transition-all duration-300 border border-white/20 group-hover:scale-110'
@@ -148,7 +182,7 @@ const Dashboard = () => {
                   )}
                 </button>
                 <Link to='/nakliyeci/jobs'>
-                  <button className='bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 text-white px-6 py-3 rounded-lg font-medium transition-all duration-300 flex items-center gap-2 text-base shadow-lg hover:shadow-xl'>
+                  <button className='bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 text-white px-6 py-3 rounded-lg font-medium transition-all duration-300 flex items-center gap-2 text-base shadow-lg hover:shadow-xl w-full sm:w-auto'>
                     <Plus size={20} />
                     Yük Pazarı
                   </button>
@@ -156,6 +190,7 @@ const Dashboard = () => {
               </div>
             </div>
           </div>
+        </div>
 
         {/* Komisyon İade Politikası Bilgilendirmesi */}
 

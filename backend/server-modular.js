@@ -94,7 +94,11 @@ try {
   pool = createDatabasePool(DATABASE_URL, NODE_ENV);
 } catch (error) {
   errorLogger.error('Failed to create database pool', { error: error.message });
-  process.exit(1);
+  if (NODE_ENV === 'production') {
+    process.exit(1);
+  } else {
+    errorLogger.warn('Continuing in development mode without database (backend may not function correctly)');
+  }
 }
 
 // Setup middleware
@@ -261,9 +265,9 @@ if (pool && !IS_TEST) {
       errorLogger.warn('No idle database connections available');
     }
 
-    // Log pool stats periodically
-    if (typeof poolStats.totalCount !== 'undefined') {
-      errorLogger.debug(`DB Pool: ${poolStats.totalCount} total, ${poolStats.idleCount} idle, ${poolStats.waitingCount} waiting`);
+    // Log pool stats periodically (development only)
+    if (NODE_ENV === 'development' && typeof poolStats.totalCount !== 'undefined') {
+      errorLogger.info(`DB Pool: ${poolStats.totalCount} total, ${poolStats.idleCount} idle, ${poolStats.waitingCount} waiting`);
     }
   }, 30000); // Check every 30 seconds
 
@@ -273,11 +277,15 @@ if (pool && !IS_TEST) {
   });
 
   pool.on('connect', () => {
-    errorLogger.debug('New database client connected');
+    if (NODE_ENV === 'development') {
+      errorLogger.info('New database client connected');
+    }
   });
 
   pool.on('remove', () => {
-    errorLogger.debug('Database client removed from pool');
+    if (NODE_ENV === 'development') {
+      errorLogger.info('Database client removed from pool');
+    }
   });
 }
 
@@ -289,7 +297,9 @@ if (!IS_TEST) {
     const heapUsedMB = Math.round(memUsage.heapUsed / 1024 / 1024);
     const heapTotalMB = Math.round(memUsage.heapTotal / 1024 / 1024);
 
-    errorLogger.debug(`Memory: RSS ${rssMB}MB, Heap ${heapUsedMB}MB/${heapTotalMB}MB`);
+    if (NODE_ENV === 'development') {
+      errorLogger.info(`Memory: RSS ${rssMB}MB, Heap ${heapUsedMB}MB/${heapTotalMB}MB`);
+    }
 
     // Warn if memory usage is high
     const memoryUsagePercent = (memUsage.heapUsed / memUsage.heapTotal) * 100;
@@ -298,7 +308,7 @@ if (!IS_TEST) {
 
       // Force garbage collection if available (development only)
       if (NODE_ENV === 'development' && global.gc) {
-        errorLogger.debug('Running garbage collection...');
+        errorLogger.info('Running garbage collection...');
         global.gc();
       }
     }
@@ -315,7 +325,9 @@ if (!IS_TEST) {
     const uptimeHours = Math.floor(uptime / 3600);
     const uptimeMinutes = Math.floor((uptime % 3600) / 60);
 
-    errorLogger.debug(`Process uptime: ${uptimeHours}h ${uptimeMinutes}m`);
+    if (NODE_ENV === 'development') {
+      errorLogger.info(`Process uptime: ${uptimeHours}h ${uptimeMinutes}m`);
+    }
 
     // Monitor event loop lag (potential blocking operations)
     const start = process.hrtime.bigint();
@@ -344,25 +356,45 @@ async function startServer() {
     // Run migrations
     if (!IS_TEST && NODE_ENV !== 'production') {
       try {
-        const migrationRunner = new MigrationRunner(pool, errorLogger);
+        const migrationRunner = new MigrationRunner(pool);
         await migrationRunner.runMigrations();
       } catch (e) {
-        errorLogger.warn('Could not run migrations automatically', { error: e?.message || String(e) });
+        errorLogger.warn('Could not run migrations automatically (continuing in development)', { error: e?.message || String(e) });
+        // In development, continue even if migrations fail
       }
     }
     
     // Initialize database tables
-    const tablesCreated = await createTables(pool);
-    if (!tablesCreated) {
-      errorLogger.error('Canonical DB schema not satisfied. Refusing to start backend.');
-      process.exit(1);
+    try {
+      const tablesCreated = await createTables(pool);
+      if (!tablesCreated) {
+        if (NODE_ENV === 'production') {
+          errorLogger.error('Canonical DB schema not satisfied. Refusing to start backend.');
+          process.exit(1);
+        } else {
+          errorLogger.warn('Could not create tables (continuing in development mode)', { 
+            note: 'Backend may not function correctly without database tables' 
+          });
+        }
+      }
+    } catch (error) {
+      if (NODE_ENV === 'production') {
+        errorLogger.error('Failed to initialize database tables', { error: error.message });
+        process.exit(1);
+      } else {
+        errorLogger.warn('Database table initialization failed (continuing in development)', { error: error.message });
+      }
     }
 
     // Seed data (development only)
-    if (NODE_ENV !== 'production') {
-      const dataSeeded = await seedData(pool);
-      if (!dataSeeded) {
-        errorLogger.info('Data seeding skipped');
+    if (NODE_ENV !== 'production' && pool) {
+      try {
+        const dataSeeded = await seedData(pool);
+        if (!dataSeeded) {
+          errorLogger.info('Data seeding skipped');
+        }
+      } catch (seedError) {
+        errorLogger.warn('Data seeding failed (continuing)', { error: seedError.message });
       }
     }
 
@@ -468,10 +500,5 @@ process.on('unhandledRejection', (reason, promise) => {
   });
   gracefulShutdown();
 });
-
-// Only start the server when this file is executed directly
-if (require.main === module && !IS_TEST) {
-  startServer();
-}
 
 

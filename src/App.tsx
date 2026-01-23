@@ -1,8 +1,10 @@
 import './App.css';
 import { useEffect } from 'react';
+import { HelmetProvider } from 'react-helmet-async';
 import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { NotificationProvider } from './contexts/NotificationContext';
+import { ToastProvider } from './contexts/ToastContext';
 import ErrorBoundary from './components/common/ErrorBoundary';
 import { AppRoutes } from './config/routes';
 
@@ -80,9 +82,10 @@ function App() {
           overlayCandidate: walkOverlay(elAtPoint) || walkOverlay(target),
         };
 
-        if (import.meta.env.DEV) {
-          console.log('[debug:clicks]', data);
-        }
+        // Debug logları sadece localStorage'da debug:clicks=1 olduğunda göster
+        // if (import.meta.env.DEV) {
+        //   console.log('[debug:clicks]', data);
+        // }
       } catch {
         // ignore
       }
@@ -97,14 +100,15 @@ function App() {
 
         const anyEv = ev as any;
         const path = typeof anyEv.composedPath === 'function' ? (anyEv.composedPath() as EventTarget[]) : undefined;
-        if (import.meta.env.DEV) {
-          console.log('[debug:clicks]', {
-            type: ev.type,
-            defaultPrevented: anyEv.defaultPrevented === true,
-            target: summarizeEl(target),
-            path: summarizePath(path),
-          });
-        }
+        // Debug logları sadece localStorage'da debug:clicks=1 olduğunda göster
+        // if (import.meta.env.DEV) {
+        //   console.log('[debug:clicks]', {
+        //     type: ev.type,
+        //     defaultPrevented: anyEv.defaultPrevented === true,
+        //     target: summarizeEl(target),
+        //     path: summarizePath(path),
+        //   });
+        // }
       } catch {
         // ignore
       }
@@ -122,15 +126,19 @@ function App() {
 
   return (
     <ErrorBoundary>
-      <ThemeProvider>
-        <AuthProvider>
-          <NotificationProvider>
-            <div className='App'>
-              <AppRoutes />
-            </div>
-          </NotificationProvider>
-        </AuthProvider>
-      </ThemeProvider>
+      <HelmetProvider>
+        <ThemeProvider>
+          <AuthProvider>
+            <NotificationProvider>
+              <ToastProvider>
+                <div className='App'>
+                  <AppRoutes />
+                </div>
+              </ToastProvider>
+            </NotificationProvider>
+          </AuthProvider>
+        </ThemeProvider>
+      </HelmetProvider>
     </ErrorBoundary>
   );
 }
