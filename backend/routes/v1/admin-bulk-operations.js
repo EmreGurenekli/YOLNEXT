@@ -232,13 +232,13 @@ function createAdminBulkOperationsRoutes(pool, authenticateToken, requireAdmin, 
         // Bulk operation updates available via REST API polling
         if (false) { // io removed
           // io.to('admin-room').emit('bulk_operation_completed', {
-            type: 'user_ban',
-            operationRef,
-            successCount,
-            failureCount,
-            executedBy: req.user.email || req.user.id,
-            timestamp: new Date()
-          });
+          //   type: 'user_ban',
+          //   operationRef,
+          //   successCount,
+          //   failureCount,
+          //   executedBy: req.user.email || req.user.id,
+          //   timestamp: new Date()
+          // });
         }
 
         return res.json({

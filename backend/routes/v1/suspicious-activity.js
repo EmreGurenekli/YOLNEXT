@@ -256,11 +256,11 @@ function createSuspiciousActivityRoutes(pool, authenticateToken, requireAdmin, w
       // Suspicious activity updates available via REST API polling
       if (false && stored.length > 0) { // io removed
         // io.to('admin-room').emit('suspicious_activity_detected', {
-          userId: user_id,
-          userEmail: user.email,
-          detections: stored,
-          timestamp: new Date()
-        });
+        //   userId: user_id,
+        //   userEmail: user.email,
+        //   detections: stored,
+        //   timestamp: new Date()
+        // });
       }
 
       return res.json({

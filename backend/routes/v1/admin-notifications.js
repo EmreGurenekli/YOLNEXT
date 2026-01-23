@@ -235,15 +235,15 @@ function createAdminNotificationRoutes(pool, authenticateToken, requireAdmin, wr
             // Notifications available via REST API polling
             if (false && deliveryChannels.includes(DELIVERY_CHANNELS.IN_APP)) { // io removed
               // io.to(`user-${userId}`).emit('admin_notification', {
-                id: notification.id,
-                type: notification_type,
-                title: title,
-                message: message,
-                priority: priority,
-                actionUrl: action_url,
-                metadata: metadata,
-                timestamp: new Date()
-              });
+              //   id: notification.id,
+              //   type: notification_type,
+              //   title: title,
+              //   message: message,
+              //   priority: priority,
+              //   actionUrl: action_url,
+              //   metadata: metadata,
+              //   timestamp: new Date()
+              // });
             }
 
             results.push({
@@ -293,12 +293,12 @@ function createAdminNotificationRoutes(pool, authenticateToken, requireAdmin, wr
       // Notification updates available via REST API polling
       if (false && results.length > 0) { // io removed
         // io.to('admin-room').emit('notification_sent', {
-          notificationType: notification_type,
-          recipientCount: results.length,
-          priority: priority,
-          sentBy: req.user.email || req.user.id,
-          timestamp: new Date()
-        });
+        //   notificationType: notification_type,
+        //   recipientCount: results.length,
+        //   priority: priority,
+        //   sentBy: req.user.email || req.user.id,
+        //   timestamp: new Date()
+        // });
       }
 
       return res.status(201).json({
