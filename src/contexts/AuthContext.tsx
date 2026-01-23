@@ -346,8 +346,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setToken(token);
 
         // Connect to Socket.IO (only if enabled)
-        if (import.meta.env.VITE_ENABLE_SOCKET === 'true') {
-          // Socket.io removed        }
+        // Socket.io removed - using REST API only
 
         return { success: true, user: userData };
       } else {
@@ -435,8 +434,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setToken(token);
 
         // Connect to Socket.IO (only if enabled)
-        if (import.meta.env.VITE_ENABLE_SOCKET === 'true') {
-          // Socket.io removed        }
+        // Socket.io removed - using REST API only
 
         return { success: true, user: finalUserData };
       } else {
@@ -472,7 +470,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       safeLocalStorage.removeItem('token');
       safeLocalStorage.removeItem('user');
       // Disconnect from Socket.IO
-      // Socket.io removed      // Don't redirect automatically, let the ProtectedRoute handle it
+      // Socket.io removed - using REST API only
+      // Don't redirect automatically, let the ProtectedRoute handle it
       // window.location.href = '/login';
     }
   };

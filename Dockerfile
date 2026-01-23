@@ -11,13 +11,8 @@ COPY vite.config.ts ./
 COPY tailwind.config.js ./
 COPY postcss.config.js ./
 
-<<<<<<< HEAD
 # Install all dependencies (devDependencies needed for build)
 RUN npm ci
-=======
-# Install dependencies
-RUN npm ci --only=production
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
 
 # Copy source code
 COPY src/ ./src/
@@ -56,14 +51,7 @@ EXPOSE 5000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-<<<<<<< HEAD
   CMD node -e "require('http').get('http://localhost:5000/api/health/live', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
 # Start the application
 CMD ["node", "server-modular.js"]
-=======
-  CMD node healthcheck.js
-
-# Start the application
-CMD ["node", "simple-server.js"]
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
