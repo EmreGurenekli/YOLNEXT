@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 import { useEffect } from 'react';
-=======
-import { Helmet } from 'react-helmet-async';
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
 
 interface SEOProps {
   title?: string;
@@ -35,7 +31,6 @@ const SEO: React.FC<SEOProps> = ({
     ? image
     : `https://YolNext.com${image}`;
 
-<<<<<<< HEAD
   useEffect(() => {
     // Update document title
     document.title = fullTitle;
@@ -117,80 +112,3 @@ const SEO: React.FC<SEOProps> = ({
 };
 
 export default SEO;
-=======
-  return (
-    <Helmet>
-      {/* Basic Meta Tags */}
-      <title>{fullTitle}</title>
-      <meta name='description' content={description} />
-      <meta name='keywords' content={keywords} />
-      <meta name='author' content={author} />
-      <meta name='robots' content='index, follow' />
-      <meta name='viewport' content='width=device-width, initial-scale=1.0' />
-
-      {/* Open Graph / Facebook */}
-      <meta property='og:type' content={type} />
-      <meta property='og:url' content={fullUrl} />
-      <meta property='og:title' content={fullTitle} />
-      <meta property='og:description' content={description} />
-      <meta property='og:image' content={fullImage} />
-      <meta property='og:site_name' content='YolNext Kargo Platform' />
-      <meta property='og:locale' content='tr_TR' />
-
-      {/* Twitter */}
-      <meta property='twitter:card' content='summary_large_image' />
-      <meta property='twitter:url' content={fullUrl} />
-      <meta property='twitter:title' content={fullTitle} />
-      <meta property='twitter:description' content={description} />
-      <meta property='twitter:image' content={fullImage} />
-
-      {/* Additional Meta Tags */}
-      <meta name='theme-color' content='#2563eb' />
-      <meta name='msapplication-TileColor' content='#2563eb' />
-      <meta name='apple-mobile-web-app-capable' content='yes' />
-      <meta name='apple-mobile-web-app-status-bar-style' content='default' />
-      <meta name='apple-mobile-web-app-title' content='YolNext' />
-
-      {/* Canonical URL */}
-      <link rel='canonical' href={fullUrl} />
-
-      {/* Article specific */}
-      {type === 'article' && publishedTime && (
-        <meta property='article:published_time' content={publishedTime} />
-      )}
-      {type === 'article' && modifiedTime && (
-        <meta property='article:modified_time' content={modifiedTime} />
-      )}
-      {type === 'article' && author && (
-        <meta property='article:author' content={author} />
-      )}
-
-      {/* Structured Data */}
-      <script type='application/ld+json'>
-        {JSON.stringify({
-          '@context': 'https://schema.org',
-          '@type': 'WebSite',
-          name: 'YolNext Kargo Platform',
-          url: 'https://YolNext.com',
-          description: description,
-          potentialAction: {
-            '@type': 'SearchAction',
-            target: 'https://YolNext.com/search?q={search_term_string}',
-            'query-input': 'required name=search_term_string',
-          },
-          publisher: {
-            '@type': 'Organization',
-            name: 'YolNext',
-            logo: {
-              '@type': 'ImageObject',
-              url: 'https://YolNext.com/img/yolnext-logo.svg',
-            },
-          },
-        })}
-      </script>
-    </Helmet>
-  );
-};
-
-export default SEO;
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
