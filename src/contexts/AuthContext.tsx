@@ -577,27 +577,4 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-<<<<<<< HEAD
-};
-    login,
-    register,
-    logout,
-    updateUser,
-    demoLogin,
-    getPanelRoute,
-  };
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-};
-    login,
-    register,
-    logout,
-    updateUser,
-    demoLogin,
-    getPanelRoute,
-  };
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-=======
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
 };
