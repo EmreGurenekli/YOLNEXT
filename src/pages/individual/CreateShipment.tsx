@@ -1722,18 +1722,3 @@ export default function CreateShipment() {
     </div>
   );
 }
-
-                <button
-                  onClick={() => setShowLimitModal(false)}
-                  className="px-4 py-2 bg-gradient-to-r from-slate-800 to-blue-900 text-white rounded-lg shadow hover:shadow-lg transition-all"
-                >
-                  Tamam
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
