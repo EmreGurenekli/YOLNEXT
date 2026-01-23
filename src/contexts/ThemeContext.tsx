@@ -67,10 +67,15 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [theme]);
 
   useEffect(() => {
-    // Apply theme to document
-    const root = document.documentElement;
-    root.classList.remove('light', 'dark');
-    root.classList.add(actualTheme);
+    // Apply theme to document (only in browser)
+    if (typeof document === 'undefined' || !document.documentElement) return;
+    try {
+      const root = document.documentElement;
+      root.classList.remove('light', 'dark');
+      root.classList.add(actualTheme);
+    } catch (error) {
+      console.warn('Failed to apply theme to document:', error);
+    }
   }, [actualTheme]);
 
   const value: ThemeContextType = {
