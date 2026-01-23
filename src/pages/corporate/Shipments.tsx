@@ -850,7 +850,7 @@ export default function CorporateShipments() {
           sortBy={sortBy}
           onSearchChange={setSearchTerm}
           onStatusFilterChange={setFilterStatus}
-          onSortByChange={(value: string) => setSortBy(value as 'date' | 'price' | 'status')}
+          onSortByChange={(value: string) => setSortBy(value as 'date' | 'price' | 'status' | 'value' | 'priority')}
           onReset={() => {
             setSearchTerm('');
             setFilterStatus('all');
@@ -898,7 +898,7 @@ export default function CorporateShipments() {
                     <CorporateShipmentsTableRow
                       key={shipment.id}
                       shipment={shipment}
-                      acceptedShipmentId={acceptedShipmentId}
+                      acceptedShipmentId={acceptedShipmentId ? String(acceptedShipmentId) : undefined}
                       onViewDetails={handleViewDetails}
                       onTrack={handleTrackShipment}
                       onMessage={handleMessage}
@@ -1025,7 +1025,7 @@ export default function CorporateShipments() {
                           Takip Kodu:{' '}
                           {
                             shipments.find(
-                              s => s.id === selectedShipmentForTracking
+                              s => s.id === selectedShipmentForTracking?.id
                             )?.trackingCode
                           }
                         </p>

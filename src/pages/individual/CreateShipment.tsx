@@ -553,7 +553,7 @@ export default function CreateShipment() {
           )}
         </div>
       </div>
-      {showSuccessMessage && <SuccessMessage message={successMessage} />}
+      {showSuccessMessage && <SuccessMessage message={successMessage} isVisible={showSuccessMessage} onClose={() => setShowSuccessMessage(false)} />}
       {showLimitModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-8 rounded-lg shadow-xl max-w-sm text-center relative">

@@ -503,7 +503,7 @@ export default function CreateShipment() {
     loadNakliyeciler();
   }, [formData.publishType]);
 
-  const handleInputChange = (field: string, value: string | number | boolean) => {
+  const handleInputChange = (field: string, value: string | number | boolean | object) => {
         setFormData(prev => {
       const newData: typeof prev = { ...prev, [field]: value };
       return newData;
@@ -880,6 +880,18 @@ export default function CreateShipment() {
           requiresAssembly: false,
           requiresPharmaLicense: false,
           temperatureControlled: false,
+          vehicleType: '',
+          trailerType: '',
+          requiresCrane: false,
+          requiresForklift: false,
+          requiresHydraulicLifter: false,
+          heavyTonage: false,
+          heavyTonageAmount: '',
+          oversizedLoad: false,
+          oversizedDimensions: { length: '', width: '', height: '' },
+          temperatureControl: false,
+          temperatureMin: '',
+          temperatureMax: '',
         });
         setCurrentStep(1);
         setErrors({});
