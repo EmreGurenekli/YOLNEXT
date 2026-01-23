@@ -152,7 +152,6 @@ const Dashboard = () => {
               </div>
             </div>
           </div>
-        </div>
 
         {/* Komisyon İade Politikası Bilgilendirmesi */}
 
