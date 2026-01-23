@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useAuth } from '../../contexts/AuthContext';
-import { useToast } from '../../contexts/ToastContext';import { dashboardAPI, notificationAPI, shipmentAPI } from '../../services/api';
+import { useToast } from '../../contexts/ToastContext';
+import { dashboardAPI, notificationAPI, shipmentAPI } from '../../services/api';
 import { createApiUrl } from '../../config/api';
 import NotificationModal from '../../components/modals/NotificationModal';
 import {
@@ -85,18 +86,7 @@ interface Notification {
 const Dashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { showToast } = useToast();                              }
-                            }
-                          }
-                        }}
-                        className='p-1.5 hover:bg-white/10 rounded-lg transition-colors'
-                        title='Kodu Paylaş'
-                      >
-                        <Users className='w-4 h-4 text-slate-300' />
-                      </button>
-                    </div>
-                  )}
-                </div>
+  const { showToast } = useToast();
               </div>
 
               <div className='flex items-center gap-3'>
