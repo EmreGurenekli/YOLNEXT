@@ -1542,3 +1542,4 @@ export default function CreateShipment() {
       default:
         return null;
     }
+  };

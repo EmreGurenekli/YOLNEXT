@@ -220,9 +220,6 @@ export default function CorporateShipments() {
       setIsLoading(false);
     }
   };
-    setShowDetailsModal(true);
-    setShowProcessAssistantDetails(false);
-  };
 
   const handleTrackShipment = (shipmentId: number) => {
     // Gönderi takip sayfasına yönlendir
