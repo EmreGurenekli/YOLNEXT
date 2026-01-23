@@ -3,7 +3,7 @@ const express = require('express');
 const { getPagination, generateTrackingNumber } = require('../../utils/routeHelpers');
 const { isValidTransition } = require('../../utils/shipmentStatus');
 
-function createShipmentRoutes(pool, authenticateToken, createNotification, idempotencyGuard, io) {
+function createShipmentRoutes(pool, authenticateToken, createNotification, idempotencyGuard) {
   const router = express.Router();
 
   let systemUserIdCache = null;
@@ -23,7 +23,7 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
 
     try {
       const inserted = await pool.query(
-        `INSERT INTO users (email, password, "firstName", "lastName", "fullName", role, "isActive", "createdAt", "updatedAt")
+        `INSERT INTO users (email, password, "firstName", "lastName", "fullName", role, "isActive", "createdat", "updatedAt")
          VALUES ($1, '', 'YolNext', 'Sistem', 'YolNext Sistem', 'system', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
          RETURNING id`,
         [email]
@@ -33,7 +33,7 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
     } catch (_eCamel) {
       try {
         const inserted = await pool.query(
-          `INSERT INTO users (email, password, first_name, last_name, full_name, role, is_active, created_at, updated_at)
+          `INSERT INTO users (email, password, first_name, last_name, full_name, role, is_active, createdat, updated_at)
            VALUES ($1, '', 'YolNext', 'Sistem', 'YolNext Sistem', 'system', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
            RETURNING id`,
           [email]
@@ -62,7 +62,7 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
     } catch (_eCamel) {
       try {
         const exists = await pool.query(
-          'SELECT 1 FROM messages WHERE shipment_id = $1 AND receiver_id = $2 AND sender_id = $3 AND content = $4 LIMIT 1',
+          'SELECT 1 FROM messages WHERE shipmentId = $1 AND receiver_id = $2 AND sender_id = $3 AND content = $4 LIMIT 1',
           [shipmentId, receiverId, systemUserId, message]
         );
         if (exists.rows && exists.rows.length > 0) return;
@@ -73,21 +73,21 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
 
     try {
       await pool.query(
-        `INSERT INTO messages ("shipmentId", "senderId", "receiverId", message, "messageType", "createdAt")
+        `INSERT INTO messages ("shipmentId", "senderId", "receiverId", message, "messageType", "createdat")
          VALUES ($1, $2, $3, $4, 'system', CURRENT_TIMESTAMP)`,
         [shipmentId, systemUserId, receiverId, message]
       );
     } catch (_eCamelInsert) {
       try {
         await pool.query(
-          `INSERT INTO messages ("shipmentId", "senderId", "receiverId", message, "createdAt")
+          `INSERT INTO messages ("shipmentId", "senderId", "receiverId", message, "createdat")
            VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)`,
           [shipmentId, systemUserId, receiverId, message]
         );
       } catch (_eSnakeInsert) {
         try {
           await pool.query(
-            `INSERT INTO messages (shipment_id, sender_id, receiver_id, content, message_type, created_at)
+            `INSERT INTO messages (shipmentId, sender_id, receiver_id, content, message_type, createdat)
              VALUES ($1, $2, $3, $4, 'system', CURRENT_TIMESTAMP)`,
             [shipmentId, systemUserId, receiverId, message]
           );
@@ -146,13 +146,13 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
     );
     const cols = new Set((colsRes.rows || []).map(r => r.column_name));
 
-    const ownerCol = cols.has('ownerId') ? '"ownerId"' : cols.has('user_id') ? '"user_id"' : cols.has('userId') ? '"userId"' : '"ownerId"';
-    const driverCol = cols.has('driver_id') ? '"driver_id"' : cols.has('driverId') ? '"driverId"' : '"driver_id"';
-    const carrierCol = cols.has('nakliyeci_id') ? '"nakliyeci_id"' : cols.has('carrier_id') ? '"carrier_id"' : '"nakliyeci_id"';
-    const statusCol = cols.has('status') ? 'status' : 'status';
-    const updatedAtCol = cols.has('updatedAt') ? '"updatedAt"' : cols.has('updated_at') ? '"updated_at"' : '"updatedAt"';
+    const ownerCol = cols.has('userId') ? 'userId' : 'user_id';
+    const driverCol = cols.has('driverId') ? 'driverId' : 'driver_id';
+    const carrierCol = cols.has('carrierId') ? 'carrierId' : 'carrier_id';
+    const statusCol = 'status';
+    const updatedAtCol = cols.has('updatedAt') ? 'updatedAt' : 'updated_at';
 
-    const q = `SELECT id, ${ownerCol} as owner_id, ${carrierCol} as carrier_id, ${driverCol} as driver_id, ${statusCol} as status, ${updatedAtCol} as updated_at FROM shipments WHERE id = $1`;
+    const q = `SELECT id, ${ownerCol} as userId, ${carrierCol} as carrierId, ${driverCol} as driverId, ${statusCol} as status, ${updatedAtCol} as updatedAt FROM shipments WHERE id = $1`;
     const res = await pool.query(q, [shipmentId]);
     return { row: res.rows[0] || null, cols: { ownerCol, carrierCol, driverCol, statusCol, updatedAtCol } };
   }
@@ -177,7 +177,7 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
       const baseQueryCamel = `
         SELECT s.*
         FROM shipments s
-        WHERE s."ownerId" = $1
+        WHERE s."userId" = $1
       `;
       const baseQuerySnake = `
         SELECT s.*
@@ -194,10 +194,10 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
       };
 
       let qCamel = addStatusClause(baseQueryCamel, status);
-      qCamel += ' ORDER BY COALESCE(s."updatedAt", s."createdAt") DESC LIMIT 200';
+      qCamel += ' ORDER BY COALESCE(s."updatedAt", s."createdat") DESC LIMIT 200';
 
       let qSnake = addStatusClause(baseQuerySnake, status);
-      qSnake += ' ORDER BY COALESCE(s.updated_at, s.created_at) DESC LIMIT 200';
+      qSnake += ' ORDER BY COALESCE(s.updated_at, s.createdat) DESC LIMIT 200';
 
       let result;
       try {
@@ -261,9 +261,9 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
                c."fullName" as "carrierName",
                c."companyName" as "carrierCompany"
         FROM shipments s
-        LEFT JOIN users u ON s."ownerId" = u.id
-        LEFT JOIN users c ON s."nakliyeci_id" = c.id
-        WHERE s."nakliyeci_id" = $1
+        LEFT JOIN users u ON s."userId" = u.id
+        LEFT JOIN users c ON s."carrierId" = c.id
+        WHERE s."carrierId" = $1
       `;
 
       const params = [userId];
@@ -274,7 +274,7 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
       }
 
       // Count query with optimized index usage
-      let countQuery = `SELECT COUNT(*) as count FROM shipments s WHERE s."nakliyeci_id" = $1`;
+      let countQuery = `SELECT COUNT(*) as count FROM shipments s WHERE s."carrierId" = $1`;
       const countParams = [userId];
       if (status && status !== 'all') {
         countQuery += ` AND s.status = $2`;
@@ -285,7 +285,7 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
       const total = parseInt(countResult.rows[0].count, 10);
 
       // Optimized query with proper indexing
-      query += ` ORDER BY COALESCE(s."updatedAt", s."createdAt") DESC LIMIT ${safeLimit} OFFSET ${safeOffset}`;
+      query += ` ORDER BY COALESCE(s."updatedAt", s."createdat") DESC LIMIT ${safeLimit} OFFSET ${safeOffset}`;
 
       const result = await pool.query(query, params);
       const normalizedRows = attachCategoryData(result.rows || []);
@@ -337,20 +337,20 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
       const type = userType || String(req.user.role || '').toLowerCase();
       const filter =
         type === 'nakliyeci' || type === 'carrier'
-          ? { primary: 's."nakliyeci_id" = $1', fallback: 's.nakliyeci_id = $1' }
+          ? { primary: 's."carrierId" = $1', fallback: 's.carrierId = $1' }
           : type === 'tasiyici' || type === 'driver'
             ? { primary: 's.driver_id = $1', fallback: 's.driver_id = $1' }
-            : { primary: 's."ownerId" = $1', fallback: 's.user_id = $1' };
+            : { primary: 's."userId" = $1', fallback: 's.user_id = $1' };
 
       const qPrimary = `
         SELECT s.*, 
                u."fullName" as "ownerName",
                c."fullName" as "carrierName"
         FROM shipments s
-        LEFT JOIN users u ON s."ownerId" = u.id
-        LEFT JOIN users c ON s."nakliyeci_id" = c.id
+        LEFT JOIN users u ON s."userId" = u.id
+        LEFT JOIN users c ON s."carrierId" = c.id
         WHERE ${filter.primary}
-        ORDER BY COALESCE(s."updatedAt", s."createdAt") DESC
+        ORDER BY COALESCE(s."updatedAt", s."createdat") DESC
         LIMIT ${safeLimit}
       `;
 
@@ -360,9 +360,9 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
                c.fullname as "carrierName"
         FROM shipments s
         LEFT JOIN users u ON s.user_id = u.id
-        LEFT JOIN users c ON s.nakliyeci_id = c.id
+        LEFT JOIN users c ON s.carrierId = c.id
         WHERE ${filter.fallback}
-        ORDER BY COALESCE(s.updated_at, s.created_at) DESC
+        ORDER BY COALESCE(s.updated_at, s.createdat) DESC
         LIMIT ${safeLimit}
       `;
 
@@ -392,7 +392,7 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
       }
 
       const userId = req.user.id;
-      const isOwner = shipment.owner_id === userId;
+      const isOwner = shipment.userId === userId;
       const isCarrier = shipment.carrier_id === userId;
       const isDriver = shipment.driver_id === userId;
 
@@ -403,14 +403,14 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
       // Return empty history if table does not exist
       try {
         const historyRes = await queryWithFallback(
-          `SELECT id, "shipmentId" as shipment_id, NULL as user_id, NULL as old_status, status as new_status, message as notes, "createdAt" as created_at, NULL as updated_by_name, NULL as user_type
+          `SELECT id, "shipmentId" as shipmentId, NULL as user_id, NULL as old_status, status as new_status, message as notes, "createdat" as createdat, NULL as updated_by_name, NULL as user_type
            FROM shipment_status_history
            WHERE "shipmentId" = $1
-           ORDER BY "createdAt" ASC`,
-          `SELECT id, shipmentId as shipment_id, NULL as user_id, NULL as old_status, status as new_status, message as notes, createdAt as created_at, NULL as updated_by_name, NULL as user_type
+           ORDER BY "createdat" ASC`,
+          `SELECT id, shipmentId as shipmentId, NULL as user_id, NULL as old_status, status as new_status, message as notes, createdat as createdat, NULL as updated_by_name, NULL as user_type
            FROM shipment_status_history
            WHERE shipmentId = $1
-           ORDER BY createdAt ASC`,
+           ORDER BY createdat ASC`,
           [shipmentId]
         );
 
@@ -447,7 +447,7 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
       }
 
       const userId = req.user.id;
-      const isOwner = shipment.owner_id === userId;
+      const isOwner = shipment.userId === userId;
       const isCarrier = shipment.carrier_id === userId;
       const isDriver = shipment.driver_id === userId;
       if (!isOwner && !isCarrier && !isDriver) {
@@ -510,7 +510,7 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
         });
       }
 
-      const ownerId = shipment.owner_id;
+      const ownerUserId = shipment.userId;
       const carrierId = shipment.carrier_id;
 
       const client = await pool.connect();
@@ -524,8 +524,8 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
         // Best-effort: insert status history if available
         try {
           await queryWithFallback(
-            `INSERT INTO shipment_status_history ("shipmentId", status, message, "createdAt") VALUES ($1, $2, $3, CURRENT_TIMESTAMP)`,
-            `INSERT INTO shipment_status_history (shipmentId, status, message, createdAt) VALUES ($1, $2, $3, CURRENT_TIMESTAMP)`,
+            `INSERT INTO shipment_status_history ("shipmentId", status, message, "createdat") VALUES ($1, $2, $3, CURRENT_TIMESTAMP)`,
+            `INSERT INTO shipment_status_history (shipmentId, status, message, createdat) VALUES ($1, $2, $3, CURRENT_TIMESTAMP)`,
             [shipmentId, nextStatus, notes || null]
           );
         } catch (e) {
@@ -547,18 +547,18 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
         const s = String(nextStatus || '').trim().toLowerCase();
         let sysText = null;
         if (s === 'picked_up') {
-          sysText = 'Sistem: Yük alındı. Takip ekranı güncellendi.';
+          sysText = 'Yük alındı. Takip ekranı güncellendi.';
         } else if (s === 'in_transit') {
-          sysText = 'Sistem: Araç yola çıktı. Canlı takip güncellendi.';
+          sysText = 'Araç yola çıktı. Canlı takip güncellendi.';
         } else if (s === 'delivered') {
-          sysText = 'Sistem: Teslimat tamamlandı. Gönderici onayı bekleniyor.';
+          sysText = 'Teslimat tamamlandı. Gönderici onayı bekleniyor.';
         } else if (s === 'completed') {
-          sysText = 'Sistem: Teslimat onaylandı. İş tamamlandı.';
+          sysText = 'Teslimat onaylandı. İşlem tamamlandı.';
         }
 
         if (sysText) {
-          if (ownerId) {
-            await insertSystemMessageIfMissing({ shipmentId, receiverId: ownerId, message: sysText });
+          if (userId) {
+            await insertSystemMessageIfMissing({ shipmentId, receiverId: userId, message: sysText });
           }
           if (carrierId) {
             await insertSystemMessageIfMissing({ shipmentId, receiverId: carrierId, message: sysText });
@@ -611,9 +611,9 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
                COALESCE(s.price, o.price, 0) as "displayPrice",
                o.price as "value"
         FROM shipments s
-        LEFT JOIN offers o ON s.id = o."shipment_id" AND (o.status = 'accepted' OR o.status = 'offer_accepted')
-        LEFT JOIN users u ON s."ownerId" = u.id
-        WHERE s."nakliyeci_id" = $1
+        LEFT JOIN offers o ON s.id = o."shipmentId" AND (o.status = 'accepted' OR o.status = 'offer_accepted')
+        LEFT JOIN users u ON s."userId" = u.id
+        WHERE s."carrierId" = $1
           AND (s.status = 'offer_accepted' OR s.status = 'accepted' OR s.status = 'in_progress' OR s.status = 'assigned' OR s.status = 'in_transit' OR s.status = 'picked_up')
       `;
 
@@ -628,7 +628,7 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
       let countQuery = `
         SELECT COUNT(*) as count
         FROM shipments s
-        WHERE s."nakliyeci_id" = $1 
+        WHERE s."carrierId" = $1 
           AND (s.status = 'offer_accepted' OR s.status = 'accepted' OR s.status = 'in_progress' OR s.status = 'assigned' OR s.status = 'in_transit' OR s.status = 'picked_up')
       `;
       const countParams = [userId];
@@ -641,7 +641,7 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
       const total = parseInt(countResult.rows[0].count, 10);
 
       // LIMIT and OFFSET must be integers, not parameters
-      query += ` ORDER BY COALESCE(s."updatedAt", s."createdAt") DESC LIMIT ${safeLimit} OFFSET ${safeOffset}`;
+      query += ` ORDER BY COALESCE(s."updatedAt", s."createdat") DESC LIMIT ${safeLimit} OFFSET ${safeOffset}`;
 
       const result = await pool.query(query, params);
 
@@ -722,10 +722,10 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
                o.price as "offerPrice",
                o.price as "value"
          FROM shipments s
-         LEFT JOIN users u ON s."ownerId" = u.id
-         LEFT JOIN offers o ON s.id = o."shipment_id" AND (o.status = 'accepted' OR o.status = 'offer_accepted')
-         WHERE s.driver_id = $1 AND s."nakliyeci_id" = $2
-         ORDER BY s."createdAt" DESC
+         LEFT JOIN users u ON s."userId" = u.id
+         LEFT JOIN offers o ON s.id = o."shipmentId" AND (o.status = 'accepted' OR o.status = 'offer_accepted')
+         WHERE s.driver_id = $1 AND s."carrierId" = $2
+         ORDER BY s."createdat" DESC
          LIMIT 20`,
         [parsedDriverId, nakliyeciId]
       );
@@ -798,10 +798,10 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
                c."phone" as "carrierPhone",
                c."email" as "carrierEmail"
         FROM shipments s
-        LEFT JOIN users u ON s."ownerId" = u.id
-        LEFT JOIN users c ON s."nakliyeci_id" = c.id
+        LEFT JOIN users u ON s."userId" = u.id
+        LEFT JOIN users c ON s."carrierId" = c.id
         ${whereClause}
-        ORDER BY s."updatedAt" DESC, s."createdAt" DESC
+        ORDER BY s."updatedAt" DESC, s."createdat" DESC
         LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
       `;
 
@@ -866,8 +866,8 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
                c."phone" as "carrierPhone",
                c."email" as "carrierEmail"
         FROM shipments s
-        LEFT JOIN users u ON s."ownerId" = u.id
-        LEFT JOIN users c ON s."nakliyeci_id" = c.id
+        LEFT JOIN users u ON s."userId" = u.id
+        LEFT JOIN users c ON s."carrierId" = c.id
         WHERE s."driver_id" = $1
       `;
 
@@ -896,7 +896,7 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
       const countResult = await pool.query(countQuery, countParams);
       const total = parseInt(countResult.rows[0].count, 10);
 
-      query += ` ORDER BY s."createdAt" DESC LIMIT ${safeLimit} OFFSET ${safeOffset}`;
+      query += ` ORDER BY s."createdat" DESC LIMIT ${safeLimit} OFFSET ${safeOffset}`;
 
       const result = await pool.query(query, params);
 
@@ -967,10 +967,10 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
                o.price as "offerPrice",
                o.price as "value"
          FROM shipments s
-         LEFT JOIN users u ON s."ownerId" = u.id
-         LEFT JOIN offers o ON s.id = o."shipment_id" AND (o.status = 'accepted' OR o.status = 'offer_accepted')
-         WHERE s.driver_id = $1 AND s."nakliyeci_id" = $2
-         ORDER BY s."createdAt" DESC
+         LEFT JOIN users u ON s."userId" = u.id
+         LEFT JOIN offers o ON s.id = o."shipmentId" AND (o.status = 'accepted' OR o.status = 'offer_accepted')
+         WHERE s.driver_id = $1 AND s."carrierId" = $2
+         ORDER BY s."createdat" DESC
          LIMIT 20`,
         [driverId, nakliyeciId]
       );
@@ -1020,26 +1020,26 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
                c."companyName" as "carrierCompany",
                c."phone" as "carrierPhone",
                c."email" as "carrierEmail",
-               s."nakliyeci_id" as "nakliyeci_id",
+               s."carrierId" as "carrierId",
                o.price as "offerPrice",
                o.id as "offerId",
                COALESCE(s.price, o.price, 0) as "displayPrice",
                o.price as "value"
         FROM shipments s
-        LEFT JOIN users u ON s."ownerId" = u.id
-        LEFT JOIN users c ON s."nakliyeci_id" = c.id
-        LEFT JOIN offers o ON s.id = o."shipment_id" AND (o.status = 'accepted' OR o.status = 'offer_accepted')
+        LEFT JOIN users u ON s."userId" = u.id
+        LEFT JOIN users c ON s."carrierId" = c.id
+        LEFT JOIN offers o ON s.id = o."shipmentId" AND (o.status = 'accepted' OR o.status = 'offer_accepted')
       `;
 
       const params = [];
       const conditions = [];
 
       if (userRole === 'individual' || userRole === 'corporate') {
-        conditions.push('s."ownerId" = $1');
+        conditions.push('s."userId" = $1');
         params.push(userId);
       } else if (userRole === 'nakliyeci') {
         // Nakliyeci can see shipments where they are assigned OR where they have accepted offers
-        conditions.push('(s."nakliyeci_id" = $1 OR EXISTS (SELECT 1 FROM offers o WHERE o."shipment_id" = s.id AND o."nakliyeci_id" = $1 AND o.status IN (\'accepted\', \'offer_accepted\')))');
+        conditions.push('(s."carrierId" = $1 OR EXISTS (SELECT 1 FROM offers o WHERE o."shipmentId" = s.id AND o."carrierId" = $1 AND o.status IN (\'accepted\', \'offer_accepted\')))');
         params.push(userId);
       } else if (userRole === 'tasiyici') {
         // Tasiyici can see shipments assigned to them
@@ -1081,7 +1081,7 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
       // Ensure limit and offset are valid integers
       const safeLimit = Math.max(1, Math.min(parseInt(limit, 10) || 10, 100));
       const safeOffset = Math.max(0, parseInt(offset, 10) || 0);
-      query += ` ORDER BY s."createdAt" DESC LIMIT ${safeLimit} OFFSET ${safeOffset}`;
+      query += ` ORDER BY s."createdat" DESC LIMIT ${safeLimit} OFFSET ${safeOffset}`;
 
       const result = await pool.query(query, params);
       const normalizedRows = attachCategoryData(result.rows || []);
@@ -1092,10 +1092,10 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
       const countConditions = [];
       
       if (userRole === 'individual' || userRole === 'corporate') {
-        countConditions.push('s."ownerId" = $1');
+        countConditions.push('s."userId" = $1');
         countParams.push(userId);
       } else if (userRole === 'nakliyeci') {
-        countConditions.push('(s."nakliyeci_id" = $1 OR EXISTS (SELECT 1 FROM offers o WHERE o."shipment_id" = s.id AND o."nakliyeci_id" = $1 AND o.status IN (\'accepted\', \'offer_accepted\')))');
+        countConditions.push('(s."carrierId" = $1 OR EXISTS (SELECT 1 FROM offers o WHERE o."shipmentId" = s.id AND o."carrierId" = $1 AND o.status IN (\'accepted\', \'offer_accepted\')))');
         countParams.push(userId);
       } else if (userRole === 'tasiyici') {
         countConditions.push('s.driver_id = $1');
@@ -1167,8 +1167,13 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
   // Create shipment
   router.post('/', authenticateToken, idempotencyGuard, async (req, res) => {
     console.log('📦 POST /api/shipments - Request received');
-    console.log('User:', req.user?.id, req.user?.email);
-    console.log('Request body keys:', Object.keys(req.body || {}));
+    // Debug logging (development only)
+    if (process.env.NODE_ENV === 'development') {
+      console.log('User:', req.user?.id, req.user?.email);
+      console.log('Request body keys:', Object.keys(req.body || {}));
+      console.log('🔍 DEBUG - Request body pickupCity:', req.body?.pickupCity);
+      console.log('🔍 DEBUG - Request body deliveryCity:', req.body?.deliveryCity);
+    }
     
     // Ensure response is always sent
     let responseSent = false;
@@ -1259,6 +1264,19 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
 
       const resolvedCategoryData = categoryData || normalizeCategoryData(req.body);
 
+      // Debug: Log all received values (development only)
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔍 DEBUG - Received values:', {
+          pickupCity,
+          pickupAddress,
+          deliveryCity,
+          deliveryAddress,
+          pickupDistrict,
+          deliveryDistrict,
+          body: req.body
+        });
+      }
+
       if (!pickupCity || !pickupAddress || !deliveryCity || !deliveryAddress) {
         sendResponse(400, {
           success: false,
@@ -1268,19 +1286,22 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
       }
 
       const trackingNumber = generateTrackingNumber();
-      console.log('📝 Generated tracking number:', trackingNumber);
-
-      console.log('🔍 Preparing INSERT query...');
-      console.log('Values:', {
-        userId,
-        title: title || `${pickupCity} → ${deliveryCity}`,
-        pickupCity,
-        pickupDistrict,
-        pickupAddress,
-        deliveryCity,
-        deliveryDistrict,
-        deliveryAddress,
-      });
+      
+      // Debug logging (development only)
+      if (process.env.NODE_ENV === 'development') {
+        console.log('📝 Generated tracking number:', trackingNumber);
+        console.log('🔍 Preparing INSERT query...');
+        console.log('Values:', {
+          userId,
+          title: title || `${pickupCity} → ${deliveryCity}`,
+          pickupCity,
+          pickupDistrict,
+          pickupAddress,
+          deliveryCity,
+          deliveryDistrict,
+          deliveryAddress,
+        });
+      }
 
       const colsRes = await pool.query(
         `SELECT column_name FROM information_schema.columns WHERE table_name = 'shipments'`
@@ -1300,21 +1321,31 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
 
       const insert = { columns: [], values: [] };
 
-      add(insert, pickCol('ownerId', 'owner_id'), userId);
+      add(insert, pickCol('userId', 'userId'), userId);
       add(insert, pickCol('user_id', 'userid', 'userId'), userId);
 
       add(insert, pickCol('title'), shipmentTitle);
       add(insert, pickCol('description'), description || null);
       add(insert, pickCol('category'), category || 'general');
 
-      add(insert, pickCol('pickupCity', 'pickup_city'), pickupCity);
-      add(insert, pickCol('pickupDistrict', 'pickup_district'), pickupDistrict || null);
-      add(insert, pickCol('pickupAddress', 'pickup_address', 'from_address'), pickupAddress);
-      add(insert, pickCol('pickupDate', 'pickup_date'), pickupDateValue);
+      // Debug: Log which column names are being used (development only)
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔍 DEBUG - Column names for pickupCity/deliveryCity:', {
+          pickupCityCol: pickCol('pickupCity', 'pickup_city'),
+          deliveryCityCol: pickCol('deliveryCity', 'delivery_city'),
+          pickupCityValue: pickupCity,
+          deliveryCityValue: deliveryCity
+        });
+      }
 
-      add(insert, pickCol('deliveryCity', 'delivery_city'), deliveryCity);
-      add(insert, pickCol('deliveryDistrict', 'delivery_district'), deliveryDistrict || null);
-      add(insert, pickCol('deliveryAddress', 'delivery_address', 'to_address'), deliveryAddress);
+      add(insert, pickCol('pickupcity'), pickupCity);
+      add(insert, pickCol('pickupdistrict'), pickupDistrict || null);
+      add(insert, pickCol('pickupaddress', 'from_address'), pickupAddress);
+      add(insert, pickCol('pickupdate'), pickupDateValue);
+
+      add(insert, pickCol('deliverycity'), deliveryCity);
+      add(insert, pickCol('deliverydistrict'), deliveryDistrict || null);
+      add(insert, pickCol('deliveryaddress', 'to_address'), deliveryAddress);
       add(insert, pickCol('deliveryDate', 'delivery_date'), deliveryDateValue);
 
       add(insert, pickCol('weight', 'weight_kg'), weight || 0);
@@ -1344,7 +1375,7 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
         pickCol('metadata'),
         JSON.stringify(resolvedCategoryData ? { ...baseMeta, categoryData: resolvedCategoryData } : baseMeta)
       );
-      add(insert, pickCol('createdAt', 'created_at'), new Date());
+      add(insert, pickCol('createdat', 'createdat'), new Date());
       add(insert, pickCol('updatedAt', 'updated_at'), new Date());
 
       if (insert.columns.length === 0) {
@@ -1464,20 +1495,20 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
         `SELECT COUNT(*) as count
          FROM shipments s
          WHERE s.status IN ('pending', 'waiting_for_offers', 'open')
-         AND s."nakliyeci_id" IS NULL
+         AND s."carrierId" IS NULL
          AND s.id NOT IN (
-           SELECT o."shipment_id" 
+           SELECT o."shipmentId" 
            FROM offers o 
-           WHERE o."nakliyeci_id" = $1 AND o.status = 'pending'
+           WHERE o."carrierId" = $1 AND o.status = 'pending'
          )`,
         `SELECT COUNT(*) as count
          FROM shipments s
          WHERE s.status IN ('pending', 'waiting_for_offers', 'open')
-         AND s.nakliyeci_id IS NULL
+         AND s.carrierId IS NULL
          AND s.id NOT IN (
-           SELECT o.shipment_id 
+           SELECT o.shipmentId 
            FROM offers o 
-           WHERE o.nakliyeci_id = $1 AND o.status = 'pending'
+           WHERE o.carrierId = $1 AND o.status = 'pending'
          )`,
         [userId]
       );
@@ -1490,29 +1521,29 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
                 u."fullName" as "ownerName",
                 u."companyName" as "ownerCompany"
          FROM shipments s
-         LEFT JOIN users u ON s."ownerId" = u.id
+         LEFT JOIN users u ON s."userId" = u.id
          WHERE s.status IN ('pending', 'waiting_for_offers', 'open')
-         AND s."nakliyeci_id" IS NULL
+         AND s."carrierId" IS NULL
          AND s.id NOT IN (
-           SELECT o."shipment_id" 
+           SELECT o."shipmentId" 
            FROM offers o 
-           WHERE o."nakliyeci_id" = $1 AND o.status = 'pending'
+           WHERE o."carrierId" = $1 AND o.status = 'pending'
          )
-         ORDER BY s."createdAt" DESC
+         ORDER BY s."createdat" DESC
          LIMIT $2 OFFSET $3`,
         `SELECT s.*, 
                 u."fullName" as "ownerName",
                 u."companyName" as "ownerCompany"
          FROM shipments s
-         LEFT JOIN users u ON s."ownerId" = u.id
+         LEFT JOIN users u ON s."userId" = u.id
          WHERE s.status IN ('pending', 'waiting_for_offers', 'open')
-         AND s.nakliyeci_id IS NULL
+         AND s.carrierId IS NULL
          AND s.id NOT IN (
-           SELECT o.shipment_id 
+           SELECT o.shipmentId 
            FROM offers o 
-           WHERE o.nakliyeci_id = $1 AND o.status = 'pending'
+           WHERE o.carrierId = $1 AND o.status = 'pending'
          )
-         ORDER BY s."createdAt" DESC
+         ORDER BY s."createdat" DESC
          LIMIT $2 OFFSET $3`,
         [userId, limit, offset]
       );
@@ -1558,7 +1589,7 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
       }
 
       // Only allow shipment owner (individual/corporate) to trigger this action
-      if (shipment.owner_id != null && shipment.owner_id !== userId) {
+      if (shipment.userId != null && shipment.userId !== userId) {
         return res.status(403).json({ success: false, message: 'Bu gönderi için işlem yapma yetkiniz yok' });
       }
 
@@ -1588,7 +1619,7 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
         return res.status(404).json({ success: false, message: 'Gönderi bulunamadı' });
       }
 
-      if (shipment.owner_id != null && shipment.owner_id !== userId) {
+      if (shipment.userId != null && shipment.userId !== userId) {
         return res.status(403).json({ success: false, message: 'Bu gönderi için işlem yapma yetkiniz yok' });
       }
 
@@ -1624,8 +1655,8 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
                 d.phone as "driverPhone",
                 d.email as "driverEmail"
          FROM shipments s
-         LEFT JOIN users u ON s."ownerId" = u.id
-         LEFT JOIN users c ON s."nakliyeci_id" = c.id
+         LEFT JOIN users u ON s."userId" = u.id
+         LEFT JOIN users c ON s."carrierId" = c.id
          LEFT JOIN users d ON s."driver_id" = d.id
          WHERE s.id = $1`,
         [id]
@@ -1651,15 +1682,15 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
 
           if (cols.size > 0) {
             const pickCol = (...names) => names.find(n => cols.has(n)) || null;
-            const ownerCol = pickCol('owner_id', 'ownerId', 'user_id', 'userId');
+            const ownerCol = pickCol('userId', 'userId', 'user_id', 'userId');
             const plateCol = pickCol('plate_number', 'plateNumber', 'vehiclePlate', 'plate');
             const typeCol = pickCol('type', 'vehicleType');
-            const createdAtCol = pickCol('createdAt', 'created_at');
+            const createdatCol = pickCol('createdat', 'createdat');
 
             if (ownerCol && (plateCol || typeCol)) {
               const qIdent = c => (/[A-Z]/.test(c) ? `"${c}"` : c);
               const ownerExpr = qIdent(ownerCol);
-              const orderExpr = createdAtCol ? qIdent(createdAtCol) : null;
+              const orderExpr = createdatCol ? qIdent(createdatCol) : null;
 
               const selectParts = [];
               if (plateCol) selectParts.push(`${qIdent(plateCol)} as plate`);
@@ -1722,8 +1753,8 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
       const cols = new Set((colsRes.rows || []).map(r => r.column_name));
       const pickCol = (...names) => names.find(n => cols.has(n)) || null;
 
-      const idCol = pickCol('id', 'shipment_id', 'shipmentId');
-      const carrierCol = pickCol('nakliyeci_id', 'carrier_id');
+      const idCol = pickCol('id', 'shipmentId', 'shipmentId');
+      const carrierCol = pickCol('carrierId', 'carrier_id');
       const statusCol = pickCol('status');
       const updatedAtCol = pickCol('updatedAt', 'updated_at');
 
@@ -1786,7 +1817,7 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
 
       // Verify shipment belongs to this nakliyeci
       const shipmentCheck = await pool.query(
-        'SELECT id, "nakliyeci_id", status FROM shipments WHERE id = $1',
+        'SELECT id, "carrierId", status FROM shipments WHERE id = $1',
         [id]
       );
 
@@ -1799,15 +1830,15 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
 
       const shipment = shipmentCheck.rows[0];
 
-      // Check if nakliyeci_id is null - cannot assign driver without accepted offer
-      if (!shipment.nakliyeci_id) {
+      // Check if carrierId is null - cannot assign driver without accepted offer
+      if (!shipment.carrierId) {
         return res.status(400).json({
           success: false,
           message: 'Bu gönderiye henüz teklif kabul edilmemiş. Önce bir teklif kabul edilmelidir.',
         });
       }
 
-      if (shipment.nakliyeci_id !== nakliyeciId) {
+      if (shipment.carrierId !== nakliyeciId) {
         return res.status(403).json({
           success: false,
           message: 'Bu gönderiyi atama yetkiniz yok',
@@ -1832,10 +1863,10 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
 
       // Get shipment owner ID for notification
       const shipmentOwner = await pool.query(
-        'SELECT "ownerId" FROM shipments WHERE id = $1',
+        'SELECT "userId" FROM shipments WHERE id = $1',
         [id]
       );
-      const ownerId = shipmentOwner.rows[0]?.ownerId;
+      const userId = shipmentOwner.rows[0]?.userId;
 
       // Validate status transition before updating
       const currentStatus = shipment.status;
@@ -1882,10 +1913,10 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
         }
 
         // Create notification for shipment owner (sender)
-        if (ownerId) {
+        if (userId) {
           try {
             await createNotification({
-              userId: ownerId,
+              userId: userId,
               type: 'driver_assigned',
               title: 'Taşıyıcı Atandı',
               message: `Gönderinize taşıyıcı atandı. Detayları görüntüleyin.`,
@@ -1933,7 +1964,7 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
 
       // Get shipment with driver info
       const shipmentResult = await pool.query(
-        `SELECT s.id, s.status, s."driver_id", s."nakliyeci_id", s."ownerId"
+        `SELECT s.id, s.status, s."driver_id", s."carrierId", s."userId"
          FROM shipments s
          WHERE s.id = $1`,
         [id]
@@ -1950,7 +1981,7 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
 
       // Check if user is the driver or nakliyeci
       const isDriver = shipment.driver_id === userId;
-      const isNakliyeci = shipment.nakliyeci_id === userId;
+      const isNakliyeci = shipment.carrierId === userId;
 
       if (!isDriver && !isNakliyeci) {
         return res.status(403).json({
@@ -1987,10 +2018,10 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
       // Create notifications
       if (createNotification) {
         // Notify shipment owner
-        if (shipment.ownerId) {
+        if (shipment.userId) {
           try {
             await createNotification({
-              userId: shipment.ownerId,
+              userId: shipment.userId,
               type: 'shipment_in_transit',
               title: 'Gönderi Yola Çıktı',
               message: `Gönderiniz yola çıktı. Takip edebilirsiniz.`,
@@ -2002,10 +2033,10 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
         }
 
         // Notify nakliyeci (if not the one who started transit)
-        if (shipment.nakliyeci_id && !isNakliyeci) {
+        if (shipment.carrierId && !isNakliyeci) {
           try {
             await createNotification({
-              userId: shipment.nakliyeci_id,
+              userId: shipment.carrierId,
               type: 'shipment_in_transit',
               title: 'Gönderi Yola Çıktı',
               message: `Gönderi #${id} yola çıktı.`,
@@ -2053,7 +2084,7 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
 
       // Get shipment with driver info
       const shipmentResult = await pool.query(
-        `SELECT s.id, s.status, s."driver_id", s."nakliyeci_id", s."ownerId"
+        `SELECT s.id, s.status, s."driver_id", s."carrierId", s."userId"
          FROM shipments s
          WHERE s.id = $1`,
         [id]
@@ -2105,10 +2136,10 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
       // Create notifications
       if (createNotification) {
         // Notify shipment owner
-        if (shipment.ownerId) {
+        if (shipment.userId) {
           try {
             await createNotification({
-              userId: shipment.ownerId,
+              userId: shipment.userId,
               type: 'shipment_delivered',
               title: 'Gönderi Teslim Edildi',
               message: `Gönderiniz teslim edildi. Lütfen teslimatı onaylayın.`,
@@ -2120,10 +2151,10 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
         }
 
         // Notify nakliyeci
-        if (shipment.nakliyeci_id) {
+        if (shipment.carrierId) {
           try {
             await createNotification({
-              userId: shipment.nakliyeci_id,
+              userId: shipment.carrierId,
               type: 'shipment_delivered',
               title: 'Gönderi Teslim Edildi',
               message: `Gönderi #${id} teslim edildi. Gönderici onayını bekliyor.`,
@@ -2190,8 +2221,8 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
       // Best-effort history log
       try {
         await queryWithFallback(
-          `INSERT INTO shipment_status_history ("shipmentId", status, message, "createdAt") VALUES ($1, $2, $3, CURRENT_TIMESTAMP)`,
-          `INSERT INTO shipment_status_history (shipmentId, status, message, createdAt) VALUES ($1, $2, $3, CURRENT_TIMESTAMP)`,
+          `INSERT INTO shipment_status_history ("shipmentId", status, message, "createdat") VALUES ($1, $2, $3, CURRENT_TIMESTAMP)`,
+          `INSERT INTO shipment_status_history (shipmentId, status, message, createdat) VALUES ($1, $2, $3, CURRENT_TIMESTAMP)`,
           [id, nextStatus, reason || null]
         );
       } catch (e) {
@@ -2272,8 +2303,8 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
       // Best-effort history log
       try {
         await queryWithFallback(
-          `INSERT INTO shipment_status_history ("shipmentId", status, message, "createdAt") VALUES ($1, $2, $3, CURRENT_TIMESTAMP)`,
-          `INSERT INTO shipment_status_history (shipmentId, status, message, createdAt) VALUES ($1, $2, $3, CURRENT_TIMESTAMP)`,
+          `INSERT INTO shipment_status_history ("shipmentId", status, message, "createdat") VALUES ($1, $2, $3, CURRENT_TIMESTAMP)`,
+          `INSERT INTO shipment_status_history (shipmentId, status, message, createdat) VALUES ($1, $2, $3, CURRENT_TIMESTAMP)`,
           [shipmentId, normalizedStatus, null]
         );
       } catch (e) {
@@ -2317,7 +2348,19 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
       }
 
       // Only owner can cancel (consistent with frontend MyShipments)
-      if (shipment.owner_id !== userId) {
+      const shipmentOwnerUserId = shipment.userId || shipment.user_id;
+      
+      // Debug logging (development only)
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔍 DEBUG - İptal yetki kontrolü:', {
+          shipmentId,
+          shipmentOwnerUserId,
+          requestUserId: userId,
+          match: shipmentOwnerUserId === userId
+        });
+      }
+      
+      if (shipmentOwnerUserId !== userId) {
         return res.status(403).json({ success: false, message: 'Bu gönderiyi iptal etme yetkiniz yok' });
       }
 
@@ -2329,16 +2372,24 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
         });
       }
 
-      await pool.query(
-        `UPDATE shipments SET status = 'cancelled', ${cols.updatedAtCol} = CURRENT_TIMESTAMP WHERE id = $1`,
-        [shipmentId]
-      );
+      try {
+        await pool.query(
+          `UPDATE shipments SET status = 'cancelled', "updatedAt" = CURRENT_TIMESTAMP WHERE id = $1`,
+          [shipmentId]
+        );
+      } catch (updateError) {
+        // Fallback: updatedAt column olmadan sadece status güncelle
+        await pool.query(
+          `UPDATE shipments SET status = 'cancelled' WHERE id = $1`,
+          [shipmentId]
+        );
+      }
 
       // Best-effort history log
       try {
         await queryWithFallback(
-          `INSERT INTO shipment_status_history ("shipmentId", status, message, "createdAt") VALUES ($1, $2, $3, CURRENT_TIMESTAMP)`,
-          `INSERT INTO shipment_status_history (shipmentId, status, message, createdAt) VALUES ($1, $2, $3, CURRENT_TIMESTAMP)`,
+          `INSERT INTO shipment_status_history ("shipmentId", status, message, "createdat") VALUES ($1, $2, $3, CURRENT_TIMESTAMP)`,
+          `INSERT INTO shipment_status_history (shipmentId, status, message, createdat) VALUES ($1, $2, $3, CURRENT_TIMESTAMP)`,
           [shipmentId, 'cancelled', reason || null]
         );
       } catch (e) {
@@ -2385,25 +2436,25 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
         return res.status(404).json({ success: false, message: 'Gönderi bulunamadı' });
       }
 
-      const ownerId = shipment.ownerId || shipment.owner_id || shipment.user_id;
-      const nakliyeciId = shipment.nakliyeci_id || shipment.nakliyeciId;
+      const shipmentOwnerUserId = shipment.userId || shipment.userId || shipment.user_id;
+      const nakliyeciId = shipment.carrierId || shipment.nakliyeciId;
       const driverId = shipment.driver_id || shipment.driverId;
-      const allowed = ownerId === userId || nakliyeciId === userId || driverId === userId;
+      const allowed = userId === shipmentOwnerUserId || nakliyeciId === userId || driverId === userId;
       if (!allowed) {
         return res.status(403).json({ success: false, message: 'Bu gönderiyi silme yetkiniz yok' });
       }
 
       try {
         await pool.query(
-          `UPDATE shipments SET status = 'cancelled', ${cols.updatedAtCol} = CURRENT_TIMESTAMP WHERE id = $1`,
+          `UPDATE shipments SET status = 'cancelled', "updatedAt" = CURRENT_TIMESTAMP WHERE id = $1`,
           [shipmentId]
         );
-      } catch (_) {
-        try {
-          await pool.query('DELETE FROM shipments WHERE id = $1', [shipmentId]);
-        } catch (_) {
-          // ignore
-        }
+      } catch (updateError) {
+        // Fallback: updatedAt column olmadan sadece status güncelle
+        await pool.query(
+          `UPDATE shipments SET status = 'cancelled' WHERE id = $1`,
+          [shipmentId]
+        );
       }
 
       return res.json({ success: true });
@@ -2464,14 +2515,14 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
         id: shipmentId,
         status: shipmentBase.status,
         driver_id: shipmentBase.driver_id,
-        nakliyeci_id: shipmentBase.carrier_id,
-        ownerId: shipmentBase.owner_id,
+        carrierId: shipmentBase.carrier_id,
+        userId: shipmentBase.userId,
         price: extra.price,
         acceptedOfferId: extra.acceptedOfferId,
       };
 
       // Only shipment owner can confirm delivery
-      if (shipment.ownerId !== userId) {
+      if (shipment.userId !== userId) {
         return res.status(403).json({
           success: false,
           message: 'Bu işlemi yapma yetkiniz yok. Sadece gönderi sahibi teslimatı onaylayabilir.',
@@ -2516,7 +2567,7 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
         let paymentAmount = 0;
         let commissionAmount = 0;
 
-        if (shipment.nakliyeci_id && shipment.price) {
+        if (shipment.carrierId && shipment.price) {
           paymentAmount = parseFloat(shipment.price);
           commissionAmount = parseFloat((paymentAmount * 0.01).toFixed(2)); // 1% commission (already deducted at offer acceptance)
           // Commission was already deducted, so nakliyeci receives full price
@@ -2526,14 +2577,14 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
           // Get or create wallet for nakliyeci
           let walletResult = await client.query(
             `SELECT id, balance, userid FROM wallets WHERE userid = $1`,
-            [shipment.nakliyeci_id]
+            [shipment.carrierId]
           );
 
           if (walletResult.rows.length === 0) {
             // Try with user_id
             walletResult = await client.query(
               `SELECT id, balance, "user_id" as userid FROM wallets WHERE "user_id" = $1`,
-              [shipment.nakliyeci_id]
+              [shipment.carrierId]
             );
           }
 
@@ -2545,17 +2596,17 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
                 `INSERT INTO wallets (userid, balance, createdat, updatedat) 
                  VALUES ($1, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) 
                  RETURNING id, balance, userid`,
-                [shipment.nakliyeci_id]
+                [shipment.carrierId]
               );
               walletId = newWallet.rows[0].id;
             } catch (createError) {
               // Try with user_id
               try {
                 const newWallet = await client.query(
-                  `INSERT INTO wallets ("user_id", balance, "created_at", "updated_at") 
+                  `INSERT INTO wallets ("user_id", balance, "createdat", "updated_at") 
                    VALUES ($1, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) 
                    RETURNING id, balance, "user_id" as userid`,
-                  [shipment.nakliyeci_id]
+                  [shipment.carrierId]
                 );
                 walletId = newWallet.rows[0].id;
               } catch (e) {
@@ -2596,10 +2647,10 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
           // Record transaction
           try {
             await client.query(
-              `INSERT INTO transactions (user_id, wallet_id, type, amount, description, reference_id, created_at)
+              `INSERT INTO transactions (user_id, wallet_id, type, amount, description, reference_id, createdat)
                VALUES ($1, $2, 'payment_release', $3, $4, $5, CURRENT_TIMESTAMP)`,
               [
-                shipment.nakliyeci_id,
+                shipment.carrierId,
                 walletId,
                 nakliyeciReceives,
                 `Gönderi #${id} tamamlandı - Ödeme serbest bırakıldı (Komisyon ${commissionAmount} TL teklif kabul edildiğinde kesilmişti)`,
@@ -2613,7 +2664,7 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
                 `INSERT INTO transactions (userid, walletid, type, amount, description, referenceid, createdat)
                  VALUES ($1, $2, 'payment_release', $3, $4, $5, CURRENT_TIMESTAMP)`,
                 [
-                  shipment.nakliyeci_id,
+                  shipment.carrierId,
                   walletId,
                   nakliyeciReceives,
                   `Gönderi #${id} tamamlandı - Ödeme serbest bırakıldı (Komisyon ${commissionAmount} TL teklif kabul edildiğinde kesilmişti)`,
@@ -2634,10 +2685,10 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
         // Create notifications
         if (createNotification) {
           // Notify nakliyeci
-          if (shipment.nakliyeci_id) {
+          if (shipment.carrierId) {
             try {
               await createNotification({
-                userId: shipment.nakliyeci_id,
+                userId: shipment.carrierId,
                 type: 'payment_released',
                 title: 'Ödeme Serbest Bırakıldı',
                 message: `Gönderi #${id} tamamlandı. ${paymentReleased ? `Ödeme cüzdanınıza yatırıldı (${paymentAmount - commissionAmount} TL).` : 'Ödeme işlemi tamamlandı.'}`,
@@ -2704,17 +2755,17 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
       const result = await pool.query(
         `SELECT 
           tu.id,
-          tu.shipment_id,
+          tu.shipmentId,
           tu.status,
           tu.location,
           tu.notes as notes,
           tu.updated_by,
           u."fullName" as updated_by_name,
-          tu.created_at
+          tu.createdat
         FROM tracking_updates tu
         LEFT JOIN users u ON tu.updated_by = u.id
-        WHERE tu.shipment_id = $1
-        ORDER BY tu.created_at DESC`,
+        WHERE tu.shipmentId = $1
+        ORDER BY tu.createdat DESC`,
         [id]
       );
 
@@ -2752,9 +2803,9 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
 
       const result = await pool.query(
         `INSERT INTO tracking_updates 
-          (shipment_id, status, location, notes, updated_by, created_at)
+          (shipmentId, status, location, notes, updated_by, createdat)
         VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
-        RETURNING id, created_at`,
+        RETURNING id, createdat`,
         [id, status, location || '', notes || '', userId]
       );
 
@@ -2784,23 +2835,14 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
         }
       }
 
-      // Send real-time notification via Socket.IO
-      if (io) {
-        io.to(`shipment_${id}`).emit('tracking_update', {
-          shipmentId: id,
-          status,
-          location,
-          notes,
-          updatedBy: userId,
-          timestamp: new Date().toISOString(),
-        });
-      }
+      // Socket.io removed - real-time updates not needed
+      // Tracking updates available via REST API polling
 
       res.json({
         success: true,
         data: {
           id: result.rows[0].id,
-          created_at: result.rows[0].created_at,
+          createdat: result.rows[0].createdat,
         },
       });
     } catch (error) {
