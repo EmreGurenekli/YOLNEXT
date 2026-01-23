@@ -19,6 +19,14 @@ function createHealthRoutes(pool) {
     }
   });
 
+  // Live endpoint for Docker healthcheck (lightweight, no DB query)
+  router.get('/live', (req, res) => {
+    res.status(200).json({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+    });
+  });
+
   return router;
 }
 
