@@ -3,7 +3,8 @@ import { Helmet } from 'react-helmet-async';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { createApiUrl } from '../../config/api';
 import { useAuth } from '../../contexts/AuthContext';
-// Socket.io removed - using REST API polling insteadimport { resolveShipmentRoute } from '../../utils/shipmentRoute';
+// Socket.io removed - using REST API polling instead
+import { resolveShipmentRoute } from '../../utils/shipmentRoute';
 import CarrierInfoCard from '../../components/CarrierInfoCard';
 import { normalizeTrackingCode } from '../../utils/trackingCode';
 import { logger } from '../../utils/logger';

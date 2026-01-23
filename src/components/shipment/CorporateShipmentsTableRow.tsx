@@ -29,6 +29,7 @@ interface Shipment {
   category: string;
   subCategory: string;
   hasRatedCarrier?: boolean;
+  createdAt?: string;
 }
 
 interface CorporateShipmentsTableRowProps {

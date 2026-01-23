@@ -162,7 +162,7 @@ export default function CreateShipmentStep3({
                 <div className="flex justify-between">
                   <span className="text-slate-600">Özel Gereksinimler:</span>
                   <span className="font-medium text-slate-900">
-                    {formData.specialRequirements.split(',').filter(r => r.trim()).map(req => {
+                    {formData.specialRequirements.split(',').filter((r: string) => r.trim()).map((req: string) => {
                       const reqMap: { [key: string]: string } = {
                         'fragile': 'Kırılgan',
                         'urgent': 'Acil',

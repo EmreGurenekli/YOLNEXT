@@ -98,7 +98,7 @@ import AdminDashboard from '../pages/admin/Dashboard';
 import AdminCases from '../pages/admin/Cases';
 import AdminFlags from '../pages/admin/Flags';
 import AdminSupportManagement from '../pages/admin/SupportManagement';
-import { useParams, Navigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 
 // Redirect component
 const IndividualShipmentToMyShipmentsRedirect: React.FC = () => {

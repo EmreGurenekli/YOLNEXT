@@ -524,7 +524,6 @@ export default function CorporateShipments() {
   };
 
   // Gerçek API'den gönderileri yükle
-  const [shipments, setShipments] = useState<Shipment[]>([]);
   const [isLoadingShipments, setIsLoadingShipments] = useState(true);
 
   const loadShipments = async () => {

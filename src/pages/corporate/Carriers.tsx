@@ -52,6 +52,7 @@ import GuidanceOverlay from '../../components/common/GuidanceOverlay';
 // import { carriersAPI } from '../../services/api';
 // Temporary workaround
 import { createApiUrl } from '../../config/api';
+import { logger } from '../../utils/logger';
 
 const carriersAPI = {
   getCorporate: async () => {

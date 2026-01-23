@@ -47,6 +47,7 @@ import CommissionManager from '../../components/CommissionManager';
 import StatusManager from '../../components/StatusManager';
 import { resolveShipmentRoute } from '../../utils/shipmentRoute';
 import NotificationCenter from '../../components/NotificationCenter';
+import { logger } from '../../utils/logger';
 
 interface Shipment {
   id: string;

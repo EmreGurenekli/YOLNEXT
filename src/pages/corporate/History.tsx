@@ -509,5 +509,3 @@ const CorporateHistory: React.FC = () => {
 };
 
 export default CorporateHistory;
-export default CorporateHistory;
-export default CorporateHistory;

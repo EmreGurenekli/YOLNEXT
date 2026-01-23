@@ -17,6 +17,7 @@ import {
 import Breadcrumb from '../../components/common/Breadcrumb';
 import LoadingState from '../../components/common/LoadingState';
 import { createApiUrl } from '../../config/api';
+import { logger } from '../../utils/logger';
 
 export default function CorporateAnalytics() {
   const [selectedPeriod, setSelectedPeriod] = useState('30days');
