@@ -371,7 +371,7 @@ function createAuthRoutes(pool, JWT_SECRET, createNotification, sendEmail) {
           push(users.lastName, null, lastName || null);
           if (users.fullName) push(users.fullName, null, fullName);
           push(users.role, null, finalRole);
-          push('phone', null, phone || null);
+          push('phone', null, normalizedPhone || null);
           push(users.companyName, null, companyName || null);
           if (users.city) push(users.city, null, city || null);
           push(users.isActive, null, true);
@@ -802,25 +802,38 @@ function createAuthRoutes(pool, JWT_SECRET, createNotification, sendEmail) {
         });
       }
 
-      // Clean phone number (remove non-digits)
-      const cleanPhone = phone.replace(/\D/g, '');
+      // Clean phone number (remove all non-digits)
+      let cleanPhone = String(phone || '').replace(/\D/g, '');
+      
+      // Normalize Turkish phone numbers
+      // Remove country code (+90 or 90)
+      if (cleanPhone.startsWith('90') && cleanPhone.length >= 12) {
+        cleanPhone = cleanPhone.slice(2);
+      }
+      // Remove leading zero
+      if (cleanPhone.startsWith('0') && cleanPhone.length === 11) {
+        cleanPhone = cleanPhone.slice(1);
+      }
 
       // Basic phone format validation (Turkish format)
-      // Accepts: +905551234567, 05551234567, 5551234567
-      if (!/^(\+90|0)?[5][0-9]{9}$/.test(cleanPhone)) {
+      // Must be exactly 10 digits starting with 5
+      // Accepts: +905551234567, 905551234567, 05551234567, 5551234567
+      if (cleanPhone.length !== 10 || !cleanPhone.startsWith('5') || !/^[0-9]{10}$/.test(cleanPhone)) {
         return res.json({
           success: false,
           isValid: false,
           requiresCode: false,
-          message: 'Invalid phone format',
+          message: 'Invalid phone format. Please use Turkish format: 05XX XXX XX XX or +90 5XX XXX XX XX',
         });
       }
 
-      // Check if phone already exists
+      // Check if phone already exists (check both normalized and original formats)
       if (pool) {
+        // Try to find by normalized phone (10 digits starting with 5)
+        // Also check common formats: 0XXXXXXXXX, +90XXXXXXXXXX, 90XXXXXXXXXX
         const existingUser = await pool.query(
-          'SELECT id FROM users WHERE phone = $1',
-          [cleanPhone]
+          `SELECT id FROM users WHERE phone = $1 OR phone = $2 OR phone = $3 OR phone = $4 OR REPLACE(REPLACE(REPLACE(phone, '+', ''), ' ', ''), '-', '') = $5`,
+          [cleanPhone, `0${cleanPhone}`, `+90${cleanPhone}`, `90${cleanPhone}`, cleanPhone]
         );
 
         if (existingUser.rows.length > 0) {
