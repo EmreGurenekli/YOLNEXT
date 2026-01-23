@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { useToast } from '../../contexts/ToastContext';import { 
+import { useToast } from '../../contexts/ToastContext';
+import { 
   Package, Truck, DollarSign, MapPin, Users, 
   FileText, ChevronDown, ChevronRight, Search,
   ArrowRight, Info, ChevronUp, AlertCircle,
@@ -30,6 +31,7 @@ interface SupportCategory {
 }
 
 const IndividualHelp: React.FC = () => {
+  const { showToast } = useToast();
   const [openFAQ, setOpenFAQ] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [isSupportOpen, setIsSupportOpen] = useState(false);

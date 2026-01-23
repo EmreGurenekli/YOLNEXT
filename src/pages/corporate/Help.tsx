@@ -306,7 +306,7 @@ const CorporateHelp = () => {
       } else {
         const errorPayload = await response.json().catch(() => null);
         showProfessionalToast(
-          toast,
+          showToast,
           'OPERATION_FAILED',
           'error',
           errorPayload?.message || 'Destek talebi oluşturulurken bir hata oluştu. Lütfen tekrar deneyin.'
