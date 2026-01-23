@@ -1,41 +1,48 @@
+# Render.com Deployment Configuration
+# Backend ve Database için Render deployment ayarları
+
 services:
+  # PostgreSQL Database
+  - type: pspg
+    name: yolnext-database
+    databaseName: yolnext
+    user: yolnext_user
+    plan: starter  # free tier için "starter", production için "standard" veya daha yüksek
+    postgresMajorVersion: 15
+
+  # Backend API Service
   - type: web
     name: yolnext-backend
-    env: node
+    runtime: node
+    plan: starter  # free tier için "starter"
     buildCommand: cd backend && npm install
-    startCommand: node server-modular.js
+    startCommand: cd backend && node server-modular.js
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
-        value: 5000
+        value: 10000  # Render otomatik PORT atar, ama belirtmek iyi
       - key: DATABASE_URL
-        sync: false
+        fromDatabase:
+          name: yolnext-database
+          property: connectionString
       - key: JWT_SECRET
-        sync: false
+        generateValue: true  # Render otomatik generate eder
       - key: FRONTEND_ORIGIN
-        sync: false
+        sync: false  # Netlify URL'i buraya eklenecek
+      - key: DB_POOL_MAX
+        value: "20"
+      - key: DB_IDLE_TIMEOUT
+        value: "30000"
+      - key: DB_CONNECTION_TIMEOUT
+        value: "2000"
+    healthCheckPath: /api/health/live
+    autoDeploy: true  # GitHub push'ta otomatik deploy
 
-  - type: web
-    name: yolnext-frontend
-    env: static
-    buildCommand: npm install && npm run build:frontend
-    staticPublishPath: ./dist
-    envVars:
-      - key: VITE_API_URL
-        sync: false
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+# Not: Environment variables Render dashboard'dan da ayarlanabilir:
+# - FRONTEND_ORIGIN: Netlify frontend URL'i (örn: https://yolnext.netlify.app)
+# - EMAIL_SMTP_URL: Email servisi için (opsiyonel)
+# - IYZICO_API_KEY: Ödeme gateway için (opsiyonel)
+# - IYZICO_SECRET_KEY: Ödeme gateway için (opsiyonel)
+# - SENTRY_DSN: Error tracking için (opsiyonel)
 

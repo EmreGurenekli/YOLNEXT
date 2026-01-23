@@ -1,38 +1,76 @@
+
 // API Configuration
 const API_CONFIG = {
   // Development
   development: {
-    baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000',
     timeout: 10000,
     retryAttempts: 3,
   },
 
   // Production
   production: {
-    baseURL: import.meta.env.VITE_API_URL || 'https://api.yolnext.com',
     timeout: 15000,
     retryAttempts: 5,
   },
 
   // Test
   test: {
-    baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000',
     timeout: 5000,
     retryAttempts: 1,
   },
 };
 
+const getViteEnv = (): any => {
+  try {
+    const isJest =
+      typeof process !== 'undefined' &&
+      !!(process as any)?.env &&
+      ((process as any).env.JEST_WORKER_ID != null || (process as any).env.NODE_ENV === 'test');
+    if (isJest) return null;
+    // Evaluate only in Vite/browser ESM context. In Jest/CJS this would throw.
+    return (0, eval)('import.meta.env');
+  } catch {
+    return null;
+  }
+};
+
 // Get current environment
 const getEnvironment = (): keyof typeof API_CONFIG => {
-  if (import.meta.env.MODE === 'test') return 'test';
-  if (import.meta.env.MODE === 'production') return 'production';
+  const viteEnv = getViteEnv();
+  const nodeEnv = typeof process !== 'undefined' ? process.env.NODE_ENV : undefined;
+  const mode = String(viteEnv?.MODE || nodeEnv || 'development');
+  if (mode === 'test') return 'test';
+  if (mode === 'production') return 'production';
   return 'development';
+};
+
+const resolveBaseUrl = (env: keyof typeof API_CONFIG) => {
+  const viteEnv = getViteEnv();
+  const nodeApiUrl = typeof process !== 'undefined' ? process.env.VITE_API_URL : undefined;
+  const fromEnv = viteEnv?.VITE_API_URL || nodeApiUrl;
+  if (fromEnv) return String(fromEnv);
+  // In production, use environment variable or default to Render.com URL pattern
+  // Render.com URL format: https://yolnext-backend.onrender.com
+  if (env === 'production') {
+    // Production URL should be set via VITE_API_URL environment variable
+    // Default fallback for Render.com deployment
+    return 'https://yolnext-backend.onrender.com';
+  }
+  // In development, use relative path so Vite proxy can forward to backend
+  // Vite proxy is configured to forward /api requests to http://localhost:5000
+  if (env === 'development') {
+    return '';
+  }
+  return 'http://localhost:5000';
 };
 
 // Get API configuration
 export const getApiConfig = () => {
   const env = getEnvironment();
-  return API_CONFIG[env];
+  return {
+    ...API_CONFIG[env],
+    baseURL: resolveBaseUrl(env),
+  };
 };
 
 // API endpoints
