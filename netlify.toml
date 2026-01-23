@@ -44,6 +44,25 @@
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
 
+# JavaScript dosyaları için MIME type düzeltmesi
+[[headers]]
+  for = "/*.js"
+  [headers.values]
+    Content-Type = "application/javascript; charset=utf-8"
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*.mjs"
+  [headers.values]
+    Content-Type = "application/javascript; charset=utf-8"
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/assets/*.js"
+  [headers.values]
+    Content-Type = "application/javascript; charset=utf-8"
+    Cache-Control = "public, max-age=31536000, immutable"
+
 # Plugin ayarları (opsiyonel)
 # [[plugins]]
 #   package = "@netlify/plugin-nextjs"
