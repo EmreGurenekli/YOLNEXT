@@ -117,7 +117,9 @@ export default function Login() {
   };
 
   const handleDemoLogin = async (userType: string) => {
-    if (import.meta.env.MODE === 'production') {
+    // Production kontrolü: Netlify'da PROD flag'i kullan
+    const isProduction = import.meta.env.PROD || import.meta.env.MODE === 'production' || window.location.hostname !== 'localhost';
+    if (isProduction) {
       setError('Hızlı giriş production ortamında devre dışı');
       return;
     }
@@ -297,40 +299,44 @@ export default function Login() {
               </p>
             </div>
 
-            {/* Demo Login Section */}
-            <div className='mb-8'>
-              <h3 className='text-lg font-semibold text-gray-900 mb-4'>
-                Hızlı Giriş (Demo)
-              </h3>
-              <div className='grid grid-cols-2 gap-3'>
-                {userTypes.map(userType => (
-                  <button
-                    key={userType.value}
-                    data-testid={`demo-${userType.value}`}
-                    onClick={() => handleDemoLogin(userType.value)}
-                    disabled={isLoading}
-                    className='p-4 rounded-xl border-2 border-gray-200 bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 disabled:opacity-50 disabled:cursor-not-allowed text-white transition-all duration-300 hover:shadow-lg'
-                  >
-                    <div className='flex items-center justify-center mb-2'>
-                      {userType.icon}
-                    </div>
-                    <div className='text-sm font-semibold'>
-                      {userType.label}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
+            {/* Demo Login Section - Sadece development'ta göster */}
+            {(!import.meta.env.PROD && import.meta.env.MODE !== 'production' && window.location.hostname === 'localhost') && (
+              <>
+                <div className='mb-8'>
+                  <h3 className='text-lg font-semibold text-gray-900 mb-4'>
+                    Hızlı Giriş (Demo)
+                  </h3>
+                  <div className='grid grid-cols-2 gap-3'>
+                    {userTypes.map(userType => (
+                      <button
+                        key={userType.value}
+                        data-testid={`demo-${userType.value}`}
+                        onClick={() => handleDemoLogin(userType.value)}
+                        disabled={isLoading}
+                        className='p-4 rounded-xl border-2 border-gray-200 bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 disabled:opacity-50 disabled:cursor-not-allowed text-white transition-all duration-300 hover:shadow-lg'
+                      >
+                        <div className='flex items-center justify-center mb-2'>
+                          {userType.icon}
+                        </div>
+                        <div className='text-sm font-semibold'>
+                          {userType.label}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
-            {/* Divider */}
-            <div className='relative mb-8'>
-              <div className='absolute inset-0 flex items-center'>
-                <div className='w-full border-t border-gray-300'></div>
-              </div>
-              <div className='relative flex justify-center text-sm'>
-                <span className='px-4 bg-white text-gray-500'>veya</span>
-              </div>
-            </div>
+                {/* Divider */}
+                <div className='relative mb-8'>
+                  <div className='absolute inset-0 flex items-center'>
+                    <div className='w-full border-t border-gray-300'></div>
+                  </div>
+                  <div className='relative flex justify-center text-sm'>
+                    <span className='px-4 bg-white text-gray-500'>veya</span>
+                  </div>
+                </div>
+              </>
+            )}
 
             {/* Login Form */}
             <form onSubmit={handleSubmit} className='space-y-6'>
@@ -437,9 +443,11 @@ export default function Login() {
                   Hemen kayıt olun
                 </Link>
               </p>
-              <p className='text-xs text-slate-500 mt-2'>
-                Demo giriş üretimde kapalıdır; test ortamında hızlı giriş yapabilirsiniz.
-              </p>
+              {(!import.meta.env.PROD && import.meta.env.MODE !== 'production' && window.location.hostname === 'localhost') && (
+                <p className='text-xs text-slate-500 mt-2'>
+                  Demo giriş üretimde kapalıdır; test ortamında hızlı giriş yapabilirsiniz.
+                </p>
+              )}
             </div>
           </div>
         </div>
