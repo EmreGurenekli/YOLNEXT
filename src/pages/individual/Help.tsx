@@ -1,12 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-<<<<<<< HEAD
-import { useToast } from '../../contexts/ToastContext';
-=======
-import toast from 'react-hot-toast';
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
-import { 
+import { useToast } from '../../contexts/ToastContext';import { 
   Package, Truck, DollarSign, MapPin, Users, 
   FileText, ChevronDown, ChevronRight, Search,
   ArrowRight, Info, ChevronUp, AlertCircle,
@@ -255,12 +250,7 @@ const IndividualHelp: React.FC = () => {
     e.preventDefault();
     
     if (!formData.category || !formData.subject || !formData.description) {
-<<<<<<< HEAD
-      showProfessionalToast(showToast, 'REQUIRED_FIELDS', 'error');
-=======
-      showProfessionalToast(toast, 'REQUIRED_FIELDS', 'error');
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
-      return;
+      showProfessionalToast(showToast, 'REQUIRED_FIELDS', 'error');      return;
     }
 
     try {
@@ -283,12 +273,7 @@ const IndividualHelp: React.FC = () => {
       });
 
       if (response.ok) {
-<<<<<<< HEAD
-        showProfessionalToast(showToast, 'SUPPORT_TICKET_CREATED', 'success');
-=======
-        showProfessionalToast(toast, 'SUPPORT_TICKET_CREATED', 'success');
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
-        setFormData({
+        showProfessionalToast(showToast, 'SUPPORT_TICKET_CREATED', 'success');        setFormData({
           category: '',
           priority: 'medium',
           subject: '',
@@ -306,12 +291,7 @@ const IndividualHelp: React.FC = () => {
         );
       }
     } catch (error) {
-<<<<<<< HEAD
-      showProfessionalToast(showToast, 'NETWORK_ERROR', 'error');
-=======
-      showProfessionalToast(toast, 'NETWORK_ERROR', 'error');
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
-    } finally {
+      showProfessionalToast(showToast, 'NETWORK_ERROR', 'error');    } finally {
       setLoading(false);
     }
   };

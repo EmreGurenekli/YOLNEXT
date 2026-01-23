@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-<<<<<<< HEAD
 =======
 import { toast } from 'react-hot-toast';
 >>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
@@ -105,150 +104,12 @@ interface SettingsData {
 
 export default function IndividualSettings() {
 <<<<<<< HEAD
-  const { showToast } = useToast();
-=======
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
-  const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState('profile');
-  const [isLoading, setIsLoading] = useState(false);
-  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
-  const [error, setError] = useState('');
-
-  const [settings, setSettings] = useState<SettingsData>({
-    profile: {
-      name: 'Kullanıcı',
-      email: 'ahmet.yilmaz@email.com',
-      phone: '+90 532 123 45 67',
-      address: 'İstanbul, Türkiye',
-      birthDate: '1985-03-15',
-    },
-    notifications: {
-      email: true,
-      sms: true,
-      push: true,
-      jobAlerts: true,
-      messageAlerts: true,
-      paymentAlerts: false,
-    },
-    privacy: {
-      showProfile: true,
-      showLocation: false,
-      allowMessages: true,
-    },
-    security: {
-      twoFactor: false,
-      biometric: true,
-      sessionTimeout: 30,
-    },
-    preferences: {
-      theme: 'light',
-      language: 'tr',
-      timezone: 'Europe/Istanbul',
-      currency: 'TRY',
-    },
-  });
-
-  // Update settings when user data is available
-  useEffect(() => {
-    if (user) {
-      const fullName = user.fullName || (user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : user.firstName || 'Kullanıcı');
-      setSettings(prev => ({
-        ...prev,
-        profile: {
-          ...prev.profile,
-          name: fullName,
-          email: user.email || prev.profile.email,
-          phone: user.phone || prev.profile.phone,
-          address: user.address || prev.profile.address,
-        },
-      }));
-    }
-  }, [user]);
-
-  const breadcrumbItems = [
-    {
-      label: 'Ana Sayfa',
-      icon: <BarChart3 className='w-4 h-4' />,
-      href: '/individual/dashboard',
-    },
-    { label: 'Ayarlar', icon: <Settings className='w-4 h-4' /> },
-  ];
-
-  const tabs = [
-    { id: 'profile', name: 'Profil', icon: User },
-  ];
-
-  const handleSave = () => {
-    setIsLoading(true);
-    setTimeout(() => {
-      setSuccessMessage('Ayarlar başarıyla kaydedildi');
-      setShowSuccessMessage(true);
-      setIsLoading(false);
-    }, 1000);
-  };
-
-  const handleInputChange = (
-    section: keyof SettingsData,
-    field: string,
-    value: any
-  ) => {
-    setSettings(prev => ({
-      ...prev,
-      [section]: {
-        ...prev[section],
-        [field]: value,
-      },
-    }));
-  };
-
-  const handleToggle = (section: keyof SettingsData, field: string) => {
-    setSettings(prev => ({
-      ...prev,
-      [section]: {
-        ...prev[section],
-        [field]: !(prev[section] as any)[field],
-      },
-    }));
-  };
-
-  const handleDeleteAccount = async (password: string) => {
-    if (!password) {
-      setError('Şifre gereklidir');
-      return;
-    }
-
-    const finalConfirm = window.confirm(
-      'SON UYARI: Hesabınızı silmek istediğinizden kesinlikle emin misiniz? Bu işlem geri alınamaz ve tüm verileriniz kalıcı olarak silinecektir!'
-    );
-
-    if (!finalConfirm) {
-      return;
-    }
-
-    setIsLoading(true);
-    setError('');
-
-    try {
-      const response = await authAPI.deleteAccount({ password, reason: 'Kullanıcı talebi' });
-      
-      if (response.success) {
-<<<<<<< HEAD
-        showProfessionalToast(showToast, 'ACTION_COMPLETED', 'success');
-=======
-        showProfessionalToast(toast, 'ACTION_COMPLETED', 'success');
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
-        setTimeout(() => {
+  const { showToast } = useToast();        setTimeout(() => {
           localStorage.clear();
           window.location.href = '/';
         }, 2000);
       } else {
-<<<<<<< HEAD
-        showProfessionalToast(showToast, 'OPERATION_FAILED', 'error');
-=======
-        showProfessionalToast(toast, 'OPERATION_FAILED', 'error');
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
-      }
+        showProfessionalToast(showToast, 'OPERATION_FAILED', 'error');      }
     } catch (err: any) {
       setError(
         err?.response?.data?.message ||

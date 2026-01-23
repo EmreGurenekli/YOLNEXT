@@ -102,112 +102,13 @@ import RatingModal from '../../components/RatingModal';
 import Pagination from '../../components/common/Pagination';
 import { useAuth } from '../../contexts/AuthContext';
 import GuidanceOverlay from '../../components/common/GuidanceOverlay';
-<<<<<<< HEAD
-import { useToast } from '../../contexts/ToastContext';
-=======
-import { toast } from 'react-hot-toast';
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
-import { TOAST_MESSAGES, showProfessionalToast } from '../../utils/toastMessages';
+import { useToast } from '../../contexts/ToastContext';import { TOAST_MESSAGES, showProfessionalToast } from '../../utils/toastMessages';
 import { logger } from '../../utils/logger';
 
 export default function CorporateShipments() {
   const navigate = useNavigate();
   const { user } = useAuth();
-<<<<<<< HEAD
-  const { showToast } = useToast();
-=======
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
-
-  const [showProcessAssistantDetails, setShowProcessAssistantDetails] = useState(false);
-
-  const toNumber = (value: any, fallback = 0) => {
-    if (typeof value === 'number') return Number.isFinite(value) ? value : fallback;
-    if (typeof value === 'string') {
-      const n = parseFloat(value.replace(/[^0-9.,-]/g, '').replace(',', '.'));
-      return Number.isFinite(n) ? n : fallback;
-    }
-    return fallback;
-  };
-
-  const toTrackingCode = (value: any, idFallback?: any) => {
-    const v = String(value ?? '').trim();
-    if (!v) {
-      const n = Number(String(idFallback ?? '').trim());
-      if (Number.isFinite(n) && n > 0) {
-        return `TRK${Math.trunc(n).toString().padStart(6, '0')}`;
-      }
-      return '';
-    }
-    if (/^TRK/i.test(v)) return v;
-    const n = Number(v);
-    if (Number.isFinite(n) && n > 0) {
-      return `TRK${Math.trunc(n).toString().padStart(6, '0')}`;
-    }
-    return v;
-  };
-
-  const isMessagingEnabledForStatus = (rawStatus?: any) => {
-    const s = normalizeShipmentStatus(rawStatus);
-    return (
-      s === 'offer_accepted' ||
-      s === 'accepted' ||
-      s === 'in_transit' ||
-      s === 'picked_up' ||
-      s === 'delivered' ||
-      s === 'completed'
-    );
-  };
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [sortBy, setSortBy] = useState('date');
-  const [showTrackingModal, setShowTrackingModal] = useState(false);
-  const [selectedShipmentForTracking, setSelectedShipmentForTracking] =
-    useState<number | null>(null);
-  const [acceptedShipmentId, setAcceptedShipmentId] = useState<string | null>(
-    null
-  );
-  const [showDetailsModal, setShowDetailsModal] = useState(false);
-  const [selectedShipmentForDetails, setSelectedShipmentForDetails] = useState<
-    number | null
-  >(null);
-  const [selectedShipmentDetail, setSelectedShipmentDetail] =
-    useState<Shipment | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 6;
-  const [showRatingModal, setShowRatingModal] = useState(false);
-  const [selectedCarrier, setSelectedCarrier] = useState<{id: string; name: string; email: string; type: string} | null>(null);
-  const [selectedShipmentId, setSelectedShipmentId] = useState<string | null>(null);
-  const [showCancelModal, setShowCancelModal] = useState(false);
-  const [cancelReason, setCancelReason] = useState('');
-  const [isCancelling, setIsCancelling] = useState(false);
-  const [selectedShipmentForCancel, setSelectedShipmentForCancel] = useState<Shipment | null>(null);
-
-  // URL parametresini oku ve kabul edilen gönderiyi işaretle
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const accepted = urlParams.get('accepted');
-    if (accepted) {
-      setAcceptedShipmentId(accepted);
-      // URL'den parametreyi temizle
-      const newUrl = window.location.pathname;
-      window.history.replaceState({}, '', newUrl);
-    }
-  }, []);
-
-  const handleViewDetails = async (shipmentId: number) => {
-    const baseShipment = shipments.find(s => s.id === shipmentId);
-    if (!baseShipment) return;
-
-    setIsLoading(true);
-    const timeoutId = setTimeout(() => {
-      setIsLoading(false);
-<<<<<<< HEAD
-      showProfessionalToast(showToast, 'TIMEOUT_ERROR', 'error');
-=======
-      showProfessionalToast(toast, 'TIMEOUT_ERROR', 'error');
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
-    }, 10000); // 10 seconds timeout
+  const { showToast } = useToast();    }, 10000); // 10 seconds timeout
 
     try {
       const token = localStorage.getItem('authToken');
@@ -485,7 +386,6 @@ export default function CorporateShipments() {
             }) || [];
           setShipments(mapped);
         }
-<<<<<<< HEAD
         showProfessionalToast(showToast, 'DELIVERY_CONFIRMED', 'success');
       } else {
         const errorData = await response.json();
@@ -493,18 +393,7 @@ export default function CorporateShipments() {
       }
     } catch (error) {
       // Error confirming delivery
-      showProfessionalToast(showToast, 'NETWORK_ERROR', 'error');
-=======
-        showProfessionalToast(toast, 'DELIVERY_CONFIRMED', 'success');
-      } else {
-        const errorData = await response.json();
-        showProfessionalToast(toast, 'OPERATION_FAILED', 'error');
-      }
-    } catch (error) {
-      // Error confirming delivery
-      showProfessionalToast(toast, 'NETWORK_ERROR', 'error');
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
-    }
+      showProfessionalToast(showToast, 'NETWORK_ERROR', 'error');    }
   };
 
   const handleCancelShipment = async () => {
@@ -535,28 +424,15 @@ export default function CorporateShipments() {
         setCancelReason('');
         setSelectedShipmentForCancel(null);
 
-<<<<<<< HEAD
-        showProfessionalToast(showToast, 'ACTION_COMPLETED', 'success');
-=======
-        showProfessionalToast(toast, 'ACTION_COMPLETED', 'success');
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
-        
+        showProfessionalToast(showToast, 'ACTION_COMPLETED', 'success');        
         // Reload shipments
         await loadShipments();
       } else {
         const errorData = await response.json();
-<<<<<<< HEAD
         showProfessionalToast(showToast, 'OPERATION_FAILED', 'error');
       }
     } catch (error) {
-      showProfessionalToast(showToast, 'NETWORK_ERROR', 'error');
-=======
-        showProfessionalToast(toast, 'OPERATION_FAILED', 'error');
-      }
-    } catch (error) {
-      showProfessionalToast(toast, 'NETWORK_ERROR', 'error');
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
-    } finally {
+      showProfessionalToast(showToast, 'NETWORK_ERROR', 'error');    } finally {
       setIsCancelling(false);
     }
   };
@@ -2060,8 +1936,4 @@ export default function CorporateShipments() {
       </div>
     </div>
   );
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11

@@ -62,12 +62,7 @@ const authAPI = {
   }
 };
 import { User } from '../types/auth';
-<<<<<<< HEAD
 // Socket.io removed - using REST API only
-=======
-import socketService from '../services/socket';
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
-
 // Register user data interface
 interface RegisterUserData {
   email: string;
@@ -352,12 +347,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         // Connect to Socket.IO (only if enabled)
         if (import.meta.env.VITE_ENABLE_SOCKET === 'true') {
-<<<<<<< HEAD
-          // Socket.io removed
-=======
-          socketService.connect();
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
-        }
+          // Socket.io removed        }
 
         return { success: true, user: userData };
       } else {
@@ -446,12 +436,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         // Connect to Socket.IO (only if enabled)
         if (import.meta.env.VITE_ENABLE_SOCKET === 'true') {
-<<<<<<< HEAD
-          // Socket.io removed
-=======
-          socketService.connect();
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
-        }
+          // Socket.io removed        }
 
         return { success: true, user: finalUserData };
       } else {
@@ -487,12 +472,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       safeLocalStorage.removeItem('token');
       safeLocalStorage.removeItem('user');
       // Disconnect from Socket.IO
-<<<<<<< HEAD
-      // Socket.io removed
-=======
-      socketService.disconnect();
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
-      // Don't redirect automatically, let the ProtectedRoute handle it
+      // Socket.io removed      // Don't redirect automatically, let the ProtectedRoute handle it
       // window.location.href = '/login';
     }
   };

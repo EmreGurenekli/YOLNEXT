@@ -1,10 +1,5 @@
 import { useCallback } from 'react';
-<<<<<<< HEAD
 import { useToast } from '../contexts/ToastContext';
-=======
-import { toast } from 'react-hot-toast';
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
-
 export interface ErrorInfo {
   message: string;
   code?: string;
@@ -20,20 +15,12 @@ export interface ErrorHandlerOptions {
 }
 
 export const useErrorHandler = () => {
-<<<<<<< HEAD
   const { showToast } = useToast();
   
   const handleError = useCallback(
     (error: any, options: ErrorHandlerOptions = {}) => {
       const {
-        showToast: shouldShowToast = true,
-=======
-  const handleError = useCallback(
-    (error: any, options: ErrorHandlerOptions = {}) => {
-      const {
-        showToast = true,
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
-        logError = true,
+        showToast: shouldShowToast = true,        logError = true,
         fallbackMessage = 'Beklenmeyen bir hata oluştu',
       } = options;
 
@@ -53,22 +40,13 @@ export const useErrorHandler = () => {
       }
 
       // Show toast notification
-<<<<<<< HEAD
       if (shouldShowToast) {
         const message = getErrorMessage(errorInfo);
         showToast({
           type: 'error',
           title: 'Hata',
           message: message,
-          duration: 5000,
-=======
-      if (showToast) {
-        const message = getErrorMessage(errorInfo);
-        toast.error(message, {
-          duration: 5000,
-          position: 'top-right',
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
-        });
+          duration: 5000,        });
       }
 
       // In production, you might want to send errors to an external service
@@ -199,8 +177,4 @@ const getErrorMessage = (errorInfo: ErrorInfo): string => {
   }
 
   return errorInfo.message;
-<<<<<<< HEAD
 };
-=======
-};
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11

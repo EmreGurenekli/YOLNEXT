@@ -48,12 +48,7 @@ interface ShipmentData {
 
 import { createApiUrl } from '../../config/api';
 
-<<<<<<< HEAD
 import { shipmentAPI } from '../../services/api';
-=======
-import { shipmentAPI } from '../../services/api.js';
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
-
 export default function CreateShipment() {
   const navigate = useNavigate();
   const { token: authTokenFromContext } = useAuth();
@@ -295,7 +290,6 @@ export default function CreateShipment() {
     }, 30000); // 30 seconds timeout for shipment creation
     
     try {
-<<<<<<< HEAD
       // Debug: Log formData to see what values are actually set (development only)
       if (import.meta.env.DEV) {
         console.log('🔍 DEBUG - FormData before API call:', {
@@ -309,20 +303,6 @@ export default function CreateShipment() {
           deliveryDate: formData.deliveryDate
         });
       }
-=======
-      // Debug: Log formData to see what values are actually set
-      console.log('🔍 DEBUG - FormData before API call:', {
-        pickupCity: formData.pickupCity,
-        pickupDistrict: formData.pickupDistrict,
-        deliveryCity: formData.deliveryCity,
-        deliveryDistrict: formData.deliveryDistrict,
-        pickupAddress: formData.pickupAddress,
-        deliveryAddress: formData.deliveryAddress,
-        pickupDate: formData.pickupDate,
-        deliveryDate: formData.deliveryDate
-      });
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
-
       // Use form data directly for city and district
       const pickupLocation = {
         city: formData.pickupCity || 'İstanbul',
