@@ -16,11 +16,14 @@ import {
   Calendar,
   Clock,
   Plus,
-  FileText
+  FileText,
+  X
 } from 'lucide-react';
 import Breadcrumb from '../../components/common/Breadcrumb';
 import SuccessMessage from '../../components/common/SuccessMessage';
 import { turkeyCities } from '../../data/turkey-cities-districts';
+import { useAuth } from '../../contexts/AuthContext';
+import { normalizeTrackingCode } from '../../utils/trackingCode';
 
 // Shipment data interface
 interface ShipmentData {
@@ -45,63 +48,17 @@ interface ShipmentData {
 
 import { createApiUrl } from '../../config/api';
 
-// Temporary workaround - direct API call
-const shipmentsApi = {
-  create: async (data: ShipmentData) => {
-    const token = localStorage.getItem('authToken');
-    const apiUrl = createApiUrl('/api/shipments');
-    
-    const response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Authorization': token ? `Bearer ${token}` : '',
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(data)
-    });
-    
-    if (!response.ok) {
-      const contentType = response.headers.get('content-type');
-      let errorMessage = `HTTP error! status: ${response.status}`;
-      
-      // Try to get error message from response
-      if (contentType && contentType.includes('application/json')) {
-        try {
-          const errorData = await response.json();
-          errorMessage = errorData.message || errorData.error || errorMessage;
-        } catch (e) {
-          // Ignore JSON parse errors
-        }
-      } else {
-        try {
-          const text = await response.text();
-          if (text) {
-            errorMessage = `${errorMessage}. Response: ${text.substring(0, 200)}`;
-          }
-        } catch (e) {
-          // Ignore text read errors
-        }
-      }
-      
-      throw new Error(errorMessage);
-    }
-    
-    const contentType = response.headers.get('content-type');
-    if (!contentType || !contentType.includes('application/json')) {
-      const text = await response.text();
-      throw new Error(`Expected JSON but got ${contentType}. Response: ${text.substring(0, 100)}`);
-    }
-    
-    return response.json();
-  }
-};
+import { shipmentAPI } from '../../services/api';
 
 export default function CreateShipment() {
   const navigate = useNavigate();
+  const { token: authTokenFromContext } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  const [showLimitModal, setShowLimitModal] = useState(false);
+  const [limitMessage, setLimitMessage] = useState('');
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [formData, setFormData] = useState({
     mainCategory: '',
@@ -168,105 +125,135 @@ export default function CreateShipment() {
     }));
   };
 
+  const parseISODateStrict = (value: string): Date | null => {
+    const s = String(value || '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+    const [yStr, mStr, dStr] = s.split('-');
+    const year = parseInt(yStr, 10);
+    const month = parseInt(mStr, 10);
+    const day = parseInt(dStr, 10);
+    if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return null;
+    const dt = new Date(year, month - 1, day);
+    if (!Number.isFinite(dt.getTime())) return null;
+    if (dt.getFullYear() !== year || dt.getMonth() !== month - 1 || dt.getDate() !== day) return null;
+    dt.setHours(0, 0, 0, 0);
+    return dt;
+  };
+
+  // Streamlined essential validation - Nakliyeci-style simplified checks
+  const validateEssentialFields = (): boolean => {
+    const newErrors: { [key: string]: string } = {};
+
+    // Only check truly essential fields to reduce friction
+    if (!formData.mainCategory) {
+      newErrors.mainCategory = 'Yük kategorisi seç';
+    }
+    if (!formData.productDescription?.trim()) {
+      newErrors.productDescription = 'Yükünü kısaca açıkla (nakliyeciler anlayacak)';
+    }
+    if (!formData.pickupCity) {
+      newErrors.pickupCity = 'Nereden alınacak? (il seç)';
+    }
+    if (!formData.deliveryCity) {
+      newErrors.deliveryCity = 'Nereye gidecek? (il seç)';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const validateStep = (step: number): boolean => {
     const newErrors: { [key: string]: string } = {};
 
     if (step === 1) {
       // Step 1: Yük Bilgileri validasyonu
       if (!formData.mainCategory) {
-        newErrors.mainCategory = 'Kategori seçimi zorunludur';
+        newErrors.mainCategory = 'Nakliyecilerin size doğru teklif verebilmesi için kategori seçimi çok önemli';
       }
       if (!formData.productDescription || formData.productDescription.trim() === '') {
-        newErrors.productDescription = 'Yük açıklaması zorunludur';
+        newErrors.productDescription = 'Nakliyeciler ne taşıyacak? Kısaca açıkla';
       }
 
       // Kategoriye göre özel validasyonlar
       if (formData.mainCategory === 'house_move') {
         if (!formData.roomCount) {
-          newErrors.roomCount = 'Oda sayısı zorunludur';
+          newErrors.roomCount = 'Kaç odalı eviniz var? Bu bilgi fiyat için çok önemli';
         }
         if (!formData.buildingType) {
-          newErrors.buildingType = 'Bina tipi zorunludur';
+          newErrors.buildingType = 'Bina tipini belirtirseniz daha doğru fiyat alırsınız';
         }
         if (!formData.pickupFloor || formData.pickupFloor.trim() === '') {
-          newErrors.pickupFloor = 'Toplama katı zorunludur';
+          newErrors.pickupFloor = 'Hangi kattan alınacak? (Asansör varsa daha ucuz olabilir)';
         }
         if (!formData.deliveryFloor || formData.deliveryFloor.trim() === '') {
-          newErrors.deliveryFloor = 'Teslimat katı zorunludur';
+          newErrors.deliveryFloor = 'Hangi kata teslim edilecek? (Kat bilgisi fiyatı etkiler)';
         }
       } else if (formData.mainCategory === 'furniture_goods') {
         if (!formData.furniturePieces) {
-          newErrors.furniturePieces = 'Parça sayısı zorunludur';
+          newErrors.furniturePieces = 'Kaç parça mobilya var? Bu fiyat için önemli';
         }
       } else if (formData.mainCategory === 'special_cargo') {
         if (!formData.weight || formData.weight.trim() === '') {
-          newErrors.weight = 'Ağırlık zorunludur';
+          newErrors.weight = 'Yaklaşık ağırlık çok önemli - nakliyeciler buna göre teklif verecek';
         }
       }
-    } else     if (step === 2) {
+    } else if (step === 2) {
       // Step 2: Adres Bilgileri validasyonu
       if (!formData.pickupCity) {
-        newErrors.pickupCity = 'Toplama ili zorunludur';
+        newErrors.pickupCity = 'Nereden alınacak? (il seç)';
       }
       if (!formData.pickupDistrict) {
-        newErrors.pickupDistrict = 'Toplama ilçesi zorunludur';
+        newErrors.pickupDistrict = 'İlçe seç (mesafe hesabı için gerekli)';
       }
       if (!formData.pickupAddress || formData.pickupAddress.trim() === '') {
-        newErrors.pickupAddress = 'Toplama adresi zorunludur';
+        newErrors.pickupAddress = 'Tam adres önemli - nakliyeci nereye gelecek?';
       }
       if (!formData.deliveryCity) {
-        newErrors.deliveryCity = 'Teslimat ili zorunludur';
+        newErrors.deliveryCity = 'Nereye gidecek? (il seç)';
       }
       if (!formData.deliveryDistrict) {
-        newErrors.deliveryDistrict = 'Teslimat ilçesi zorunludur';
+        newErrors.deliveryDistrict = 'İlçe seç (mesafe hesabı için gerekli)';
       }
       if (!formData.deliveryAddress || formData.deliveryAddress.trim() === '') {
-        newErrors.deliveryAddress = 'Teslimat adresi zorunludur';
+        newErrors.deliveryAddress = 'Tam teslimat adresi - nakliyeci nereye gidecek?';
       }
       if (!formData.pickupDate) {
-        newErrors.pickupDate = 'Toplama tarihi zorunludur';
+        newErrors.pickupDate = 'Ne zaman alınmasını istiyorsunuz?';
       } else {
-        const pickupDate = new Date(formData.pickupDate);
+        const pickupDate = parseISODateStrict(formData.pickupDate);
         const today = new Date();
         today.setHours(0, 0, 0, 0);
+
+        if (!pickupDate) {
+          newErrors.pickupDate = 'Takvimden tarih seç';
+        }
         
         // Geçmiş tarih kontrolü
-        if (pickupDate < today) {
-          newErrors.pickupDate = 'Toplama tarihi geçmiş bir tarih olamaz. Lütfen bugün veya ileri bir tarih seçin.';
+        if (pickupDate && pickupDate < today) {
+          newErrors.pickupDate = 'Geçmiş tarih seçemezsiniz - bugünden itibaren seçebilirsiniz';
         }
         
         // 20 gün sonrası kontrolü
         const maxDate = new Date(today);
         maxDate.setDate(maxDate.getDate() + 20);
-        if (pickupDate > maxDate) {
-          newErrors.pickupDate = 'Toplama tarihi bugünden en fazla 20 gün sonrası için olabilir. Lütfen daha yakın bir tarih seçin.';
-        }
-      }
-      if (!formData.deliveryDate) {
-        newErrors.deliveryDate = 'Teslimat tarihi zorunludur';
-      } else {
-        const deliveryDate = new Date(formData.deliveryDate);
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        
-        // Geçmiş tarih kontrolü
-        if (deliveryDate < today) {
-          newErrors.deliveryDate = 'Teslimat tarihi geçmiş bir tarih olamaz. Lütfen bugün veya ileri bir tarih seçin.';
+        if (pickupDate && pickupDate > maxDate) {
+          newErrors.pickupDate = 'En fazla 20 gün sonrası için planlayabilirsiniz - daha yakın tarih seçin';
         }
         
-        // 20 gün sonrası kontrolü
-        const maxDate = new Date(today);
-        maxDate.setDate(maxDate.getDate() + 20);
-        if (deliveryDate > maxDate) {
-          newErrors.deliveryDate = 'Teslimat tarihi bugünden en fazla 20 gün sonrası için olabilir. Lütfen daha yakın bir tarih seçin.';
-        }
-      }
-      // Validate that delivery date is after pickup date
-      if (formData.pickupDate && formData.deliveryDate) {
-        const pickupDate = new Date(formData.pickupDate);
-        const deliveryDate = new Date(formData.deliveryDate);
-        if (deliveryDate <= pickupDate) {
-          newErrors.deliveryDate = 'Teslimat tarihi toplama tarihinden sonra olmalıdır';
+        // Teslimat tarihi kontrolü
+        if (formData.deliveryDate) {
+          const deliveryDate = parseISODateStrict(formData.deliveryDate);
+          if (!deliveryDate) {
+            newErrors.deliveryDate = 'Takvimden tarih seç';
+          } else if (pickupDate && deliveryDate < pickupDate) {
+            newErrors.deliveryDate = 'Teslimat tarihi alım tarihinden önce olamaz';
+          } else if (pickupDate) {
+            const maxDeliveryDate = new Date(pickupDate);
+            maxDeliveryDate.setDate(maxDeliveryDate.getDate() + 30);
+            if (deliveryDate > maxDeliveryDate) {
+              newErrors.deliveryDate = 'Teslimat tarihi alım tarihinden en fazla 30 gün sonra olabilir';
+            }
+          }
         }
       }
     }
@@ -277,8 +264,8 @@ export default function CreateShipment() {
 
   const handleNext = () => {
     if (validateStep(currentStep)) {
-    if (currentStep < steps.length) {
-      setCurrentStep(currentStep + 1);
+      if (currentStep < steps.length) {
+        setCurrentStep(currentStep + 1);
         setErrors({});
       }
     }
@@ -291,18 +278,33 @@ export default function CreateShipment() {
   };
 
   const handlePublish = async () => {
-    // Tüm adımları validate et
-    const step1Valid = validateStep(1);
-    const step2Valid = validateStep(2);
-    if (!step1Valid || !step2Valid) {
-      // Hatalar gösterildi, yayınlama yapma
-      setCurrentStep(1); // İlk hataya geri dön
+    // Streamlined validation - only check essential fields like Nakliyeci panel
+    const essentialValid = validateEssentialFields();
+    if (!essentialValid) {
       return;
     }
 
     setIsLoading(true);
+    const timeoutId = setTimeout(() => {
+      setIsLoading(false);
+      setErrors({ publish: 'Gönderi oluşturma işlemi zaman aşımına uğradı. Lütfen tekrar deneyin.' });
+    }, 30000); // 30 seconds timeout for shipment creation
     
     try {
+      // Debug: Log formData to see what values are actually set (development only)
+      if (import.meta.env.DEV) {
+        console.log('🔍 DEBUG - FormData before API call:', {
+          pickupCity: formData.pickupCity,
+          pickupDistrict: formData.pickupDistrict,
+          deliveryCity: formData.deliveryCity,
+          deliveryDistrict: formData.deliveryDistrict,
+          pickupAddress: formData.pickupAddress,
+          deliveryAddress: formData.deliveryAddress,
+          pickupDate: formData.pickupDate,
+          deliveryDate: formData.deliveryDate
+        });
+      }
+
       // Use form data directly for city and district
       const pickupLocation = {
         city: formData.pickupCity || 'İstanbul',
@@ -314,7 +316,7 @@ export default function CreateShipment() {
       };
 
       const shipmentData = {
-        title: formData.productDescription || 'Ev Taşınması',
+        title: `${pickupLocation.city} → ${deliveryLocation.city}`,
         description: formData.productDescription || '',
         productDescription: formData.productDescription || '',
         category: formData.mainCategory || 'general',
@@ -358,25 +360,40 @@ export default function CreateShipment() {
         })(),
       };
 
-      // Use centralized API service instead of hardcoded fetch
-      const result = await shipmentsApi.create(shipmentData);
+      // Use centralized API service
+      const result = await shipmentAPI.create(shipmentData);
       
+      clearTimeout(timeoutId);
       setIsLoading(false);
       
       // Verify success
       if (result.success && (result.data?.shipment || result.data?.id)) {
         const shipment = result.data?.shipment || result.data;
-        const trackingNumber = shipment.trackingNumber || shipment.trackingnumber || shipment.id;
-        const trackingText = trackingNumber ? `Takip numaranız: ${trackingNumber}. ` : '';
-        setSuccessMessage(`Gönderiniz başarıyla yayınlandı! ${trackingText}Nakliyecilerden teklifler almaya başlayacaksınız.`);
+        const rawTracking =
+          shipment?.trackingNumber ||
+          shipment?.tracking_number ||
+          shipment?.trackingnumber ||
+          shipment?.trackingCode ||
+          shipment?.tracking_code ||
+          shipment?.trackingcode ||
+          shipment?.shipmentCode ||
+          shipment?.shipment_code ||
+          shipment?.shipmentcode ||
+          null;
+
+        const trackingNumber = normalizeTrackingCode(rawTracking, shipment?.id);
+        const trackingText = trackingNumber ? `Takip kodunuz: ${trackingNumber}` : '';
+        // Professional but warm success feedback
+        setSuccessMessage(`Gönderiniz başarıyla yayınlandı. ${trackingText ? trackingText + '. ' : ''}Nakliyecilerden teklifler gelmeye başlayacak. Ortalama bekleme süresi 5-15 dakikadır. 24 saat içinde teklif gelmezse otomatik bildirim alırsınız. Teklifler sayfasına yönlendiriliyorsunuz...`);
         setShowSuccessMessage(true);
         
-        // Redirect to My Shipments after 2 seconds
+        // Quick transition - direct to offers for immediate engagement
         setTimeout(() => {
-          navigate('/individual/my-shipments');
+          setShowSuccessMessage(false);
+          navigate('/individual/offers');
         }, 2000);
       } else {
-        throw new Error(result.message || 'Gönderi oluşturuldu ancak beklenmeyen yanıt alındı');
+        throw new Error(result.message || 'Gönderi oluşturuldu ama bir sorun var - destek ile iletişime geç');
       }
       
       setTimeout(() => {
@@ -413,14 +430,22 @@ export default function CreateShipment() {
         setErrors({});
       }, 3000);
     } catch (error) {
+      clearTimeout(timeoutId);
       setIsLoading(false);
-      let errorMessage = 'Gönderi yayınlanamadı';
+      let errorMessage = 'Bir sorun oluştu - tekrar dene';
+      if ((error as any)?.status === 429) {
+        const dataMsg = (error as any)?.data?.message || (error as any)?.message;
+        setLimitMessage(dataMsg || 'Günlük limit aşıldı. Lütfen yarın tekrar deneyin.');
+        setShowLimitModal(true);
+        setErrors(prev => ({ ...prev, publish: '' }));
+        return;
+      }
       
       if (error instanceof Error) {
         errorMessage = error.message;
         // Check for network errors
         if (error.message.includes('fetch') || error.message.includes('network') || error.message.includes('Failed to fetch')) {
-          errorMessage = 'Sunucuya bağlanılamıyor. Lütfen internet bağlantınızı kontrol edin ve tekrar deneyin. Sorun devam ederse destek ekibimizle iletişime geçebilirsiniz.';
+          errorMessage = 'İnternet bağlantınızı kontrol edin ve tekrar deneyin.';
         }
       }
       
@@ -439,25 +464,31 @@ export default function CreateShipment() {
             <div>
               <label className="block text-lg font-semibold text-slate-900 mb-4">
                 <Package className="w-5 h-5 inline mr-2" />
-                Hangi tür yük taşıyacaksınız? *
+                Ne taşıyacaksınız? (Kategori seçin - nakliyeciler size özel teklif verecek) *
               </label>
               <select
-                value={formData.mainCategory}
+                value={formData.mainCategory ?? ''}
+                onChangeCapture={(e) => {
+                  handleInputChange('mainCategory', (e.currentTarget as HTMLSelectElement).value);
+                }}
                 onChange={(e) => {
-                  handleInputChange('mainCategory', e.target.value);
+                  handleInputChange('mainCategory', e.currentTarget.value);
                   if (errors.mainCategory) {
                     setErrors(prev => ({ ...prev, mainCategory: '' }));
                   }
+                }}
+                onInput={(e) => {
+                  handleInputChange('mainCategory', (e.currentTarget as HTMLSelectElement).value);
                 }}
                 aria-label="Yük kategorisi seçin"
                 aria-required="true"
                 aria-invalid={!!errors.mainCategory}
                 aria-describedby={errors.mainCategory ? 'mainCategory-error' : undefined}
-                className={`w-full p-4 border-2 rounded-xl focus:ring-2 focus:ring-blue-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md text-slate-700 text-lg ${
+                className={`w-full p-4 border-2 rounded-xl focus:ring-2 focus:ring-blue-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md text-slate-700 text-lg min-h-[48px] ${
                   errors.mainCategory ? 'border-red-500 focus:border-red-500' : 'border-slate-200 focus:border-blue-500'
                 }`}
               >
-                <option value="">Kategori seçiniz</option>
+                <option value="">Seçin - doğru kategori = doğru fiyat</option>
                 {mainCategories.map((category) => (
                   <option key={category.id} value={category.id}>
                     {category.name}
@@ -491,7 +522,7 @@ export default function CreateShipment() {
                       aria-required="true"
                       aria-invalid={!!errors.productDescription}
                       aria-describedby={errors.productDescription ? 'productDescription-error' : undefined}
-                      className={`w-full p-4 border-2 rounded-xl focus:ring-2 transition-all duration-200 bg-white shadow-sm hover:shadow-md text-slate-700 resize-none ${
+                      className={`w-full p-4 border-2 rounded-xl focus:ring-2 transition-all duration-200 bg-white shadow-sm hover:shadow-md text-slate-700 resize-none min-h-[100px] ${
                         errors.productDescription ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-slate-200 focus:ring-blue-500 focus:border-blue-500'
                       }`}
                       placeholder={
@@ -518,16 +549,19 @@ export default function CreateShipment() {
                             Oda Sayısı *
                           </label>
                           <select
-                            value={formData.roomCount}
+                            value={formData.roomCount ?? ''}
                             onChange={(e) => {
-                              handleInputChange('roomCount', e.target.value);
+                              handleInputChange('roomCount', e.currentTarget.value);
                               if (errors.roomCount) {
                                 setErrors(prev => ({ ...prev, roomCount: '' }));
                               }
                             }}
+                            onInput={(e) => {
+                              handleInputChange('roomCount', (e.currentTarget as HTMLSelectElement).value);
+                            }}
                             className={`w-full p-4 border-2 rounded-xl focus:ring-2 transition-all duration-200 bg-white shadow-sm hover:shadow-md ${
                               errors.roomCount ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-gray-200 focus:ring-blue-500 focus:border-blue-500'
-                            }`}
+                            } text-slate-900 caret-slate-900 relative z-10`}
                           >
                             <option value="">Seçiniz</option>
                             <option value="1">1 Oda</option>
@@ -549,16 +583,19 @@ export default function CreateShipment() {
                             Bina Tipi *
                           </label>
                           <select
-                            value={formData.buildingType}
+                            value={formData.buildingType ?? ''}
                             onChange={(e) => {
-                              handleInputChange('buildingType', e.target.value);
+                              handleInputChange('buildingType', e.currentTarget.value);
                               if (errors.buildingType) {
                                 setErrors(prev => ({ ...prev, buildingType: '' }));
                               }
                             }}
+                            onInput={(e) => {
+                              handleInputChange('buildingType', (e.currentTarget as HTMLSelectElement).value);
+                            }}
                             className={`w-full p-4 border-2 rounded-xl focus:ring-2 transition-all duration-200 bg-white shadow-sm hover:shadow-md ${
                               errors.buildingType ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-gray-200 focus:ring-blue-500 focus:border-blue-500'
-                            }`}
+                            } text-slate-900 caret-slate-900 relative z-10`}
                           >
                             <option value="">Seçiniz</option>
                             <option value="apartment">Apartman Dairesi</option>
@@ -590,7 +627,7 @@ export default function CreateShipment() {
                             }}
                             className={`w-full p-4 border-2 rounded-xl focus:ring-2 transition-all duration-200 bg-white shadow-sm hover:shadow-md ${
                               errors.pickupFloor ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-gray-200 focus:ring-blue-500 focus:border-blue-500'
-                            }`}
+                            } text-slate-900 caret-slate-900`}
                             placeholder="Örn: Zemin, 1, 2, 3, Çatı katı"
                           />
                           {errors.pickupFloor && (
@@ -612,7 +649,7 @@ export default function CreateShipment() {
                             }}
                             className={`w-full p-4 border-2 rounded-xl focus:ring-2 transition-all duration-200 bg-white shadow-sm hover:shadow-md ${
                               errors.deliveryFloor ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-gray-200 focus:ring-blue-500 focus:border-blue-500'
-                            }`}
+                            } text-slate-900 caret-slate-900`}
                             placeholder="Örn: Zemin, 1, 2, 3, Çatı katı"
                           />
                           {errors.deliveryFloor && (
@@ -667,7 +704,7 @@ export default function CreateShipment() {
                           value={formData.specialItems}
                           onChange={(e) => handleInputChange('specialItems', e.target.value)}
                       rows={3}
-                          className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md resize-none"
+                          className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md resize-none text-slate-900 caret-slate-900"
                           placeholder="Varsa özel eşyalarınızı belirtin (piano, antika, sanat eseri, kırılgan değerli eşyalar vb.)"
                     />
                   </div>
@@ -682,19 +719,22 @@ export default function CreateShipment() {
                           Parça Sayısı *
                         </label>
                         <input
-                          type="number"
-                          value={formData.furniturePieces}
-                          onChange={(e) => {
-                            handleInputChange('furniturePieces', e.target.value);
-                            if (errors.furniturePieces) {
-                              setErrors(prev => ({ ...prev, furniturePieces: '' }));
-                            }
-                          }}
-                          className={`w-full p-4 border-2 rounded-xl focus:ring-2 transition-all duration-200 bg-white shadow-sm hover:shadow-md ${
-                            errors.furniturePieces ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-gray-200 focus:ring-blue-500 focus:border-blue-500'
-                          }`}
-                          min="1"
-                        />
+                        type="number"
+                        value={formData.furniturePieces ?? ''}
+                        onChange={(e) => {
+                          handleInputChange('furniturePieces', e.target.value);
+                          if (errors.furniturePieces) {
+                            setErrors(prev => ({ ...prev, furniturePieces: '' }));
+                          }
+                        }}
+                        onInput={(e) => {
+                          handleInputChange('furniturePieces', (e.currentTarget as HTMLInputElement).value);
+                        }}
+                        className={`w-full p-4 border-2 rounded-xl focus:ring-2 transition-all duration-200 bg-white shadow-sm hover:shadow-md ${
+                          errors.furniturePieces ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-gray-200 focus:ring-blue-500 focus:border-blue-500'
+                        }`}
+                        min="1"
+                      />
                         {errors.furniturePieces && (
                           <p className="mt-2 text-sm text-red-600">{errors.furniturePieces}</p>
                         )}
@@ -760,12 +800,15 @@ export default function CreateShipment() {
                       </label>
                       <input
                         type="number"
-                        value={formData.weight}
+                        value={formData.weight ?? ''}
                           onChange={(e) => {
                             handleInputChange('weight', e.target.value);
                             if (errors.weight) {
                               setErrors(prev => ({ ...prev, weight: '' }));
                             }
+                          }}
+                          onInput={(e) => {
+                            handleInputChange('weight', (e.currentTarget as HTMLInputElement).value);
                           }}
                           className={`w-full p-4 border-2 rounded-xl focus:ring-2 transition-all duration-200 bg-white shadow-sm hover:shadow-md ${
                             errors.weight ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-gray-200 focus:ring-blue-500 focus:border-blue-500'
@@ -784,8 +827,9 @@ export default function CreateShipment() {
                       </label>
                       <input
                         type="number"
-                        value={formData.quantity}
+                        value={formData.quantity ?? ''}
                         onChange={(e) => handleInputChange('quantity', e.target.value)}
+                        onInput={(e) => handleInputChange('quantity', (e.currentTarget as HTMLInputElement).value)}
                         className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md"
                           min="1"
                       />
@@ -978,13 +1022,18 @@ export default function CreateShipment() {
                         İl *
                       </label>
                       <select
-                        value={formData.pickupCity}
+                        value={formData.pickupCity ?? ''}
                         onChange={(e) => {
                           handleInputChange('pickupCity', e.target.value);
                           handleInputChange('pickupDistrict', ''); // Reset district when city changes
                           if (errors.pickupCity) {
                             setErrors(prev => ({ ...prev, pickupCity: '' }));
                           }
+                        }}
+                        onInput={(e) => {
+                          const next = (e.currentTarget as HTMLSelectElement).value;
+                          handleInputChange('pickupCity', next);
+                          handleInputChange('pickupDistrict', '');
                         }}
                         aria-label="Toplama ili"
                         aria-required="true"
@@ -1010,12 +1059,15 @@ export default function CreateShipment() {
                         İlçe *
                       </label>
                       <select
-                        value={formData.pickupDistrict}
+                        value={formData.pickupDistrict ?? ''}
                         onChange={(e) => {
                           handleInputChange('pickupDistrict', e.target.value);
                           if (errors.pickupDistrict) {
                             setErrors(prev => ({ ...prev, pickupDistrict: '' }));
                           }
+                        }}
+                        onInput={(e) => {
+                          handleInputChange('pickupDistrict', (e.currentTarget as HTMLSelectElement).value);
                         }}
                         disabled={!formData.pickupCity}
                         aria-label="Toplama ilçesi"
@@ -1117,13 +1169,18 @@ export default function CreateShipment() {
                         İl *
                       </label>
                       <select
-                        value={formData.deliveryCity}
+                        value={formData.deliveryCity ?? ''}
                         onChange={(e) => {
                           handleInputChange('deliveryCity', e.target.value);
                           handleInputChange('deliveryDistrict', ''); // Reset district when city changes
                           if (errors.deliveryCity) {
                             setErrors(prev => ({ ...prev, deliveryCity: '' }));
                           }
+                        }}
+                        onInput={(e) => {
+                          const next = (e.currentTarget as HTMLSelectElement).value;
+                          handleInputChange('deliveryCity', next);
+                          handleInputChange('deliveryDistrict', '');
                         }}
                         aria-label="Teslimat ili"
                         aria-required="true"
@@ -1149,12 +1206,15 @@ export default function CreateShipment() {
                         İlçe *
                       </label>
                       <select
-                        value={formData.deliveryDistrict}
+                        value={formData.deliveryDistrict ?? ''}
                         onChange={(e) => {
                           handleInputChange('deliveryDistrict', e.target.value);
                           if (errors.deliveryDistrict) {
                             setErrors(prev => ({ ...prev, deliveryDistrict: '' }));
                           }
+                        }}
+                        onInput={(e) => {
+                          handleInputChange('deliveryDistrict', (e.currentTarget as HTMLSelectElement).value);
                         }}
                         disabled={!formData.deliveryCity}
                         aria-label="Teslimat ilçesi"
@@ -1418,8 +1478,8 @@ export default function CreateShipment() {
                     <p className="text-sm text-red-700">{errors.publish}</p>
                     {errors.publish.includes('bağlanılamıyor') || errors.publish.includes('connection') || errors.publish.includes('Failed to fetch') ? (
                       <p className="text-xs text-red-600 mt-2">
-                        Sunucuya bağlanılamıyor. Lütfen internet bağlantınızı kontrol edin ve tekrar deneyin. 
-                        Sorun devam ederse destek ekibimizle iletişime geçebilirsiniz.
+                        Sunucuya bağlanılamıyor. İnternet bağlantını kontrol et. 
+                        Sorun devam ederse gönderi bilgilerinizi kontrol edip tekrar deneyin.
                       </p>
                     ) : null}
                   </div>
@@ -1432,15 +1492,22 @@ export default function CreateShipment() {
               <div className="flex items-start gap-3">
                 <AlertTriangle className="w-6 h-6 text-amber-600 flex-shrink-0 mt-0.5" />
                 <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-amber-900 mb-3">Önemli Bilgilendirme</h3>
+                  <h3 className="text-lg font-semibold text-amber-900 mb-3">Önemli Bilgilendirme - Sorumluluk Reddi</h3>
                   <div className="space-y-3 text-sm text-amber-800">
+                    <p className="font-semibold">
+                      YolNext bir pazaryeri platformudur. Hiçbir sorumluluk almaz.
+                    </p>
                     <p>
                       YolNext, göndericiler ve nakliyeciler arasında bağlantı kuran bir aracı platformdur. 
                       Taşımacılık hizmetlerini bizzat sağlamaz ve sigorta hizmeti vermez.
                     </p>
                     <p className="font-medium">
-                      Tüm riskler gönderici ve nakliyeci arasındadır. Sigorta ihtiyacınız varsa, 
-                      kendi sigortanızı yaptırmak sizin sorumluluğunuzdadır.
+                      Tüm riskler gönderici ve nakliyeci arasındadır. Kaza, yangın, çalınma gibi durumlarda 
+                      taraflar arasında çözülmelidir. Platform sadece tarafları buluşturan bir aracıdır.
+                    </p>
+                    <p>
+                      <strong>Sigorta:</strong> İhtiyaç duyuyorsanız, kendi sigortanızı yaptırmak TAMAMEN sizin sorumluluğunuzdadır. 
+                      YolNext hiçbir sigorta hizmeti vermez.
                     </p>
                     <p>
                       <Link to="/terms" target="_blank" className="text-amber-900 underline font-medium hover:text-amber-700">
@@ -1486,7 +1553,7 @@ export default function CreateShipment() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
       <Helmet>
-        <title>Yeni Gönderi - YolNet Bireysel</title>
+        <title>Yeni Gönderi - YolNext Bireysel</title>
         <meta name="description" content="Bireysel gönderi oluşturun" />
       </Helmet>
 
@@ -1601,6 +1668,72 @@ export default function CreateShipment() {
             isVisible={showSuccessMessage}
             onClose={() => setShowSuccessMessage(false)}
           />
+        )}
+
+        {/* Günlük limit modalı */}
+        {showLimitModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+            <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setShowLimitModal(false)}></div>
+            <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 p-6 animate-[fadeIn_200ms_ease]">
+              <button
+                onClick={() => setShowLimitModal(false)}
+                className="absolute top-3 right-3 p-2 rounded-full bg-slate-100 hover:bg-slate-200 transition-colors"
+                aria-label="Kapat"
+              >
+                <X className="w-5 h-5 text-slate-600" />
+              </button>
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
+                  <AlertTriangle className="w-5 h-5 text-amber-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-900">Günlük limit doldu</h3>
+                  <p className="text-sm text-slate-600">Bireysel kullanıcılar günde en fazla 2 gönderi yayınlayabilir.</p>
+                </div>
+              </div>
+              <div className="text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-xl p-4">
+                {limitMessage || 'Bugün için limit doldu. Yarın yeni bir gönderi oluşturabilirsiniz.'}
+              </div>
+              <div className="mt-4 flex justify-end">
+                <button
+                  onClick={() => setShowLimitModal(false)}
+                  className="px-4 py-2 bg-gradient-to-r from-slate-800 to-blue-900 text-white rounded-lg shadow hover:shadow-lg transition-all"
+                >
+                  Tamam
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+                <button
+                  onClick={() => setShowLimitModal(false)}
+                  className="px-4 py-2 bg-gradient-to-r from-slate-800 to-blue-900 text-white rounded-lg shadow hover:shadow-lg transition-all"
+                >
+                  Tamam
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+                <button
+                  onClick={() => setShowLimitModal(false)}
+                  className="px-4 py-2 bg-gradient-to-r from-slate-800 to-blue-900 text-white rounded-lg shadow hover:shadow-lg transition-all"
+                >
+                  Tamam
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>
