@@ -854,7 +854,7 @@ export default function CorporateShipments() {
           onReset={() => {
             setSearchTerm('');
             setFilterStatus('all');
-            setSortBy('date');
+            setSortBy('date' as 'date' | 'price' | 'status' | 'value' | 'priority');
             setCurrentPage(1);
           }}
         />
