@@ -1543,3 +1543,17 @@ export default function CreateShipment() {
         return null;
     }
   };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+      <Helmet>
+        <title>Gönderi Oluştur - YolNext</title>
+      </Helmet>
+      <div className="container mx-auto px-4 py-8">
+        <Breadcrumb items={[{ label: 'Ana Sayfa', href: '/individual/dashboard' }, { label: 'Gönderi Oluştur', href: '/individual/create-shipment' }]} />
+        {renderStepContent()}
+      </div>
+      {showSuccessMessage && <SuccessMessage message={successMessage} />}
+    </div>
+  );
+}
