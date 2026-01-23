@@ -51,18 +51,31 @@ const GuidanceOverlay: React.FC<GuidanceOverlayProps> = ({
   }, [localStorageKey, isEmpty]);
 
   useEffect(() => {
-    if (isOverlayOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = 'unset';
+    if (typeof document === 'undefined' || !document.body) return;
+    try {
+      if (isOverlayOpen) {
+        document.body.style.overflow = 'hidden';
+      } else {
+        document.body.style.overflow = 'unset';
+      }
+    } catch (error) {
+      console.warn('Failed to set body overflow:', error);
     }
 
     return () => {
-      document.body.style.overflow = 'unset';
+      try {
+        if (typeof document !== 'undefined' && document.body) {
+          document.body.style.overflow = 'unset';
+        }
+      } catch (error) {
+        console.warn('Failed to reset body overflow:', error);
+      }
     };
   }, [isOverlayOpen]);
 
   useEffect(() => {
+    if (typeof document === 'undefined') return;
+    
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         dismiss();
@@ -70,11 +83,21 @@ const GuidanceOverlay: React.FC<GuidanceOverlayProps> = ({
     };
 
     if (isOverlayOpen) {
-      document.addEventListener('keydown', handleEscape);
+      try {
+        document.addEventListener('keydown', handleEscape);
+      } catch (error) {
+        console.warn('Failed to add escape listener:', error);
+      }
     }
 
     return () => {
-      document.removeEventListener('keydown', handleEscape);
+      try {
+        if (typeof document !== 'undefined') {
+          document.removeEventListener('keydown', handleEscape);
+        }
+      } catch (error) {
+        console.warn('Failed to remove escape listener:', error);
+      }
     };
   }, [isOverlayOpen]);
 

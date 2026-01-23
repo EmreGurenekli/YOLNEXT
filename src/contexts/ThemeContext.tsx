@@ -88,6 +88,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
     if (typeof document === 'undefined' || !document.documentElement) return;
     try {
       const root = document.documentElement;
+      if (!root || !root.classList) return;
       root.classList.remove('light', 'dark');
       root.classList.add(actualTheme);
     } catch (error) {
