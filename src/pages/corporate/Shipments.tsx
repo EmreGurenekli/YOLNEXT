@@ -913,7 +913,7 @@ export default function CorporateShipments() {
                           email: '',
                           type: 'nakliyeci',
                         });
-                        setSelectedShipmentId(shipment.id.toString());
+                        setSelectedShipmentId(shipment.id);
                         setShowRatingModal(true);
                       }}
                       onCancel={handleCancelClick}
@@ -957,13 +957,16 @@ export default function CorporateShipments() {
                   key={`${shipment.id}-${shipment.trackingCode}-${index}`}
                   shipment={shipment}
                   index={index}
-                  onViewDetails={handleViewDetails}
-                  onTrack={handleTrackShipment}
-                  onMessage={handleMessage}
+                  onViewDetails={(shipmentId: number) => {
+                    const shipment = shipments.find(s => s.id === shipmentId);
+                    if (shipment) handleViewDetails(shipment);
+                  }}
+                  onTrack={(shipmentId: number) => handleTrackShipment(shipmentId)}
+                  onMessage={(shipment: any) => handleMessage(shipment as Shipment)}
                   isMessagingEnabled={isMessagingEnabledForStatus}
                   getStatusStyle={getStatusStyle}
-                  onShowTracking={(shipment: Shipment) => {
-                    setSelectedShipmentForTracking(shipment);
+                  onShowTracking={(shipment: any) => {
+                    setSelectedShipmentForTracking(shipment as Shipment);
                     setShowTrackingModal(true);
                   }}
                 />
@@ -1038,7 +1041,7 @@ export default function CorporateShipments() {
                             <span className='text-sm text-gray-600'>
                               {
                                 shipments.find(
-                                  s => s.id === selectedShipmentForTracking
+                                  s => s.id === selectedShipmentForTracking?.id
                                 )?.from
                               }{' '}
                               →{' '}
@@ -1205,7 +1208,7 @@ export default function CorporateShipments() {
                   </h2>
                   <p className='text-gray-600 mt-1 text-sm'>
                     {(() => {
-                      const s = shipments.find(sh => sh.id === selectedShipmentForDetails);
+                      const s = selectedShipmentForDetails ? shipments.find(sh => sh.id === selectedShipmentForDetails.id) : null;
                       return s ? (
                         <>
                           Takip Kodu:{' '}
@@ -1230,7 +1233,7 @@ export default function CorporateShipments() {
               {(() => {
                 const shipment =
                   selectedShipmentDetail ||
-                  shipments.find(s => s.id === selectedShipmentForDetails);
+                  selectedShipmentForDetails ? shipments.find(s => s.id === selectedShipmentForDetails.id) : null;
                 if (!shipment) return null;
 
                 return (
