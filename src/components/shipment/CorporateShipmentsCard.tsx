@@ -29,7 +29,7 @@ interface CorporateShipmentsCardProps {
   onMessage: (shipment: Shipment) => void;
   isMessagingEnabled: (status: string) => boolean;
   getStatusStyle: (status: string) => string;
-  onShowTracking: (shipmentId: number) => void;
+  onShowTracking: (shipment: Shipment) => void;
 }
 
 export default function CorporateShipmentsCard({
