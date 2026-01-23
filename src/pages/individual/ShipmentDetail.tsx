@@ -1,4 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
+<<<<<<< HEAD
+=======
+import { toast } from 'react-hot-toast';
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
 import {
   Package,
   MapPin,
@@ -411,12 +415,20 @@ const IndividualShipmentDetail: React.FC = () => {
 
       if (response.ok) {
         await loadShipmentDetail();
+<<<<<<< HEAD
         showProfessionalToast(showToast, 'OFFER_ACCEPTED', 'success');
+=======
+        showProfessionalToast(toast, 'OFFER_ACCEPTED', 'success');
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
         // Navigate to shipments page
         navigate('/individual/my-shipments');
       } else {
         const errorData = await response.json().catch(() => ({}));
+<<<<<<< HEAD
         showProfessionalToast(showToast, 'OPERATION_FAILED', 'error');
+=======
+        showProfessionalToast(toast, 'OPERATION_FAILED', 'error');
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
       }
     } catch (error) {
       showProfessionalToast(toast, 'NETWORK_ERROR', 'error');
@@ -443,10 +455,17 @@ const IndividualShipmentDetail: React.FC = () => {
 
       if (response.ok) {
         await loadShipmentDetail();
+<<<<<<< HEAD
         showProfessionalToast(showToast, 'OFFER_REJECTED', 'success');
       } else {
         const errorData = await response.json().catch(() => ({}));
         showProfessionalToast(showToast, 'OPERATION_FAILED', 'error');
+=======
+        showProfessionalToast(toast, 'OFFER_REJECTED', 'success');
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        showProfessionalToast(toast, 'OPERATION_FAILED', 'error');
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
       }
     } catch (error) {
       showProfessionalToast(toast, 'NETWORK_ERROR', 'error');
@@ -491,11 +510,19 @@ const IndividualShipmentDetail: React.FC = () => {
         const data = await response.json();
         // Update local state
         setShipment((prev: ShipmentDetail | null) => prev ? { ...prev, status: 'delivered' } : null);
+<<<<<<< HEAD
         showProfessionalToast(showToast, 'DELIVERY_CONFIRMED', 'success');
         await loadShipmentDetail();
       } else {
         const errorData = await response.json();
         showProfessionalToast(showToast, 'OPERATION_FAILED', 'error');
+=======
+        showProfessionalToast(toast, 'DELIVERY_CONFIRMED', 'success');
+        await loadShipmentDetail();
+      } else {
+        const errorData = await response.json();
+        showProfessionalToast(toast, 'OPERATION_FAILED', 'error');
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
       }
     } catch (error) {
       // Error confirming delivery

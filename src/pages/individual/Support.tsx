@@ -1,4 +1,8 @@
 import React, { useState, useEffect } from 'react';
+<<<<<<< HEAD
+=======
+import { toast } from 'react-hot-toast';
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import { 

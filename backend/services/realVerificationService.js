@@ -419,6 +419,7 @@ class RealVerificationService {
     }
   }
   
+<<<<<<< HEAD
   // Telefon numarası doğrulama - SMS removed
   async verifyPhoneNumber(phone) {
     // SMS functionality removed - phone verification disabled
@@ -427,6 +428,22 @@ class RealVerificationService {
       requiresCode: false,
       message: 'Phone verification temporarily disabled'
     };
+=======
+  // Telefon numarası doğrulama - GERÇEK
+  async verifyPhoneNumber(phone) {
+    try {
+      // SMS doğrulama kodu gönder
+      const verificationCode = Math.floor(100000 + Math.random() * 900000);
+      
+      // Gerçek SMS servisi (Twilio, Netgsm, vs.)
+      const smsResult = await this.sendRealSMS(phone, verificationCode);
+      
+      return {
+        isValid: smsResult.success,
+        requiresCode: true,
+        message: smsResult.success ? 'SMS kodu gönderildi' : 'SMS gönderilemedi'
+      };
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
       
     } catch (error) {
       console.error('Telefon doğrulama hatası:', error);
@@ -434,7 +451,58 @@ class RealVerificationService {
     }
   }
   
+<<<<<<< HEAD
   // SMS functions removed - no longer needed
+=======
+  // Gerçek SMS gönderimi
+  async sendRealSMS(phone, code) {
+    try {
+      console.log(`SMS gönderiliyor: ${phone} - Kod: ${code}`);
+      
+      // Netgsm SMS servisi - GERÇEK
+      const response = await axios.post('https://api.netgsm.com.tr/sms/send/get', {
+        usercode: process.env.NETGSM_USERCODE || 'demo',
+        password: process.env.NETGSM_PASSWORD || 'demo',
+        gsmno: phone,
+        message: `YolNext doğrulama kodu: ${code}`,
+        msgheader: 'YOLNEXT'
+      }, {
+        timeout: 10000
+      });
+      
+      const success = response.data.includes('00');
+      console.log(`SMS gönderim sonucu: ${success ? 'Başarılı' : 'Başarısız'}`);
+      
+      return { success: success };
+      
+    } catch (error) {
+      console.error('SMS gönderim hatası:', error);
+      
+      // Hata durumunda alternatif SMS servisi
+      return await this.sendAlternativeSMS(phone, code);
+    }
+  }
+  
+  // Alternatif SMS servisi
+  async sendAlternativeSMS(phone, code) {
+    try {
+      // Alternatif SMS servisi (Iletimerkezi, vs.)
+      const response = await axios.post('https://api.iletimerkezi.com/v1/send-sms', {
+        username: process.env.ILETIMERKEZI_USERNAME || 'demo',
+        password: process.env.ILETIMERKEZI_PASSWORD || 'demo',
+        to: phone,
+        text: `YolNext doğrulama kodu: ${code}`,
+        from: 'YOLNEXT'
+      });
+      
+      return { success: response.status === 200 };
+      
+    } catch (error) {
+      console.error('Alternatif SMS gönderim hatası:', error);
+      return { success: false, error: error.message };
+    }
+  }
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
   
   // E-posta doğrulama - GERÇEK
   async verifyEmail(email) {

@@ -4,7 +4,11 @@
 const express = require('express');
 const router = express.Router();
 
+<<<<<<< HEAD
 function createSuspiciousActivityRoutes(pool, authenticateToken, requireAdmin, writeAuditLog, createNotification) {
+=======
+function createSuspiciousActivityRoutes(pool, authenticateToken, requireAdmin, writeAuditLog, createNotification, io) {
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
   
   router.use(authenticateToken);
   router.use(requireAdmin);
@@ -252,6 +256,7 @@ function createSuspiciousActivityRoutes(pool, authenticateToken, requireAdmin, w
         });
       }
 
+<<<<<<< HEAD
       // Socket.io removed - real-time updates not needed
       // Suspicious activity updates available via REST API polling
       if (false && stored.length > 0) { // io removed
@@ -261,6 +266,16 @@ function createSuspiciousActivityRoutes(pool, authenticateToken, requireAdmin, w
         //   detections: stored,
         //   timestamp: new Date()
         // });
+=======
+      // Real-time alert
+      if (io && stored.length > 0) {
+        io.to('admin-room').emit('suspicious_activity_detected', {
+          userId: user_id,
+          userEmail: user.email,
+          detections: stored,
+          timestamp: new Date()
+        });
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
       }
 
       return res.json({
@@ -612,4 +627,8 @@ function createSuspiciousActivityRoutes(pool, authenticateToken, requireAdmin, w
   return router;
 }
 
+<<<<<<< HEAD
 module.exports = createSuspiciousActivityRoutes;
+=======
+module.exports = createSuspiciousActivityRoutes;
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11

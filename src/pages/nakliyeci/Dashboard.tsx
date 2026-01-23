@@ -2,7 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useAuth } from '../../contexts/AuthContext';
+<<<<<<< HEAD
 import { useToast } from '../../contexts/ToastContext';
+=======
+import { toast } from 'react-hot-toast';
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
 import { dashboardAPI, notificationAPI, shipmentAPI } from '../../services/api';
 import { createApiUrl } from '../../config/api';
 import NotificationModal from '../../components/modals/NotificationModal';
@@ -86,7 +90,10 @@ interface Notification {
 const Dashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+<<<<<<< HEAD
   const { showToast } = useToast();
+=======
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
   const [stats, setStats] = useState({
     totalShipments: 0,
     deliveredShipments: 0,
@@ -504,7 +511,11 @@ const Dashboard = () => {
                               } else {
                                 // Panoya kopyala
                                 navigator.clipboard.writeText(shareText);
+<<<<<<< HEAD
                                 showToast({ type: 'success', title: 'Başarılı', message: 'Kod panoya kopyalandı!' });
+=======
+                                toast.success('Kod panoya kopyalandı!');
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
                               }
                             }
                           }
@@ -906,4 +917,8 @@ const Dashboard = () => {
   );
 };
 
+<<<<<<< HEAD
 export default Dashboard;
+=======
+export default Dashboard;
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11

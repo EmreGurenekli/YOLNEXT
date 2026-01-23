@@ -1,5 +1,9 @@
 // Notification helper utility
+<<<<<<< HEAD
 function createNotificationHelper(pool) {
+=======
+function createNotificationHelper(pool, io) {
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
   /**
    * Create a notification for a user
    * @param {number} userId - The user ID to notify
@@ -107,6 +111,7 @@ function createNotificationHelper(pool) {
 
       const notification = result.rows[0];
 
+<<<<<<< HEAD
       // Socket.IO removed - using REST API only
       // Real-time notifications can be polled via GET /api/notifications
 
@@ -114,6 +119,26 @@ function createNotificationHelper(pool) {
     } catch (error) {
       // Error creating notification - silent fail in production
       // Can be logged to error tracking service if needed
+=======
+      // Emit real-time notification via Socket.IO if available
+      if (io) {
+        const createdAt = notification.createdAt || notification.created_at || notification.createdat || notification.created_at || null;
+        io.to(`user_${userId}`).emit('notification', {
+          id: notification.id,
+          type: notification.type,
+          title: notification.title,
+          message: notification.message,
+          linkUrl: notification.linkurl,
+          priority: notification.priority,
+          metadata: notification.metadata,
+          createdAt
+        });
+      }
+
+      return notification;
+    } catch (error) {
+      console.error('Error creating notification:', error);
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
       return null;
     }
   };

@@ -102,14 +102,21 @@ import RatingModal from '../../components/RatingModal';
 import Pagination from '../../components/common/Pagination';
 import { useAuth } from '../../contexts/AuthContext';
 import GuidanceOverlay from '../../components/common/GuidanceOverlay';
+<<<<<<< HEAD
 import { useToast } from '../../contexts/ToastContext';
+=======
+import { toast } from 'react-hot-toast';
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
 import { TOAST_MESSAGES, showProfessionalToast } from '../../utils/toastMessages';
 import { logger } from '../../utils/logger';
 
 export default function CorporateShipments() {
   const navigate = useNavigate();
   const { user } = useAuth();
+<<<<<<< HEAD
   const { showToast } = useToast();
+=======
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
 
   const [showProcessAssistantDetails, setShowProcessAssistantDetails] = useState(false);
 
@@ -195,7 +202,11 @@ export default function CorporateShipments() {
     setIsLoading(true);
     const timeoutId = setTimeout(() => {
       setIsLoading(false);
+<<<<<<< HEAD
       showProfessionalToast(showToast, 'TIMEOUT_ERROR', 'error');
+=======
+      showProfessionalToast(toast, 'TIMEOUT_ERROR', 'error');
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
     }, 10000); // 10 seconds timeout
 
     try {
@@ -474,6 +485,7 @@ export default function CorporateShipments() {
             }) || [];
           setShipments(mapped);
         }
+<<<<<<< HEAD
         showProfessionalToast(showToast, 'DELIVERY_CONFIRMED', 'success');
       } else {
         const errorData = await response.json();
@@ -482,6 +494,16 @@ export default function CorporateShipments() {
     } catch (error) {
       // Error confirming delivery
       showProfessionalToast(showToast, 'NETWORK_ERROR', 'error');
+=======
+        showProfessionalToast(toast, 'DELIVERY_CONFIRMED', 'success');
+      } else {
+        const errorData = await response.json();
+        showProfessionalToast(toast, 'OPERATION_FAILED', 'error');
+      }
+    } catch (error) {
+      // Error confirming delivery
+      showProfessionalToast(toast, 'NETWORK_ERROR', 'error');
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
     }
   };
 
@@ -513,16 +535,27 @@ export default function CorporateShipments() {
         setCancelReason('');
         setSelectedShipmentForCancel(null);
 
+<<<<<<< HEAD
         showProfessionalToast(showToast, 'ACTION_COMPLETED', 'success');
+=======
+        showProfessionalToast(toast, 'ACTION_COMPLETED', 'success');
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
         
         // Reload shipments
         await loadShipments();
       } else {
         const errorData = await response.json();
+<<<<<<< HEAD
         showProfessionalToast(showToast, 'OPERATION_FAILED', 'error');
       }
     } catch (error) {
       showProfessionalToast(showToast, 'NETWORK_ERROR', 'error');
+=======
+        showProfessionalToast(toast, 'OPERATION_FAILED', 'error');
+      }
+    } catch (error) {
+      showProfessionalToast(toast, 'NETWORK_ERROR', 'error');
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
     } finally {
       setIsCancelling(false);
     }
@@ -2027,4 +2060,8 @@ export default function CorporateShipments() {
       </div>
     </div>
   );
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11

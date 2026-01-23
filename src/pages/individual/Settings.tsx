@@ -1,4 +1,8 @@
 import React, { useState, useEffect } from 'react';
+<<<<<<< HEAD
+=======
+import { toast } from 'react-hot-toast';
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import {
@@ -100,7 +104,10 @@ interface SettingsData {
 }
 
 export default function IndividualSettings() {
+<<<<<<< HEAD
   const { showToast } = useToast();
+=======
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('profile');
   const [isLoading, setIsLoading] = useState(false);
@@ -226,13 +233,21 @@ export default function IndividualSettings() {
       const response = await authAPI.deleteAccount({ password, reason: 'Kullanıcı talebi' });
       
       if (response.success) {
+<<<<<<< HEAD
         showProfessionalToast(showToast, 'ACTION_COMPLETED', 'success');
+=======
+        showProfessionalToast(toast, 'ACTION_COMPLETED', 'success');
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
         setTimeout(() => {
           localStorage.clear();
           window.location.href = '/';
         }, 2000);
       } else {
+<<<<<<< HEAD
         showProfessionalToast(showToast, 'OPERATION_FAILED', 'error');
+=======
+        showProfessionalToast(toast, 'OPERATION_FAILED', 'error');
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
       }
     } catch (err: any) {
       setError(

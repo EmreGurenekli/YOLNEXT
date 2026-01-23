@@ -49,6 +49,7 @@ const resolveBaseUrl = (env: keyof typeof API_CONFIG) => {
   const nodeApiUrl = typeof process !== 'undefined' ? process.env.VITE_API_URL : undefined;
   const fromEnv = viteEnv?.VITE_API_URL || nodeApiUrl;
   if (fromEnv) return String(fromEnv);
+<<<<<<< HEAD
   // In production, use environment variable or default to Render.com URL pattern
   // Render.com URL format: https://yolnext-backend.onrender.com
   if (env === 'production') {
@@ -56,6 +57,9 @@ const resolveBaseUrl = (env: keyof typeof API_CONFIG) => {
     // Default fallback for Render.com deployment
     return 'https://yolnext-backend.onrender.com';
   }
+=======
+  if (env === 'production') return 'https://api.yolnext.com';
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
   // In development, use relative path so Vite proxy can forward to backend
   // Vite proxy is configured to forward /api requests to http://localhost:5000
   if (env === 'development') {

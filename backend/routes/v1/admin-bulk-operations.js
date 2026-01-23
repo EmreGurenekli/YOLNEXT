@@ -4,7 +4,11 @@
 const express = require('express');
 const router = express.Router();
 
+<<<<<<< HEAD
 function createAdminBulkOperationsRoutes(pool, authenticateToken, requireAdmin, writeAuditLog, createNotification) {
+=======
+function createAdminBulkOperationsRoutes(pool, authenticateToken, requireAdmin, writeAuditLog, createNotification, io) {
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
   
   router.use(authenticateToken);
   router.use(requireAdmin);
@@ -228,6 +232,7 @@ function createAdminBulkOperationsRoutes(pool, authenticateToken, requireAdmin, 
           });
         }
 
+<<<<<<< HEAD
         // Socket.io removed - real-time updates not needed
         // Bulk operation updates available via REST API polling
         if (false) { // io removed
@@ -239,6 +244,18 @@ function createAdminBulkOperationsRoutes(pool, authenticateToken, requireAdmin, 
           //   executedBy: req.user.email || req.user.id,
           //   timestamp: new Date()
           // });
+=======
+        // Real-time notification to admins
+        if (io) {
+          io.to('admin-room').emit('bulk_operation_completed', {
+            type: 'user_ban',
+            operationRef,
+            successCount,
+            failureCount,
+            executedBy: req.user.email || req.user.id,
+            timestamp: new Date()
+          });
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
         }
 
         return res.json({
@@ -792,4 +809,8 @@ function createAdminBulkOperationsRoutes(pool, authenticateToken, requireAdmin, 
   return router;
 }
 
+<<<<<<< HEAD
 module.exports = createAdminBulkOperationsRoutes;
+=======
+module.exports = createAdminBulkOperationsRoutes;
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11

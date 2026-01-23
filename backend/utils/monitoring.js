@@ -4,6 +4,10 @@
  */
 
 const client = require('prom-client');
+<<<<<<< HEAD
+=======
+const logger = require('./logger');
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
 
 class ApplicationMonitoring {
   constructor() {
@@ -146,7 +150,11 @@ class ApplicationMonitoring {
 
         // Log slow requests
         if (duration > 2) {
+<<<<<<< HEAD
           console.warn('Slow request detected', {
+=======
+          logger.warn('Slow request detected', {
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
             requestId: req.requestId,
             method: req.method,
             route,

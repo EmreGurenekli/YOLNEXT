@@ -17,7 +17,10 @@ export { default as LoadingSpinner } from './common/LoadingSpinner';
 export { default as LoadingCard } from './common/LoadingCard';
 export { default as LoadingState } from './common/LoadingState';
 export { default as ErrorBoundary } from './common/ErrorBoundary';
+<<<<<<< HEAD
 // error/ErrorBoundary.tsx removed - using common/ErrorBoundary.tsx
+=======
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
 export { default as EmptyState } from './common/EmptyState';
 export { default as Modal } from './common/Modal';
 export { default as Toast } from './common/Toast';
@@ -46,4 +49,8 @@ export { default as OfferModal } from './OfferModal';
 export { default as RatingModal } from './RatingModal';
 export { default as TrackingModal } from './TrackingModal';
 export { default as WalletModal } from './WalletModal';
+<<<<<<< HEAD
 export { default as MessagingModal } from './MessagingModal';
+=======
+export { default as MessagingModal } from './MessagingModal';
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11

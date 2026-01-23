@@ -19,6 +19,7 @@ function createHealthRoutes(pool) {
     }
   });
 
+<<<<<<< HEAD
   // Live endpoint for Docker healthcheck (lightweight, no DB query)
   router.get('/live', (req, res) => {
     res.status(200).json({
@@ -27,6 +28,8 @@ function createHealthRoutes(pool) {
     });
   });
 
+=======
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
   return router;
 }
 

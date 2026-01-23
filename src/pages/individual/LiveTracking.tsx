@@ -3,7 +3,11 @@ import { Helmet } from 'react-helmet-async';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { createApiUrl } from '../../config/api';
 import { useAuth } from '../../contexts/AuthContext';
+<<<<<<< HEAD
 // Socket.io removed - using REST API polling instead
+=======
+import socketService from '../../services/socket';
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
 import { resolveShipmentRoute } from '../../utils/shipmentRoute';
 import CarrierInfoCard from '../../components/CarrierInfoCard';
 import { normalizeTrackingCode } from '../../utils/trackingCode';
@@ -221,10 +225,20 @@ const IndividualLiveTracking: React.FC = () => {
       );
     };
 
+<<<<<<< HEAD
     // Socket.io removed - using REST API polling instead
     (async () => {
       try {
         // Load initial tracking history
+=======
+    const token = localStorage.getItem('authToken') || undefined;
+    (async () => {
+      try {
+        await socketService.connect(token);
+        socketService.joinShipmentRoom(shipmentId);
+        socketService.onTrackingUpdate(onUpdate);
+
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
         const history = await fetchTrackingHistory(shipmentId);
         if (mounted && history.length > 0) {
           setSelectedShipment(prev => {
@@ -248,6 +262,7 @@ const IndividualLiveTracking: React.FC = () => {
       }
     })();
 
+<<<<<<< HEAD
     // Poll for updates every 10 seconds
     const pollInterval = setInterval(async () => {
       if (!mounted || !shipmentId) return;
@@ -264,6 +279,12 @@ const IndividualLiveTracking: React.FC = () => {
     return () => {
       mounted = false;
       clearInterval(pollInterval);
+=======
+    return () => {
+      mounted = false;
+      socketService.off('tracking_update', onUpdate);
+      socketService.leaveShipmentRoom(shipmentId);
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
     };
   }, [selectedShipment?.id]);
 
@@ -1182,6 +1203,7 @@ const IndividualLiveTracking: React.FC = () => {
 };
 
 export default IndividualLiveTracking;
+<<<<<<< HEAD
 
                             className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-1"
                           >
@@ -1288,3 +1310,5 @@ export default IndividualLiveTracking;
 };
 
 export default IndividualLiveTracking;
+=======
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11

@@ -1,7 +1,11 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
+<<<<<<< HEAD
 import { useToast } from '../../contexts/ToastContext';
+=======
+import { toast } from 'react-hot-toast';
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
 import {
   HelpCircle,
   Package,
@@ -55,10 +59,15 @@ interface SupportCategory {
 }
 
 const CorporateHelp = () => {
+<<<<<<< HEAD
   const { showToast } = useToast();
   const [openFAQ, setOpenFAQ] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const { showToast } = useToast();
+=======
+  const [openFAQ, setOpenFAQ] = useState<number | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
   const [isSupportOpen, setIsSupportOpen] = useState(false);
   
   // Ticket system states
@@ -273,7 +282,11 @@ const CorporateHelp = () => {
     e.preventDefault();
     
     if (!formData.category || !formData.subject || !formData.description) {
+<<<<<<< HEAD
       showProfessionalToast(showToast, 'REQUIRED_FIELDS', 'error');
+=======
+      showProfessionalToast(toast, 'REQUIRED_FIELDS', 'error');
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
       return;
     }
 
@@ -298,7 +311,11 @@ const CorporateHelp = () => {
       });
 
       if (response.ok) {
+<<<<<<< HEAD
         showProfessionalToast(showToast, 'SUPPORT_TICKET_CREATED', 'success');
+=======
+        showProfessionalToast(toast, 'SUPPORT_TICKET_CREATED', 'success');
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
         setFormData({
           category: '',
           priority: 'medium',
@@ -317,7 +334,11 @@ const CorporateHelp = () => {
         );
       }
     } catch (error) {
+<<<<<<< HEAD
       showProfessionalToast(showToast, 'NETWORK_ERROR', 'error');
+=======
+      showProfessionalToast(toast, 'NETWORK_ERROR', 'error');
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
     } finally {
       setLoading(false);
     }
@@ -807,3 +828,7 @@ const CorporateHelp = () => {
 
 export default CorporateHelp;
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11

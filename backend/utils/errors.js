@@ -88,6 +88,7 @@ class FileUploadError extends ApiError {
 const errorHandler = (error, req, res, next) => {
   let apiError = error;
 
+<<<<<<< HEAD
   // PostgreSQL validation hatası
   if (error.code === '23502') { // NOT NULL violation
     apiError = new ValidationError('Zorunlu alanlar eksik', { field: error.column });
@@ -108,6 +109,15 @@ const errorHandler = (error, req, res, next) => {
   // PostgreSQL syntax/type errors
   if (error.code === '22P02' || error.code === '42703') { // Invalid input syntax / Undefined column
     apiError = new ValidationError('Geçersiz veri formatı', { column: error.column });
+=======
+  // Mongoose validation hatası
+  if (error.name === 'ValidationError') {
+    const details = Object.values(error.errors).map(err => ({
+      field: err.path,
+      message: err.message
+    }));
+    apiError = new ValidationError('Geçersiz veri', details);
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
   }
 
   // JWT hatası
@@ -132,9 +142,19 @@ const errorHandler = (error, req, res, next) => {
     apiError = new FileUploadError('Beklenmeyen dosya alanı');
   }
 
+<<<<<<< HEAD
   // PostgreSQL connection errors
   if (error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT') {
     apiError = new DatabaseError('Veritabanı bağlantı hatası');
+=======
+  // SQLite hatası
+  if (error.code === 'SQLITE_CONSTRAINT') {
+    if (error.message.includes('UNIQUE')) {
+      apiError = new ConflictError('Bu kayıt zaten mevcut');
+    } else {
+      apiError = new DatabaseError('Veritabanı kısıtlaması ihlali');
+    }
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
   }
 
   // Eğer ApiError değilse, genel sunucu hatası yap

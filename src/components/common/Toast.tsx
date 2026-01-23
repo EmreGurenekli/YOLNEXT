@@ -1,4 +1,5 @@
 import React from 'react';
+<<<<<<< HEAD
 
 // Simple icon components using SVG (no external library)
 const CheckCircle: React.FC<{ className?: string }> = ({ className }) => (
@@ -30,6 +31,9 @@ const X: React.FC<{ className?: string }> = ({ className }) => (
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
   </svg>
 );
+=======
+import { CheckCircle, XCircle, AlertCircle, Info, X } from 'lucide-react';
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
 
 export type ToastType = 'success' | 'error' | 'warning' | 'info';
 
@@ -130,4 +134,8 @@ export const ToastContainer: React.FC<ToastContainerProps> = ({
   );
 };
 
+<<<<<<< HEAD
 export default Toast;
+=======
+export default Toast;
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11

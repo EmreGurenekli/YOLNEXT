@@ -62,7 +62,11 @@ const authAPI = {
   }
 };
 import { User } from '../types/auth';
+<<<<<<< HEAD
 // Socket.io removed - using REST API only
+=======
+import socketService from '../services/socket';
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
 
 // Register user data interface
 interface RegisterUserData {
@@ -348,7 +352,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         // Connect to Socket.IO (only if enabled)
         if (import.meta.env.VITE_ENABLE_SOCKET === 'true') {
+<<<<<<< HEAD
           // Socket.io removed
+=======
+          socketService.connect();
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
         }
 
         return { success: true, user: userData };
@@ -438,7 +446,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
         // Connect to Socket.IO (only if enabled)
         if (import.meta.env.VITE_ENABLE_SOCKET === 'true') {
+<<<<<<< HEAD
           // Socket.io removed
+=======
+          socketService.connect();
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
         }
 
         return { success: true, user: finalUserData };
@@ -475,7 +487,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       safeLocalStorage.removeItem('token');
       safeLocalStorage.removeItem('user');
       // Disconnect from Socket.IO
+<<<<<<< HEAD
       // Socket.io removed
+=======
+      socketService.disconnect();
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
       // Don't redirect automatically, let the ProtectedRoute handle it
       // window.location.href = '/login';
     }
@@ -581,6 +597,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+<<<<<<< HEAD
 };
     login,
     register,
@@ -601,4 +618,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+=======
+>>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
 };
