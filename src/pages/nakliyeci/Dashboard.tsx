@@ -87,9 +87,47 @@ const Dashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { showToast } = useToast();
-              </div>
+  const [showNotificationModal, setShowNotificationModal] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [stats, setStats] = useState({
+    totalShipments: 0,
+    activeShipments: 0,
+    completedShipments: 0,
+    totalRevenue: 0,
+    pendingOffers: 0,
+  });
+  const [shipments, setShipments] = useState<Shipment[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
-              <div className='flex items-center gap-3'>
+  const markNotificationsAsRead = async () => {
+    try {
+      const token = localStorage.getItem('authToken');
+      await fetch(createApiUrl('/api/notifications/mark-read'), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      setUnreadCount(0);
+    } catch (error) {
+      // Ignore errors
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+      <Helmet>
+        <title>Nakliyeci Dashboard - YolNext</title>
+      </Helmet>
+      <div className="container mx-auto px-4 py-8">
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h1 className="text-3xl font-bold text-slate-900">Dashboard</h1>
+              <p className="text-slate-600 mt-1">Hoş geldiniz, {user?.firstName || user?.email}</p>
+            </div>
+            <div className="flex items-center gap-3">
                 <button
                   onClick={() => {
                     setShowNotificationModal(true);
