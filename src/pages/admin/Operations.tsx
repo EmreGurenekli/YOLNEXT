@@ -182,16 +182,14 @@ const Operations: React.FC = () => {
 
   useEffect(() => {
     loadShipments();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statusFilter]);
+  }, [statusFilter, loadShipments]);
 
   useEffect(() => {
     const t = setTimeout(() => {
       loadShipments();
     }, 300);
     return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query]);
+  }, [query, loadShipments]);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);

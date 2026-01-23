@@ -57,7 +57,7 @@ const CorporateHelp = () => {
   const { showToast } = useToast();
   const [openFAQ, setOpenFAQ] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const { showToast } = useToast();  const [isSupportOpen, setIsSupportOpen] = useState(false);
+  const [isSupportOpen, setIsSupportOpen] = useState(false);
   
   // Ticket system states
   const [tickets, setTickets] = useState<SupportTicket[]>([]);

@@ -2,47 +2,12 @@
 const express = require('express');
 const router = express.Router();
 
-<<<<<<< HEAD
 const { getPagination } = require('../../utils/routeHelpers');
 
 function createOfferRoutes(pool, authenticateToken, createNotification, sendEmail, writeAuditLog, offerSpeedLimiter, idempotencyGuard) {
   const router = require('express').Router();
 
   // Simplified signature - io parameter removed (Socket.io no longer used)
-=======
-const { clearCachePattern } = require('../../utils/cache');
-const { getPagination } = require('../../utils/routeHelpers');
-
-function createOfferRoutes(pool, a1, a2, a3, a4, a5, a6, a7, a8) {
-  const router = require('express').Router();
-
-  // Support multiple call signatures (older route module vs server-modular wiring)
-  // Signature A (route module): (pool, io, authenticateToken, offerSpeedLimiter, idempotencyGuard, createNotification, clearCachePattern)
-  // Signature B (server-modular): (pool, authenticateToken, createNotification, sendEmail, sendSMS, writeAuditLog, offerSpeedLimiter, idempotencyGuard, io)
-  let io = null;
-  let authenticateToken = null;
-  let offerSpeedLimiter = null;
-  let idempotencyGuard = null;
-  let createNotification = null;
-  let clearCachePatternFn = clearCachePattern;
-
-  const looksLikeIo = (v) => v && typeof v === 'object' && typeof v.to === 'function';
-
-  if (looksLikeIo(a1)) {
-    io = a1;
-    authenticateToken = a2;
-    offerSpeedLimiter = a3;
-    idempotencyGuard = a4;
-    createNotification = a5;
-    clearCachePatternFn = a6 || clearCachePatternFn;
-  } else {
-    authenticateToken = a1;
-    createNotification = a2;
-    offerSpeedLimiter = a6;
-    idempotencyGuard = a7;
-    io = a8 || null;
-  }
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
 
   const commissionPercentage = 0.01;
 
@@ -820,17 +785,8 @@ function createOfferRoutes(pool, a1, a2, a3, a4, a5, a6, a7, a8) {
 
   const emitTo = (room, event, payload) => {
     try {
-<<<<<<< HEAD
       // Socket.io removed - real-time updates not needed
       // Offer updates available via REST API polling
-      if (false) { // io removed
-        // if (!io || !room) return;
-        // io.to(room).emit(event, payload);
-      }
-=======
-      if (!io || !room) return;
-      io.to(room).emit(event, payload);
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
     } catch (_) {
       // ignore
     }
@@ -2353,15 +2309,7 @@ function createOfferRoutes(pool, a1, a2, a3, a4, a5, a6, a7, a8) {
 
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
 
-<<<<<<< HEAD
         // Cache clearing removed - not needed for minimum stack
-=======
-        try {
-          clearCachePatternFn('GET:/api/shipments');
-        } catch (_) {
-          // ignore cache clear errors
-        }
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
 
         return res.json({
           success: true,
@@ -2740,8 +2688,3 @@ function createOfferRoutes(pool, a1, a2, a3, a4, a5, a6, a7, a8) {
 }
 
 module.exports = createOfferRoutes;
-<<<<<<< HEAD
-=======
-
-
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11

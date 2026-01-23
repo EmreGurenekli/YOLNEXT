@@ -4,11 +4,7 @@ dist/
 coverage/
 build/
 
-<<<<<<< HEAD
 # Test files (removed - no unit tests)
-=======
-# Test files
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
 test-results/
 test-screenshots/
 test-videos/
@@ -17,15 +13,12 @@ playwright-report/
 .playwright-mcp/
 *.log
 *.cache
-<<<<<<< HEAD
 tests/
 backend/tests/
 tools/legacy/
 backup/
 backend/backup/
 backend/backups/
-=======
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
 
 # Temporary/generated files
 microservices/api-gateway/temp_settings.html
@@ -43,7 +36,6 @@ public/sw.js
 .DS_Store
 Thumbs.db
 
-<<<<<<< HEAD
 # Legacy (removed)
 # /legacy/
 
@@ -61,10 +53,6 @@ playwright-report/
 test-results/
 screenshots/
 testsprite_tests/
-=======
-# Legacy
-/legacy/
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
 
 # Environment files (CRITICAL - Never commit these!)
 .env

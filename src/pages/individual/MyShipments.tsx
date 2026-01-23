@@ -37,6 +37,10 @@ import EmptyState from '../../components/common/EmptyState';
 import Pagination from '../../components/common/Pagination';
 import Breadcrumb from '../../components/common/Breadcrumb';
 import { logger } from '../../utils/logger';
+import MyShipmentsHeader from '../../components/shipment/MyShipmentsHeader';
+import MyShipmentsFilters from '../../components/shipment/MyShipmentsFilters';
+import MyShipmentsTableRow from '../../components/shipment/MyShipmentsTableRow';
+import MyShipmentsCard from '../../components/shipment/MyShipmentsCard';
 
 interface Shipment {
   id: string;
@@ -1173,22 +1177,7 @@ const MyShipments: React.FC<{ basePath?: string }> = ({ basePath = '/individual'
         />
 
         {/* Header - Match Corporate Design */}
-        <div className='text-center mb-12'>
-          <div className='flex justify-center mb-6'>
-            <div className='w-16 h-16 bg-gradient-to-br from-slate-800 to-blue-900 rounded-2xl flex items-center justify-center shadow-lg'>
-              <Package className='w-8 h-8 text-white' />
-            </div>
-          </div>
-          <h1 className='text-4xl md:text-5xl font-bold text-slate-900 mb-3'>
-            Gönderilerinizi{' '}
-            <span className='text-transparent bg-clip-text bg-gradient-to-r from-slate-800 to-blue-900'>
-              Takip Edin
-            </span>
-          </h1>
-          <p className='text-lg text-slate-600'>
-            Gönderilerinizin durumunu takip edin ve yönetin
-          </p>
-        </div>
+        <MyShipmentsHeader />
 
         <div className='mb-6'>
           <GuidanceOverlay
@@ -1209,64 +1198,23 @@ const MyShipments: React.FC<{ basePath?: string }> = ({ basePath = '/individual'
         </div>
 
         {/* Filters Card */}
-        <div className='bg-white rounded-2xl p-8 shadow-xl border border-slate-200 mb-8'>
-          <div className='grid grid-cols-1 md:grid-cols-4 gap-4 mb-4'>
-            <div className='relative'>
-              <Search className='absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4' />
-              <input
-                type='text'
-                placeholder='Gönderi ara...'
-                value={searchTerm}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
-                className='w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                aria-label='Gönderi ara'
-              />
-            </div>
-
-            <select
-              value={statusFilter}
-              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setStatusFilter(e.target.value)}
-              className='px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-              aria-label='Durum filtresi'
-            >
-              <option value='all'>Tüm Durumlar</option>
-              <option value='active'>Aktif Gönderiler</option>
-              <option value='completed'>Tamamlanan</option>
-              <option value='pending'>Beklemede</option>
-            </select>
-
-            <select
-              value={sortBy}
-              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSortBy(e.target.value)}
-              className='px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-              aria-label='Sıralama seçeneği'
-            >
-              <option value='date'>Tarihe Göre</option>
-              <option value='status'>Duruma Göre</option>
-              <option value='priority'>Önceliğe Göre</option>
-              <option value='value'>Değere Göre</option>
-            </select>
-
-            <button
-              onClick={() => {
-                setSearchTerm('');
-                setStatusFilter('all');
-                setSortBy('date');
-                setPagination((prev: typeof pagination) => ({
-                  ...prev,
-                  page: 1,
-                }));
-              }}
-              className='min-h-[44px] px-4 py-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors flex items-center justify-center gap-2'
-              aria-label='Filtreleri sıfırla'
-            >
-              <X className='w-4 h-4' />
-              Sıfırla
-            </button>
-          </div>
-
-          {/* Export Buttons kaldırıldı */}
-        </div>
+        <MyShipmentsFilters
+          searchTerm={searchTerm}
+          statusFilter={statusFilter}
+          sortBy={sortBy}
+          onSearchChange={setSearchTerm}
+          onStatusFilterChange={setStatusFilter}
+          onSortByChange={setSortBy}
+          onReset={() => {
+            setSearchTerm('');
+            setStatusFilter('all');
+            setSortBy('date');
+            setPagination((prev: typeof pagination) => ({
+              ...prev,
+              page: 1,
+            }));
+          }}
+        />
 
         {/* Shipments Table */}
         <div className='bg-white rounded-2xl p-4 sm:p-8 shadow-xl border border-slate-200'>
@@ -1299,160 +1247,21 @@ const MyShipments: React.FC<{ basePath?: string }> = ({ basePath = '/individual'
                 <tbody>
                   {sortedShipments.length > 0 ? (
                     sortedShipments.map((shipment, index) => (
-                      <tr
+                      <MyShipmentsTableRow
                         key={`${shipment.id}-${shipment.trackingCode}-${index}`}
-                        className='border-b border-slate-100 hover:bg-slate-50 transition-colors'
-                      >
-                        <td className='py-4 px-4'>
-                          <div className='font-mono text-sm font-semibold text-slate-900'>
-                            {shipment.trackingCode}
-                          </div>
-                          <div className='text-xs text-slate-500'>
-                            {formatDate(shipment.createdAt, 'long')}
-                          </div>
-                          <div className='text-xs text-slate-500'>
-                            {shipment.title}
-                          </div>
-                        </td>
-                        <td className='py-4 px-4'>
-                          <div className='text-sm font-medium text-slate-900'>
-                            {shipment.from} → {shipment.to}
-                          </div>
-                          <div className='text-xs text-slate-500'>
-                            {(() => {
-                              const getCategoryName = (cat: string) => {
-                                const categoryMap: { [key: string]: string } = {
-                                  'house_move': 'Ev Taşınması',
-                                  'furniture_goods': 'Mobilya Taşıma',
-                                  'special_cargo': 'Özel Yük',
-                                  'other': 'Diğer',
-                                  'general': 'Genel Gönderi'
-                                };
-                                return categoryMap[cat] || cat;
-                              };
-                              
-                              const category = getCategoryName(shipment.category || '');
-                              const subCategory = shipment.subCategory ? getCategoryName(shipment.subCategory) : '';
-                              
-                              if (!subCategory || subCategory === category) {
-                                return category;
-                              }
-                              return `${category} - ${subCategory}`;
-                            })()}
-                          </div>
-                        </td>
-                        <td className='py-4 px-4'>
-                          <span
-                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                              shipment.status === 'delivered'
-                                ? 'bg-green-100 text-green-800'
-                                : shipment.status === 'completed'
-                                  ? 'bg-gray-100 text-gray-800'
-                                : shipment.status === 'in_transit'
-                                  ? 'bg-blue-100 text-blue-800'
-                                  : shipment.status === 'preparing'
-                                    ? 'bg-orange-100 text-orange-800'
-                                    : shipment.status === 'offer_accepted' || shipment.status === 'accepted'
-                                      ? 'bg-green-100 text-green-800'
-                                      : 'bg-yellow-100 text-yellow-800'
-                            }`}
-                          >
-                            {getStatusIcon(shipment.status)}
-                            {getStatusInfo(shipment.status).text}
-                          </span>
-                        </td>
-                        <td className='py-4 px-4'>
-                          {shipment.carrierId && shipment.carrierName ? (
-                            <CarrierInfoCard
-                              carrierId={String(shipment.carrierId)}
-                              carrierName={shipment.carrierName}
-                              companyName={shipment.carrierCompany}
-                              carrierRating={shipment.carrierRating || 0}
-                              carrierReviews={shipment.carrierReviews || 0}
-                              carrierVerified={shipment.carrierVerified || false}
-                              successRate={shipment.successRate || 0}
-                              completedJobs={shipment.completedJobs || 0}
-                              variant="compact"
-                              showMessaging={false}
-                              className="max-w-xs"
-                            />
-                          ) : (
-                            <div className='text-sm font-medium text-slate-500'>
-                              Atanmamış
-                            </div>
-                          )}
-                        </td>
-                        <td className='py-4 px-4'>
-                          <div className='text-sm font-bold text-slate-900'>
-                            {shipment.price && Number(shipment.price) > 0 
-                              ? formatCurrency(shipment.price) 
-                              : <span className='text-slate-400 font-normal'>Teklif Bekleniyor</span>}
-                          </div>
-                          <div className='text-xs text-slate-500'>
-                            {shipment.volume && shipment.volume !== '0' && Number(shipment.volume) > 0 ? `${shipment.volume} m³` : ''}
-                          </div>
-                          <div className='text-xs text-slate-500'>
-                            {formatDate(shipment.estimatedDelivery, 'long')}
-                          </div>
-                        </td>
-                        <td className='py-4 px-4'>
-                          <div className='flex items-center gap-2'>
-                            <button
-                              onClick={() => handleViewDetails(shipment.id)}
-                              className='px-3 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs font-medium rounded-lg transition-colors'
-                              aria-label={`${shipment.trackingCode} gönderisinin detaylarını görüntüle`}
-                            >
-                              Detay
-                            </button>
-                            {isTrackEnabledForShipment(shipment.status) && (
-                              <button
-                                onClick={() => handleTrackShipment(shipment.id)}
-                                className='px-3 py-1.5 bg-green-100 hover:bg-green-200 text-green-700 text-xs font-medium rounded-lg transition-colors'
-                                aria-label={`${shipment.trackingCode} gönderisini takip et`}
-                              >
-                                Takip
-                              </button>
-                            )}
-                            <button
-                              onClick={() => handleMessage(shipment)}
-                              disabled={!isMessagingEnabledForShipment(shipment.status)}
-                              title={!isMessagingEnabledForShipment(shipment.status) ? 'Mesajlaşma teklif kabul edilince açılır' : 'Nakliyeci ile mesajlaş'}
-                              aria-label={!isMessagingEnabledForShipment(shipment.status) ? 'Mesajlaşma teklif kabul edilince açılır' : 'Nakliyeci ile mesajlaş'}
-                              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-                                isMessagingEnabledForShipment(shipment.status)
-                                  ? 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-                                  : 'bg-gray-50 text-gray-400 cursor-not-allowed'
-                              }`}
-                            >
-                              Mesaj
-                            </button>
-                            {shipment.status === 'delivered' && (
-                              <button
-                                onClick={() => handleConfirmDelivery(shipment)}
-                                className='px-3 py-1.5 bg-green-100 hover:bg-green-200 text-green-700 text-xs font-medium rounded-lg transition-colors'
-                              >
-                                Onayla
-                              </button>
-                            )}
-                            {(shipment.status === 'completed') && shipment.carrierName && !shipment.rating && !isShipmentLocallyRated(shipment.id) && (
-                              <button
-                                onClick={() => handleRateCarrier(shipment)}
-                                className='px-3 py-1.5 bg-yellow-100 hover:bg-yellow-200 text-yellow-700 text-xs font-medium rounded-lg transition-colors'
-                              >
-                                Değerlendir
-                              </button>
-                            )}
-                            {canCancelShipment(shipment.status) && (
-                              <button
-                                onClick={() => handleCancelClick(shipment)}
-                                className='px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-700 text-xs font-medium rounded-lg transition-colors'
-                              >
-                                İptal Et
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
+                        shipment={shipment}
+                        index={index}
+                        onViewDetails={handleViewDetails}
+                        onTrack={handleTrackShipment}
+                        onMessage={handleMessage}
+                        onConfirmDelivery={handleConfirmDelivery}
+                        onRateCarrier={handleRateCarrier}
+                        onCancel={handleCancelClick}
+                        isTrackEnabled={isTrackEnabledForShipment}
+                        isMessagingEnabled={isMessagingEnabledForShipment}
+                        canCancel={canCancelShipment}
+                        isLocallyRated={isShipmentLocallyRated}
+                      />
                     ))
                   ) : (
                     <tr>
@@ -1477,143 +1286,23 @@ const MyShipments: React.FC<{ basePath?: string }> = ({ basePath = '/individual'
           <div className='md:hidden'>
             {sortedShipments.length > 0 ? (
               sortedShipments.map((shipment, index) => (
-                <div
+                <MyShipmentsCard
                   key={`${shipment.id}-${shipment.trackingCode}-${index}`}
-                  className='bg-white rounded-2xl shadow-md border border-slate-200 mb-4'
-                >
-                  <div className='p-4'>
-                    <div className='flex items-center justify-between mb-3'>
-                      <div className='text-lg font-bold text-slate-900'>{shipment.trackingCode}</div>
-                      <div className='text-xs text-slate-500'>{formatDate(shipment.createdAt, 'long')}</div>
-                    </div>
-                    <div className='text-sm font-medium text-slate-900 mb-2'>{shipment.title}</div>
-                    <div className='text-xs text-slate-500'>{shipment.from} → {shipment.to}</div>
-                    <div className='text-xs text-slate-500'>
-                      {(() => {
-                        const getCategoryName = (cat: string) => {
-                          const categoryMap: { [key: string]: string } = {
-                            'house_move': 'Ev Taşınması',
-                            'furniture_goods': 'Mobilya Taşıma',
-                            'special_cargo': 'Özel Yük',
-                            'other': 'Diğer'
-                          };
-                          return categoryMap[cat] || cat;
-                        };
-                        
-                        const category = getCategoryName(shipment.category || '');
-                        const subCategory = shipment.subCategory ? getCategoryName(shipment.subCategory) : '';
-                        
-                        if (!subCategory || subCategory === category) {
-                          return category;
-                        }
-                        return `${category} - ${subCategory}`;
-                      })()}
-                    </div>
-                  </div>
-
-                  {/* Carrier */}
-                  <div className='mb-3'>
-                    {shipment.carrierId && shipment.carrierName ? (
-                      <CarrierInfoCard
-                        carrierId={String(shipment.carrierId)}
-                        carrierName={shipment.carrierName}
-                        companyName={shipment.carrierCompany}
-                        carrierRating={shipment.carrierRating || 0}
-                        carrierReviews={shipment.carrierReviews || 0}
-                        carrierVerified={shipment.carrierVerified || false}
-                        successRate={shipment.successRate || 0}
-                        completedJobs={shipment.completedJobs || 0}
-                        variant="compact"
-                        showMessaging={false}
-                        className="w-full"
-                      />
-                    ) : (
-                      <div className='text-sm font-medium text-slate-500'>
-                        Nakliyeci atanmamış
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Price and Date */}
-                  <div className='mb-4'>
-                    <div className='text-lg font-bold text-slate-900 mb-1'>
-                      {formatCurrency(shipment.price)}
-                    </div>
-                    <div className='text-xs text-slate-500 space-y-1'>
-                      <div>Teslimat: {formatDate(shipment.estimatedDelivery, 'long')}</div>
-                      {shipment.volume && shipment.volume !== '0' && (
-                        <div>Hacim: {shipment.volume} m³</div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  <div className='flex flex-wrap gap-2'>
-                    <button
-                      onClick={() => handleViewDetails(shipment.id)}
-                      className='flex-1 min-w-[80px] min-h-[44px] px-3 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs font-medium rounded-lg transition-colors flex items-center justify-center'
-                      aria-label={`${shipment.trackingCode} gönderisinin detaylarını görüntüle`}
-                    >
-                      Detay
-                    </button>
-                    {isTrackEnabledForShipment(shipment.status) && (
-                      <button
-                        onClick={() => handleTrackShipment(shipment.id)}
-                        className='flex-1 min-w-[80px] min-h-[44px] px-3 py-2 bg-green-100 hover:bg-green-200 text-green-700 text-xs font-medium rounded-lg transition-colors flex items-center justify-center'
-                        aria-label={`${shipment.trackingCode} gönderisini takip et`}
-                      >
-                        Takip
-                      </button>
-                    )}
-                    <button
-                      onClick={() => handleMessage(shipment)}
-                      disabled={!isMessagingEnabledForShipment(shipment.status)}
-                      className={`flex-1 min-w-[80px] min-h-[44px] px-3 py-2 text-xs font-medium rounded-lg transition-colors flex items-center justify-center ${
-                        isMessagingEnabledForShipment(shipment.status)
-                          ? 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-                          : 'bg-gray-50 text-gray-400 cursor-not-allowed'
-                      }`}
-                      aria-label={!isMessagingEnabledForShipment(shipment.status) ? 'Mesajlaşma teklif kabul edilince açılır' : 'Nakliyeci ile mesajlaş'}
-                    >
-                      Mesaj
-                    </button>
-                  </div>
-
-                  {/* Additional Actions for Delivered */}
-                  {shipment.status === 'delivered' && (
-                    <div className='flex flex-wrap gap-2 mt-2'>
-                      <button
-                        onClick={() => handleConfirmDelivery(shipment)}
-                        className='flex-1 min-w-[80px] min-h-[44px] px-3 py-2 bg-green-100 hover:bg-green-200 text-green-700 text-xs font-medium rounded-lg transition-colors flex items-center justify-center'
-                        aria-label='Teslimatı onayla'
-                      >
-                        Onayla
-                      </button>
-                      {shipment.carrierName && !shipment.rating && !isShipmentLocallyRated(shipment.id) && (
-                        <button
-                          onClick={() => handleRateCarrier(shipment)}
-                          className='flex-1 min-w-[80px] min-h-[44px] px-3 py-2 bg-yellow-100 hover:bg-yellow-200 text-yellow-700 text-xs font-medium rounded-lg transition-colors flex items-center justify-center'
-                          aria-label='Nakliyeciyi değerlendir'
-                        >
-                          Değerlendir
-                        </button>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Cancel Action */}
-                  {canCancelShipment(shipment.status) && (
-                    <div className='mt-2'>
-                      <button
-                        onClick={() => handleCancelClick(shipment)}
-                        className='w-full min-h-[44px] px-3 py-2 bg-red-100 hover:bg-red-200 text-red-700 text-xs font-medium rounded-lg transition-colors flex items-center justify-center'
-                        aria-label='Gönderiyi iptal et'
-                      >
-                        İptal Et
-                      </button>
-                    </div>
-                  )}
-                </div>
+                  shipment={shipment}
+                  index={index}
+                  onViewDetails={handleViewDetails}
+                  onTrack={handleTrackShipment}
+                  onMessage={handleMessage}
+                  onConfirmDelivery={handleConfirmDelivery}
+                  onRateCarrier={handleRateCarrier}
+                  onCancel={handleCancelClick}
+                  isTrackEnabled={isTrackEnabledForShipment}
+                  isMessagingEnabled={isMessagingEnabledForShipment}
+                  canCancel={canCancelShipment}
+                  isLocallyRated={isShipmentLocallyRated}
+                  getStatusInfo={getStatusInfo}
+                  getStatusIcon={getStatusIcon}
+                />
               ))
             ) : (
               <div className='min-h-[50vh] flex items-center justify-center px-4 py-12'>

@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { createApiUrl } from '../../config/api';
+import { useToast } from '../../contexts/ToastContext';
 import { TOAST_MESSAGES, showProfessionalToast } from '../../utils/toastMessages';
 import { sanitizeShipmentTitle } from '../../utils/format';
 import { normalizeTrackingCode } from '../../utils/trackingCode';
@@ -215,6 +216,7 @@ const getCargoTypeInfo = (type: ShipmentDetail['cargoDetails']['type']) => {
 };
 
 const IndividualShipmentDetail: React.FC = () => {
+  const { showToast } = useToast();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [shipment, setShipment] = useState<ShipmentDetail | null>(null);
@@ -417,7 +419,7 @@ const IndividualShipmentDetail: React.FC = () => {
         const errorData = await response.json().catch(() => ({}));
         showProfessionalToast(showToast, 'OPERATION_FAILED', 'error');      }
     } catch (error) {
-      showProfessionalToast(toast, 'NETWORK_ERROR', 'error');
+      showProfessionalToast(showToast, 'NETWORK_ERROR', 'error');
     } finally {
       setIsConfirming(false);
     }
@@ -446,7 +448,7 @@ const IndividualShipmentDetail: React.FC = () => {
         const errorData = await response.json().catch(() => ({}));
         showProfessionalToast(showToast, 'OPERATION_FAILED', 'error');      }
     } catch (error) {
-      showProfessionalToast(toast, 'NETWORK_ERROR', 'error');
+      showProfessionalToast(showToast, 'NETWORK_ERROR', 'error');
     } finally {
       setIsConfirming(false);
     }
@@ -495,7 +497,7 @@ const IndividualShipmentDetail: React.FC = () => {
         showProfessionalToast(showToast, 'OPERATION_FAILED', 'error');      }
     } catch (error) {
       // Error confirming delivery
-      showProfessionalToast(toast, 'NETWORK_ERROR', 'error');
+      showProfessionalToast(showToast, 'NETWORK_ERROR', 'error');
     } finally {
       setIsConfirming(false);
     }

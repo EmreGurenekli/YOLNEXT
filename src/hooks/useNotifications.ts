@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { useWebSocket } from '../contexts/WebSocketContext';
 import { createApiUrl } from '../config/api';
 
 interface UseNotificationsReturn {
@@ -11,7 +10,6 @@ interface UseNotificationsReturn {
 
 export const useNotifications = (): UseNotificationsReturn => {
   const { user, token } = useAuth();
-  const { socket, isConnected } = useWebSocket();
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -45,7 +43,7 @@ export const useNotifications = (): UseNotificationsReturn => {
   useEffect(() => {
     fetchUnreadCount();
 
-    // Refresh every 30 seconds
+    // Refresh every 30 seconds (REST API polling instead of WebSocket)
     const interval = setInterval(fetchUnreadCount, 30000);
 
     // Listen for custom refresh events
@@ -57,27 +55,6 @@ export const useNotifications = (): UseNotificationsReturn => {
       window.removeEventListener('yolnext:refresh-notifications', handleRefresh);
     };
   }, [user, token]);
-
-  // Listen for real-time WebSocket notifications
-  useEffect(() => {
-    if (socket && isConnected) {
-      const handleNewNotification = () => {
-        setUnreadCount(prev => prev + 1);
-      };
-
-      socket.on('notification', handleNewNotification);
-      socket.on('new_offer', handleNewNotification);
-      socket.on('offer_status_changed', handleNewNotification);
-      socket.on('shipment_status_changed', handleNewNotification);
-
-      return () => {
-        socket.off('notification', handleNewNotification);
-        socket.off('new_offer', handleNewNotification);
-        socket.off('offer_status_changed', handleNewNotification);
-        socket.off('shipment_status_changed', handleNewNotification);
-      };
-    }
-  }, [socket, isConnected]);
 
   return {
     unreadCount,

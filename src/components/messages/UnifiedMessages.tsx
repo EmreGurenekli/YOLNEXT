@@ -567,8 +567,7 @@ export default function UnifiedMessages({ userType }: UnifiedMessagesProps) {
         }
       : undefined;
     loadShipmentConversation(String(shipmentIdParam), seed);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shipmentIdParam]);
+  }, [shipmentIdParam, loadShipmentConversation]);
 
   useEffect(() => {
     if (!userIdParam) return;

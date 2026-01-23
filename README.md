@@ -1,5 +1,7 @@
 # YolNext Kargo Platformu - Geliştirici Raporu
 
+> **📖 Yeni Geliştirici Rehberi:** Projeye yeni katılan geliştiriciler için detaylı proje yapısı ve rehber için [`PROJECT_STRUCTURE.md`](./PROJECT_STRUCTURE.md) dosyasına bakın.
+
 ## 📋 Proje Genel Bakış
 
 **Proje Adı:** YolNext Kargo Platformu  

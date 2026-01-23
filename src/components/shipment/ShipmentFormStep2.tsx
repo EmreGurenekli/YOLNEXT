@@ -1,7 +1,7 @@
 // Step 2: Adres Bilgileri
 import React from 'react';
 import { MapPin, Calendar } from 'lucide-react';
-import { cities } from './constants/cities';
+import { turkeyCities } from '../../../data/turkey-cities-districts';
 
 interface ShipmentFormStep2Props {
   formData: any;
@@ -21,13 +21,13 @@ export default function ShipmentFormStep2({
   // Get districts - handle both city ID and city name
   const getPickupDistricts = () => {
     if (!formData.pickupCity) return [];
-    const city = cities.find((c: any) => c.id === formData.pickupCity || c.name === formData.pickupCity);
+    const city = turkeyCities.find((c: any) => c.id === formData.pickupCity || c.name === formData.pickupCity);
     return city?.districts || [];
   };
   
   const getDeliveryDistricts = () => {
     if (!formData.deliveryCity) return [];
-    const city = cities.find((c: any) => c.id === formData.deliveryCity || c.name === formData.deliveryCity);
+    const city = turkeyCities.find((c: any) => c.id === formData.deliveryCity || c.name === formData.deliveryCity);
     return city?.districts || [];
   };
   
@@ -63,7 +63,7 @@ export default function ShipmentFormStep2({
               required
             >
               <option value=''>Şehir Seçin</option>
-              {cities.map((city: any) => (
+              {turkeyCities.map((city: any) => (
                 <option key={city.id} value={city.name}>
                   {city.name}
                 </option>
@@ -173,7 +173,7 @@ export default function ShipmentFormStep2({
               required
             >
               <option value=''>Şehir Seçin</option>
-              {cities.map((city: any) => (
+              {turkeyCities.map((city: any) => (
                 <option key={city.id} value={city.name}>
                   {city.name}
                 </option>

@@ -1,37 +1,22 @@
 /**
- * Logger utility - Only logs in development mode
- * Prevents console.log pollution in production
+ * Logger utility - Re-export from services/logger for backward compatibility
+ * This file exists to maintain compatibility with existing imports
+ * All new code should import from '../services/logger' directly
  */
 
-const isDevelopment = import.meta.env.DEV || import.meta.env.MODE === 'development';
+import { logger as servicesLogger } from '../services/logger';
 
+// Re-export the logger instance with compatible API
 export const logger = {
-  log: (...args: any[]) => {
-    if (isDevelopment) {
-      console.log(...args);
-    }
-  },
-  error: (...args: any[]) => {
-    if (isDevelopment) {
-      console.error(...args);
-    }
-  },
-  warn: (...args: any[]) => {
-    if (isDevelopment) {
-      console.warn(...args);
-    }
-  },
-  info: (...args: any[]) => {
-    if (isDevelopment) {
-      console.info(...args);
-    }
-  },
-  debug: (...args: any[]) => {
-    if (isDevelopment) {
-      console.debug(...args);
-    }
-  },
+  log: (message: string, ...args: any[]) => servicesLogger.info(message, ...args),
+  error: (message: string, ...args: any[]) => servicesLogger.error(message, ...args),
+  warn: (message: string, ...args: any[]) => servicesLogger.warn(message, ...args),
+  info: (message: string, ...args: any[]) => servicesLogger.info(message, ...args),
+  debug: (message: string, ...args: any[]) => servicesLogger.debug(message, ...args),
 };
+
+// Re-export types
+export { LogLevel, type LogEntry } from '../services/logger';
 
 // For backward compatibility - can be used as drop-in replacement
 export const debugLog = logger.log;

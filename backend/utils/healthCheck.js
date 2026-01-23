@@ -53,29 +53,12 @@ async function checkExternalServices() {
       status: 'unknown',
       message: 'Email service not configured',
     },
-<<<<<<< HEAD
   };
 
   // TODO: Add actual health checks for email services when implemented
   if (process.env.SMTP_HOST) {
     services.email.status = 'configured';
   }
-=======
-    sms: {
-      status: 'unknown',
-      message: 'SMS service not configured',
-    },
-  };
-
-  // TODO: Add actual health checks for email/SMS services when implemented
-  if (process.env.SMTP_HOST) {
-    services.email.status = 'configured';
-  }
-  
-  if (process.env.TWILIO_ACCOUNT_SID) {
-    services.sms.status = 'configured';
-  }
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
 
   return services;
 }
@@ -114,6 +97,7 @@ module.exports = {
   checkExternalServices,
   comprehensiveHealthCheck,
 };
+
 
 
 

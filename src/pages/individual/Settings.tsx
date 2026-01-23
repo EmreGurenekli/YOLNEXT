@@ -30,6 +30,7 @@ import LoadingState from '../../components/common/LoadingState';
 import Modal from '../../components/common/Modal';
 import SuccessMessage from '../../components/common/SuccessMessage';
 import { useAuth } from '../../contexts/AuthContext';
+import { useToast } from '../../contexts/ToastContext';
 import { createApiUrl } from '../../config/api';
 import { authAPI as authService } from '../../services/api';
 import { TOAST_MESSAGES, showProfessionalToast } from '../../utils/toastMessages';
@@ -100,11 +101,83 @@ interface SettingsData {
 }
 
 export default function IndividualSettings() {
+  const { user } = useAuth();
   const { showToast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  const [activeTab, setActiveTab] = useState('profile');
+  const [settings, setSettings] = useState<SettingsData>({
+    profile: {
+      name: user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : user?.email || '',
+      email: user?.email || '',
+      phone: user?.phone || '',
+      address: '',
+      birthDate: '',
+    },
+    notifications: {
+      email: true,
+      sms: false,
+      push: true,
+      jobAlerts: true,
+      messageAlerts: true,
+      paymentAlerts: true,
+    },
+    privacy: {
+      showProfile: true,
+      showLocation: false,
+      allowMessages: true,
+    },
+    security: {
+      twoFactor: false,
+      biometric: false,
+      sessionTimeout: 30,
+    },
+    preferences: {
+      theme: 'light',
+      language: 'tr',
+      timezone: 'Europe/Istanbul',
+      currency: 'TRY',
+    },
+  });
+
+  const breadcrumbItems = [
+    { label: 'Ana Sayfa', href: '/individual/dashboard' },
+    { label: 'Ayarlar', href: '/individual/settings' },
+  ];
+
+  const tabs = [
+    { id: 'profile', name: 'Profil', icon: User },
+    { id: 'notifications', name: 'Bildirimler', icon: Bell },
+    { id: 'privacy', name: 'Gizlilik', icon: Shield },
+    { id: 'security', name: 'Güvenlik', icon: Lock },
+    { id: 'preferences', name: 'Tercihler', icon: Settings },
+  ];
+
+  const handleInputChange = (section: keyof SettingsData, field: string, value: any) => {
+    setSettings(prev => ({
+      ...prev,
+      [section]: {
+        ...prev[section],
+        [field]: value,
+      },
+    }));
+  };
+
+  const handleSave = async () => {
+    setIsLoading(true);
+    try {
+      // TODO: Implement save logic
+      setShowSuccessMessage(true);
+      setSuccessMessage('Ayarlar başarıyla kaydedildi');
+      showProfessionalToast(showToast, 'ACTION_COMPLETED', 'success');
+    } catch (err: any) {
+      showProfessionalToast(showToast, 'OPERATION_FAILED', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleDeleteAccount = async (password: string) => {
     setIsLoading(true);

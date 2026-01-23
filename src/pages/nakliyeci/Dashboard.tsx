@@ -47,6 +47,7 @@ import LoadingState from '../../components/common/LoadingState';
 import { normalizeTrackingCode } from '../../utils/trackingCode';
 import { formatDate } from '../../utils/format';
 import { logger } from '../../utils/logger';
+import { getStatusInfo } from '../../utils/shipmentStatus';
 
 interface Shipment {
   id: string | number;
@@ -95,8 +96,11 @@ const Dashboard = () => {
     completedShipments: 0,
     totalRevenue: 0,
     pendingOffers: 0,
+    deliveredShipments: 0,
+    pendingShipments: 0,
   });
   const [shipments, setShipments] = useState<Shipment[]>([]);
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const markNotificationsAsRead = async () => {
@@ -403,7 +407,7 @@ const Dashboard = () => {
             </Link>
           </div>
 
-          {recentShipments.length > 0 ? (
+          {shipments.length > 0 ? (
             <div className='overflow-x-auto'>
               <table className='w-full'>
                 <thead>
@@ -429,7 +433,7 @@ const Dashboard = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {recentShipments.map(shipment => (
+                  {shipments.slice(0, 5).map((shipment: any) => (
                     <tr
                       key={shipment.id}
                       className='border-b border-slate-100 hover:bg-slate-50 transition-colors'
@@ -441,9 +445,9 @@ const Dashboard = () => {
                       </td>
                       <td className='py-4 px-4'>
                         <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(shipment.status)}`}
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusInfo(shipment.status).color}`}
                         >
-                          {getStatusText(shipment.status)}
+                          {getStatusInfo(shipment.status).text}
                         </span>
                       </td>
                       <td className='py-4 px-4'>
@@ -458,7 +462,7 @@ const Dashboard = () => {
                       </td>
                       <td className='py-4 px-4'>
                         <div className='text-sm text-slate-500'>
-                          {formatDateSafe(shipment.createdAt || shipment.created_at || shipment.date || shipment.updatedAt || shipment.updated_at)}
+                          {formatDate(shipment.createdAt || shipment.created_at || shipment.date || shipment.updatedAt || shipment.updated_at || '', 'long')}
                         </div>
                       </td>
                       <td className='py-4 px-4'>

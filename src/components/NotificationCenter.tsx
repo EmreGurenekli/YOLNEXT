@@ -11,7 +11,7 @@ import {
   Clock,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useWebSocket } from '../contexts/WebSocketContext';
+// WebSocket removed - using REST API polling
 import { createApiUrl } from '../config/api';
 
 interface Notification {
@@ -50,7 +50,7 @@ export default function NotificationCenter({
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
-  const { socket, isConnected } = useWebSocket();
+  // WebSocket removed - using REST API polling
   const navigate = useNavigate();
 
   const fallbackText = (type: string, meta: any) => {
@@ -143,48 +143,8 @@ export default function NotificationCenter({
     }
   }, [isOpen]);
 
-  // WebSocket bildirimlerini dinle
-  useEffect(() => {
-    if (socket && isConnected) {
-      socket.on('notification', notification => {
-        console.log('🔔 Yeni bildirim alındı:', notification);
-
-        const meta = notification.data ?? notification.metadata;
-        const fb = fallbackText(notification.type || 'info', parseMeta(meta));
-        const title = String(notification.title || '').trim() || fb.title;
-        const message = String(notification.message || '').trim() || fb.message;
-
-        // Bildirimi listeye ekle
-        const newNotification: Notification = {
-          id: Date.now(), // Geçici ID
-          title,
-          message,
-          type: notification.type || 'info',
-          is_read: false,
-          created_at: new Date().toISOString(),
-          priority: notification.priority || 'medium',
-          data: notification.data ?? notification.metadata,
-          metadata: notification.metadata,
-          linkUrl: notification.linkUrl ?? notification.link_url,
-        };
-
-        setNotifications(prev => [newNotification, ...prev]);
-        setUnreadCount(prev => prev + 1);
-
-        // Browser bildirimi göster
-        if (Notification.permission === 'granted') {
-          new Notification(notification.title, {
-            body: notification.message,
-            icon: '/favicon.ico',
-          });
-        }
-      });
-
-      return () => {
-        socket.off('notification');
-      };
-    }
-  }, [socket, isConnected]);
+  // WebSocket removed - using REST API polling instead
+  // Notifications are refreshed via loadNotifications() which is called periodically
 
   const loadNotifications = async () => {
     try {

@@ -47,6 +47,8 @@ import { createApiUrl } from '../../config/api';
 import { formatCurrency, formatDate, sanitizeAddressLabel, sanitizeMessageText, sanitizeShipmentTitle } from '../../utils/format';
 import { getStatusInfo, getStatusDescription } from '../../utils/shipmentStatus';
 import { resolveShipmentRoute } from '../../utils/shipmentRoute';
+import ActiveShipmentsHeader from '../../components/shipment/ActiveShipmentsHeader';
+import ActiveShipmentsFilters from '../../components/shipment/ActiveShipmentsFilters';
 
 interface ActiveShipment {
   id: string;
@@ -815,19 +817,7 @@ const ActiveShipments = () => {
         </div>
 
         {/* Header */}
-        <div className='text-center mb-6 sm:mb-8 md:mb-12'>
-          <div className='flex justify-center mb-3 sm:mb-4 md:mb-6'>
-            <div className='w-10 h-10 sm:w-12 sm:h-12 md:w-16 md:h-16 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg sm:rounded-xl md:rounded-2xl flex items-center justify-center shadow-lg'>
-              <Package className='w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 text-white' />
-            </div>
-          </div>
-          <h1 className='text-xl sm:text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-bold text-slate-900 mb-2 sm:mb-3'>
-            Aktif Yükler
-          </h1>
-          <p className='text-xs sm:text-sm md:text-base lg:text-lg text-slate-600 px-2 sm:px-4'>
-            Tüm gönderilerinizi tek ekranda görüntüleyin ve yönetin
-          </p>
-        </div>
+        <ActiveShipmentsHeader />
 
         {/* Action Buttons */}
         <div className='flex justify-center mb-6 sm:mb-8'>
@@ -845,35 +835,12 @@ const ActiveShipments = () => {
         </div>
 
         {/* Filters */}
-        <div className='bg-white rounded-xl p-3 sm:p-4 md:p-6 shadow-lg border border-gray-200 mb-4 sm:mb-6'>
-          <div className='flex flex-col gap-3 sm:gap-4'>
-            <div className='flex-1'>
-              <div className='relative'>
-                <Search className='absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-3 h-3 sm:w-4 sm:h-4' />
-                <input
-                  type='text'
-                  placeholder='Yük ara...'
-                  value={searchTerm}
-                  onChange={e => setSearchTerm(e.target.value)}
-                  className='w-full pl-8 sm:pl-10 pr-3 sm:pr-4 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
-                />
-              </div>
-            </div>
-            <div className='flex gap-2'>
-              <select
-                value={statusFilter}
-                onChange={e => setStatusFilter(e.target.value)}
-                className='flex-1 px-3 sm:px-4 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
-              >
-                <option value='all'>Tümü</option>
-                <option value='waiting_driver'>Taşıyıcı Bekliyor</option>
-                <option value='active'>Aktif</option>
-                <option value='delivered'>Tamamlanan</option>
-                <option value='cancelled'>İptal Edilen</option>
-              </select>
-            </div>
-          </div>
-        </div>
+        <ActiveShipmentsFilters
+          searchTerm={searchTerm}
+          statusFilter={statusFilter}
+          onSearchChange={setSearchTerm}
+          onStatusFilterChange={setStatusFilter}
+        />
 
         {/* Shipments List */}
         {filteredShipments.length > 0 ? (

@@ -36,6 +36,10 @@ import LoadingState from '../../components/common/LoadingState';
 import ErrorToast from '../../components/error/ErrorToast';
 import { createApiUrl } from '../../config/api';
 import { normalizeTrackingCode } from '../../utils/trackingCode';
+import RoutePlannerHeader from '../../components/route/RoutePlannerHeader';
+import RoutePlannerDriverSelector from '../../components/route/RoutePlannerDriverSelector';
+import RoutePlannerCorridorInfo from '../../components/route/RoutePlannerCorridorInfo';
+import RoutePlannerCorridorLoads from '../../components/route/RoutePlannerCorridorLoads';
 
 interface Vehicle {
   id: number;
@@ -1116,195 +1120,37 @@ export default function RoutePlanner() {
         </div>
 
         {/* Header */}
-        <div className='text-center mb-8 sm:mb-12'>
-          <div className='flex justify-center mb-4 sm:mb-6'>
-            <div className='w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-br from-slate-800 to-blue-900 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-lg'>
-              <Route className='w-6 h-6 sm:w-8 sm:h-8 text-white' />
-            </div>
-          </div>
-          <h1 className='text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-slate-900 mb-2 sm:mb-3'>
-            Akıllı{' '}
-            <span className='text-transparent bg-clip-text bg-gradient-to-r from-slate-800 to-blue-900'>
-              Rota
-            </span>
-          </h1>
-          <p className='text-sm sm:text-base md:text-lg text-slate-600 px-4'>
-            Akıllı rota planlama ve yol üstü yük arama sistemi
-          </p>
-        </div>
+        <RoutePlannerHeader />
 
         {/* Ana İçerik */}
         <div className='max-w-4xl mx-auto space-y-6'>
           {/* Taşıyıcı Listesi */}
-          <div className='bg-white rounded-xl p-6 shadow-lg border border-slate-200'>
-            <div className='flex items-center gap-3 mb-4'>
-              <Truck className='w-6 h-6 text-slate-700' />
-              <h2 className='text-xl font-bold text-slate-900'>Taşıyıcı Seçin</h2>
-            </div>
-            <p className='text-sm text-slate-600 mb-4'>
-              Bir taşıyıcı seçin, sistem otomatik olarak o taşıyıcının güzergahındaki yükleri gösterecek.
-            </p>
-            {driversLoading ? (
-              <div className='flex items-center justify-center py-8'>
-                <RefreshCw className='w-5 h-5 animate-spin text-slate-600' />
-                <span className='ml-2 text-slate-600'>Taşıyıcılar yükleniyor...</span>
-              </div>
-            ) : drivers.length === 0 ? (
-              <div className='text-center py-8 text-slate-500'>
-                <Truck className='w-12 h-12 mx-auto mb-3 text-slate-300' />
-                <p className='text-sm'>Henüz taşıyıcı bulunmuyor</p>
-              </div>
-            ) : (
-              <div className='grid grid-cols-1 md:grid-cols-2 gap-3'>
-                {drivers.map(driver => (
-                  <div
-                    key={driver.id}
-                    onClick={() => handleDriverClick(driver.id)}
-                    className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
-                      selectedDriverId === driver.id
-                        ? 'border-blue-500 bg-blue-50 shadow-md'
-                        : 'border-slate-200 hover:border-blue-300 hover:shadow-sm'
-                    }`}
-                  >
-                    <div className='flex items-center justify-between'>
-                      <div className='flex-1'>
-                        <div className='font-semibold text-slate-900 mb-1'>
-                          {driver.name || driver.email || driver.phone || driver.id}
-                        </div>
-                        {driver.code && (
-                          <div className='text-xs text-slate-500 mb-1'>Kod: {driver.code}</div>
-                        )}
-                        {driver.status && (
-                          <div className={`text-xs font-medium ${
-                            driver.status === 'available' ? 'text-green-600' : 'text-orange-600'
-                          }`}>
-                            {driver.status === 'available' ? '✓ Müsait' : '⚠ Meşgul'}
-                          </div>
-                        )}
-                      </div>
-                      {corridor && selectedDriverId === driver.id && (
-                        <div className='ml-3 px-3 py-1 bg-blue-600 text-white text-xs font-medium rounded-full'>
-                          Aktif
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
+          <RoutePlannerDriverSelector
+            drivers={drivers}
+            driversLoading={driversLoading}
+            selectedDriverId={selectedDriverId}
+            corridor={corridor}
+            onDriverClick={handleDriverClick}
+          />
 
           {/* Güzergah Bilgisi */}
-          {corridor && selectedDriverId ? (
-            <div className='bg-gradient-to-r from-slate-800 to-blue-900 rounded-xl p-6 text-white shadow-lg'>
-              <div className='flex items-center gap-3 mb-4'>
-                <Route className='w-6 h-6 text-white' />
-                <h3 className='text-lg font-bold'>Aktif Güzergah</h3>
-              </div>
-              <div className='bg-white bg-opacity-10 rounded-lg p-4'>
-                <div className='flex items-center justify-center gap-3'>
-                  <div className='text-center'>
-                    <div className='text-xs text-blue-200 mb-1'>Başlangıç</div>
-                    <div className='text-lg font-bold'>
-                      {corridor.pickupCity || '—'}
-                    </div>
-                  </div>
-                  <ArrowRight className='w-5 h-5 text-white' />
-                  <div className='text-center'>
-                    <div className='text-xs text-blue-200 mb-1'>Hedef</div>
-                    <div className='text-lg font-bold'>
-                      {corridor.deliveryCity || '—'}
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <p className='text-xs text-blue-200 mt-3 text-center'>
-                Bu güzergahtaki yükler aşağıda gösteriliyor
-              </p>
-            </div>
-          ) : selectedDriverId && !corridor ? (
-            <div className='bg-yellow-50 rounded-xl p-6 border-2 border-yellow-200'>
-              <div className='flex items-center gap-3 mb-2'>
-                <AlertCircle className='w-6 h-6 text-yellow-600' />
-                <h3 className='text-lg font-semibold text-yellow-900'>Güzergah Bulunamadı</h3>
-              </div>
-              <p className='text-sm text-yellow-800'>
-                Bu taşıyıcının henüz aktif bir yükü yok. Taşıyıcıya bir yük atandığında güzergah otomatik olarak oluşacak.
-              </p>
-            </div>
-          ) : null}
+          <RoutePlannerCorridorInfo
+            corridor={corridor}
+            selectedDriverId={selectedDriverId}
+          />
 
           {/* Güzergah Yükleri */}
-          {corridor && selectedDriverId ? (
-            <div className='bg-white rounded-xl p-6 shadow-lg border border-slate-200'>
-              <div className='flex items-center gap-3 mb-4'>
-                <Package className='w-6 h-6 text-slate-700' />
-                <h2 className='text-xl font-bold text-slate-900'>Güzergah Yükleri</h2>
-              </div>
-              <p className='text-sm text-slate-600 mb-4'>
-                Bu güzergahtaki yüklere teklif vererek taşıyıcınızın dolu gidip dolu gelmesini sağlayın.
-              </p>
-              {corridorLoading ? (
-                <div className='flex items-center justify-center py-8'>
-                  <RefreshCw className='w-5 h-5 animate-spin text-slate-600' />
-                  <span className='ml-3 text-slate-600'>Yükler yükleniyor...</span>
-                </div>
-              ) : corridorLoads.length === 0 ? (
-                <div className='text-center py-8 text-slate-500'>
-                  <Package className='w-12 h-12 mx-auto mb-3 text-slate-300' />
-                  <p className='text-base font-medium mb-1'>Bu güzergahta yük bulunamadı</p>
-                  <p className='text-sm'>Başka bir taşıyıcı seçebilir veya daha sonra tekrar kontrol edebilirsiniz.</p>
-                </div>
-              ) : (
-                <div className='space-y-3'>
-                  {corridorLoads.map(load => (
-                    <div
-                      key={load.id}
-                      className='p-4 border border-slate-200 rounded-lg hover:border-slate-300 transition-colors'
-                    >
-                      <div className='flex items-start justify-between mb-2'>
-                        <h4 className='font-medium text-slate-900'>{load.title}</h4>
-                        <button
-                          onClick={() => {
-                            setSelectedLoadForOffer(load);
-                            setOfferPrice(load.price > 0 ? String(load.price) : '');
-                            setShowOfferModal(true);
-                          }}
-                          className='px-3 py-1 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors'
-                        >
-                          Teklif Ver
-                        </button>
-                      </div>
-                      <div className='space-y-2 text-sm text-slate-600'>
-                        <div className='flex items-center gap-2'>
-                          <MapPin className='w-4 h-4' />
-                          <span>{load.pickupAddress} → {load.deliveryAddress}</span>
-                        </div>
-                        <div className='flex items-center gap-4'>
-                          <span className='flex items-center gap-1'>
-                            <Weight className='w-4 h-4' />
-                            {load.weight.toLocaleString()}kg
-                          </span>
-                          <span className='flex items-center gap-1'>
-                            <DollarSign className='w-4 h-4' />₺
-                            {load.price.toLocaleString()}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ) : !selectedDriverId ? (
-            <div className='bg-slate-50 rounded-xl p-8 border-2 border-dashed border-slate-300 text-center'>
-              <Truck className='w-16 h-16 mx-auto mb-4 text-slate-400' />
-              <p className='text-slate-600 font-medium'>
-                Bir taşıyıcı seçin, güzergah yükleri görüntülenecek
-              </p>
-            </div>
-          ) : null}
+          <RoutePlannerCorridorLoads
+            corridor={corridor}
+            selectedDriverId={selectedDriverId}
+            corridorLoads={corridorLoads}
+            corridorLoading={corridorLoading}
+            onLoadClick={(load) => {
+              setSelectedLoadForOffer(load);
+              setOfferPrice(load.price > 0 ? String(load.price) : '');
+              setShowOfferModal(true);
+            }}
+          />
         </div>
       </div>
       

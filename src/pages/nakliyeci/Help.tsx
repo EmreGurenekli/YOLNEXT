@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import Breadcrumb from '../../components/common/Breadcrumb';
 import { createApiUrl } from '../../config/api';
+import { useToast } from '../../contexts/ToastContext';
 import { showProfessionalToast } from '../../utils/toastMessages';
 
 // Ticket system interfaces
@@ -53,6 +54,7 @@ interface SupportCategory {
 }
 
 const NakliyeciHelp = () => {
+  const { showToast } = useToast();
   const [openFAQ, setOpenFAQ] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [isSupportOpen, setIsSupportOpen] = useState(false);
@@ -269,7 +271,7 @@ const NakliyeciHelp = () => {
     e.preventDefault();
     
     if (!formData.category || !formData.subject || !formData.description) {
-      showProfessionalToast(toast, 'REQUIRED_FIELDS', 'error');
+      showProfessionalToast(showToast, 'REQUIRED_FIELDS', 'error');
       return;
     }
 
@@ -294,7 +296,7 @@ const NakliyeciHelp = () => {
       });
 
       if (response.ok) {
-        showProfessionalToast(toast, 'SUPPORT_TICKET_CREATED', 'success');
+        showProfessionalToast(showToast, 'SUPPORT_TICKET_CREATED', 'success');
         setFormData({
           category: '',
           priority: 'medium',
@@ -306,14 +308,14 @@ const NakliyeciHelp = () => {
       } else {
         const errorPayload = await response.json().catch(() => null);
         showProfessionalToast(
-          toast,
+          showToast,
           'OPERATION_FAILED',
           'error',
           errorPayload?.message || 'Destek talebi oluşturulurken bir hata oluştu. Lütfen tekrar deneyin.'
         );
       }
     } catch (error) {
-      showProfessionalToast(toast, 'NETWORK_ERROR', 'error');
+      showProfessionalToast(showToast, 'NETWORK_ERROR', 'error');
     } finally {
       setLoading(false);
     }

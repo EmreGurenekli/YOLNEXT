@@ -1,7 +1,6 @@
 /**
  * Error Logger Utility
  * 
-<<<<<<< HEAD
  * Centralized error logging with optional Sentry integration.
  * Handles both production (Sentry) and development (console) logging.
  */
@@ -15,13 +14,6 @@ if (process.env.SENTRY_DSN) {
     // Sentry not available, continue without it
   }
 }
-=======
- * Centralized error logging with Sentry integration.
- * Handles both production (Sentry) and development (console) logging.
- */
-
-const Sentry = require('@sentry/node');
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
 
 /**
  * Centralized error logging utility
@@ -52,11 +44,7 @@ class ErrorLogger {
     }
 
     // Sentry logging (if enabled)
-<<<<<<< HEAD
     if (this.isSentryEnabled && Sentry) {
-=======
-    if (this.isSentryEnabled) {
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
       Sentry.captureException(error, {
         level: 'error',
         tags: {
@@ -85,11 +73,7 @@ class ErrorLogger {
       });
     }
 
-<<<<<<< HEAD
     if (this.isSentryEnabled && Sentry) {
-=======
-    if (this.isSentryEnabled) {
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
       Sentry.captureMessage(message, {
         level: 'warning',
         tags: context,
@@ -113,7 +97,6 @@ class ErrorLogger {
   }
 
   /**
-<<<<<<< HEAD
    * Alias methods for convenience (error, warn, info)
    */
   error(messageOrError, context = {}) {
@@ -133,8 +116,6 @@ class ErrorLogger {
   }
 
   /**
-=======
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
    * Log API error with request context
    * @param {Error} error - Error object
    * @param {object} req - Express request object
@@ -211,8 +192,5 @@ class ErrorLogger {
 }
 
 // Export singleton instance
-<<<<<<< HEAD
 module.exports = new ErrorLogger();
-=======
-module.exports = new ErrorLogger();
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
+

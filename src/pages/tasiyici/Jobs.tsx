@@ -149,14 +149,14 @@ const TasiyiciJobs: React.FC = () => {
 
         setJob(jobData as Job);
       } else if (response.status === 404) {
-        showProfessionalToast(toast, 'JOB_NOT_FOUND', 'error');
+        showProfessionalToast(showToast, 'JOB_NOT_FOUND', 'error');
         navigate('/tasiyici/active-jobs');
       } else {
         throw new Error('İş yüklenemedi');
       }
     } catch (error) {
       if (import.meta.env.DEV) console.error('İş yüklenirken hata:', error);
-      showProfessionalToast(toast, 'REQUEST_FAILED', 'error');
+      showProfessionalToast(showToast, 'REQUEST_FAILED', 'error');
       navigate('/tasiyici/active-jobs');
     } finally {
       setLoading(false);
@@ -171,7 +171,7 @@ const TasiyiciJobs: React.FC = () => {
     setUpdatingStatus(true);
     const timeoutId = setTimeout(() => {
       setUpdatingStatus(false);
-      showProfessionalToast(toast, 'TIMEOUT_ERROR', 'error');
+      showProfessionalToast(showToast, 'TIMEOUT_ERROR', 'error');
     }, 10000); // 10 seconds timeout
 
     try {
@@ -214,12 +214,12 @@ const TasiyiciJobs: React.FC = () => {
         clearTimeout(timeoutId);
         const errorMsg = responseData.message || 'Bu işlem şu an yapılamıyor.';
         logger.error('❌ Status güncelleme hatası:', errorMsg);
-        showProfessionalToast(toast, 'UPDATE_FAILED', 'error');
+        showProfessionalToast(showToast, 'UPDATE_FAILED', 'error');
       }
     } catch (error: any) {
       clearTimeout(timeoutId);
       logger.error('❌ Status güncelleme exception:', error);
-      showProfessionalToast(toast, 'NETWORK_ERROR', 'error');
+      showProfessionalToast(showToast, 'NETWORK_ERROR', 'error');
     } finally {
       clearTimeout(timeoutId);
       setUpdatingStatus(false);

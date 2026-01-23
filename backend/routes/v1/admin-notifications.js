@@ -4,11 +4,7 @@
 const express = require('express');
 const router = express.Router();
 
-<<<<<<< HEAD
 function createAdminNotificationRoutes(pool, authenticateToken, requireAdmin, writeAuditLog, createNotification) {
-=======
-function createAdminNotificationRoutes(pool, authenticateToken, requireAdmin, writeAuditLog, createNotification, io) {
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
   
   router.use(authenticateToken);
   router.use(requireAdmin);
@@ -38,10 +34,6 @@ function createAdminNotificationRoutes(pool, authenticateToken, requireAdmin, wr
   const DELIVERY_CHANNELS = {
     IN_APP: 'in_app',
     EMAIL: 'email',
-<<<<<<< HEAD
-=======
-    SMS: 'sms',
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
     PUSH: 'push',
     WEBHOOK: 'webhook'
   };
@@ -70,11 +62,7 @@ function createAdminNotificationRoutes(pool, authenticateToken, requireAdmin, wr
       try {
         const prefs = JSON.parse(userPrefs.rows[0].notification_preferences || '{}');
         if (prefs.email) channels.push(DELIVERY_CHANNELS.EMAIL);
-<<<<<<< HEAD
         // SMS removed - no longer supported
-=======
-        if (prefs.sms) channels.push(DELIVERY_CHANNELS.SMS);
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
         if (prefs.push) channels.push(DELIVERY_CHANNELS.PUSH);
       } catch (e) {
         console.error('Error parsing notification preferences:', e);
@@ -215,14 +203,7 @@ function createAdminNotificationRoutes(pool, authenticateToken, requireAdmin, wr
                     deliveryResults.push({ channel, status: 'pending_integration' });
                     break;
 
-<<<<<<< HEAD
                   // SMS removed - no longer supported
-=======
-                  case DELIVERY_CHANNELS.SMS:
-                    // TODO: Integrate with SMS service  
-                    deliveryResults.push({ channel, status: 'pending_integration' });
-                    break;
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
 
                   case DELIVERY_CHANNELS.PUSH:
                     // TODO: Integrate with push notification service
@@ -250,7 +231,6 @@ function createAdminNotificationRoutes(pool, authenticateToken, requireAdmin, wr
               notification.id
             ]);
 
-<<<<<<< HEAD
             // Socket.io removed - real-time updates not needed
             // Notifications available via REST API polling
             if (false && deliveryChannels.includes(DELIVERY_CHANNELS.IN_APP)) { // io removed
@@ -264,20 +244,6 @@ function createAdminNotificationRoutes(pool, authenticateToken, requireAdmin, wr
               //   metadata: metadata,
               //   timestamp: new Date()
               // });
-=======
-            // Real-time WebSocket notification to user
-            if (io && deliveryChannels.includes(DELIVERY_CHANNELS.IN_APP)) {
-              io.to(`user-${userId}`).emit('admin_notification', {
-                id: notification.id,
-                type: notification_type,
-                title: title,
-                message: message,
-                priority: priority,
-                actionUrl: action_url,
-                metadata: metadata,
-                timestamp: new Date()
-              });
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
             }
 
             results.push({
@@ -323,7 +289,6 @@ function createAdminNotificationRoutes(pool, authenticateToken, requireAdmin, wr
       }
 
       // Real-time update to admin panel
-<<<<<<< HEAD
       // Socket.io removed - real-time updates not needed
       // Notification updates available via REST API polling
       if (false && results.length > 0) { // io removed
@@ -334,16 +299,6 @@ function createAdminNotificationRoutes(pool, authenticateToken, requireAdmin, wr
         //   sentBy: req.user.email || req.user.id,
         //   timestamp: new Date()
         // });
-=======
-      if (io && results.length > 0) {
-        io.to('admin-room').emit('notification_sent', {
-          notificationType: notification_type,
-          recipientCount: results.length,
-          priority: priority,
-          sentBy: req.user.email || req.user.id,
-          timestamp: new Date()
-        });
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
       }
 
       return res.status(201).json({
@@ -852,3 +807,4 @@ function createAdminNotificationRoutes(pool, authenticateToken, requireAdmin, wr
 }
 
 module.exports = createAdminNotificationRoutes;
+

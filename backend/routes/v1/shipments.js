@@ -3,11 +3,7 @@ const express = require('express');
 const { getPagination, generateTrackingNumber } = require('../../utils/routeHelpers');
 const { isValidTransition } = require('../../utils/shipmentStatus');
 
-<<<<<<< HEAD
 function createShipmentRoutes(pool, authenticateToken, createNotification, idempotencyGuard) {
-=======
-function createShipmentRoutes(pool, authenticateToken, createNotification, idempotencyGuard, io) {
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
   const router = express.Router();
 
   let systemUserIdCache = null;
@@ -1171,7 +1167,6 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
   // Create shipment
   router.post('/', authenticateToken, idempotencyGuard, async (req, res) => {
     console.log('📦 POST /api/shipments - Request received');
-<<<<<<< HEAD
     // Debug logging (development only)
     if (process.env.NODE_ENV === 'development') {
       console.log('User:', req.user?.id, req.user?.email);
@@ -1179,13 +1174,6 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
       console.log('🔍 DEBUG - Request body pickupCity:', req.body?.pickupCity);
       console.log('🔍 DEBUG - Request body deliveryCity:', req.body?.deliveryCity);
     }
-=======
-    console.log('User:', req.user?.id, req.user?.email);
-    console.log('Request body keys:', Object.keys(req.body || {}));
-    console.log('Request body:', req.body);
-    console.log('🔍 DEBUG - Request body pickupCity:', req.body?.pickupCity);
-    console.log('🔍 DEBUG - Request body deliveryCity:', req.body?.deliveryCity);
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
     
     // Ensure response is always sent
     let responseSent = false;
@@ -1276,7 +1264,6 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
 
       const resolvedCategoryData = categoryData || normalizeCategoryData(req.body);
 
-<<<<<<< HEAD
       // Debug: Log all received values (development only)
       if (process.env.NODE_ENV === 'development') {
         console.log('🔍 DEBUG - Received values:', {
@@ -1289,18 +1276,6 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
           body: req.body
         });
       }
-=======
-      // Debug: Log all received values
-      console.log('🔍 DEBUG - Received values:', {
-        pickupCity,
-        pickupAddress,
-        deliveryCity,
-        deliveryAddress,
-        pickupDistrict,
-        deliveryDistrict,
-        body: req.body
-      });
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
 
       if (!pickupCity || !pickupAddress || !deliveryCity || !deliveryAddress) {
         sendResponse(400, {
@@ -1311,7 +1286,6 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
       }
 
       const trackingNumber = generateTrackingNumber();
-<<<<<<< HEAD
       
       // Debug logging (development only)
       if (process.env.NODE_ENV === 'development') {
@@ -1328,21 +1302,6 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
           deliveryAddress,
         });
       }
-=======
-      console.log('📝 Generated tracking number:', trackingNumber);
-
-      console.log('🔍 Preparing INSERT query...');
-      console.log('Values:', {
-        userId,
-        title: title || `${pickupCity} → ${deliveryCity}`,
-        pickupCity,
-        pickupDistrict,
-        pickupAddress,
-        deliveryCity,
-        deliveryDistrict,
-        deliveryAddress,
-      });
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
 
       const colsRes = await pool.query(
         `SELECT column_name FROM information_schema.columns WHERE table_name = 'shipments'`
@@ -1369,7 +1328,6 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
       add(insert, pickCol('description'), description || null);
       add(insert, pickCol('category'), category || 'general');
 
-<<<<<<< HEAD
       // Debug: Log which column names are being used (development only)
       if (process.env.NODE_ENV === 'development') {
         console.log('🔍 DEBUG - Column names for pickupCity/deliveryCity:', {
@@ -1379,15 +1337,6 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
           deliveryCityValue: deliveryCity
         });
       }
-=======
-      // Debug: Log which column names are being used
-      console.log('🔍 DEBUG - Column names for pickupCity/deliveryCity:', {
-        pickupCityCol: pickCol('pickupCity', 'pickup_city'),
-        deliveryCityCol: pickCol('deliveryCity', 'delivery_city'),
-        pickupCityValue: pickupCity,
-        deliveryCityValue: deliveryCity
-      });
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
 
       add(insert, pickCol('pickupcity'), pickupCity);
       add(insert, pickCol('pickupdistrict'), pickupDistrict || null);
@@ -2400,7 +2349,6 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
 
       // Only owner can cancel (consistent with frontend MyShipments)
       const shipmentOwnerUserId = shipment.userId || shipment.user_id;
-<<<<<<< HEAD
       
       // Debug logging (development only)
       if (process.env.NODE_ENV === 'development') {
@@ -2412,15 +2360,6 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
         });
       }
       
-=======
-      console.log('🔍 DEBUG - İptal yetki kontrolü:', {
-        shipmentId,
-        shipment,
-        shipmentOwnerUserId,
-        requestUserId: userId,
-        match: shipmentOwnerUserId === userId
-      });
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
       if (shipmentOwnerUserId !== userId) {
         return res.status(403).json({ success: false, message: 'Bu gönderiyi iptal etme yetkiniz yok' });
       }
@@ -2896,22 +2835,8 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
         }
       }
 
-<<<<<<< HEAD
       // Socket.io removed - real-time updates not needed
       // Tracking updates available via REST API polling
-=======
-      // Send real-time notification via Socket.IO
-      if (io) {
-        io.to(`shipment_${id}`).emit('tracking_update', {
-          shipmentId: id,
-          status,
-          location,
-          notes,
-          updatedBy: userId,
-          timestamp: new Date().toISOString(),
-        });
-      }
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
 
       res.json({
         success: true,
@@ -2934,6 +2859,7 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
 }
 
 module.exports = createShipmentRoutes;
+
 
 
 

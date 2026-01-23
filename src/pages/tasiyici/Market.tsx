@@ -32,6 +32,7 @@ interface Listing {
 }
 
 const Market: React.FC = () => {
+  const { showToast } = useToast();
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
   const [bidPrice, setBidPrice] = useState<Record<number, string>>({});

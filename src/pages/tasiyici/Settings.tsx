@@ -104,6 +104,7 @@ interface SettingsData {
 }
 
 export default function TasiyiciSettings() {
+  const { showToast } = useToast();
   const { user, updateUser } = useAuth();
   const [activeTab, setActiveTab] = useState('profile');
   const [isLoading, setIsLoading] = useState(false);
@@ -499,7 +500,7 @@ export default function TasiyiciSettings() {
                                     showProfessionalToast(showToast, 'OPERATION_FAILED', 'error');
                                   }
                                 } catch (err: any) {
-                                  showProfessionalToast(toast, 'OPERATION_FAILED', 'error');
+                                  showProfessionalToast(showToast, 'OPERATION_FAILED', 'error');
                                 } finally {
                                   setIsLoading(false);
                                 }

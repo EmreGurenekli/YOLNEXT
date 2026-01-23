@@ -4,7 +4,7 @@
 const express = require('express');
 const router = express.Router();
 
-function createDisputeRoutes(pool, authenticateToken, requireAdmin, writeAuditLog, createNotification, io) {
+function createDisputeRoutes(pool, authenticateToken, requireAdmin, writeAuditLog, createNotification) {
   
   // Apply middleware to all dispute routes
   router.use(authenticateToken);

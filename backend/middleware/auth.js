@@ -13,15 +13,6 @@ function createAuthMiddleware(pool, JWT_SECRET) {
       const token = authHeader && authHeader.split(' ')[1];
 
       if (!token) {
-<<<<<<< HEAD
-=======
-        try {
-          const ah = typeof authHeader === 'string' ? authHeader : '';
-          console.warn('[AUTH] Missing token', { path: req.originalUrl || req.url, authHeader: ah ? ah.slice(0, 32) : '' });
-        } catch (_) {
-          // ignore
-        }
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
         return res.status(401).json({
           success: false,
           message: 'Access token required',
@@ -105,3 +96,4 @@ function createAuthMiddleware(pool, JWT_SECRET) {
 }
 
 module.exports = { createAuthMiddleware };
+

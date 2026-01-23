@@ -106,13 +106,7 @@ export const processRefund = async (
 };
 
 // Format currency - Re-export from format.ts for backward compatibility
-import { formatCurrency as formatCurrencyBase } from './format';
-export const formatCurrency = (
-  amount: number,
-  currency: string = 'TRY'
-): string => {
-  return formatCurrencyBase(amount, currency);
-};
+export { formatCurrency } from './format';
 
 // Validate payment amount
 export const validatePaymentAmount = (

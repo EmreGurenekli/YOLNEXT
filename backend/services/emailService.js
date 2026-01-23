@@ -2,11 +2,7 @@ const nodemailer = require('nodemailer');
 
 class EmailService {
   constructor() {
-<<<<<<< HEAD
     this.transporter = nodemailer.createTransport({
-=======
-    this.transporter = nodemailer.createTransporter({
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
       host: process.env.SMTP_HOST || 'smtp.gmail.com',
       port: process.env.SMTP_PORT || 587,
       secure: false,

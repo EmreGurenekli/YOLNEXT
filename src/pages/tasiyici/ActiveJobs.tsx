@@ -12,6 +12,7 @@ import GuidanceOverlay from '../../components/common/GuidanceOverlay';
 import TrackingModal from '../../components/TrackingModal';
 
 const ActiveJobs: React.FC = () => {
+  const { showToast } = useToast();
   const [jobs, setJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -148,7 +149,7 @@ const ActiveJobs: React.FC = () => {
           await sendStatusUpdate(update.jobId, update.status, true);
         });
         localStorage.removeItem('tasiyici_pending_updates');
-        showProfessionalToast(toast, 'SYNC_COMPLETED', 'success');
+        showProfessionalToast(showToast, 'SYNC_COMPLETED', 'success');
       }
     }
   }, [isOnline]);
@@ -219,7 +220,7 @@ const ActiveJobs: React.FC = () => {
               'in_transit': 'Yolda',
               'delivered': 'Teslim edildi',
             };
-            showProfessionalToast(toast, 'STATUS_UPDATED', 'success');
+            showProfessionalToast(showToast, 'STATUS_UPDATED', 'success');
           }
           return true;
         }
@@ -254,7 +255,7 @@ const ActiveJobs: React.FC = () => {
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
-          showProfessionalToast(toast, 'DELIVERY_CONFIRMED', 'success');
+          showProfessionalToast(showToast, 'DELIVERY_CONFIRMED', 'success');
           // İş listesini yeniden yükle
           const loadResponse = await fetch(createApiUrl('/api/shipments/tasiyici'), {
             headers: {
@@ -305,10 +306,10 @@ const ActiveJobs: React.FC = () => {
         }
       } else {
         const errorData = await response.json();
-        showProfessionalToast(toast, 'OPERATION_FAILED', 'error');
+        showProfessionalToast(showToast, 'OPERATION_FAILED', 'error');
       }
     } catch (error) {
-      showProfessionalToast(toast, 'NETWORK_ERROR', 'error');
+      showProfessionalToast(showToast, 'NETWORK_ERROR', 'error');
     } finally {
       setUpdatingStatus(prev => ({ ...prev, [jobId]: false }));
     }
@@ -351,14 +352,14 @@ const ActiveJobs: React.FC = () => {
         await loadActiveJobs();
       } else {
         const errorData = await response.json().catch(() => ({ message: 'İş reddedilemedi' }));
-        showProfessionalToast(toast, 'OPERATION_FAILED', 'error');
+        showProfessionalToast(showToast, 'OPERATION_FAILED', 'error');
       }
     } catch (error: any) {
       const errorMessage = error?.message || 'İş reddedilirken bir hata oluştu';
       if (errorMessage.includes('Network') || errorMessage.includes('fetch')) {
         showProfessionalToast(showToast, 'NETWORK_ERROR', 'error');
       } else {
-        showProfessionalToast(toast, 'OPERATION_FAILED', 'error');
+        showProfessionalToast(showToast, 'OPERATION_FAILED', 'error');
       }
     } finally {
       setIsRejecting(false);
@@ -381,7 +382,7 @@ const ActiveJobs: React.FC = () => {
           job.id === jobId ? { ...job, status: newStatus } : job
         ));
         
-        showProfessionalToast(toast, 'OFFLINE_SAVED', 'success');
+        showProfessionalToast(showToast, 'OFFLINE_SAVED', 'success');
         setUpdatingStatus(prev => ({ ...prev, [jobId]: false }));
         return;
       }
@@ -399,10 +400,10 @@ const ActiveJobs: React.FC = () => {
           job.id === jobId ? { ...job, status: newStatus } : job
         ));
         
-        showProfessionalToast(toast, 'OFFLINE_SAVED', 'success');
+        showProfessionalToast(showToast, 'OFFLINE_SAVED', 'success');
       }
     } catch (error) {
-      showProfessionalToast(toast, 'OPERATION_FAILED', 'error');
+      showProfessionalToast(showToast, 'OPERATION_FAILED', 'error');
     } finally {
       setUpdatingStatus(prev => ({ ...prev, [jobId]: false }));
     }

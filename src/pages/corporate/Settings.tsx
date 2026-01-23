@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 import { createApiUrl } from '../../config/api';
 import { authAPI as authService } from '../../services/api';
+import { useToast } from '../../contexts/ToastContext';
 import { TOAST_MESSAGES, showProfessionalToast } from '../../utils/toastMessages';
 
 // Temporary workaround
@@ -67,6 +68,7 @@ const authAPI = {
 };
 
 export default function CorporateSettings() {
+  const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState('profile');
   const [isSaving, setIsSaving] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -452,16 +454,16 @@ export default function CorporateSettings() {
                         setIsSaving(true);
                         const response = await authAPI.deleteAccount({ password, reason: 'Kullanıcı talebi' });
                         if (response.success) {
-                          showProfessionalToast(toast, 'ACTION_COMPLETED', 'success');
+                          showProfessionalToast(showToast, 'ACTION_COMPLETED', 'success');
                           setTimeout(() => {
                             localStorage.clear();
                             window.location.href = '/';
                           }, 2000);
                         } else {
-                          showProfessionalToast(toast, 'OPERATION_FAILED', 'error');
+                          showProfessionalToast(showToast, 'OPERATION_FAILED', 'error');
                         }
                       } catch (err: any) {
-                        showProfessionalToast(toast, 'OPERATION_FAILED', 'error');
+                        showProfessionalToast(showToast, 'OPERATION_FAILED', 'error');
                       } finally {
                         setIsSaving(false);
                       }

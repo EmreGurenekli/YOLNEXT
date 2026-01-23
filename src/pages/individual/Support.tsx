@@ -14,6 +14,7 @@ import {
   X
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useToast } from '../../contexts/ToastContext';
 import { createApiUrl } from '../../config/api';
 import { TOAST_MESSAGES, showProfessionalToast } from '../../utils/toastMessages';
 
@@ -31,6 +32,7 @@ interface SupportTicket {
 
 const Support: React.FC = () => {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -113,7 +115,7 @@ const Support: React.FC = () => {
     e.preventDefault();
     
     if (!formData.category || !formData.subject || !formData.description) {
-      showProfessionalToast(toast, 'REQUIRED_FIELDS', 'error');
+      showProfessionalToast(showToast, 'REQUIRED_FIELDS', 'error');
       return;
     }
 
@@ -147,7 +149,7 @@ const Support: React.FC = () => {
       });
 
       if (response.ok) {
-        showProfessionalToast(toast, 'SUPPORT_TICKET_CREATED', 'success');
+        showProfessionalToast(showToast, 'SUPPORT_TICKET_CREATED', 'success');
         setShowCreateForm(false);
         setFormData({
           category: '',
@@ -161,11 +163,11 @@ const Support: React.FC = () => {
         loadTickets();
       } else {
         const errorData = await response.json();
-        showProfessionalToast(toast, 'OPERATION_FAILED', 'error');
+        showProfessionalToast(showToast, 'OPERATION_FAILED', 'error');
       }
     } catch (error) {
       console.error('Error creating ticket:', error);
-      showProfessionalToast(toast, 'NETWORK_ERROR', 'error');
+      showProfessionalToast(showToast, 'NETWORK_ERROR', 'error');
     }
   };
 

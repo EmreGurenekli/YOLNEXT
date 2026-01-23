@@ -80,8 +80,9 @@ function App() {
           overlayCandidate: walkOverlay(elAtPoint) || walkOverlay(target),
         };
 
-        // eslint-disable-next-line no-console
-        console.log('[debug:clicks]', data);
+        if (import.meta.env.DEV) {
+          console.log('[debug:clicks]', data);
+        }
       } catch {
         // ignore
       }
@@ -96,13 +97,14 @@ function App() {
 
         const anyEv = ev as any;
         const path = typeof anyEv.composedPath === 'function' ? (anyEv.composedPath() as EventTarget[]) : undefined;
-        // eslint-disable-next-line no-console
-        console.log('[debug:clicks]', {
-          type: ev.type,
-          defaultPrevented: anyEv.defaultPrevented === true,
-          target: summarizeEl(target),
-          path: summarizePath(path),
-        });
+        if (import.meta.env.DEV) {
+          console.log('[debug:clicks]', {
+            type: ev.type,
+            defaultPrevented: anyEv.defaultPrevented === true,
+            target: summarizeEl(target),
+            path: summarizePath(path),
+          });
+        }
       } catch {
         // ignore
       }

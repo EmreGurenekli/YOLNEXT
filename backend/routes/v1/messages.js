@@ -2,11 +2,7 @@
 const express = require('express');
 const contentModeration = require('../../middleware/contentModeration');
 
-<<<<<<< HEAD
 function createMessageRoutes(pool, authenticateToken, createNotification, writeAuditLog, messageSpeedLimiter, idempotencyGuard, generalLimiter, upload) {
-=======
-function createMessageRoutes(pool, authenticateToken, createNotification, io, writeAuditLog, messageSpeedLimiter, idempotencyGuard, generalLimiter, upload) {
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
   const router = express.Router();
 
   const normalizeRole = r => String(r || '').toLowerCase();
@@ -884,15 +880,8 @@ function createMessageRoutes(pool, authenticateToken, createNotification, io, wr
 
       const newMessage = result.rows[0];
 
-<<<<<<< HEAD
       // Socket.io removed - real-time updates not needed
       // New messages available via REST API polling
-=======
-      // Emit via Socket.IO
-      if (io) {
-        io.to(`user_${resolvedReceiverId}`).emit('new_message', newMessage);
-      }
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
 
       // Create notification
       if (createNotification) {
@@ -1040,14 +1029,8 @@ function createMessageRoutes(pool, authenticateToken, createNotification, io, wr
 
       const newMessage = result.rows[0];
 
-<<<<<<< HEAD
       // Socket.io removed - real-time updates not needed
       // New messages available via REST API polling
-=======
-      if (io) {
-        io.to(`user_${receiverId}`).emit('new_message', newMessage);
-      }
->>>>>>> d16e01282458675ee948d13b88a3dc5d9dde5b11
 
       if (createNotification) {
         await createNotification(
@@ -1233,6 +1216,7 @@ function createMessageRoutes(pool, authenticateToken, createNotification, io, wr
 }
 
 module.exports = createMessageRoutes;
+
 
 
 
