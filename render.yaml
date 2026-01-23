@@ -39,7 +39,7 @@ services:
       - key: JWT_SECRET
         generateValue: true  # Render otomatik generate eder
       - key: FRONTEND_ORIGIN
-        sync: false  # Netlify URL'i buraya eklenecek
+        value: https://imaginative-lokum-aff632.netlify.app
       - key: DB_POOL_MAX
         value: "20"
       - key: DB_IDLE_TIMEOUT
