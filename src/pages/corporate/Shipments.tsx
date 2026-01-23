@@ -120,7 +120,7 @@ export default function CorporateShipments() {
   const [isLoading, setIsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
-  const [sortBy, setSortBy] = useState<'date' | 'price' | 'status'>('date');
+  const [sortBy, setSortBy] = useState<'date' | 'price' | 'status' | 'value' | 'priority'>('date');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [selectedShipmentDetail, setSelectedShipmentDetail] = useState<Shipment | null>(null);
