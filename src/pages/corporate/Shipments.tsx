@@ -102,13 +102,20 @@ import RatingModal from '../../components/RatingModal';
 import Pagination from '../../components/common/Pagination';
 import { useAuth } from '../../contexts/AuthContext';
 import GuidanceOverlay from '../../components/common/GuidanceOverlay';
-import { useToast } from '../../contexts/ToastContext';import { TOAST_MESSAGES, showProfessionalToast } from '../../utils/toastMessages';
+import { useToast } from '../../contexts/ToastContext';
+import { TOAST_MESSAGES, showProfessionalToast } from '../../utils/toastMessages';
 import { logger } from '../../utils/logger';
 
 export default function CorporateShipments() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { showToast } = useToast();    }, 10000); // 10 seconds timeout
+  const { showToast } = useToast();
+
+  const loadShipmentDetail = async (shipmentId: string) => {
+    setIsLoading(true);
+    const timeoutId = setTimeout(() => {
+      setIsLoading(false);
+    }, 10000); // 10 seconds timeout
 
     try {
       const token = localStorage.getItem('authToken');
@@ -212,8 +219,7 @@ export default function CorporateShipments() {
       clearTimeout(timeoutId);
       setIsLoading(false);
     }
-
-    setSelectedShipmentForDetails(shipmentId);
+  };
     setShowDetailsModal(true);
     setShowProcessAssistantDetails(false);
   };

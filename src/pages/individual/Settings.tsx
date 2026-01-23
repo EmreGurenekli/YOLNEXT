@@ -100,12 +100,25 @@ interface SettingsData {
 }
 
 export default function IndividualSettings() {
-  const { showToast } = useToast();        setTimeout(() => {
+  const { showToast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+
+  const handleDeleteAccount = async (password: string) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await authAPI.deleteAccount({ password });
+      if (response.success) {
+        setTimeout(() => {
           localStorage.clear();
           window.location.href = '/';
         }, 2000);
       } else {
-        showProfessionalToast(showToast, 'OPERATION_FAILED', 'error');      }
+        showProfessionalToast(showToast, 'OPERATION_FAILED', 'error');
+      }
     } catch (err: any) {
       setError(
         err?.response?.data?.message ||
