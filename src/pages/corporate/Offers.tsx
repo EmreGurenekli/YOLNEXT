@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createApiUrl } from '../../config/api';
 import { useNavigate, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
@@ -104,6 +104,7 @@ export default function Offers() {
   });
   const navigateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const paymentModalOpenRef = useRef(false);
+  const loadingRef = useRef(false);
 
   useEffect(() => {
     const userId = (user as any)?.id;
@@ -119,7 +120,7 @@ export default function Offers() {
 
   useEffect(() => {
     loadOffers();
-  }, [filterStatus, searchTerm]);
+  }, [loadOffers]);
 
   useEffect(() => {
     const handleVisibilityOrFocus = () => {
@@ -141,7 +142,7 @@ export default function Offers() {
       document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
       window.removeEventListener('yolnext:refresh-badges', handleGlobalRefresh);
     };
-  }, [filterStatus, searchTerm]);
+  }, [loadOffers]);
 
   useEffect(() => {
     return () => {
@@ -151,12 +152,16 @@ export default function Offers() {
     };
   }, []);
 
-  const loadOffers = async () => {
+  const loadOffers = useCallback(async () => {
+    // Prevent multiple simultaneous calls using ref
+    if (loadingRef.current) return;
+    loadingRef.current = true;
     setIsLoading(true);
     
     // Timeout protection - maksimum 10 saniye bekle
     const timeoutId = setTimeout(() => {
       setIsLoading(false);
+      loadingRef.current = false;
     }, 10000);
     
     try {
@@ -286,8 +291,10 @@ export default function Offers() {
       });
     } finally {
       setIsLoading(false);
+      loadingRef.current = false;
+      clearTimeout(timeoutId);
     }
-  };
+  }, [filterStatus, searchTerm]);
 
   const filteredOffers = offers.filter(offer => {
     const matchesStatus =

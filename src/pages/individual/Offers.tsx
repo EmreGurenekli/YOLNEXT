@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createApiUrl } from '../../config/api';
 import { useNavigate, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
@@ -136,6 +136,7 @@ export default function Offers() {
   });
   const navigateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const paymentModalOpenRef = useRef(false);
+  const loadingRef = useRef(false);
 
   useEffect(() => {
     const userId = (user as any)?.id;
@@ -166,6 +167,9 @@ export default function Offers() {
   };
 
   const loadOffers = useCallback(async () => {
+    // Prevent multiple simultaneous calls using ref
+    if (loadingRef.current) return;
+    loadingRef.current = true;
     setIsLoading(true);
     try {
       const user = localStorage.getItem('user')
@@ -321,6 +325,7 @@ export default function Offers() {
       setErrorMessage(errorMsg);
     } finally {
       setIsLoading(false);
+      loadingRef.current = false;
     }
   }, []);
 
@@ -329,16 +334,14 @@ export default function Offers() {
     
     // Auto-refresh offers every 30 seconds when page is visible
     const intervalId = setInterval(() => {
-      if (document.visibilityState === 'visible' && !isLoading) {
+      if (document.visibilityState === 'visible') {
         loadOffers();
       }
     }, 30000);
     
     // Listen for real-time updates via custom events
     const handleRefresh = () => {
-      if (!isLoading) {
-        loadOffers();
-      }
+      loadOffers();
     };
     
     window.addEventListener('yolnext:refresh-badges', handleRefresh);
@@ -349,7 +352,7 @@ export default function Offers() {
       window.removeEventListener('yolnext:refresh-badges', handleRefresh);
       window.removeEventListener('focus', handleRefresh);
     };
-  }, [loadOffers, isLoading]);
+  }, [loadOffers]);
 
   // Only show pending offers - accepted/rejected should not appear
   const filteredOffers = offers.filter((offer: Offer) => {
