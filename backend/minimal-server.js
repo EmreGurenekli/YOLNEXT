@@ -205,11 +205,6 @@ app.post('/api/auth/login', (req, res) => {
       success: false,
       message: 'Geçersiz giriş bilgileri'
     });
-  } else {
-    res.status(401).json({
-      success: false,
-      message: 'Geçersiz giriş bilgileri'
-    });
   }
 });
 
