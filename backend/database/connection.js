@@ -26,17 +26,24 @@
  
    const cfg = {};
  
-   // Prefer explicit credentials if present (so DATABASE_HOST/etc can override DATABASE_URL)
-   const hasExplicit = Boolean(host || port || database || user || password);
-   if (!hasExplicit && connectionString) {
-     cfg.connectionString = connectionString;
-   } else {
-     if (host) cfg.host = host;
-     if (port) cfg.port = port;
-     if (database) cfg.database = database;
-     if (user) cfg.user = user;
-     if (password) cfg.password = password;
-   }
+  // In production, always prefer DATABASE_URL over individual credentials
+  // This prevents local env files from overriding production DATABASE_URL
+  if (process.env.NODE_ENV === 'production' && connectionString) {
+    console.log('🔧 PRODUCTION MODE: Using DATABASE_URL, ignoring individual DB credentials');
+    cfg.connectionString = connectionString;
+  } else {
+    // Prefer explicit credentials if present (so DATABASE_HOST/etc can override DATABASE_URL)
+    const hasExplicit = Boolean(host || port || database || user || password);
+    if (!hasExplicit && connectionString) {
+      cfg.connectionString = connectionString;
+    } else {
+      if (host) cfg.host = host;
+      if (port) cfg.port = port;
+      if (database) cfg.database = database;
+      if (user) cfg.user = user;
+      if (password) cfg.password = password;
+    }
+  }
  
    if (process.env.DB_POOL_MAX) {
      const max = parseInt(process.env.DB_POOL_MAX, 10);
