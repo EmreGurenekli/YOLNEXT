@@ -2,7 +2,7 @@
   "name": "yolnext-kargo-platform",
   "description": "🚛 YolNext - Turkey's Digital Logistics Marketplace Platform. Connects shippers with carriers for efficient cargo transport. Supports 4 user types: Individual, Corporate, Nakliyeci (logistics companies), and Tasiyici (individual carriers). Features real-time tracking, offer system, messaging, and comprehensive admin panel.",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
   "scripts": {
     "//": "=== PRODUCTION DEPLOYMENT ===",
