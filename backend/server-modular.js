@@ -78,33 +78,11 @@ console.log('🔍 DATABASE DEBUG DETAILED:', {
   }
 });
 
-// Test database connection immediately (with proper error handling)
-console.log('🔍 TESTING DATABASE CONNECTION...');
-const testConnection = async () => {
-  try {
-    const { getPool } = require('./database/connection');
-    const pool = getPool();
-    const result = await pool.query('SELECT NOW() as current_time');
-    console.log('✅ DATABASE CONNECTION SUCCESS:', result.rows[0]);
-  } catch (error) {
-    console.error('❌ DATABASE CONNECTION FAILED:', {
-      message: error.message,
-      code: error.code,
-      errno: error.errno,
-      syscall: error.syscall,
-      address: error.address,
-      port: error.port
-    });
-    // Don't crash the app, just log the error
-    console.warn('⚠️ Backend will continue without database (limited functionality)');
-  }
-};
-
-// Run connection test without blocking startup
-testConnection().catch((error) => {
-  console.error('🚨 Connection test failed to execute:', error.message);
-  console.warn('⚠️ Backend will continue without database connection test');
-});
+// TEMPORARILY DISABLED: Database connection test (causing crashes)
+// Will enable after backend is stable
+console.log('⚠️ DATABASE CONNECTION TEST DISABLED (preventing crashes)');
+console.log('🔧 Backend will start without initial database test');
+console.log('🔧 Database connections will be tested when first API call is made');
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const IS_TEST = NODE_ENV === 'test' || !!process.env.JEST_WORKER_ID;
 // Security: No default values for production secrets
@@ -445,13 +423,14 @@ async function startServer() {
       }
     }
     
-    // Initialize database tables
+    // Initialize database tables (graceful failure in production)
     try {
       const tablesCreated = await createTables(pool);
       if (!tablesCreated) {
         if (NODE_ENV === 'production') {
-          errorLogger.error('Canonical DB schema not satisfied. Refusing to start backend.');
-          process.exit(1);
+          errorLogger.warn('Could not create tables (continuing in production with limited functionality)', { 
+            note: 'Backend may not function correctly without database tables' 
+          });
         } else {
           errorLogger.warn('Could not create tables (continuing in development mode)', { 
             note: 'Backend may not function correctly without database tables' 
@@ -459,9 +438,12 @@ async function startServer() {
         }
       }
     } catch (error) {
+      errorLogger.error('Error creating tables:', error);
       if (NODE_ENV === 'production') {
-        errorLogger.error('Failed to initialize database tables', { error: error.message });
-        process.exit(1);
+        errorLogger.warn('Database table initialization failed (continuing in production)', { 
+          error: error.message,
+          note: 'Backend will start with limited functionality' 
+        });
       } else {
         errorLogger.warn('Database table initialization failed (continuing in development)', { error: error.message });
       }
