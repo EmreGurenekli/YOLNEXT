@@ -52,12 +52,19 @@ const { createNotificationHelper } = require('./utils/userNotificationUtils');
 // Environment variables
 const PORT = process.env.PORT || 5000;
 
-// Debug: Database connection info
-console.log('🔍 DATABASE DEBUG:', {
+// Debug: Database connection info - DETAILED
+console.log('🔍 DATABASE DEBUG DETAILED:', {
   DATABASE_URL: process.env.DATABASE_URL ? 'SET' : 'NOT_SET',
-  URL_START: process.env.DATABASE_URL ? process.env.DATABASE_URL.substring(0, 20) + '...' : 'NONE',
+  URL_START: process.env.DATABASE_URL ? process.env.DATABASE_URL.substring(0, 30) + '...' : 'NONE',
+  URL_LENGTH: process.env.DATABASE_URL ? process.env.DATABASE_URL.length : 0,
   NODE_ENV: process.env.NODE_ENV,
-  PORT: PORT
+  PORT: PORT,
+  ALL_DB_VARS: {
+    DATABASE_HOST: process.env.DATABASE_HOST,
+    DATABASE_PORT: process.env.DATABASE_PORT,
+    DATABASE_NAME: process.env.DATABASE_NAME,
+    DATABASE_USER: process.env.DATABASE_USER
+  }
 });
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const IS_TEST = NODE_ENV === 'test' || !!process.env.JEST_WORKER_ID;
