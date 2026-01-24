@@ -144,21 +144,27 @@ const app = express();
 app.disable('etag'); // Prevent client/proxy caching of API responses
 const server = createServer(app);
 
-// Create database pool (graceful failure in production)
+// EMERGENCY: DISABLE DATABASE TEMPORARILY - ISOLATE CRASH SOURCE
 let pool = null;
-try {
-  pool = createDatabasePool(DATABASE_URL, NODE_ENV);
-  errorLogger.info('✅ Database pool created successfully');
-} catch (error) {
-  errorLogger.error('Failed to create database pool', { error: error.message });
-  if (NODE_ENV === 'production') {
-    errorLogger.warn('⚠️ Database pool creation failed in production (continuing without database)', { 
-      error: error.message,
-      note: 'Backend will start with limited functionality - API endpoints will be available but database operations will fail'
-    });
-    pool = null; // Explicitly set to null for safety
-  } else {
-    errorLogger.warn('Continuing in development mode without database (backend may not function correctly)');
+console.log('🚨 EMERGENCY MODE: Database completely disabled for crash isolation');
+console.log('🚨 This will help us identify if database is causing crashes');
+console.log('🚨 Server will start with NO database operations');
+
+if (false) { // Completely disable database for now
+  try {
+    pool = createDatabasePool(DATABASE_URL, NODE_ENV);
+    errorLogger.info('✅ Database pool created successfully');
+  } catch (error) {
+    errorLogger.error('Failed to create database pool', { error: error.message });
+    if (NODE_ENV === 'production') {
+      errorLogger.warn('⚠️ Database pool creation failed in production (continuing without database)', { 
+        error: error.message,
+        note: 'Backend will start with limited functionality - API endpoints will be available but database operations will fail'
+      });
+      pool = null; // Explicitly set to null for safety
+    } else {
+      errorLogger.warn('Continuing in development mode without database (backend may not function correctly)');
+    }
   }
 }
 
@@ -488,87 +494,37 @@ async function startServer() {
   try {
     errorLogger.info('Starting Modular PostgreSQL Backend');
 
-    // TEST DATABASE CONNECTION FIRST (Real Production Test)
-    if (pool && DATABASE_URL) {
-      console.log('🔧 TESTING DATABASE CONNECTION...');
-      try {
-        const testClient = await pool.connect();
-        await testClient.query('SELECT NOW() as current_time, version() as db_version');
-        testClient.release();
-        console.log('✅ DATABASE CONNECTION TEST: SUCCESS');
-        errorLogger.info('✅ Database connection verified successfully');
-      } catch (dbTestError) {
-        console.error('❌ DATABASE CONNECTION TEST: FAILED', dbTestError.message);
-        errorLogger.error('Database connection test failed', { 
-          error: dbTestError.message, 
-          code: dbTestError.code,
-          detail: dbTestError.detail
-        });
-        
-        if (NODE_ENV === 'production') {
-          errorLogger.error('CRITICAL: Database connection failed in production - CONTINUING WITH LIMITED FUNCTIONALITY', {
-            error: dbTestError.message,
-            code: dbTestError.code,
-            detail: dbTestError.detail,
-            hint: dbTestError.hint,
-            note: 'Server will start but database operations will fail'
-          });
-          // Don't crash in production, continue with limited functionality
-          console.log('⚠️ PRODUCTION: Database failed, continuing without database operations');
-        } else {
-          errorLogger.warn('Database connection failed in development, continuing with limited functionality');
-        }
-      }
-    } else {
-      console.log('⚠️ SKIPPING DATABASE TEST: No pool or DATABASE_URL available');
-      errorLogger.warn('Database connection test skipped - no pool or DATABASE_URL');
-    }
-
-    // Run migrations (skip if no pool)
-    if (!IS_TEST && NODE_ENV !== 'production' && pool) {
-      try {
-        const migrationRunner = new MigrationRunner(pool);
-        await migrationRunner.runMigrations();
-        errorLogger.info('✅ Database migrations completed');
-      } catch (e) {
-        errorLogger.warn('Could not run migrations automatically (continuing in development)', { error: e?.message || String(e) });
-        // In development, continue even if migrations fail
-      }
-    } else if (!pool) {
-      errorLogger.warn('⚠️ Skipping database migrations (no database pool available)');
-    }
+    // EMERGENCY: DATABASE TEST COMPLETELY DISABLED
+    console.log('🚨 EMERGENCY: Database connection test DISABLED for crash isolation');
+    console.log('🚨 This will help identify if database operations are causing server crashes');
+    console.log('🚨 Pool status:', pool ? 'EXISTS' : 'NULL');
     
-    // Initialize database tables (skip if no pool)
-    if (pool) {
-      try {
-        const tablesCreated = await createTables(pool);
-        if (!tablesCreated) {
-          errorLogger.warn('Could not create tables (continuing with limited functionality)', { 
-            note: 'Backend may not function correctly without database tables' 
-          });
-        } else {
-          errorLogger.info('✅ Database tables initialized successfully');
-        }
-      } catch (error) {
-        errorLogger.error('Error creating tables:', error);
-        errorLogger.warn('Database table initialization failed (continuing)', { 
-          error: error.message,
-          note: 'Backend will start with limited functionality' 
-        });
-      }
+    if (false && pool && DATABASE_URL) {
+      // All database code temporarily disabled
+      console.log('Database operations disabled');
     } else {
-      errorLogger.warn('⚠️ Skipping database table initialization (no database pool available)');
+      console.log('⚠️ DATABASE OPERATIONS: Completely disabled in emergency mode');
+      errorLogger.warn('Database operations disabled for crash isolation');
     }
 
-    // Seed data (development only)
-    if (NODE_ENV !== 'production' && pool) {
-      try {
-        const dataSeeded = await seedData(pool);
-        if (!dataSeeded) {
-          errorLogger.info('Data seeding skipped');
-        }
-      } catch (seedError) {
-        errorLogger.warn('Data seeding failed (continuing)', { error: seedError.message });
+    // 🚨 EMERGENCY: ALL DATABASE OPERATIONS DISABLED
+    console.log('🚨 EMERGENCY: Migrations, table creation, and seeding DISABLED');
+    console.log('🚨 This isolates any database-related crashes during startup');
+    
+    if (false) { // All database initialization disabled
+      // Run migrations (skip if no pool)
+      if (!IS_TEST && NODE_ENV !== 'production' && pool) {
+        console.log('Migrations disabled');
+      }
+      
+      // Initialize database tables (skip if no pool) 
+      if (pool) {
+        console.log('Table creation disabled');
+      }
+
+      // Seed data (development only)
+      if (NODE_ENV !== 'production' && pool) {
+        console.log('Data seeding disabled');
       }
     }
 
