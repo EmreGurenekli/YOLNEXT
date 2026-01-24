@@ -51,6 +51,14 @@ const { createNotificationHelper } = require('./utils/userNotificationUtils');
 
 // Environment variables
 const PORT = process.env.PORT || 5000;
+
+// Debug: Database connection info
+console.log('🔍 DATABASE DEBUG:', {
+  DATABASE_URL: process.env.DATABASE_URL ? 'SET' : 'NOT_SET',
+  URL_START: process.env.DATABASE_URL ? process.env.DATABASE_URL.substring(0, 20) + '...' : 'NONE',
+  NODE_ENV: process.env.NODE_ENV,
+  PORT: PORT
+});
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const IS_TEST = NODE_ENV === 'test' || !!process.env.JEST_WORKER_ID;
 // Security: No default values for production secrets
