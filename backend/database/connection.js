@@ -1,18 +1,27 @@
  const path = require('path');
  const { Pool } = require('pg');
  
- // Ensure scripts can read the same env files as the backend server.
- // This module is primarily used by backend/scripts/* utilities.
- try {
-   const dotenv = require('dotenv');
-   const root = path.resolve(__dirname, '..', '..');
-   dotenv.config({ path: path.join(root, '.env') });
-   dotenv.config({ path: path.join(root, 'env.development') });
-   // env.local must override env.development so local DB credentials win
-   dotenv.config({ path: path.join(root, 'env.local'), override: true });
- } catch (_) {
-   // ignore
- }
+// Ensure scripts can read the same env files as the backend server.
+// This module is primarily used by backend/scripts/* utilities.
+try {
+  const dotenv = require('dotenv');
+  const root = path.resolve(__dirname, '..', '..');
+  
+  // In production, skip loading local env files that might override production settings
+  if (process.env.NODE_ENV === 'production') {
+    console.log('🔧 PRODUCTION: Skipping local env files to prevent override');
+    // Only load base .env if it exists, no development or local overrides
+    dotenv.config({ path: path.join(root, '.env') });
+  } else {
+    // Development mode: load all env files
+    dotenv.config({ path: path.join(root, '.env') });
+    dotenv.config({ path: path.join(root, 'env.development') });
+    // env.local must override env.development so local DB credentials win
+    dotenv.config({ path: path.join(root, 'env.local'), override: true });
+  }
+} catch (_) {
+  // ignore
+}
  
  let pool = null;
  

@@ -4,9 +4,15 @@ const { Pool } = require('pg');
 try {
   const dotenv = require('dotenv');
   const root = path.resolve(__dirname, '..', '..');
-  dotenv.config({ path: path.join(root, '.env') });
-  dotenv.config({ path: path.join(root, 'env.development') });
-  dotenv.config({ path: path.join(root, 'env.local'), override: true });
+  
+  if (process.env.NODE_ENV === 'production') {
+    console.log('🔧 DATABASE CONFIG: Production mode, skipping local env files');
+    dotenv.config({ path: path.join(root, '.env') });
+  } else {
+    dotenv.config({ path: path.join(root, '.env') });
+    dotenv.config({ path: path.join(root, 'env.development') });
+    dotenv.config({ path: path.join(root, 'env.local'), override: true });
+  }
 } catch (_) {
   // ignore
 }

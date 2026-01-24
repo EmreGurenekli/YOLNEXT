@@ -32,11 +32,20 @@
 const path = require('path');
 const dotenv = require('dotenv');
 
-// Load env from repo root with precedence:
-// .env (lowest) < env.development < env.local (highest)
-dotenv.config({ path: path.resolve(__dirname, '../.env') });
-dotenv.config({ path: path.resolve(__dirname, '../env.development'), override: true });
-dotenv.config({ path: path.resolve(__dirname, '../env.local'), override: true });
+// Load env from repo root with production-safe precedence
+console.log('🔧 ENV LOADING: NODE_ENV =', process.env.NODE_ENV);
+
+if (process.env.NODE_ENV === 'production') {
+  console.log('🔧 PRODUCTION MODE: Loading only base .env, skipping local overrides');
+  // In production, only load base .env, never override with local files
+  dotenv.config({ path: path.resolve(__dirname, '../.env') });
+} else {
+  console.log('🔧 DEVELOPMENT MODE: Loading all env files with overrides');
+  // Development: .env (lowest) < env.development < env.local (highest)
+  dotenv.config({ path: path.resolve(__dirname, '../.env') });
+  dotenv.config({ path: path.resolve(__dirname, '../env.development'), override: true });
+  dotenv.config({ path: path.resolve(__dirname, '../env.local'), override: true });
+}
 
 const express = require('express');
 const { createServer } = require('http');
