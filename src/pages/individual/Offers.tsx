@@ -170,10 +170,8 @@ export default function Offers() {
   const loadOffers = useCallback(async () => {
     // Prevent multiple simultaneous calls using ref
     if (loadingRef.current) {
-      console.log('⏸️ loadOffers: Already loading, skipping...');
       return;
     }
-    console.log('🔄 loadOffers: Starting...');
     loadingRef.current = true;
     setIsLoading(true);
     try {
@@ -207,13 +205,10 @@ export default function Offers() {
       clearTimeout(timeoutId);
 
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ API Error:', response.status, errorText);
         throw new Error(`HTTP ${response.status}: Teklifler yüklenemedi`);
       }
 
       const data = await response.json();
-      console.log('📦 API Response:', { status: response.status, dataKeys: Object.keys(data) });
       const rawOffers = data.data || data.offers || (Array.isArray(data) ? data : []);
 
       const rawOffersArray = Array.isArray(rawOffers) ? rawOffers : [];
@@ -295,7 +290,6 @@ export default function Offers() {
         });
       
       // Only pending offers are shown - accepted/rejected are handled elsewhere
-      console.log('✅ Offers loaded:', mappedOffers.length, 'pending offers');
       setOffers(mappedOffers);
       
       setStats({
@@ -312,7 +306,6 @@ export default function Offers() {
       setErrorMessage('');
     } catch (error: any) {
       // Error loading offers - show error with retry option
-      console.error('❌ loadOffers Error:', error);
       setOffers([]);
       setStats({
         totalOffers: 0,
@@ -342,22 +335,36 @@ export default function Offers() {
       // CRITICAL: Don't retry automatically - prevent infinite loop
       // User can manually refresh if needed
     } finally {
-      console.log('✅ loadOffers: Completed');
       setIsLoading(false);
       loadingRef.current = false;
     }
   }, []);
 
-  // Load offers only once on mount - STRICT MODE
+  // Load offers only once on mount - ULTRA STRICT MODE with sessionStorage
   useEffect(() => {
-    // Prevent multiple calls even in React Strict Mode
-    if (hasLoadedOnceRef.current) {
-      console.log('⏸️ Offers: Already loaded once, skipping...');
+    // Use sessionStorage to prevent loading even across re-renders
+    const storageKey = 'yolnext_offers_loaded';
+    const alreadyLoaded = sessionStorage.getItem(storageKey);
+    
+    if (alreadyLoaded === 'true' || hasLoadedOnceRef.current) {
       return;
     }
-    console.log('🚀 Offers: Initial load starting...');
+    
     hasLoadedOnceRef.current = true;
-    loadOffers();
+    sessionStorage.setItem(storageKey, 'true');
+    
+    // Load offers
+    loadOffers().catch((error) => {
+      // Reset flag on error so user can retry
+      sessionStorage.removeItem(storageKey);
+      hasLoadedOnceRef.current = false;
+    });
+    
+    // Cleanup: Remove flag when component unmounts (optional - allows reload on navigation)
+    return () => {
+      // Don't remove on unmount - keep it for the session
+      // sessionStorage.removeItem(storageKey);
+    };
   }, []); // EMPTY ARRAY - Only run once on mount
 
   // Separate effect for auto-refresh (disabled to prevent loops)
