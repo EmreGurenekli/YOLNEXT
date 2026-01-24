@@ -1,5 +1,6 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
+const { ipKeyGenerator } = require('express-rate-limit');
 
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
@@ -385,7 +386,9 @@ function createAdminRoutes(pool, authenticateToken, requireAdmin, writeAuditLog)
     },
     keyGenerator: (req) => {
       // Rate limit by admin user ID + IP for better security
-      return `${req.user?.id || 'unknown'}_${req.ip}`;
+      // Use ipKeyGenerator helper for IPv6 support
+      const ip = ipKeyGenerator(req);
+      return `${req.user?.id || 'unknown'}_${ip}`;
     }
   });
 
