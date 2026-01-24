@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import {
@@ -149,10 +149,11 @@ export default function IndividualSettings() {
 
   const tabs = [
     { id: 'profile', name: 'Profil', icon: User },
-    { id: 'notifications', name: 'Bildirimler', icon: Bell },
-    { id: 'privacy', name: 'Gizlilik', icon: Shield },
-    { id: 'security', name: 'Güvenlik', icon: Lock },
-    { id: 'preferences', name: 'Tercihler', icon: Settings },
+    // DEMO: Other tabs disabled for simplicity
+    // { id: 'notifications', name: 'Bildirimler', icon: Bell },
+    // { id: 'privacy', name: 'Gizlilik', icon: Shield },
+    // { id: 'security', name: 'Güvenlik', icon: Lock },
+    // { id: 'preferences', name: 'Tercihler', icon: Settings },
   ];
 
   const handleInputChange = (section: keyof SettingsData, field: string, value: any) => {

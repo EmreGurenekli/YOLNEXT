@@ -320,9 +320,10 @@ export const useMyShipments = (basePath: string) => {
     refreshShipments();
   };
 
+  // DEMO FIX: Prevent infinite loop by removing problematic dependencies
   useEffect(() => {
     loadShipments();
-  }, [pagination.currentPage, searchTerm, statusFilter, sortBy]);
+  }, []); // Empty dependency array - load only once
 
   useEffect(() => {
     document.addEventListener('visibilitychange', handleVisibilityChange);

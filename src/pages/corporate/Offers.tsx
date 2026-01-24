@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createApiUrl } from '../../config/api';
 import { useNavigate, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
@@ -857,7 +857,7 @@ export default function Offers() {
               </div>
             ))
           ) : (
-            <div className='bg-white rounded-2xl shadow-xl border border-slate-200 p-10 text-center w-full max-w-2xl'>
+            <div className='bg-white rounded-2xl shadow-xl border border-slate-200 p-6 text-center col-span-full'>
               <EmptyState
                 icon={FileText}
                 title='Henüz Teklif Yok'

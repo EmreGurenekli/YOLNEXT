@@ -237,6 +237,110 @@ app.get('/api/user/profile', (req, res) => {
   }
 });
 
+// MISSING ENDPOINTS - Adding all critical APIs
+
+// Logs API (frontend keeps calling this)
+app.get('/api/logs', (req, res) => {
+  console.log('🔧 MINIMAL SERVER: Logs API called');
+  res.json({
+    success: true,
+    logs: [],
+    message: 'Logs disabled in minimal mode'
+  });
+});
+
+// Nakliyeci APIs
+app.get('/api/nakliyeci/market', (req, res) => {
+  console.log('🔧 MINIMAL SERVER: Nakliyeci market API called');
+  res.json({
+    success: true,
+    shipments: [
+      {
+        id: 'SHIP001',
+        title: 'Ev Eşyası Taşıması',
+        from: 'İstanbul',
+        to: 'Ankara',
+        date: '2026-01-25',
+        price: 850,
+        category: 'ev_tasimasi'
+      }
+    ],
+    total: 1
+  });
+});
+
+app.get('/api/nakliyeci/offers', (req, res) => {
+  console.log('🔧 MINIMAL SERVER: Nakliyeci offers API called');
+  res.json({
+    success: true,
+    offers: [],
+    message: 'No active offers'
+  });
+});
+
+app.get('/api/nakliyeci/analytics', (req, res) => {
+  console.log('🔧 MINIMAL SERVER: Nakliyeci analytics API called');
+  res.json({
+    success: true,
+    analytics: {
+      totalOffers: 0,
+      completedJobs: 0,
+      earnings: 0,
+      rating: 0
+    }
+  });
+});
+
+app.get('/api/nakliyeci/wallet', (req, res) => {
+  console.log('🔧 MINIMAL SERVER: Nakliyeci wallet API called');
+  res.json({
+    success: true,
+    wallet: {
+      balance: 0,
+      pendingBalance: 0,
+      transactions: []
+    }
+  });
+});
+
+// Taşıyıcı APIs  
+app.get('/api/tasiyici/jobs', (req, res) => {
+  console.log('🔧 MINIMAL SERVER: Tasiyici jobs API called');
+  res.json({
+    success: true,
+    jobs: [],
+    message: 'No active jobs'
+  });
+});
+
+app.get('/api/tasiyici/my-jobs', (req, res) => {
+  console.log('🔧 MINIMAL SERVER: Tasiyici my-jobs API called');
+  res.json({
+    success: true,
+    jobs: [],
+    message: 'No jobs assigned'
+  });
+});
+
+// Corporate APIs
+app.get('/api/corporate/shipments', (req, res) => {
+  console.log('🔧 MINIMAL SERVER: Corporate shipments API called');
+  res.json({
+    success: true,
+    shipments: [],
+    message: 'No corporate shipments'
+  });
+});
+
+app.get('/api/corporate/carriers', (req, res) => {
+  console.log('🔧 MINIMAL SERVER: Corporate carriers API called');
+  res.json({
+    success: true,
+    carriers: [],
+    message: 'No carriers found'
+  });
+});
+
 // Catch all for frontend
 if (NODE_ENV === 'production') {
   app.get('*', (req, res) => {

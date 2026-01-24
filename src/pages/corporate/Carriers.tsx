@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Helmet } from 'react-helmet-async';
 import {
   Users,
@@ -1084,7 +1084,7 @@ export default function CorporateCarriers() {
           </>
         ) : (
           <div className='min-h-[50vh] flex items-center justify-center'>
-            <div className='bg-white rounded-2xl shadow-xl border border-slate-200 p-10 text-center w-full max-w-2xl'>
+            <div className='bg-white rounded-2xl shadow-xl border border-slate-200 p-6 text-center col-span-full'>
               <EmptyState
                 icon={Users}
                 title='Nakliyeci bulunamadı'
