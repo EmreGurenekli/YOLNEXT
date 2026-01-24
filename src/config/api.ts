@@ -95,9 +95,9 @@ const resolveBaseUrl = (env: keyof typeof API_CONFIG) => {
   // In production, use environment variable or default to Render.com URL pattern
   // Render.com URL format: https://yolnext.onrender.com
   if (env === 'production') {
-    // Production URL should be set via VITE_API_URL environment variable
-    // Default fallback for Render.com deployment
-    return 'https://yolnext.onrender.com';
+  // Production URL should be set via VITE_API_URL environment variable
+  // Default fallback for Railway deployment
+  return 'https://yolnext-production.up.railway.app';
   }
   // In development, use relative path so Vite proxy can forward to backend
   // Vite proxy is configured to forward /api requests to http://localhost:5000

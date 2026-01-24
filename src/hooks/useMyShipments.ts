@@ -28,6 +28,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { createApiUrl } from '../config/api';
 import { normalizeTrackingCode } from '../utils/trackingCode';
+import { useAuth } from '../contexts/AuthContext';
 
 /**
  * Main shipment entity interface
@@ -207,6 +208,7 @@ interface Notification {
  */
 export const useMyShipments = (basePath: string) => {
   const location = useLocation();
+  const { user } = useAuth();
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -233,6 +235,8 @@ export const useMyShipments = (basePath: string) => {
   const loadShipments = async () => {
     try {
       setLoading(true);
+      
+      
       const token = localStorage.getItem('authToken');
       if (!token) {
         console.warn('No auth token found');
