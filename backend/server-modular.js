@@ -53,27 +53,58 @@ console.log('🚨 EMERGENCY: Loading only essential modules (express, http)');
 const express = require('express');
 const { createServer } = require('http');
 
-// 🚨 EMERGENCY: All other modules disabled to isolate crash
+// Step 1: Re-enable errorLogger (try-catch to prevent crashes)
 let errorLogger = null;
+try {
+  console.log('🔧 Step 1: Loading errorLogger...');
+  errorLogger = require('./utils/errorLogger');
+  console.log('✅ errorLogger loaded successfully');
+} catch (error) {
+  console.error('❌ errorLogger failed to load:', error.message);
+  // Fallback to simple logger
+  errorLogger = {
+    info: (msg, data) => console.log('ℹ️ INFO:', msg, data || ''),
+    warn: (msg, data) => console.warn('⚠️ WARN:', msg, data || ''),
+    error: (msg, data) => console.error('❌ ERROR:', msg, data || '')
+  };
+}
+
+// Step 2: Re-enable database pool (for real data)
 let MigrationRunner = null;
 let createDatabasePool = null;
+try {
+  console.log('🔧 Step 2: Loading database pool...');
+  const dbConfig = require('./config/database');
+  createDatabasePool = dbConfig.createDatabasePool;
+  console.log('✅ Database pool module loaded successfully');
+} catch (error) {
+  console.error('❌ Database pool module failed to load:', error.message);
+  createDatabasePool = null;
+}
+
+// Step 4: Re-enable middleware and routes (for API endpoints)
 let setupMiddleware = null;
 let setupRoutes = null;
+try {
+  console.log('🔧 Step 4: Loading middleware and routes...');
+  const middlewareConfig = require('./config/middleware');
+  setupMiddleware = middlewareConfig.setupMiddleware;
+  const routesConfig = require('./config/routes');
+  setupRoutes = routesConfig.setupRoutes;
+  console.log('✅ Middleware and routes modules loaded successfully');
+} catch (error) {
+  console.error('❌ Middleware/routes modules failed to load:', error.message);
+  setupMiddleware = null;
+  setupRoutes = null;
+}
+
+// Still disabled for now (optional features)
 let setupEmailService = null;
 let setupFileUpload = null;
 let setupIdempotencyGuard = null;
 let setupAdminGuard = null;
 let setupAuditLog = null;
 let createNotificationHelper = null;
-
-console.log('🚨 EMERGENCY: All complex modules disabled - using minimal console.log instead');
-
-// Simple error logger replacement
-errorLogger = {
-  info: (msg, data) => console.log('ℹ️ INFO:', msg, data || ''),
-  warn: (msg, data) => console.warn('⚠️ WARN:', msg, data || ''),
-  error: (msg, data) => console.error('❌ ERROR:', msg, data || '')
-};
 
 // Environment variables
 const PORT = process.env.PORT || 5000;
@@ -109,113 +140,139 @@ const SENTRY_DSN = process.env.SENTRY_DSN;
 let Sentry = null;
 console.log('🚨 EMERGENCY: Sentry disabled');
 
-// 🚨 EMERGENCY: ALL VALIDATION DISABLED
-console.log('🚨 EMERGENCY: Environment validation COMPLETELY DISABLED');
-console.log('🚨 This will help identify if validation is causing crashes');
+// Step 7: Re-enable validation (soft mode - warnings only, no crashes)
+console.log('🔧 Step 7: Running environment validation (soft mode)...');
 
 function validateEnvironment() {
-  console.log('🚨 Validation disabled - skipping all checks');
+  const requiredVars = ['JWT_SECRET', 'DATABASE_URL', 'FRONTEND_ORIGIN'];
+  const missingVars = requiredVars.filter(varName => !process.env[varName]);
+
+  if (missingVars.length > 0) {
+    errorLogger.warn('Missing environment variables (continuing anyway)', { missingVars });
+    console.warn('⚠️ Missing vars:', missingVars.join(', '));
+  }
+
+  // Validate JWT secret strength (warning only)
+  if (JWT_SECRET && JWT_SECRET.length < 32) {
+    errorLogger.warn('JWT_SECRET is weak (less than 32 characters)');
+  }
+
+  // Validate database URL (warning only)
+  if (DATABASE_URL && !DATABASE_URL.includes('postgresql://')) {
+    errorLogger.warn('DATABASE_URL format may be invalid', { databaseUrl: DATABASE_URL.substring(0, 20) + '...' });
+  }
+
+  errorLogger.info('Environment validation completed (soft mode)');
 }
 
-// Skip validation
-// validateEnvironment(); // DISABLED
+validateEnvironment();
 
-// Skip JWT_SECRET check
-// if (NODE_ENV === 'production' && !JWT_SECRET) {
-//   errorLogger.error('CRITICAL: JWT_SECRET must be set in production!');
-//   process.exit(1);
-// }
-console.log('🚨 JWT_SECRET validation disabled');
+// JWT_SECRET check (warning only, no crash)
+if (NODE_ENV === 'production' && !JWT_SECRET) {
+  errorLogger.warn('⚠️ WARNING: JWT_SECRET not set in production - authentication may not work!');
+  console.warn('⚠️ JWT_SECRET missing - continuing anyway');
+}
 
 // Create Express app
 const app = express();
 app.disable('etag'); // Prevent client/proxy caching of API responses
 const server = createServer(app);
 
-// EMERGENCY: DISABLE DATABASE TEMPORARILY - ISOLATE CRASH SOURCE
+// Step 3: Create database pool (REAL DATA - User requested)
 let pool = null;
-console.log('🚨 EMERGENCY MODE: Database completely disabled for crash isolation');
-console.log('🚨 This will help us identify if database is causing crashes');
-console.log('🚨 Server will start with NO database operations');
+console.log('🔧 Step 3: Creating database pool for REAL data...');
 
-if (false) { // Completely disable database for now
+if (createDatabasePool && DATABASE_URL) {
   try {
     pool = createDatabasePool(DATABASE_URL, NODE_ENV);
     errorLogger.info('✅ Database pool created successfully');
+    console.log('✅ Database pool ready for REAL data operations');
   } catch (error) {
     errorLogger.error('Failed to create database pool', { error: error.message });
+    console.error('❌ Database pool creation failed:', error.message);
     if (NODE_ENV === 'production') {
       errorLogger.warn('⚠️ Database pool creation failed in production (continuing without database)', { 
         error: error.message,
         note: 'Backend will start with limited functionality - API endpoints will be available but database operations will fail'
       });
-      pool = null; // Explicitly set to null for safety
+      pool = null;
     } else {
       errorLogger.warn('Continuing in development mode without database (backend may not function correctly)');
+      pool = null;
     }
   }
+} else {
+  console.log('⚠️ Skipping database pool: createDatabasePool function not available or DATABASE_URL missing');
+  pool = null;
 }
 
-// 🚨 EMERGENCY: ALL SETUP DISABLED - ULTRA MINIMAL MODE
-console.log('🚨 EMERGENCY: Middleware, services, guards COMPLETELY DISABLED');
-console.log('🚨 This will help identify if setup code is causing crashes');
+// Step 5: Setup middleware and routes (REAL API ENDPOINTS)
+console.log('🔧 Step 5: Setting up middleware and routes for REAL API...');
 
 let middleware = null, sendEmail = null, upload = null;
 let idempotencyGuard = null, requireAdmin = null, writeAuditLog = null, createNotification = null;
 
-if (false) { // All setup disabled
-  // Setup middleware (safe mode)
+// Setup middleware (safe mode)
+if (setupMiddleware) {
   try {
     console.log('🔧 Setting up middleware...');
     middleware = setupMiddleware(app, pool, JWT_SECRET, FRONTEND_ORIGIN, NODE_ENV);
     console.log('✅ Middleware setup complete');
   } catch (error) {
     console.error('❌ Middleware setup failed:', error.message);
+    errorLogger.error('Middleware setup failed', { error: error.message });
     middleware = null;
   }
-
-  try {
-    console.log('🔧 Setting up services...');  
-    const emailService = setupEmailService();
-    sendEmail = emailService.sendEmail;
-    upload = setupFileUpload();
-    console.log('✅ Services setup complete');
-  } catch (error) {
-    console.error('❌ Services setup failed:', error.message);
-    sendEmail = null;
-    upload = null;
-  }
-
-  // Setup guards and utilities (safe mode)
-  try {
-    console.log('🔧 Setting up guards...');
-    requireAdmin = setupAdminGuard();
-    createNotification = pool ? createNotificationHelper(pool) : null;
-    console.log('✅ Basic guards setup complete');
-  } catch (error) {
-    console.error('❌ Basic guards setup failed:', error.message);
-    requireAdmin = null;
-    createNotification = null;
-  }
+} else {
+  console.log('⚠️ Skipping middleware setup (module not loaded)');
 }
 
-// 🚨 EMERGENCY: ASYNC SETUP COMPLETELY DISABLED
-console.log('🚨 EMERGENCY: Async guards and routes COMPLETELY DISABLED');
+// Services are optional for now
+sendEmail = null;
+upload = null;
 
-// Setup basic health check route ONLY
+// Guards are optional for now
+requireAdmin = null;
+createNotification = null;
+
+// Step 6: Setup routes (REAL API ENDPOINTS)
+console.log('🔧 Step 6: Setting up routes for REAL API endpoints...');
+
+// Basic health check (always available)
 app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'ok', 
-    message: 'Backend running (ULTRA MINIMAL MODE - all setup disabled)',
+    message: 'Backend running with REAL database',
     timestamp: new Date().toISOString(),
-    mode: 'emergency-isolation'
+    database: pool ? 'connected' : 'disconnected',
+    mode: 'production'
   });
 });
 
-if (false) { // All async setup disabled
+// Setup routes with whatever we have (async safe)
+if (setupRoutes) {
   (async () => {
-    // Disabled
+    try {
+      console.log('🔧 Setting up routes...');
+      setupRoutes(app, pool, middleware, {
+        createNotification,
+        sendEmail,
+        writeAuditLog,
+      }, {
+        idempotencyGuard,
+        upload,
+        requireAdmin,
+      });
+      console.log('✅ Routes setup complete - REAL API endpoints available');
+      errorLogger.info('✅ All routes registered successfully');
+    } catch (routeError) {
+      console.error('❌ Routes setup failed:', routeError.message);
+      errorLogger.error('Routes setup failed', { error: routeError.message });
+      // Continue with basic health check only
+    }
   })();
+} else {
+  console.log('⚠️ Skipping routes setup (module not loaded)');
 }
 
 // Serve static uploads
@@ -426,30 +483,93 @@ if (!IS_TEST) {
 // Start server function and remaining code continues below...
 // (Duplicate middleware, routes, and services code removed - handled by setupMiddleware and setupRoutes)
 
-// 🚨 EMERGENCY: ULTRA MINIMAL startServer - ONLY server.listen()
+// Step 8: Full startServer with REAL database operations
 async function startServer() {
-  console.log('🚨 EMERGENCY: Ultra minimal startServer - NO database, NO migrations, NO setup');
+  console.log('🔧 Step 8: Starting server with REAL database operations...');
+  
+  // Database initialization
+  const { createTables, seedData } = require('./database/init');
   
   try {
-    console.log(`🚨 Starting server on port ${PORT} (ULTRA MINIMAL MODE)`);
+    errorLogger.info('Starting Modular PostgreSQL Backend with REAL data');
+
+    // TEST DATABASE CONNECTION (graceful failure)
+    if (pool && DATABASE_URL) {
+      console.log('🔧 Testing database connection...');
+      try {
+        const testClient = await pool.connect();
+        await testClient.query('SELECT NOW() as current_time, version() as db_version');
+        testClient.release();
+        console.log('✅ Database connection test: SUCCESS');
+        errorLogger.info('✅ Database connection verified successfully');
+      } catch (dbTestError) {
+        console.error('❌ Database connection test: FAILED', dbTestError.message);
+        errorLogger.warn('Database connection test failed (continuing anyway)', { 
+          error: dbTestError.message, 
+          code: dbTestError.code
+        });
+      }
+    }
+
+    // Run migrations (development only, graceful failure)
+    if (!IS_TEST && NODE_ENV !== 'production' && pool) {
+      try {
+        const MigrationRunner = require('./migrations/migration-runner');
+        const migrationRunner = new MigrationRunner(pool);
+        await migrationRunner.runMigrations();
+        errorLogger.info('✅ Database migrations completed');
+      } catch (e) {
+        errorLogger.warn('Migrations failed (continuing)', { error: e?.message || String(e) });
+      }
+    }
     
+    // Initialize database tables (graceful failure)
+    if (pool) {
+      try {
+        const tablesCreated = await createTables(pool);
+        if (tablesCreated) {
+          errorLogger.info('✅ Database tables initialized successfully');
+        } else {
+          errorLogger.warn('Table creation returned false (continuing)');
+        }
+      } catch (error) {
+        errorLogger.warn('Table initialization failed (continuing)', { error: error.message });
+      }
+    }
+
+    // Seed data (development only, graceful failure)
+    if (NODE_ENV !== 'production' && pool) {
+      try {
+        await seedData(pool);
+        errorLogger.info('✅ Data seeding completed');
+      } catch (seedError) {
+        errorLogger.warn('Data seeding failed (continuing)', { error: seedError.message });
+      }
+    }
+
     server.once('error', (err) => {
-      console.error('❌ Server error:', err.message);
       if (err && err.code === 'EADDRINUSE') {
-        console.error(`Port ${PORT} is already in use`);
+        errorLogger.error(`Port ${PORT} is already in use. Stop the other process or change PORT.`);
         process.exit(1);
       }
+      errorLogger.error('Server failed to start', { error: err.message });
       process.exit(1);
     });
 
     server.listen(PORT, () => {
-      console.log(`✅ SERVER RUNNING on http://localhost:${PORT} (ULTRA MINIMAL MODE)`);
+      errorLogger.info(`Modular Backend running on http://localhost:${PORT}`, {
+        port: PORT,
+        environment: NODE_ENV,
+        healthCheck: `http://localhost:${PORT}/api/health`,
+        database: pool ? 'connected' : 'disconnected'
+      });
+      console.log(`✅ SERVER RUNNING on http://localhost:${PORT} (REAL DATABASE MODE)`);
       console.log(`✅ Health check: http://localhost:${PORT}/api/health`);
-      console.log(`✅ Environment: ${NODE_ENV}`);
+      console.log(`✅ Database: ${pool ? 'CONNECTED' : 'DISCONNECTED'}`);
     });
   } catch (error) {
+    errorLogger.error('Failed to start server', { error: error.message, stack: error.stack });
     console.error('❌ CRITICAL: Failed to start server:', error.message);
-    console.error('Stack:', error.stack);
     process.exit(1);
   }
 }
