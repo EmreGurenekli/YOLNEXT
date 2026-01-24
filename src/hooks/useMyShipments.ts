@@ -225,6 +225,7 @@ export const useMyShipments = (basePath: string) => {
   const isCorporateView = basePath === '/corporate';
   const toTrackingCode = normalizeTrackingCode;
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const errorShownRef = useRef(false);
 
   const showNotification = useCallback((type: 'success' | 'error' | 'info', message: string) => {
     setNotification({ type, message });
@@ -238,7 +239,6 @@ export const useMyShipments = (basePath: string) => {
       
       const token = localStorage.getItem('authToken');
       if (!token) {
-        console.warn('No auth token found');
         setShipments([]);
         setLoading(false);
         return;
@@ -261,7 +261,15 @@ export const useMyShipments = (basePath: string) => {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+        // Only show error notification for critical errors (not 401/403)
+        if (response.status !== 401 && response.status !== 403) {
+          throw new Error(`HTTP ${response.status}`);
+        } else {
+          // Auth errors - silent fail, user will be redirected
+          setShipments([]);
+          setLoading(false);
+          return;
+        }
       }
 
       const data = await response.json();
@@ -274,9 +282,17 @@ export const useMyShipments = (basePath: string) => {
         totalCount: data.totalCount || 0,
         hasMore: data.hasMore || false,
       }));
+      
+      // Clear error flag on success
+      errorShownRef.current = false;
+      setNotification(null);
     } catch (error) {
       console.error('Error loading shipments:', error);
-      showNotification('error', 'Gönderiler yüklenirken bir hata oluştu');
+      // Only show notification once - prevent spam
+      if (!errorShownRef.current) {
+        errorShownRef.current = true;
+        showNotification('error', 'Gönderiler yüklenirken bir hata oluştu');
+      }
       setShipments([]);
     } finally {
       setLoading(false);
@@ -313,35 +329,35 @@ export const useMyShipments = (basePath: string) => {
     loadShipments();
   }, [loadShipments]);
 
-  // Auto-refresh için visibility change handler
-  const handleVisibilityChange = useCallback(() => {
-    if (!document.hidden) {
-      refreshShipments();
-    }
-  }, [refreshShipments]);
+  // DISABLED: Auto-refresh to prevent infinite loops and error spam
+  // Users can manually refresh if needed
+  // const handleVisibilityChange = useCallback(() => {
+  //   if (!document.hidden) {
+  //     refreshShipments();
+  //   }
+  // }, [refreshShipments]);
 
-  const handleFocus = useCallback(() => {
-    refreshShipments();
-  }, [refreshShipments]);
+  // const handleFocus = useCallback(() => {
+  //   refreshShipments();
+  // }, [refreshShipments]);
 
-  // EMERGENCY FIX: Load shipments only once on mount
+  // Load shipments only once on mount
   useEffect(() => {
-    console.log('🔧 useMyShipments: Loading shipments (ONE TIME ONLY)');
     loadShipments();
-  }, []); // EMPTY ARRAY - NO DEPENDENCIES - NO LOOPS!
+  }, []); // EMPTY ARRAY - Only run once on mount
 
-  useEffect(() => {
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('focus', handleFocus);
-
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('focus', handleFocus);
-      if (refreshTimerRef.current) {
-        clearTimeout(refreshTimerRef.current);
-      }
-    };
-  }, [handleVisibilityChange, handleFocus]);
+  // DISABLED: Event listeners to prevent infinite refresh loops
+  // useEffect(() => {
+  //   document.addEventListener('visibilitychange', handleVisibilityChange);
+  //   window.addEventListener('focus', handleFocus);
+  //   return () => {
+  //     document.removeEventListener('visibilitychange', handleVisibilityChange);
+  //     window.removeEventListener('focus', handleFocus);
+  //     if (refreshTimerRef.current) {
+  //       clearTimeout(refreshTimerRef.current);
+  //     }
+  //   };
+  // }, [handleVisibilityChange, handleFocus]);
 
   return {
     // Data
