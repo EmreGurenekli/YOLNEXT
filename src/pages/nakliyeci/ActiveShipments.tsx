@@ -1,4 +1,4 @@
-﻿  import React, { useState, useEffect, useRef } from 'react';
+  import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useAuth } from '../../contexts/AuthContext';
@@ -44,6 +44,7 @@ import MessagingModal from '../../components/MessagingModal';
 import RatingModal from '../../components/RatingModal';
 import TrackingModal from '../../components/TrackingModal';
 import { createApiUrl } from '../../config/api';
+import { safeJsonParse } from '../../utils/safeFetch';
 import { formatCurrency, formatDate, sanitizeAddressLabel, sanitizeMessageText, sanitizeShipmentTitle } from '../../utils/format';
 import { getStatusInfo, getStatusDescription } from '../../utils/shipmentStatus';
 import { resolveShipmentRoute } from '../../utils/shipmentRoute';
@@ -216,7 +217,7 @@ const ActiveShipments = () => {
       );
 
       if (response.ok) {
-        const data = await response.json();
+        const data = await safeJsonParse(response);
         const rawShipments = (data.data || data.shipments || (Array.isArray(data) ? data : [])) as any[];
         
         
@@ -448,7 +449,7 @@ const ActiveShipments = () => {
       
         logger.debug('[DEBUG] ActiveShipments - Drivers API response status:', response.status);
       if (response.ok) {
-        const data = await response.json();
+        const data = await safeJsonParse(response);
           logger.debug('[DEBUG] ActiveShipments - Drivers API response data:', data);
         // Show all drivers for now (available and busy)
         // TODO: Add filter option in UI to show only available drivers
@@ -560,8 +561,12 @@ const ActiveShipments = () => {
         await loadActiveShipments();
       } else {
         clearTimeout(timeoutId);
-        const errorData = await response.json().catch(() => ({}));
-        setErrorMessage(errorData.message || 'Taşıyıcı atanamadı. Lütfen tekrar deneyin.');
+        try {
+          const errorData = await safeJsonParse(response);
+          setErrorMessage((errorData as any)?.message || 'Taşıyıcı atanamadı. Lütfen tekrar deneyin.');
+        } catch {
+          setErrorMessage('Taşıyıcı atanamadı. Lütfen tekrar deneyin.');
+        }
         setShowError(true);
         setTimeout(() => setShowError(false), 5000);
       }
@@ -601,7 +606,11 @@ const ActiveShipments = () => {
       // If we get a 501 or a known "routes not available" message, open broadcast via shipments route.
       let responsePayload: any = null;
       if (!response.ok) {
-        responsePayload = await response.json().catch(() => ({}));
+        try {
+          responsePayload = await safeJsonParse(response);
+        } catch {
+          responsePayload = {};
+        }
         const msg = String(responsePayload?.message || '').toLowerCase();
         const shouldFallback =
           response.status === 501 ||
@@ -631,8 +640,12 @@ const ActiveShipments = () => {
             return;
           }
 
-          const fbErr = await fallbackRes.json().catch(() => ({}));
-          setErrorMessage(fbErr.message || '❌ İlan oluşturulamadı, tekrar dene.');
+          try {
+            const fbErr = await safeJsonParse(fallbackRes);
+            setErrorMessage((fbErr as any)?.message || '❌ İlan oluşturulamadı, tekrar dene.');
+          } catch {
+            setErrorMessage('❌ İlan oluşturulamadı, tekrar dene.');
+          }
           setShowError(true);
           setTimeout(() => setShowError(false), 5000);
           return;

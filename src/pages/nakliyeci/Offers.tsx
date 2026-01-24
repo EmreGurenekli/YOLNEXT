@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 import {
   DollarSign,
@@ -38,6 +38,7 @@ import { resolveShipmentRoute } from '../../utils/shipmentRoute';
 import Pagination from '../../components/shared-ui-elements/Pagination';
 import GuidanceOverlay from '../../components/shared-ui-elements/GuidanceOverlay';
 import { createApiUrl } from '../../config/api';
+import { safeJsonParse } from '../../utils/safeFetch';
 import { useNavigate } from 'react-router-dom';
 import { normalizeTrackingCode } from '../../utils/trackingCode';
 
@@ -239,7 +240,7 @@ export default function NakliyeciOffers() {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
-      const data = await response.json();
+      const data = await safeJsonParse(response);
       const list = (
         data?.data && Array.isArray(data.data)
           ? data.data
@@ -594,11 +595,19 @@ export default function NakliyeciOffers() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Teklif iptal edilemedi');
+        try {
+          const errorData = await safeJsonParse(response);
+          throw new Error((errorData as any)?.message || 'Teklif iptal edilemedi');
+        } catch (parseError) {
+          throw new Error('Teklif iptal edilemedi');
+        }
       }
 
-      await response.json().catch(() => null);
+      try {
+        await safeJsonParse(response);
+      } catch {
+        // Ignore parse errors for successful responses
+      }
       setSuccessMessage('Teklif başarıyla iptal edildi');
       setShowSuccessMessage(true);
       setTimeout(() => setShowSuccessMessage(false), 5000);

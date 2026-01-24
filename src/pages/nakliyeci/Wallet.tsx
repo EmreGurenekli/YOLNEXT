@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 import {
   Wallet as WalletIcon,
@@ -23,6 +23,7 @@ import LoadingState from '../../components/shared-ui-elements/LoadingState';
 import EmptyState from '../../components/shared-ui-elements/EmptyState';
 import GuidanceOverlay from '../../components/shared-ui-elements/GuidanceOverlay';
 import { createApiUrl } from '../../config/api';
+import { safeJsonParse } from '../../utils/safeFetch';
 import { formatCurrency, formatDateTime } from '../../utils/format';
 
 interface CommissionTransaction {
@@ -90,7 +91,7 @@ const Wallet: React.FC = () => {
         throw new Error('Cüzdan verileri yüklenemedi');
       }
 
-      const data = await response.json();
+      const data = await safeJsonParse(response);
 
       if (data.success) {
         // Backend format: { success: true, data: { balance, transactions } }
@@ -133,7 +134,7 @@ const Wallet: React.FC = () => {
         body: JSON.stringify({ amount }),
       });
 
-      const intentJson = await intentRes.json().catch(() => null);
+      const intentJson = intentRes.ok ? await safeJsonParse(intentRes).catch(() => null) : null;
       if (!intentRes.ok || !intentJson?.success) {
         setError(intentJson?.message || 'Para yatırma işlemi başarısız');
         return;
@@ -152,7 +153,7 @@ const Wallet: React.FC = () => {
           body: JSON.stringify({ providerIntentId }),
         });
 
-        const confirmJson = await confirmRes.json().catch(() => null);
+        const confirmJson = confirmRes.ok ? await safeJsonParse(confirmRes).catch(() => null) : null;
         if (!confirmRes.ok || !confirmJson?.success) {
           setError(confirmJson?.message || 'Ödeme doğrulanamadı');
           return;

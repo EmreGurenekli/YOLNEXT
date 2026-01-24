@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import {
@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import Breadcrumb from '../../components/shared-ui-elements/Breadcrumb';
 import { createApiUrl } from '../../config/api';
+import { safeJsonParse } from '../../utils/safeFetch';
 import { useToast } from '../../contexts/ToastContext';
 import { showProfessionalToast } from '../../utils/toastMessages';
 
@@ -243,7 +244,7 @@ const NakliyeciHelp = () => {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (response.ok) {
-        const data = await response.json();
+        const data = await safeJsonParse(response);
         const resolvedTickets = data?.data?.tickets || data?.data || data?.tickets || [];
         setTickets(Array.isArray(resolvedTickets) ? resolvedTickets : []);
       }
@@ -258,7 +259,7 @@ const NakliyeciHelp = () => {
     try {
       const response = await fetch(createApiUrl('/api/support/categories'));
       if (response.ok) {
-        const data = await response.json();
+        const data = await safeJsonParse(response);
         const resolvedCategories = data?.data || data?.categories || [];
         setCategories(Array.isArray(resolvedCategories) ? resolvedCategories : []);
       }
@@ -306,7 +307,7 @@ const NakliyeciHelp = () => {
         });
         loadTickets();
       } else {
-        const errorPayload = await response.json().catch(() => null);
+        const errorPayload = response.ok ? await safeJsonParse(response).catch(() => null) : null;
         showProfessionalToast(
           showToast,
           'OPERATION_FAILED',

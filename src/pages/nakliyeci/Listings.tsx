@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -27,6 +27,7 @@ import EmptyState from '../../components/shared-ui-elements/EmptyState';
 import SuccessMessage from '../../components/shared-ui-elements/SuccessMessage';
 import Modal from '../../components/shared-ui-elements/Modal';
 import { createApiUrl } from '../../config/api';
+import { safeJsonParse } from '../../utils/safeFetch';
 import GuidanceOverlay from '../../components/shared-ui-elements/GuidanceOverlay';
 import UserTrustRating from '../../components/UserTrustRating';
 
@@ -102,8 +103,12 @@ const Listings: React.FC = () => {
         headers: headers(),
       });
       if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Reddedilemedi');
+        try {
+          const errorData = await safeJsonParse(res);
+          throw new Error((errorData as any)?.message || 'Reddedilemedi');
+        } catch {
+          throw new Error('Reddedilemedi');
+        }
       }
       setSuccessMessage('Teklif reddedildi.');
       setShowSuccess(true);
@@ -127,7 +132,7 @@ const Listings: React.FC = () => {
         headers: headers(),
       });
       if (!res.ok) throw new Error('İlanlar alınamadı');
-      const data = await res.json();
+      const data = await safeJsonParse(res);
       const rows = Array.isArray(data)
         ? data
         : (Array.isArray(data?.data) ? data.data : (data?.data?.listings || data?.listings || []));
@@ -160,7 +165,7 @@ const Listings: React.FC = () => {
         { headers: headers() }
       );
       if (!res.ok) throw new Error('Teklifler alınamadı');
-      const data = await res.json();
+      const data = await safeJsonParse(res);
       const rows = Array.isArray(data)
         ? data
         : (Array.isArray(data?.data) ? data.data : (data?.data?.bids || data?.bids || []));
@@ -190,7 +195,7 @@ const Listings: React.FC = () => {
                 },
               });
               if (!r.ok) return;
-              const payload = await r.json();
+              const payload = await safeJsonParse(r);
               const summary = payload?.data
                 ? {
                     averageRating: Number(payload.data.averageRating || 0),
@@ -231,8 +236,12 @@ const Listings: React.FC = () => {
         headers: headers(),
       });
       if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Kabul edilemedi');
+        try {
+          const errorData = await safeJsonParse(res);
+          throw new Error((errorData as any)?.message || 'Kabul edilemedi');
+        } catch {
+          throw new Error('Kabul edilemedi');
+        }
       }
       setSuccessMessage('Teklif kabul edildi! İş taşıyıcıya atandı.');
       setShowSuccess(true);

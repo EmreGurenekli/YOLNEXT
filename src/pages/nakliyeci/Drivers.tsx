@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { 
@@ -37,7 +37,7 @@ const driversAPI = {
       },
       body: JSON.stringify(data)
     });
-    return response.json();
+    return await safeJsonParse(response);
   },
   lookup: async (code: string) => {
     const response = await fetch(createApiUrl(`/api/drivers/lookup/${encodeURIComponent(code)}`), {
@@ -46,7 +46,7 @@ const driversAPI = {
         'Content-Type': 'application/json',
       }
     });
-    return response.json();
+    return await safeJsonParse(response);
   },
   delete: async (driverId: string) => {
     const response = await fetch(createApiUrl(`/api/drivers/${driverId}`), {
@@ -56,10 +56,11 @@ const driversAPI = {
         'Content-Type': 'application/json'
       }
     });
-    return response.json();
+    return await safeJsonParse(response);
   }
 };
 import { createApiUrl } from '../../config/api';
+import { safeJsonParse } from '../../utils/safeFetch';
 import LoadingState from '../../components/shared-ui-elements/LoadingState';
 
 const normalizeDriverIdentifier = (raw: string) => {
@@ -200,7 +201,7 @@ const Drivers = () => {
       });
       
       if (response.ok) {
-        const data = await response.json();
+        const data = await safeJsonParse(response);
         // Backend driver response interface (defined before component)
         setDrivers((data.drivers || []).map((d: BackendDriver) => ({
           id: String(d.id),
@@ -297,7 +298,7 @@ const Drivers = () => {
             'Content-Type': 'application/json',
           },
         });
-        const json = await res.json().catch(() => ({}));
+        const json = res.ok ? await safeJsonParse(res).catch(() => ({})) : {};
         if (!res.ok || json.success === false) {
           setLookupData(null);
           setLookupError(json.message || 'Kod bulunamadı');

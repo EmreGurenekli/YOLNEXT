@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 import {
   Truck,
@@ -33,6 +33,7 @@ import Modal from '../../components/shared-ui-elements/Modal';
 import SuccessMessage from '../../components/shared-ui-elements/SuccessMessage';
 import GuidanceOverlay from '../../components/shared-ui-elements/GuidanceOverlay';
 import { createApiUrl } from '../../config/api';
+import { safeJsonParse } from '../../utils/safeFetch';
 import { logger } from '../../utils/logger';
 import { formatCurrency, formatDate, sanitizeAddressLabel, sanitizeShipmentTitle } from '../../utils/format';
 import { normalizeTrackingCode } from '../../utils/trackingCode';
@@ -471,7 +472,7 @@ const Jobs: React.FC = () => {
         body: JSON.stringify(offerData),
       });
 
-      const data = await response.json().catch(() => ({} as any));
+      const data = response.ok ? await safeJsonParse(response).catch(() => ({} as any)) : ({} as any);
       
       if (response.ok) {
         setSuccessMessage(data?.message || 'Teklifiniz başarıyla iletilmiştir. Gönderici tarafından değerlendirilecektir. Kabul edildiğinde ödeme güvence altına alınır ve bildirim alırsınız.');

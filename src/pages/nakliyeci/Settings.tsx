@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useToast } from '../../contexts/ToastContext';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
@@ -47,6 +47,7 @@ import Modal from '../../components/shared-ui-elements/Modal';
 import SuccessMessage from '../../components/shared-ui-elements/SuccessMessage';
 import { useAuth } from '../../contexts/AuthContext';
 import { createApiUrl } from '../../config/api';
+import { safeJsonParse } from '../../utils/safeFetch';
 import { authAPI as authService } from '../../services/apiClient';
 import { TOAST_MESSAGES, showProfessionalToast } from '../../utils/toastMessages';
 
@@ -56,14 +57,14 @@ const kvkkAPI = {
     const response = await fetch(createApiUrl('/api/kvkk/data-access'), {
       headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
     });
-    return response.json();
+    return await safeJsonParse(response);
   },
   deleteData: async () => {
     const response = await fetch(createApiUrl('/api/kvkk/delete-data'), {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
     });
-    return response.json();
+    return await safeJsonParse(response);
   }
 };
 const authAPI = {
@@ -76,7 +77,7 @@ const authAPI = {
       },
       body: JSON.stringify(data)
     });
-    return response.json();
+    return await safeJsonParse(response);
   }
 };
 
@@ -264,7 +265,7 @@ export default function NakliyeciSettings() {
         });
 
         if (response.ok) {
-          const data = await response.json();
+          const data = await safeJsonParse(response);
           if (data.success) {
             setStats(data.data);
           }
@@ -292,7 +293,7 @@ export default function NakliyeciSettings() {
           });
 
           if (res.ok) {
-            const resp = await res.json();
+            const resp = await safeJsonParse(res);
             const profile = resp.data?.user || resp.user || resp.data || resp;
             const code = profile?.nakliyeciCode || profile?.nakliyecicode;
             if (code) {

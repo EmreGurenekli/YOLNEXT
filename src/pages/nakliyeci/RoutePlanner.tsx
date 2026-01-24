@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useSearchParams } from 'react-router-dom';
 import {
@@ -35,6 +35,7 @@ import Breadcrumb from '../../components/shared-ui-elements/Breadcrumb';
 import LoadingState from '../../components/shared-ui-elements/LoadingState';
 import ErrorToast from '../../components/error/ErrorToast';
 import { createApiUrl } from '../../config/api';
+import { safeJsonParse } from '../../utils/safeFetch';
 import { normalizeTrackingCode } from '../../utils/trackingCode';
 import RoutePlannerHeader from '../../components/route/RoutePlannerHeader';
 import RoutePlannerDriverSelector from '../../components/route/RoutePlannerDriverSelector';
@@ -267,7 +268,7 @@ export default function RoutePlanner() {
         throw new Error('Araçlar yüklenemedi');
       }
 
-      const data = await response.json();
+      const data = await safeJsonParse(response);
       // Backend format: { success: true, vehicles: [...] }
       const vehicles = data.vehicles || data.data || [];
       setVehicles(vehicles);
@@ -315,7 +316,7 @@ export default function RoutePlanner() {
         throw new Error('Uygun yükler yüklenemedi');
       }
 
-      const data = await response.json();
+      const data = await safeJsonParse(response);
       // Backend format: { success: true, data: [...] }
       const loads = data.data || data.loads || [];
       setAvailableLoads(loads);
@@ -362,7 +363,7 @@ export default function RoutePlanner() {
         throw new Error('Taşıyıcılar yüklenemedi');
       }
 
-      const data = await response.json();
+      const data = await safeJsonParse(response);
       const driversList = data.drivers || data.data || [];
       setDrivers(driversList);
     } catch (error) {
@@ -390,7 +391,7 @@ export default function RoutePlanner() {
         return null;
       }
 
-      const data = await response.json();
+      const data = await safeJsonParse(response);
       return data.corridor || null;
     } catch (error) {
       if (import.meta.env.DEV) {
@@ -416,7 +417,7 @@ export default function RoutePlanner() {
         throw new Error('Koridor yükleri yüklenemedi');
       }
 
-      const data = await response.json();
+      const data = await safeJsonParse(response);
       setCorridorLoads(data.data || []);
     } catch (error) {
       if (import.meta.env.DEV) {
@@ -476,7 +477,7 @@ export default function RoutePlanner() {
         }),
       });
 
-      const data = await response.json();
+      const data = await safeJsonParse(response);
 
       if (!response.ok || !data.success) {
         throw new Error(data.message || 'Teklif gönderilemedi');
@@ -685,7 +686,7 @@ export default function RoutePlanner() {
               },
             });
             if (res.ok) {
-              const payload = await res.json().catch(() => ({} as any));
+              const payload = res.ok ? await safeJsonParse(res).catch(() => ({} as any)) : ({} as any);
               const row = payload?.data || payload?.shipment || null;
 
               const vType = pickFromObject(row, 'vehicleType', 'vehicle_type');
@@ -1026,7 +1027,7 @@ export default function RoutePlanner() {
         body: JSON.stringify(body),
       });
 
-      const resp = await res.json().catch(() => ({}));
+      const resp = res.ok ? await safeJsonParse(res).catch(() => ({})) : {};
       if (!res.ok || !resp.success) {
         throw new Error(resp.message || 'Rota planı kaydedilemedi');
       }

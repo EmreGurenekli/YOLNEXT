@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import {
   BarChart3,
@@ -14,6 +14,7 @@ import {
 import Breadcrumb from '../../components/shared-ui-elements/Breadcrumb';
 import LoadingState from '../../components/shared-ui-elements/LoadingState';
 import { createApiUrl } from '../../config/api';
+import { safeJsonParse } from '../../utils/safeFetch';
 
 type Period = '7days' | '30days' | '90days' | '1year';
 
@@ -108,9 +109,9 @@ const NakliyeciAnalytics: React.FC = () => {
         fetch(createApiUrl(`/api/analytics/performance?period=${encodeURIComponent(period)}`), { headers }),
       ]);
 
-      const dRaw = dRes.ok ? await dRes.json() : null;
-      const sRaw = sRes.ok ? await sRes.json() : null;
-      const pRaw = pRes.ok ? await pRes.json() : null;
+      const dRaw = dRes.ok ? await safeJsonParse(dRes).catch(() => null) : null;
+      const sRaw = sRes.ok ? await safeJsonParse(sRes).catch(() => null) : null;
+      const pRaw = pRes.ok ? await safeJsonParse(pRes).catch(() => null) : null;
 
       const dashboardData = dRaw?.data || dRaw || null;
       const shipmentsData = sRaw?.data || sRaw || null;
