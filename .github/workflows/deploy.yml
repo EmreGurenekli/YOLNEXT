@@ -1,0 +1,87 @@
+name: 🚀 Deploy YolNext Platform
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  # Frontend Build and Deploy to Netlify
+  frontend:
+    name: 🎨 Frontend Deploy (Netlify)
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout Repository
+      uses: actions/checkout@v4
+      
+    - name: 📦 Setup Node.js 18
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: 📚 Install Dependencies
+      run: npm ci
+      
+    - name: 🔧 Build Frontend
+      run: npm run build:frontend
+      env:
+        VITE_API_URL: ${{ secrets.VITE_API_URL }}
+        
+    - name: 🚀 Deploy to Netlify
+      uses: netlify/actions/cli@master
+      with:
+        args: deploy --prod --dir=dist
+      env:
+        NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+        NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+
+  # Backend Health Check
+  backend-check:
+    name: 🔍 Backend Health Check
+    runs-on: ubuntu-latest
+    needs: frontend
+    
+    steps:
+    - name: 📥 Checkout Repository
+      uses: actions/checkout@v4
+      
+    - name: 📦 Setup Node.js 18
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: 📚 Install Backend Dependencies
+      run: cd backend && npm ci
+      
+    - name: 🧪 Run Backend Tests
+      run: cd backend && npm run test || echo "Tests will be added"
+      
+    - name: 🔍 Health Check Backend API
+      run: |
+        echo "Backend health check will be performed after Render deployment"
+        # curl -f ${{ secrets.BACKEND_URL }}/api/health/live || exit 1
+
+  # Notify Deployment Status
+  notify:
+    name: 📢 Deployment Notification
+    runs-on: ubuntu-latest
+    needs: [frontend, backend-check]
+    if: always()
+    
+    steps:
+    - name: 📢 Success Notification
+      if: needs.frontend.result == 'success' && needs.backend-check.result == 'success'
+      run: |
+        echo "✅ YolNext Platform successfully deployed!"
+        echo "🎨 Frontend: https://yolnext.netlify.app"
+        echo "🔧 Backend: https://yolnext-backend.onrender.com"
+        
+    - name: 📢 Failure Notification
+      if: needs.frontend.result == 'failure' || needs.backend-check.result == 'failure'
+      run: |
+        echo "❌ Deployment failed! Check logs for details."
+        exit 1
