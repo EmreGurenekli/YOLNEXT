@@ -1,4 +1,4 @@
-﻿import React, {
+import React, {
   createContext,
   useContext,
   useState,
@@ -490,10 +490,40 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       setIsLoading(true);
 
-      const response = await authAPI.demoLogin(userType);
-      const apiResponse = response as ApiResponse<{ user: User; token: string }>;
-      const rawUser: any = apiResponse.data?.user || apiResponse.user;
-      const token = apiResponse.data?.token || apiResponse.token;
+      // Demo hesapları - Database olmadan da çalışır
+      const demoUsers: Record<string, any> = {
+        individual: {
+          id: 'demo-individual',
+          email: 'demo-bireysel@yolnext.com',
+          fullName: 'Demo Bireysel Kullanıcı',
+          role: 'individual',
+          isVerified: true
+        },
+        corporate: {
+          id: 'demo-corporate',
+          email: 'demo-kurumsal@yolnext.com', 
+          fullName: 'Demo Kurumsal Kullanıcı',
+          role: 'corporate',
+          isVerified: true
+        },
+        nakliyeci: {
+          id: 'demo-nakliyeci',
+          email: 'demo-nakliyeci@yolnext.com',
+          fullName: 'Demo Nakliyeci',
+          role: 'nakliyeci', 
+          isVerified: true
+        },
+        tasiyici: {
+          id: 'demo-tasiyici',
+          email: 'demo-tasiyici@yolnext.com',
+          fullName: 'Demo Taşıyıcı',
+          role: 'tasiyici',
+          isVerified: true
+        }
+      };
+
+      const rawUser = demoUsers[userType];
+      const token = `demo-token-${userType}-${Date.now()}`;
 
       if (!rawUser || !token) {
         throw new Error('Hızlı giriş başarısız');
