@@ -168,115 +168,67 @@ if (false) { // Completely disable database for now
   }
 }
 
-// Setup middleware (safe mode)
-let middleware, sendEmail, upload;
+// 🚨 EMERGENCY: ALL SETUP DISABLED - ULTRA MINIMAL MODE
+console.log('🚨 EMERGENCY: Middleware, services, guards COMPLETELY DISABLED');
+console.log('🚨 This will help identify if setup code is causing crashes');
 
-try {
-  console.log('🔧 Setting up middleware...');
-  middleware = setupMiddleware(app, pool, JWT_SECRET, FRONTEND_ORIGIN, NODE_ENV);
-  console.log('✅ Middleware setup complete');
-} catch (error) {
-  console.error('❌ Middleware setup failed:', error.message);
-  // Continue without middleware in production
-  middleware = null;
-}
+let middleware = null, sendEmail = null, upload = null;
+let idempotencyGuard = null, requireAdmin = null, writeAuditLog = null, createNotification = null;
 
-try {
-  console.log('🔧 Setting up services...');  
-  const emailService = setupEmailService();
-  sendEmail = emailService.sendEmail;
-  upload = setupFileUpload();
-  console.log('✅ Services setup complete');
-} catch (error) {
-  console.error('❌ Services setup failed:', error.message);
-  // Continue without services in production
-  sendEmail = null;
-  upload = null;
-}
-
-// Setup guards and utilities (safe mode)
-let idempotencyGuard, requireAdmin, writeAuditLog, createNotification;
-
-try {
-  console.log('🔧 Setting up guards...');
-  requireAdmin = setupAdminGuard();
-  createNotification = pool ? createNotificationHelper(pool) : null;
-  console.log('✅ Basic guards setup complete');
-} catch (error) {
-  console.error('❌ Basic guards setup failed:', error.message);
-  requireAdmin = null;
-  createNotification = null;
-}
-
-// Setup async guards and routes (safe mode)
-(async () => {
+if (false) { // All setup disabled
+  // Setup middleware (safe mode)
   try {
-    console.log('🔧 Setting up async guards and routes...');
-    
-    // Only setup async guards if pool is available
-    if (pool) {
-      try {
-        idempotencyGuard = await setupIdempotencyGuard(pool);
-        console.log('✅ Idempotency guard setup complete');
-      } catch (error) {
-        console.error('❌ Idempotency guard failed:', error.message);
-        idempotencyGuard = null;
-      }
-      
-      try {
-        writeAuditLog = await setupAuditLog(pool);
-        console.log('✅ Audit log setup complete');
-      } catch (error) {
-        console.error('❌ Audit log setup failed:', error.message);
-        writeAuditLog = null;
-      }
-    } else {
-      console.log('⚠️ Skipping async guards (no database pool)');
-      idempotencyGuard = null;
-      writeAuditLog = null;
-    }
-    
-    // Setup routes with whatever we have
-    try {
-      setupRoutes(app, pool, middleware, {
-        createNotification,
-        sendEmail,
-        writeAuditLog,
-      }, {
-        idempotencyGuard,
-        upload,
-        requireAdmin,
-      });
-      console.log('✅ Routes setup complete');
-    } catch (routeError) {
-      console.error('❌ Routes setup failed:', routeError.message);
-      if (NODE_ENV === 'production') {
-        console.log('⚠️ Setting up basic routes only...');
-        // Setup basic health check if routes fail
-        app.get('/api/health', (req, res) => {
-          res.json({ 
-            status: 'ok', 
-            message: 'Backend running (limited functionality)',
-            timestamp: new Date().toISOString()
-          });
-        });
-      } else {
-        throw routeError;
-      }
-    }
-    
+    console.log('🔧 Setting up middleware...');
+    middleware = setupMiddleware(app, pool, JWT_SECRET, FRONTEND_ORIGIN, NODE_ENV);
+    console.log('✅ Middleware setup complete');
   } catch (error) {
-    errorLogger.error('Failed to setup async components', { error: error.message });
-    if (NODE_ENV === 'production') {
-      errorLogger.warn('⚠️ Async setup failed in production (continuing with minimal functionality)', { 
-        error: error.message,
-        note: 'Backend will run with very limited functionality'
-      });
-    } else {
-      process.exit(1);
-    }
+    console.error('❌ Middleware setup failed:', error.message);
+    middleware = null;
   }
-})();
+
+  try {
+    console.log('🔧 Setting up services...');  
+    const emailService = setupEmailService();
+    sendEmail = emailService.sendEmail;
+    upload = setupFileUpload();
+    console.log('✅ Services setup complete');
+  } catch (error) {
+    console.error('❌ Services setup failed:', error.message);
+    sendEmail = null;
+    upload = null;
+  }
+
+  // Setup guards and utilities (safe mode)
+  try {
+    console.log('🔧 Setting up guards...');
+    requireAdmin = setupAdminGuard();
+    createNotification = pool ? createNotificationHelper(pool) : null;
+    console.log('✅ Basic guards setup complete');
+  } catch (error) {
+    console.error('❌ Basic guards setup failed:', error.message);
+    requireAdmin = null;
+    createNotification = null;
+  }
+}
+
+// 🚨 EMERGENCY: ASYNC SETUP COMPLETELY DISABLED
+console.log('🚨 EMERGENCY: Async guards and routes COMPLETELY DISABLED');
+
+// Setup basic health check route ONLY
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    message: 'Backend running (ULTRA MINIMAL MODE - all setup disabled)',
+    timestamp: new Date().toISOString(),
+    mode: 'emergency-isolation'
+  });
+});
+
+if (false) { // All async setup disabled
+  (async () => {
+    // Disabled
+  })();
+}
 
 // Serve static uploads
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -486,66 +438,30 @@ if (!IS_TEST) {
 // Start server function and remaining code continues below...
 // (Duplicate middleware, routes, and services code removed - handled by setupMiddleware and setupRoutes)
 
-// Start server
+// 🚨 EMERGENCY: ULTRA MINIMAL startServer - ONLY server.listen()
 async function startServer() {
-  // Database initialization
-  const { createTables, seedData } = require('./database/init');
+  console.log('🚨 EMERGENCY: Ultra minimal startServer - NO database, NO migrations, NO setup');
   
   try {
-    errorLogger.info('Starting Modular PostgreSQL Backend');
-
-    // EMERGENCY: DATABASE TEST COMPLETELY DISABLED
-    console.log('🚨 EMERGENCY: Database connection test DISABLED for crash isolation');
-    console.log('🚨 This will help identify if database operations are causing server crashes');
-    console.log('🚨 Pool status:', pool ? 'EXISTS' : 'NULL');
+    console.log(`🚨 Starting server on port ${PORT} (ULTRA MINIMAL MODE)`);
     
-    if (false && pool && DATABASE_URL) {
-      // All database code temporarily disabled
-      console.log('Database operations disabled');
-    } else {
-      console.log('⚠️ DATABASE OPERATIONS: Completely disabled in emergency mode');
-      errorLogger.warn('Database operations disabled for crash isolation');
-    }
-
-    // 🚨 EMERGENCY: ALL DATABASE OPERATIONS DISABLED
-    console.log('🚨 EMERGENCY: Migrations, table creation, and seeding DISABLED');
-    console.log('🚨 This isolates any database-related crashes during startup');
-    
-    if (false) { // All database initialization disabled
-      // Run migrations (skip if no pool)
-      if (!IS_TEST && NODE_ENV !== 'production' && pool) {
-        console.log('Migrations disabled');
-      }
-      
-      // Initialize database tables (skip if no pool) 
-      if (pool) {
-        console.log('Table creation disabled');
-      }
-
-      // Seed data (development only)
-      if (NODE_ENV !== 'production' && pool) {
-        console.log('Data seeding disabled');
-      }
-    }
-
     server.once('error', (err) => {
+      console.error('❌ Server error:', err.message);
       if (err && err.code === 'EADDRINUSE') {
-        errorLogger.error(`Port ${PORT} is already in use. Stop the other process or change PORT.`);
+        console.error(`Port ${PORT} is already in use`);
         process.exit(1);
       }
-      errorLogger.error('Server failed to start', { error: err.message });
       process.exit(1);
     });
 
     server.listen(PORT, () => {
-      errorLogger.info(`Modular Backend running on http://localhost:${PORT}`, {
-        port: PORT,
-        environment: NODE_ENV,
-        healthCheck: `http://localhost:${PORT}/api/health`
-      });
+      console.log(`✅ SERVER RUNNING on http://localhost:${PORT} (ULTRA MINIMAL MODE)`);
+      console.log(`✅ Health check: http://localhost:${PORT}/api/health`);
+      console.log(`✅ Environment: ${NODE_ENV}`);
     });
   } catch (error) {
-    errorLogger.error('Failed to start server', { error: error.message, stack: error.stack });
+    console.error('❌ CRITICAL: Failed to start server:', error.message);
+    console.error('Stack:', error.stack);
     process.exit(1);
   }
 }
