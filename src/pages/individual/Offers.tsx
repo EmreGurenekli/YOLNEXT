@@ -137,6 +137,7 @@ export default function Offers() {
   const navigateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const paymentModalOpenRef = useRef(false);
   const loadingRef = useRef(false);
+  const hasLoadedOnceRef = useRef(false);
 
   useEffect(() => {
     const userId = (user as any)?.id;
@@ -168,7 +169,11 @@ export default function Offers() {
 
   const loadOffers = useCallback(async () => {
     // Prevent multiple simultaneous calls using ref
-    if (loadingRef.current) return;
+    if (loadingRef.current) {
+      console.log('⏸️ loadOffers: Already loading, skipping...');
+      return;
+    }
+    console.log('🔄 loadOffers: Starting...');
     loadingRef.current = true;
     setIsLoading(true);
     try {
@@ -202,10 +207,13 @@ export default function Offers() {
       clearTimeout(timeoutId);
 
       if (!response.ok) {
-        throw new Error('Teklifler yüklenemedi');
+        const errorText = await response.text();
+        console.error('❌ API Error:', response.status, errorText);
+        throw new Error(`HTTP ${response.status}: Teklifler yüklenemedi`);
       }
 
       const data = await response.json();
+      console.log('📦 API Response:', { status: response.status, dataKeys: Object.keys(data) });
       const rawOffers = data.data || data.offers || (Array.isArray(data) ? data : []);
 
       const rawOffersArray = Array.isArray(rawOffers) ? rawOffers : [];
@@ -287,6 +295,7 @@ export default function Offers() {
         });
       
       // Only pending offers are shown - accepted/rejected are handled elsewhere
+      console.log('✅ Offers loaded:', mappedOffers.length, 'pending offers');
       setOffers(mappedOffers);
       
       setStats({
@@ -298,8 +307,12 @@ export default function Offers() {
         topCarrier: '',
         responseTime: 0,
       });
+      
+      // Clear any previous error messages on success
+      setErrorMessage('');
     } catch (error: any) {
       // Error loading offers - show error with retry option
+      console.error('❌ loadOffers Error:', error);
       setOffers([]);
       setStats({
         totalOffers: 0,
@@ -320,39 +333,57 @@ export default function Offers() {
         errorMsg = 'İnternet bağlantınızı kontrol edin. Bağlantı sorunu giderildikten sonra tekrar deneyin.';
       } else if (error?.response?.status === 500 || error?.status === 500) {
         errorMsg = 'Teklifler şu anda yüklenemiyor. Lütfen birkaç dakika sonra tekrar deneyin.';
+      } else if (error?.message?.includes('401') || error?.message?.includes('401')) {
+        errorMsg = 'Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.';
       }
       
       setErrorMessage(errorMsg);
+      
+      // CRITICAL: Don't retry automatically - prevent infinite loop
+      // User can manually refresh if needed
     } finally {
+      console.log('✅ loadOffers: Completed');
       setIsLoading(false);
       loadingRef.current = false;
     }
   }, []);
 
+  // Load offers only once on mount - STRICT MODE
   useEffect(() => {
+    // Prevent multiple calls even in React Strict Mode
+    if (hasLoadedOnceRef.current) {
+      console.log('⏸️ Offers: Already loaded once, skipping...');
+      return;
+    }
+    console.log('🚀 Offers: Initial load starting...');
+    hasLoadedOnceRef.current = true;
     loadOffers();
-    
-    // Auto-refresh offers every 30 seconds when page is visible
-    const intervalId = setInterval(() => {
-      if (document.visibilityState === 'visible') {
-        loadOffers();
-      }
-    }, 30000);
-    
-    // Listen for real-time updates via custom events
-    const handleRefresh = () => {
-      loadOffers();
-    };
-    
-    window.addEventListener('yolnext:refresh-badges', handleRefresh);
-    window.addEventListener('focus', handleRefresh);
-    
-    return () => {
-      clearInterval(intervalId);
-      window.removeEventListener('yolnext:refresh-badges', handleRefresh);
-      window.removeEventListener('focus', handleRefresh);
-    };
-  }, [loadOffers]);
+  }, []); // EMPTY ARRAY - Only run once on mount
+
+  // Separate effect for auto-refresh (disabled to prevent loops)
+  // useEffect(() => {
+  //   const intervalId = setInterval(() => {
+  //     if (document.visibilityState === 'visible' && !loadingRef.current) {
+  //       loadOffers();
+  //     }
+  //   }, 30000);
+  //   return () => clearInterval(intervalId);
+  // }, []);
+
+  // Separate effect for event listeners (disabled to prevent loops)
+  // useEffect(() => {
+  //   const handleRefresh = () => {
+  //     if (!loadingRef.current) {
+  //       loadOffers();
+  //     }
+  //   };
+  //   window.addEventListener('yolnext:refresh-badges', handleRefresh);
+  //   window.addEventListener('focus', handleRefresh);
+  //   return () => {
+  //     window.removeEventListener('yolnext:refresh-badges', handleRefresh);
+  //     window.removeEventListener('focus', handleRefresh);
+  //   };
+  // }, []);
 
   // Only show pending offers - accepted/rejected should not appear
   const filteredOffers = offers.filter((offer: Offer) => {
