@@ -147,14 +147,19 @@ const app = express();
 app.disable('etag'); // Prevent client/proxy caching of API responses
 const server = createServer(app);
 
-// Create database pool
-let pool;
+// Create database pool (graceful failure in production)
+let pool = null;
 try {
   pool = createDatabasePool(DATABASE_URL, NODE_ENV);
+  errorLogger.info('✅ Database pool created successfully');
 } catch (error) {
   errorLogger.error('Failed to create database pool', { error: error.message });
   if (NODE_ENV === 'production') {
-    process.exit(1);
+    errorLogger.warn('⚠️ Database pool creation failed in production (continuing without database)', { 
+      error: error.message,
+      note: 'Backend will start with limited functionality - API endpoints will be available but database operations will fail'
+    });
+    pool = null; // Explicitly set to null for safety
   } else {
     errorLogger.warn('Continuing in development mode without database (backend may not function correctly)');
   }
@@ -412,41 +417,40 @@ async function startServer() {
   try {
     errorLogger.info('Starting Modular PostgreSQL Backend');
 
-    // Run migrations
-    if (!IS_TEST && NODE_ENV !== 'production') {
+    // Run migrations (skip if no pool)
+    if (!IS_TEST && NODE_ENV !== 'production' && pool) {
       try {
         const migrationRunner = new MigrationRunner(pool);
         await migrationRunner.runMigrations();
+        errorLogger.info('✅ Database migrations completed');
       } catch (e) {
         errorLogger.warn('Could not run migrations automatically (continuing in development)', { error: e?.message || String(e) });
         // In development, continue even if migrations fail
       }
+    } else if (!pool) {
+      errorLogger.warn('⚠️ Skipping database migrations (no database pool available)');
     }
     
-    // Initialize database tables (graceful failure in production)
-    try {
-      const tablesCreated = await createTables(pool);
-      if (!tablesCreated) {
-        if (NODE_ENV === 'production') {
-          errorLogger.warn('Could not create tables (continuing in production with limited functionality)', { 
+    // Initialize database tables (skip if no pool)
+    if (pool) {
+      try {
+        const tablesCreated = await createTables(pool);
+        if (!tablesCreated) {
+          errorLogger.warn('Could not create tables (continuing with limited functionality)', { 
             note: 'Backend may not function correctly without database tables' 
           });
         } else {
-          errorLogger.warn('Could not create tables (continuing in development mode)', { 
-            note: 'Backend may not function correctly without database tables' 
-          });
+          errorLogger.info('✅ Database tables initialized successfully');
         }
-      }
-    } catch (error) {
-      errorLogger.error('Error creating tables:', error);
-      if (NODE_ENV === 'production') {
-        errorLogger.warn('Database table initialization failed (continuing in production)', { 
+      } catch (error) {
+        errorLogger.error('Error creating tables:', error);
+        errorLogger.warn('Database table initialization failed (continuing)', { 
           error: error.message,
           note: 'Backend will start with limited functionality' 
         });
-      } else {
-        errorLogger.warn('Database table initialization failed (continuing in development)', { error: error.message });
       }
+    } else {
+      errorLogger.warn('⚠️ Skipping database table initialization (no database pool available)');
     }
 
     // Seed data (development only)
