@@ -43,11 +43,16 @@
      if (Number.isFinite(max) && max > 0) cfg.max = max;
    }
  
-   // In production with managed DBs, ssl may be required.
-   // Keep it opt-in to avoid breaking local dev.
-   if (String(process.env.PGSSLMODE || '').toLowerCase() === 'require') {
-     cfg.ssl = { rejectUnauthorized: false };
-   }
+  // In production with managed DBs, ssl may be required.
+  // Keep it opt-in to avoid breaking local dev.
+  if (String(process.env.PGSSLMODE || '').toLowerCase() === 'require') {
+    cfg.ssl = { rejectUnauthorized: false };
+  }
+  
+  // Force SSL for Render.com PostgreSQL in production
+  if (process.env.NODE_ENV === 'production' && connectionString && connectionString.includes('render.com')) {
+    cfg.ssl = { rejectUnauthorized: false };
+  }
  
    return cfg;
  }
