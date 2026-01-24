@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+﻿import React, { useState, useEffect, useMemo } from 'react';
 import { Helmet } from 'react-helmet-async';
 import {
   Users,
@@ -41,15 +41,15 @@ import {
   Save,
 } from 'lucide-react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import Breadcrumb from '../../components/common/Breadcrumb';
-import EmptyState from '../../components/common/EmptyState';
-import LoadingState from '../../components/common/LoadingState';
-import Modal from '../../components/common/Modal';
-import SuccessMessage from '../../components/common/SuccessMessage';
-import Pagination from '../../components/common/Pagination';
+import Breadcrumb from '../../components/shared-ui-elements/Breadcrumb';
+import EmptyState from '../../components/shared-ui-elements/EmptyState';
+import LoadingState from '../../components/shared-ui-elements/LoadingState';
+import Modal from '../../components/shared-ui-elements/Modal';
+import SuccessMessage from '../../components/shared-ui-elements/SuccessMessage';
+import Pagination from '../../components/shared-ui-elements/Pagination';
 import RatingModal from '../../components/RatingModal';
-import GuidanceOverlay from '../../components/common/GuidanceOverlay';
-// import { carriersAPI } from '../../services/api';
+import GuidanceOverlay from '../../components/shared-ui-elements/GuidanceOverlay';
+// import { carriersAPI } from '../../services/apiClient';
 // Temporary workaround
 import { createApiUrl } from '../../config/api';
 import { logger } from '../../utils/logger';
@@ -542,7 +542,7 @@ export default function CorporateCarriers() {
                 onClick={() => setViewMode('grid')}
                 className={`p-2 rounded-lg transition-colors ${
                   viewMode === 'grid'
-                    ? 'bg-blue-600 text-white'
+                    ? 'bg-gradient-to-r from-slate-800 to-blue-900 text-white'
                     : 'text-slate-500 hover:bg-slate-100'
                 }`}
               >
@@ -557,7 +557,7 @@ export default function CorporateCarriers() {
                 onClick={() => setViewMode('list')}
                 className={`p-2 rounded-lg transition-colors ${
                   viewMode === 'list'
-                    ? 'bg-blue-600 text-white'
+                    ? 'bg-gradient-to-r from-slate-800 to-blue-900 text-white'
                     : 'text-slate-500 hover:bg-slate-100'
                 }`}
               >
@@ -1354,3 +1354,14 @@ export default function CorporateCarriers() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+

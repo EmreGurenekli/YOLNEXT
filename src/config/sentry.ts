@@ -26,3 +26,12 @@ export const initSentry = async () => {
 
 export default initSentry;
 
+
+
+
+
+
+
+
+
+

@@ -1,4 +1,4 @@
-import React, { ReactNode, useEffect } from 'react';
+﻿import React, { ReactNode, useEffect } from 'react';
 import { AuthProvider } from '../../contexts/AuthContext';
 import { ThemeProvider } from '../../contexts/ThemeContext';
 import { NotificationProvider } from '../../contexts/NotificationContext';
@@ -26,3 +26,14 @@ export const AppProviders: React.FC<AppProvidersProps> = ({ children }) => {
     </ThemeProvider>
   );
 };
+
+
+
+
+
+
+
+
+
+
+

@@ -1,128 +1,50 @@
+﻿/**
+ * 🏠 YOLNEXT FRONTEND APPLICATION ROOT
+ * 
+ * BUSINESS PURPOSE: Single Page Application (SPA) for logistics marketplace
+ * Serves different interfaces based on user type after authentication
+ * 
+ * USER JOURNEYS SUPPORTED:
+ * 👤 Individual Users: Personal shipment management, tracking
+ * 🏢 Corporate Users: Business shipment management, bulk operations
+ * 🚛 Nakliyeci: Logistics companies - view market, manage offers/jobs
+ * 🚚 Tasiyici: Individual carriers - find jobs, manage deliveries  
+ * 👨‍💼 Admin: System management, user oversight, analytics
+ * 
+ * TECHNICAL ARCHITECTURE:
+ * - React 18 with TypeScript for type safety
+ * - Context providers for global state management
+ * - Error boundaries for graceful error handling
+ * - Responsive design (mobile-first approach)
+ * - SEO optimized with React Helmet
+ * 
+ * GLOBAL PROVIDERS (Wrapping all components):
+ * 🔐 AuthProvider - User authentication state, JWT management
+ * 🎨 ThemeProvider - Dark/light mode, UI customization  
+ * 🔔 NotificationProvider - Real-time notifications, WebSocket
+ * 🍞 ToastProvider - Success/error message popups
+ * 🛡️ ErrorBoundary - Catches JavaScript errors, prevents crashes
+ * 
+ * ROUTING STRUCTURE:
+ * /individual/* - Personal user dashboard, shipments, tracking
+ * /corporate/* - Business user interface, bulk operations
+ * /nakliyeci/* - Logistics company interface, market, jobs
+ * /tasiyici/* - Individual carrier interface, available jobs
+ * /admin/* - Administrative panel, system management
+ * /tracking/* - Public tracking (no login required)
+ */
+
 import './App.css';
-import { useEffect } from 'react';
 import { HelmetProvider } from 'react-helmet-async';
 import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 import { ToastProvider } from './contexts/ToastContext';
-import ErrorBoundary from './components/common/ErrorBoundary';
+import ErrorBoundary from './components/shared-ui-elements/ErrorBoundary';
 import { AppRoutes } from './config/routes';
 
 function App() {
 
-  useEffect(() => {
-    if (!(import.meta as any)?.env?.DEV) return;
-    let enabled = false;
-    try {
-      enabled = localStorage.getItem('debug:clicks') === '1';
-    } catch {
-      enabled = false;
-    }
-    if (!enabled) return;
-
-    const summarizeEl = (el: HTMLElement | null) => {
-      if (!el) return null;
-      const cs = window.getComputedStyle(el);
-      return {
-        tag: el.tagName,
-        id: el.id || undefined,
-        className: (el.getAttribute('class') || '').slice(0, 200) || undefined,
-        role: el.getAttribute('role') || undefined,
-        testid: el.getAttribute('data-testid') || undefined,
-        zIndex: cs.zIndex,
-        position: cs.position,
-        pointerEvents: cs.pointerEvents,
-        opacity: cs.opacity,
-      };
-    };
-
-    const summarizePath = (path: EventTarget[] | undefined) => {
-      if (!Array.isArray(path)) return [];
-      return path
-        .filter((x): x is HTMLElement => x instanceof HTMLElement)
-        .slice(0, 8)
-        .map((el) => {
-          const cs = window.getComputedStyle(el);
-          return {
-            tag: el.tagName,
-            id: el.id || undefined,
-            className: (el.getAttribute('class') || '').slice(0, 120) || undefined,
-            zIndex: cs.zIndex,
-            position: cs.position,
-            pointerEvents: cs.pointerEvents,
-          };
-        });
-    };
-
-    const clickHandler = (e: MouseEvent) => {
-      try {
-        const target = e.target as HTMLElement | null;
-        const elAtPoint = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
-
-        const walkOverlay = (start: HTMLElement | null) => {
-          let cur: HTMLElement | null = start;
-          for (let i = 0; i < 8 && cur; i++) {
-            const cs = window.getComputedStyle(cur);
-            const isOverlayLike =
-              (cs.position === 'fixed' || cs.position === 'sticky') &&
-              cs.pointerEvents !== 'none' &&
-              cs.opacity !== '0';
-            if (isOverlayLike) return summarizeEl(cur);
-            cur = cur.parentElement;
-          }
-          return null;
-        };
-
-        const data = {
-          type: e.type,
-          x: e.clientX,
-          y: e.clientY,
-          target: summarizeEl(target),
-          elementFromPoint: summarizeEl(elAtPoint),
-          overlayCandidate: walkOverlay(elAtPoint) || walkOverlay(target),
-        };
-
-        // Debug logları sadece localStorage'da debug:clicks=1 olduğunda göster
-        // if (import.meta.env.DEV) {
-        //   console.log('[debug:clicks]', data);
-        // }
-      } catch {
-        // ignore
-      }
-    };
-
-    const pointerHandler = (e: Event) => {
-      try {
-        const ev = e as MouseEvent;
-        const target = ev.target as HTMLElement | null;
-        const isSelect = target?.tagName === 'SELECT' || target?.closest?.('select');
-        if (!isSelect) return;
-
-        const anyEv = ev as any;
-        const path = typeof anyEv.composedPath === 'function' ? (anyEv.composedPath() as EventTarget[]) : undefined;
-        // Debug logları sadece localStorage'da debug:clicks=1 olduğunda göster
-        // if (import.meta.env.DEV) {
-        //   console.log('[debug:clicks]', {
-        //     type: ev.type,
-        //     defaultPrevented: anyEv.defaultPrevented === true,
-        //     target: summarizeEl(target),
-        //     path: summarizePath(path),
-        //   });
-        // }
-      } catch {
-        // ignore
-      }
-    };
-
-    document.addEventListener('pointerdown', pointerHandler, true);
-    document.addEventListener('mousedown', pointerHandler, true);
-    document.addEventListener('click', clickHandler, true);
-    return () => {
-      document.removeEventListener('pointerdown', pointerHandler, true);
-      document.removeEventListener('mousedown', pointerHandler, true);
-      document.removeEventListener('click', clickHandler, true);
-    };
-  }, []);
 
   return (
     <ErrorBoundary>
@@ -144,4 +66,14 @@ function App() {
 }
 
 export default App;
+
+
+
+
+
+
+
+
+
+
 

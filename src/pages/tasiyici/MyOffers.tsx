@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import {
   CheckCircle,
@@ -10,10 +10,10 @@ import {
   ArrowRight,
   Eye,
 } from 'lucide-react';
-import Breadcrumb from '../../components/common/Breadcrumb';
-import LoadingState from '../../components/common/LoadingState';
+import Breadcrumb from '../../components/shared-ui-elements/Breadcrumb';
+import LoadingState from '../../components/shared-ui-elements/LoadingState';
 import { Link } from 'react-router-dom';
-import GuidanceOverlay from '../../components/common/GuidanceOverlay';
+import GuidanceOverlay from '../../components/shared-ui-elements/GuidanceOverlay';
 import { createApiUrl } from '../../config/api';
 
 interface CarrierOffer {
@@ -291,3 +291,14 @@ const MyOffers: React.FC = () => {
 };
 
 export default MyOffers;
+
+
+
+
+
+
+
+
+
+
+

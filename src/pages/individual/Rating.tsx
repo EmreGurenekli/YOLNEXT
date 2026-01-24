@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import {
@@ -263,7 +263,7 @@ const Rating: React.FC = () => {
                 <button
                   type='submit'
                   disabled={isSubmitting || ratingData.rating === 0}
-                  className='flex-1 bg-blue-600 text-white py-3 px-6 rounded-xl font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2'
+                  className='flex-1 bg-gradient-to-r from-slate-800 to-blue-900 text-white py-3 px-6 rounded-xl font-semibold hover:from-blue-900 hover:to-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2'
                 >
                   {isSubmitting ? (
                     <>
@@ -327,3 +327,14 @@ const Rating: React.FC = () => {
 };
 
 export default Rating;
+
+
+
+
+
+
+
+
+
+
+

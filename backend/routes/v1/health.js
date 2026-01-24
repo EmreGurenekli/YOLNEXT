@@ -1,6 +1,6 @@
 // Health check routes - Modular version
 const express = require('express');
-const { comprehensiveHealthCheck } = require('../../utils/healthCheck');
+const { comprehensiveHealthCheck } = require('../../utils/systemHealthCheck');
 
 function createHealthRoutes(pool) {
   const router = express.Router();

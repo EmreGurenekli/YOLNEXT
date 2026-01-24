@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+﻿import React, { useEffect } from 'react';
 import { XCircle, CheckCircle, AlertCircle, Info } from 'lucide-react';
 
 interface ErrorToastProps {
@@ -80,3 +80,14 @@ const ErrorToast: React.FC<ErrorToastProps> = ({
 };
 
 export default ErrorToast;
+
+
+
+
+
+
+
+
+
+
+

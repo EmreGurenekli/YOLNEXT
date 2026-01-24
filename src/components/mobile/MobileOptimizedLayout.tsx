@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Menu, X, Bell, User } from 'lucide-react';
 
@@ -55,7 +55,7 @@ export default function MobileOptimizedLayout({
         <div className='flex justify-around'>
           <button className='flex flex-col items-center py-2 px-3 text-blue-600'>
             <div className='w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center'>
-              <div className='w-2 h-2 bg-blue-600 rounded-full'></div>
+              <div className='w-2 h-2 bg-gradient-to-r from-slate-800 to-blue-900 rounded-full'></div>
             </div>
             <span className='text-xs mt-1'>Ana Sayfa</span>
           </button>
@@ -76,3 +76,14 @@ export default function MobileOptimizedLayout({
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+

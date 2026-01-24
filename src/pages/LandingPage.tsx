@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import {
   Truck,
@@ -34,9 +34,9 @@ import {
   UserCheck,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import YolNextLogo from '../components/common/yolnextLogo';
-import Footer from '../components/common/Footer';
-import { analytics } from '../services/analytics';
+import YolNextLogo from '../components/shared-ui-elements/yolnextLogo';
+import Footer from '../components/shared-ui-elements/Footer';
+import { analytics } from '../services/businessAnalytics';
 
 const personaPanels = [
     {
@@ -822,7 +822,7 @@ const LandingPage: React.FC = () => {
                     }`}
                   >
                     <div className={`mb-4 flex h-12 w-12 items-center justify-center rounded-2xl transition-colors ${
-                      isSelected ? 'bg-blue-600' : 'bg-slate-100'
+                      isSelected ? 'bg-gradient-to-r from-slate-800 to-blue-900' : 'bg-slate-100'
                     }`}>
                       <panel.icon className={`h-6 w-6 ${isSelected ? 'text-white' : 'text-slate-900'}`} />
                   </div>
@@ -955,7 +955,7 @@ const LandingPage: React.FC = () => {
                   )}
                   <div className='rounded-3xl border border-white/15 bg-white/5 p-6 backdrop-blur hover:bg-white/10 hover:-translate-y-2 transition-all duration-300'>
                     <div className={`mb-4 flex h-14 w-14 items-center justify-center rounded-2xl text-white text-xl font-bold shadow-lg ${
-                      step.color === 'blue' ? 'bg-blue-600' :
+                      step.color === 'blue' ? 'bg-gradient-to-r from-slate-800 to-blue-900' :
                       step.color === 'green' ? 'bg-green-600' :
                       step.color === 'purple' ? 'bg-purple-600' :
                       step.color === 'orange' ? 'bg-orange-600' :
@@ -1292,4 +1292,15 @@ const LandingPage: React.FC = () => {
 };
 
 export default LandingPage;
+
+
+
+
+
+
+
+
+
+
+
 

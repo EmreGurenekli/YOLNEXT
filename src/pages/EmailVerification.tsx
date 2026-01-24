@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 
 const EmailVerification = () => {
   return (
@@ -14,3 +14,14 @@ const EmailVerification = () => {
 };
 
 export default EmailVerification;
+
+
+
+
+
+
+
+
+
+
+

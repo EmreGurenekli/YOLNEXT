@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 import {
   History as HistoryIcon,
@@ -23,8 +23,8 @@ import {
 import { Link } from 'react-router-dom';
 import { createApiUrl } from '../../config/api';
 import { useAuth } from '../../contexts/AuthContext';
-import Pagination from '../../components/common/Pagination';
-import Breadcrumb from '../../components/common/Breadcrumb';
+import Pagination from '../../components/shared-ui-elements/Pagination';
+import Breadcrumb from '../../components/shared-ui-elements/Breadcrumb';
 import { sanitizeShipmentTitle } from '../../utils/format';
 import { logger } from '../../utils/logger';
 import { normalizeTrackingCode } from '../../utils/trackingCode';
@@ -565,3 +565,14 @@ const IndividualHistory: React.FC = () => {
 };
 
 export default IndividualHistory;
+
+
+
+
+
+
+
+
+
+
+

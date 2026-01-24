@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import {
   Star,
   Users,
@@ -170,7 +170,7 @@ const CaseStudies: React.FC = () => {
                   onClick={() => setSelectedCategory(category.id)}
                   className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                     selectedCategory === category.id
-                      ? 'bg-blue-600 text-white'
+                      ? 'bg-gradient-to-r from-slate-800 to-blue-900 text-white'
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
                 >
@@ -273,7 +273,7 @@ const CaseStudies: React.FC = () => {
 
                   <button
                     onClick={() => setSelectedCase(caseStudy)}
-                    className='w-full bg-blue-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center justify-center'
+                    className='w-full bg-gradient-to-r from-slate-800 to-blue-900 text-white py-2 px-4 rounded-lg font-medium hover:from-blue-900 hover:to-slate-800 transition-colors flex items-center justify-center'
                   >
                     Detayları Gör
                     <ArrowRight className='w-4 h-4 ml-2' />
@@ -435,3 +435,14 @@ const CaseStudies: React.FC = () => {
 };
 
 export default CaseStudies;
+
+
+
+
+
+
+
+
+
+
+

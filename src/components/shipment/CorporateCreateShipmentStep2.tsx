@@ -1,4 +1,4 @@
-// CorporateCreateShipmentStep2.tsx
+﻿// CorporateCreateShipmentStep2.tsx
 // Step 2 component for Corporate CreateShipment page - Address Information
 // Used in: src/pages/corporate/CreateShipment.tsx
 
@@ -288,4 +288,15 @@ export default function CorporateCreateShipmentStep2({
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
 

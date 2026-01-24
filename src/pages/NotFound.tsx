@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import {
@@ -41,7 +41,7 @@ export default function NotFoundPage() {
         <div className='flex flex-col sm:flex-row gap-4 justify-center mb-8'>
           <Link
             to='/'
-            className='inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-medium'
+            className='inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-slate-800 to-blue-900 text-white rounded-xl hover:from-blue-900 hover:to-slate-800 transition-colors font-medium'
           >
             <Home className='w-5 h-5' />
             Ana Sayfaya Dön
@@ -131,3 +131,14 @@ export default function NotFoundPage() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+

@@ -1,4 +1,4 @@
-  import React, { useState, useEffect, useRef } from 'react';
+﻿  import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useAuth } from '../../contexts/AuthContext';
@@ -31,15 +31,15 @@ import {
   Route,
   Star,
 } from 'lucide-react';
-import Breadcrumb from '../../components/common/Breadcrumb';
-import EmptyState from '../../components/common/EmptyState';
-import LoadingState from '../../components/common/LoadingState';
-import GuidanceOverlay from '../../components/common/GuidanceOverlay';
+import Breadcrumb from '../../components/shared-ui-elements/Breadcrumb';
+import EmptyState from '../../components/shared-ui-elements/EmptyState';
+import LoadingState from '../../components/shared-ui-elements/LoadingState';
+import GuidanceOverlay from '../../components/shared-ui-elements/GuidanceOverlay';
 import { normalizeTrackingCode } from '../../utils/trackingCode';
 import { logger } from '../../utils/logger';
-import Pagination from '../../components/common/Pagination';
-import Modal from '../../components/common/Modal';
-import SuccessMessage from '../../components/common/SuccessMessage';
+import Pagination from '../../components/shared-ui-elements/Pagination';
+import Modal from '../../components/shared-ui-elements/Modal';
+import SuccessMessage from '../../components/shared-ui-elements/SuccessMessage';
 import MessagingModal from '../../components/MessagingModal';
 import RatingModal from '../../components/RatingModal';
 import TrackingModal from '../../components/TrackingModal';
@@ -1075,7 +1075,7 @@ const ActiveShipments = () => {
                             setAssignMode('listing');
                             setShowAssignModal(true);
                           }}
-                          className='w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-3 sm:px-4 py-2 sm:py-3 rounded-lg font-medium transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center gap-2 text-sm sm:text-base'
+                          className='w-full bg-gradient-to-r from-slate-800 to-blue-900 hover:from-blue-700 hover:to-indigo-700 text-white px-3 sm:px-4 py-2 sm:py-3 rounded-lg font-medium transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center gap-2 text-sm sm:text-base'
                         >
                           <FilePlus2 className='w-4 h-4' />
                           Teklifleri Yönet
@@ -1515,3 +1515,14 @@ const ActiveShipments = () => {
 };
 
 export default ActiveShipments;
+
+
+
+
+
+
+
+
+
+
+

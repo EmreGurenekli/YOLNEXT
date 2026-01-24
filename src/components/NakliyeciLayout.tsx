@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { Outlet } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import NakliyeciSidebar from './navigation/NakliyeciSidebar';
@@ -23,3 +23,14 @@ const NakliyeciLayout: React.FC = () => {
 };
 
 export default NakliyeciLayout;
+
+
+
+
+
+
+
+
+
+
+

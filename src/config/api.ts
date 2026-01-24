@@ -1,5 +1,41 @@
 
-// API Configuration
+/**
+ * 🔌 API CONFIGURATION - FRONTEND ↔ BACKEND COMMUNICATION
+ * 
+ * BUSINESS PURPOSE: Manages all HTTP communication between React frontend and Node.js backend
+ * Critical for all business operations: auth, shipments, offers, tracking, payments
+ * 
+ * ENVIRONMENT HANDLING:
+ * 🏗️ Development: Uses Vite proxy to forward /api/* to localhost:5000
+ * 🚀 Production: Connects to deployed backend (Render.com, AWS, etc.)
+ * 🧪 Test: Isolated test environment for automated testing
+ * 
+ * KEY BUSINESS ENDPOINTS:
+ * 
+ * 🔐 AUTHENTICATION (/api/auth/*)
+ * - /login, /register - User onboarding (critical conversion funnel)
+ * - /demo-login - Demo access for prospects
+ * - /forgot-password - Account recovery (reduces support load)
+ * 
+ * 📦 SHIPMENT MANAGEMENT (/api/shipments/*)
+ * - /shipments - CRUD operations for cargo shipments (core business)
+ * - /shipments/open - Public marketplace for carriers to browse
+ * - /shipments/offers - Carrier bidding system (revenue generation)
+ * 
+ * 💰 OFFER SYSTEM (/api/offers/*)
+ * - /offers - Carrier price quotes (competitive marketplace)
+ * - /offers/:id/accept - Revenue-generating transaction completion
+ * 
+ * 👥 USER MANAGEMENT (/api/users/*)
+ * - /profile - Account management (user retention)
+ * - /kvkk/* - GDPR compliance (legal requirement in Turkey)
+ * 
+ * TECHNICAL FEATURES:
+ * ⚡ Retry logic for network resilience (3-5 attempts based on env)
+ * ⏱️ Timeout configuration (10-15s based on criticality)
+ * 🛡️ Environment-aware security (dev vs prod)
+ * 📱 Cross-platform compatibility (web, mobile-web)
+ */
 const API_CONFIG = {
   // Development
   development: {
@@ -149,3 +185,12 @@ export default {
   createApiUrl,
   API_ENDPOINTS,
 };
+
+
+
+
+
+
+
+
+

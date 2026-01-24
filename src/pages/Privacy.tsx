@@ -1,9 +1,9 @@
-import React from 'react';
+﻿import React from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import { Shield, ArrowLeft, Lock } from 'lucide-react';
-import YolNextLogo from '../components/common/yolnextLogo';
-import Footer from '../components/common/Footer';
+import YolNextLogo from '../components/shared-ui-elements/yolnextLogo';
+import Footer from '../components/shared-ui-elements/Footer';
 import { LEGAL_CONTACT } from '../config/legal';
 
 const Privacy = () => {
@@ -205,3 +205,14 @@ const Privacy = () => {
 };
 
 export default Privacy;
+
+
+
+
+
+
+
+
+
+
+

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+﻿import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useSearchParams } from 'react-router-dom';
 import {
@@ -31,8 +31,8 @@ import {
   Settings,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import Breadcrumb from '../../components/common/Breadcrumb';
-import LoadingState from '../../components/common/LoadingState';
+import Breadcrumb from '../../components/shared-ui-elements/Breadcrumb';
+import LoadingState from '../../components/shared-ui-elements/LoadingState';
 import ErrorToast from '../../components/error/ErrorToast';
 import { createApiUrl } from '../../config/api';
 import { normalizeTrackingCode } from '../../utils/trackingCode';
@@ -1220,7 +1220,7 @@ export default function RoutePlanner() {
                 <button
                   onClick={handleSubmitOffer}
                   disabled={submittingOffer || !offerPrice}
-                  className='flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors'
+                  className='flex-1 px-4 py-2 bg-gradient-to-r from-slate-800 to-blue-900 text-white rounded-lg hover:from-blue-900 hover:to-slate-800 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors'
                 >
                   {submittingOffer ? 'Gönderiliyor...' : 'Teklif Gönder'}
                 </button>
@@ -1241,3 +1241,14 @@ export default function RoutePlanner() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+

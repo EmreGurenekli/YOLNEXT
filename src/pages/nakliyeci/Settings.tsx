@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useToast } from '../../contexts/ToastContext';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
@@ -40,14 +40,14 @@ import {
   ArrowRight,
   FileText,
 } from 'lucide-react';
-import Breadcrumb from '../../components/common/Breadcrumb';
-import EmptyState from '../../components/common/EmptyState';
-import LoadingState from '../../components/common/LoadingState';
-import Modal from '../../components/common/Modal';
-import SuccessMessage from '../../components/common/SuccessMessage';
+import Breadcrumb from '../../components/shared-ui-elements/Breadcrumb';
+import EmptyState from '../../components/shared-ui-elements/EmptyState';
+import LoadingState from '../../components/shared-ui-elements/LoadingState';
+import Modal from '../../components/shared-ui-elements/Modal';
+import SuccessMessage from '../../components/shared-ui-elements/SuccessMessage';
 import { useAuth } from '../../contexts/AuthContext';
 import { createApiUrl } from '../../config/api';
-import { authAPI as authService } from '../../services/api';
+import { authAPI as authService } from '../../services/apiClient';
 import { TOAST_MESSAGES, showProfessionalToast } from '../../utils/toastMessages';
 
 // Temporary workaround
@@ -720,7 +720,7 @@ export default function NakliyeciSettings() {
                               <div className='grid grid-cols-2 sm:grid-cols-4 gap-2'>
                                 <button
                                   onClick={() => shareToSocial('facebook')}
-                                  className='flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all duration-200 shadow-md hover:shadow-lg font-medium text-sm'
+                                  className='flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-slate-800 to-blue-900 hover:from-blue-900 hover:to-slate-800 text-white rounded-lg transition-all duration-200 shadow-md hover:shadow-lg font-medium text-sm'
                                 >
                                   <Facebook className='w-4 h-4' />
                                   <span className='hidden sm:inline'>Facebook</span>
@@ -900,7 +900,7 @@ export default function NakliyeciSettings() {
                         <button
                           onClick={handleSave}
                           disabled={isLoading}
-                          className='px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg font-semibold transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed'
+                          className='px-6 py-3 bg-gradient-to-r from-slate-800 to-blue-900 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg font-semibold transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed'
                         >
                           {isLoading ? 'Kaydediliyor...' : 'Kaydet'}
                         </button>
@@ -982,3 +982,13 @@ export default function NakliyeciSettings() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+

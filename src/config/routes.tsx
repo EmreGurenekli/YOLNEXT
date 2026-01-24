@@ -1,6 +1,57 @@
-/**
- * Route Configuration
- * Centralized route definitions for the application
+﻿/**
+ * 🛣️ YOLNEXT APPLICATION ROUTES - BUSINESS STRUCTURE DEFINITION
+ * 
+ * BUSINESS PURPOSE: Defines the complete application structure and user journeys
+ * Maps URLs to business functions for different user types in logistics marketplace
+ * 
+ * ROUTE ARCHITECTURE BY USER TYPE:
+ * 
+ * 🌐 PUBLIC ROUTES (No authentication required):
+ * / - Landing page with platform overview
+ * /login, /register - User onboarding
+ * /tracking - Public shipment tracking (key customer feature)
+ * /about, /contact - Marketing and support pages
+ * /terms, /privacy - Legal compliance (KVKK, GDPR)
+ * 
+ * 👤 INDIVIDUAL USER ROUTES (/individual/*):
+ * /dashboard - Personal shipment overview and statistics
+ * /create-shipment - Create new cargo shipment (core feature)
+ * /my-shipments - Manage all shipments (most used page)
+ * /live-tracking - Real-time shipment tracking
+ * /profile - Account management
+ * /help, /support - Customer service
+ * 
+ * 🏢 CORPORATE USER ROUTES (/corporate/*):
+ * Similar to individual but with business features:
+ * - Bulk shipment operations
+ * - Company branding
+ * - Invoice management
+ * - Team management
+ * 
+ * 🚛 NAKLIYECI ROUTES (/nakliyeci/* - Logistics Companies):
+ * /dashboard - Business analytics, earnings overview
+ * /market - Browse available shipments (key revenue source)
+ * /my-offers - Manage price quotes to customers
+ * /active-jobs - Current assigned shipments
+ * /settings - Company profile, vehicle fleet
+ * 
+ * 🚚 TASIYICI ROUTES (/tasiyici/* - Individual Carriers):
+ * /dashboard - Personal earnings, performance metrics  
+ * /jobs - Available pickup/delivery jobs
+ * /active-jobs - Current assignments
+ * /profile - Driver profile, vehicle info
+ * 
+ * 👨‍💼 ADMIN ROUTES (/admin/* - Platform Management):
+ * /dashboard - System overview, key metrics
+ * /users - User management, verification
+ * /shipments - All platform shipments, dispute resolution
+ * /operations - System maintenance, monitoring
+ * 
+ * SECURITY MODEL:
+ * - Public routes accessible to everyone
+ * - Protected routes require JWT authentication
+ * - Role-based access control (RBAC) by user type
+ * - Admin routes require special admin permissions
  */
 
 import { Routes, Route, Navigate } from 'react-router-dom';
@@ -34,7 +85,7 @@ import MobileOptimizedLayout from '../components/mobile/MobileOptimizedLayout';
 import ProtectedRoute from '../components/auth/ProtectedRoute';
 import AdminGuard from '../components/admin/AdminGuard';
 import AdminLayout from '../components/admin/AdminLayout';
-import CookieConsentBanner from '../components/common/CookieConsentBanner';
+import CookieConsentBanner from '../components/shared-ui-elements/CookieConsentBanner';
 import OnboardingWizard from '../components/onboarding/OnboardingWizard';
 import CostCalculator from '../components/calculators/CostCalculator';
 import CaseStudies from '../components/case-studies/CaseStudies';
@@ -85,7 +136,7 @@ import TasiyiciSettings from '../pages/tasiyici/Settings';
 import TasiyiciActiveJobs from '../pages/tasiyici/ActiveJobs';
 import TasiyiciCompletedJobs from '../pages/tasiyici/CompletedJobs';
 import TasiyiciMarket from '../pages/tasiyici/Market';
-import TasiyiciIslerim from '../pages/tasiyici/Islerim';
+import TasiyiciIslerim from '../pages/tasiyici/MyCarrierJobs';
 import TasiyiciHelp from '../pages/tasiyici/Help';
 
 // Admin pages
@@ -95,7 +146,7 @@ import AdminIndexRedirect from '../pages/admin/IndexRedirect';
 import AdminOps from '../pages/admin/Ops';
 import AdminOperations from '../pages/admin/Operations';
 import AdminDashboard from '../pages/admin/Dashboard';
-import AdminCases from '../pages/admin/Cases';
+import AdminCases from '../pages/admin/DisputeCases';
 import AdminFlags from '../pages/admin/Flags';
 import AdminSupportManagement from '../pages/admin/SupportManagement';
 import { useParams } from 'react-router-dom';
@@ -273,3 +324,13 @@ export const AppRoutes: React.FC = () => {
     </>
   );
 };
+
+
+
+
+
+
+
+
+
+

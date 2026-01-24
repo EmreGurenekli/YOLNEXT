@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 import {
   DollarSign,
@@ -29,14 +29,14 @@ import {
   TrendingUp,
   TrendingDown,
 } from 'lucide-react';
-import Breadcrumb from '../../components/common/Breadcrumb';
-import EmptyState from '../../components/common/EmptyState';
-import LoadingState from '../../components/common/LoadingState';
-import Modal from '../../components/common/Modal';
-import SuccessMessage from '../../components/common/SuccessMessage';
+import Breadcrumb from '../../components/shared-ui-elements/Breadcrumb';
+import EmptyState from '../../components/shared-ui-elements/EmptyState';
+import LoadingState from '../../components/shared-ui-elements/LoadingState';
+import Modal from '../../components/shared-ui-elements/Modal';
+import SuccessMessage from '../../components/shared-ui-elements/SuccessMessage';
 import { resolveShipmentRoute } from '../../utils/shipmentRoute';
-import Pagination from '../../components/common/Pagination';
-import GuidanceOverlay from '../../components/common/GuidanceOverlay';
+import Pagination from '../../components/shared-ui-elements/Pagination';
+import GuidanceOverlay from '../../components/shared-ui-elements/GuidanceOverlay';
 import { createApiUrl } from '../../config/api';
 import { useNavigate } from 'react-router-dom';
 import { normalizeTrackingCode } from '../../utils/trackingCode';
@@ -947,7 +947,7 @@ export default function NakliyeciOffers() {
                       <>
                         <button
                           onClick={() => handleEditClick(offer)}
-                          className='px-3 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-lg text-sm font-medium transition-all duration-200 shadow-md hover:shadow-lg flex items-center gap-1'
+                          className='px-3 py-2 bg-gradient-to-r from-slate-800 to-blue-900 hover:from-blue-900 hover:to-slate-800 text-white rounded-lg text-sm font-medium transition-all duration-200 shadow-md hover:shadow-lg flex items-center gap-1'
                           title='Teklifi düzenle'
                         >
                           <Edit className='w-4 h-4' />
@@ -1151,7 +1151,7 @@ export default function NakliyeciOffers() {
               </button>
               <button
                 onClick={handleEditSubmit}
-                className='px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors'
+                className='px-4 py-2 bg-gradient-to-r from-slate-800 to-blue-900 text-white rounded-lg hover:from-blue-900 hover:to-slate-800 transition-colors'
               >
                 Kaydet
               </button>
@@ -1239,7 +1239,7 @@ export default function NakliyeciOffers() {
             <div className='flex justify-end'>
               <button
                 onClick={handleCommissionAcknowledge}
-                className='px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors'
+                className='px-4 py-2 bg-gradient-to-r from-slate-800 to-blue-900 text-white rounded-lg hover:from-blue-900 hover:to-slate-800 transition-colors'
               >
                 Anladım
               </button>
@@ -1259,5 +1259,16 @@ export default function NakliyeciOffers() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
 
 

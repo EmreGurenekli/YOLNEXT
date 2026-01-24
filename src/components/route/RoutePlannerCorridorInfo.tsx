@@ -1,4 +1,4 @@
-// RoutePlannerCorridorInfo.tsx
+﻿// RoutePlannerCorridorInfo.tsx
 // Corridor info component for Route Planner page - displays active corridor information
 // Used in: src/pages/nakliyeci/RoutePlanner.tsx
 
@@ -66,4 +66,15 @@ export default function RoutePlannerCorridorInfo({
 
   return null;
 }
+
+
+
+
+
+
+
+
+
+
+
 

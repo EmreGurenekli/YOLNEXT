@@ -126,3 +126,12 @@ export interface RegisterData {
   };
   acceptTerms: boolean;
 }
+
+
+
+
+
+
+
+
+

@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 
 const SMSVerification = () => {
   return (
@@ -12,3 +12,14 @@ const SMSVerification = () => {
 };
 
 export default SMSVerification;
+
+
+
+
+
+
+
+
+
+
+

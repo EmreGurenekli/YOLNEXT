@@ -1,4 +1,4 @@
-// JobsHeader.tsx
+﻿// JobsHeader.tsx
 // Header component for Jobs page (nakliyeci) - displays title and description
 // Used in: src/pages/nakliyeci/Jobs.tsx
 
@@ -25,4 +25,15 @@ export default function JobsHeader() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
 

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+﻿import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import {
@@ -29,7 +29,7 @@ import {
   X,
   MessageSquare,
 } from 'lucide-react';
-import Breadcrumb from '../../components/common/Breadcrumb';
+import Breadcrumb from '../../components/shared-ui-elements/Breadcrumb';
 import { createApiUrl } from '../../config/api';
 import { useToast } from '../../contexts/ToastContext';
 import { showProfessionalToast } from '../../utils/toastMessages';
@@ -725,7 +725,7 @@ const NakliyeciHelp = () => {
                 <button
                   type="submit"
                   disabled={loading}
-                  className='w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-3 px-4 rounded-lg font-medium hover:from-blue-700 hover:to-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2'
+                  className='w-full bg-gradient-to-r from-slate-800 to-blue-900 text-white py-3 px-4 rounded-lg font-medium hover:from-blue-700 hover:to-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2'
                 >
                   {loading ? (
                     <>
@@ -775,3 +775,14 @@ const NakliyeciHelp = () => {
 };
 
 export default NakliyeciHelp;
+
+
+
+
+
+
+
+
+
+
+

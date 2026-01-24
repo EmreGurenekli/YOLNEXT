@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { 
   MessageSquare, 
@@ -477,7 +477,7 @@ const SupportManagement: React.FC = () => {
                       <button
                         onClick={sendResponse}
                         disabled={!responseForm.message.trim()}
-                        className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                        className="bg-gradient-to-r from-slate-800 to-blue-900 text-white px-6 py-2 rounded-lg hover:from-blue-900 hover:to-slate-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                       >
                         <Send className="w-4 h-4" />
                         Gönder
@@ -507,3 +507,14 @@ const SupportManagement: React.FC = () => {
 };
 
 export default SupportManagement;
+
+
+
+
+
+
+
+
+
+
+

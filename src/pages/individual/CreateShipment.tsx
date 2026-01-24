@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
@@ -20,8 +20,8 @@ import {
   X,
   ShoppingCart
 } from 'lucide-react';
-import Breadcrumb from '../../components/common/Breadcrumb';
-import SuccessMessage from '../../components/common/SuccessMessage';
+import Breadcrumb from '../../components/shared-ui-elements/Breadcrumb';
+import SuccessMessage from '../../components/shared-ui-elements/SuccessMessage';
 import { turkeyCities } from '../../data/turkey-cities-districts';
 import { useAuth } from '../../contexts/AuthContext';
 import { normalizeTrackingCode } from '../../utils/trackingCode';
@@ -48,7 +48,7 @@ interface ShipmentData {
 }
 
 import { createApiUrl } from '../../config/api';
-import { shipmentAPI } from '../../services/api';
+import { shipmentAPI } from '../../services/apiClient';
 import CreateShipmentStep1 from '../../components/shipment/CreateShipmentStep1';
 import CreateShipmentStep2 from '../../components/shipment/CreateShipmentStep2';
 import CreateShipmentStep3 from '../../components/shipment/CreateShipmentStep3';
@@ -702,3 +702,13 @@ export default function CreateShipment() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+

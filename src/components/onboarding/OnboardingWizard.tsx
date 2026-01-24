@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import {
   CheckCircle,
   ArrowRight,
@@ -223,7 +223,7 @@ const OnboardingWizard: React.FC = () => {
           </div>
 
           <div className='space-y-4'>
-            <button className='w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-blue-700 transition-colors'>
+            <button className='w-full bg-gradient-to-r from-slate-800 to-blue-900 text-white py-3 px-6 rounded-lg font-medium hover:from-blue-900 hover:to-slate-800 transition-colors'>
               Dashboard'a Git
             </button>
             <button className='w-full bg-gray-100 text-gray-700 py-3 px-6 rounded-lg font-medium hover:bg-gray-200 transition-colors'>
@@ -329,7 +329,7 @@ const OnboardingWizard: React.FC = () => {
               <button
                 onClick={handleNext}
                 disabled={currentStep === 1 && !userType}
-                className='flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors'
+                className='flex items-center px-6 py-3 bg-gradient-to-r from-slate-800 to-blue-900 text-white rounded-lg hover:from-blue-900 hover:to-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors'
               >
                 İleri
                 <ArrowRight className='w-4 h-4 ml-2' />
@@ -343,3 +343,14 @@ const OnboardingWizard: React.FC = () => {
 };
 
 export default OnboardingWizard;
+
+
+
+
+
+
+
+
+
+
+

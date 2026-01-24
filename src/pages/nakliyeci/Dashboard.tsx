@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
-import { dashboardAPI, notificationAPI, shipmentAPI } from '../../services/api';
+import { dashboardAPI, notificationAPI, shipmentAPI } from '../../services/apiClient';
 import { createApiUrl } from '../../config/api';
-import NotificationModal from '../../components/modals/NotificationModal';
+import NotificationModal from '../../components/dialog-windows/NotificationModal';
 import {
   Package,
   CheckCircle2,
@@ -41,9 +41,9 @@ import {
   Copy,
   CheckCircle,
 } from 'lucide-react';
-import Breadcrumb from '../../components/common/Breadcrumb';
-import EmptyState from '../../components/common/EmptyState';
-import LoadingState from '../../components/common/LoadingState';
+import Breadcrumb from '../../components/shared-ui-elements/Breadcrumb';
+import EmptyState from '../../components/shared-ui-elements/EmptyState';
+import LoadingState from '../../components/shared-ui-elements/LoadingState';
 import { normalizeTrackingCode } from '../../utils/trackingCode';
 import { formatDate } from '../../utils/format';
 import { logger } from '../../utils/logger';
@@ -357,7 +357,7 @@ const Dashboard = () => {
             <Link to='/nakliyeci/jobs'>
               <div className='group bg-white rounded-2xl p-6 shadow-lg border border-slate-200 hover:shadow-xl hover:border-blue-300 transition-all duration-300 hover:-translate-y-2'>
                 <div className='flex flex-col items-center text-center'>
-                  <div className='w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-800 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300 mb-4'>
+                  <div className='w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300 mb-4'>
                     <Target className='w-6 h-6 text-white' />
                   </div>
                   <h3 className='text-lg font-bold text-slate-900 mb-2'>
@@ -366,7 +366,7 @@ const Dashboard = () => {
                   <p className='text-sm text-slate-600'>
                     Açık ilanlar ve teklifler
                   </p>
-                  <div className='mt-3 w-8 h-1 bg-blue-600 rounded-full group-hover:w-12 transition-all duration-300'></div>
+                  <div className='mt-3 w-8 h-1 bg-gradient-to-r from-slate-800 to-blue-900 rounded-full group-hover:w-12 transition-all duration-300'></div>
                 </div>
               </div>
             </Link>
@@ -552,3 +552,13 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
+
+
+
+
+
+
+
+
+
+

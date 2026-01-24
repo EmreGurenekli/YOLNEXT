@@ -1,14 +1,14 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { createApiUrl } from '../../config/api';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import { Clock, MapPin, DollarSign, Truck, CheckCircle, ArrowRight, Package, Search, CheckCircle2, Navigation, Wifi, WifiOff, XCircle } from 'lucide-react';
 import { useToast } from '../../contexts/ToastContext';
 import { TOAST_MESSAGES, showProfessionalToast } from '../../utils/toastMessages';
-import Breadcrumb from '../../components/common/Breadcrumb';
-import LoadingState from '../../components/common/LoadingState';
-import Modal from '../../components/common/Modal';
-import GuidanceOverlay from '../../components/common/GuidanceOverlay';
+import Breadcrumb from '../../components/shared-ui-elements/Breadcrumb';
+import LoadingState from '../../components/shared-ui-elements/LoadingState';
+import Modal from '../../components/shared-ui-elements/Modal';
+import GuidanceOverlay from '../../components/shared-ui-elements/GuidanceOverlay';
 import TrackingModal from '../../components/TrackingModal';
 
 const ActiveJobs: React.FC = () => {
@@ -681,7 +681,7 @@ const ActiveJobs: React.FC = () => {
                       <button
                         onClick={() => updateJobStatus(job.id, 'in_transit')}
                         disabled={updatingStatus[job.id]}
-                        className='w-full px-3 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg font-bold text-sm transition-all duration-300 flex items-center justify-center gap-2 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed'
+                        className='w-full px-3 py-3 bg-gradient-to-r from-slate-800 to-blue-900 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg font-bold text-sm transition-all duration-300 flex items-center justify-center gap-2 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed'
                       >
                         <Navigation className='w-5 h-5' />
                         Yoldayım
@@ -814,3 +814,14 @@ const ActiveJobs: React.FC = () => {
 };
 
 export default ActiveJobs;
+
+
+
+
+
+
+
+
+
+
+

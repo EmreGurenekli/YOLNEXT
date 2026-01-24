@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { 
@@ -16,9 +16,9 @@ import {
   Activity,
   MessageSquare
 } from 'lucide-react';
-import Breadcrumb from '../../components/common/Breadcrumb';
-import Modal from '../../components/common/Modal';
-import GuidanceOverlay from '../../components/common/GuidanceOverlay';
+import Breadcrumb from '../../components/shared-ui-elements/Breadcrumb';
+import Modal from '../../components/shared-ui-elements/Modal';
+import GuidanceOverlay from '../../components/shared-ui-elements/GuidanceOverlay';
 // Driver link data interface
 interface DriverLinkData {
   code?: string | null;
@@ -60,7 +60,7 @@ const driversAPI = {
   }
 };
 import { createApiUrl } from '../../config/api';
-import LoadingState from '../../components/common/LoadingState';
+import LoadingState from '../../components/shared-ui-elements/LoadingState';
 
 const normalizeDriverIdentifier = (raw: string) => {
   const input = (raw || '').trim();
@@ -846,6 +846,17 @@ const Drivers = () => {
 
 
 export default Drivers;
+
+
+
+
+
+
+
+
+
+
+
 
 
 

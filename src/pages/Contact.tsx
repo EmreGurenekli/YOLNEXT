@@ -1,5 +1,5 @@
-import React from 'react';
-import Footer from '../components/common/Footer';
+﻿import React from 'react';
+import Footer from '../components/shared-ui-elements/Footer';
 import { Helmet } from 'react-helmet-async';
 import { Mail, Phone, MapPin, Send } from 'lucide-react';
 import { LEGAL_CONTACT } from '../config/legal';
@@ -131,4 +131,15 @@ export default function Contact() {
     </>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
 

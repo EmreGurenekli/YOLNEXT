@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
@@ -18,8 +18,8 @@ import {
 } from 'lucide-react';
 import { useToast } from '../../contexts/ToastContext';
 import { TOAST_MESSAGES, showProfessionalToast } from '../../utils/toastMessages';
-import Breadcrumb from '../../components/common/Breadcrumb';
-import LoadingState from '../../components/common/LoadingState';
+import Breadcrumb from '../../components/shared-ui-elements/Breadcrumb';
+import LoadingState from '../../components/shared-ui-elements/LoadingState';
 import { createApiUrl } from '../../config/api';
 import { formatDate, formatDateTime } from '../../utils/format';
 import { logger } from '../../utils/logger';
@@ -499,7 +499,7 @@ const TasiyiciJobs: React.FC = () => {
                       .sort((a: any, b: any) => (Number(a.order || 0) - Number(b.order || 0)))
                       .map((p: any, idx: number) => (
                         <div key={String(p.id || idx)} className='flex items-start gap-3'>
-                          <div className='w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold flex-shrink-0'>
+                          <div className='w-7 h-7 rounded-full bg-gradient-to-r from-slate-800 to-blue-900 text-white flex items-center justify-center text-xs font-bold flex-shrink-0'>
                             {idx + 1}
                           </div>
                           <div className='flex-1'>
@@ -554,7 +554,7 @@ const TasiyiciJobs: React.FC = () => {
                   <button
                     onClick={() => updateStatus('in_transit')}
                     disabled={updatingStatus}
-                    className='w-full px-4 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg font-bold text-base transition-all duration-300 flex items-center justify-center gap-3 shadow-lg hover:shadow-xl disabled:opacity-50'
+                    className='w-full px-4 py-4 bg-gradient-to-r from-slate-800 to-blue-900 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg font-bold text-base transition-all duration-300 flex items-center justify-center gap-3 shadow-lg hover:shadow-xl disabled:opacity-50'
                   >
                     <Truck className='w-6 h-6' />
                     Yola Çıktım
@@ -629,3 +629,13 @@ const TasiyiciJobs: React.FC = () => {
 };
 
 export default TasiyiciJobs;
+
+
+
+
+
+
+
+
+
+

@@ -1,4 +1,33 @@
-// Auth routes - Modular version
+/**
+ * 🔐 AUTHENTICATION ROUTES - SECURITY CORE OF YOLNEXT PLATFORM
+ * 
+ * BUSINESS CRITICAL: Handles login/registration for all 4 user types
+ * - Individual customers (personal shipments)
+ * - Corporate customers (business shipments)  
+ * - Nakliyeci (logistics companies - offer transport services)
+ * - Tasiyici (individual carriers - offer transport services)
+ * 
+ * SECURITY FEATURES:
+ * ✅ JWT token-based authentication with refresh tokens
+ * ✅ bcrypt password hashing (10+ rounds)
+ * ✅ Role-based access control (RBAC)
+ * ✅ Rate limiting protection (handled by middleware)
+ * ✅ Input validation and sanitization
+ * ✅ Audit trail for compliance (KVKK/GDPR)
+ * 
+ * API ENDPOINTS:
+ * POST /api/v1/auth/register - Create new user account
+ * POST /api/v1/auth/login - Authenticate user, return JWT
+ * POST /api/v1/auth/refresh - Refresh expired JWT tokens
+ * POST /api/v1/auth/logout - Invalidate user session
+ * 
+ * DATABASE INTERACTION:
+ * - Dynamically detects user table schema (flexible DB structure)
+ * - Supports multiple column naming conventions
+ * - Handles both individual and corporate user data
+ * - Stores consent records for legal compliance
+ */
+
 const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
@@ -139,7 +168,8 @@ function createAuthRoutes(pool, JWT_SECRET, createNotification, sendEmail) {
               updParams
             );
           } else {
-            const hashedPassword = await bcrypt.hash('demo_password', 10);
+            const demoPassword = process.env.DEMO_PASSWORD || 'temp_password_change_me';
+            const hashedPassword = await bcrypt.hash(demoPassword, 10);
 
             const cols = [];
             const vals = [];

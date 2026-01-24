@@ -1,7 +1,7 @@
-import React from 'react';
+﻿import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import LoadingState from '../../components/common/LoadingState';
+import LoadingState from '../../components/shared-ui-elements/LoadingState';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -48,3 +48,13 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 };
 
 export default ProtectedRoute;
+
+
+
+
+
+
+
+
+
+

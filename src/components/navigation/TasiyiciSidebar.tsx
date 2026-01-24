@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   User,
@@ -22,8 +22,8 @@ import {
   HelpCircle,
   LifeBuoy,
 } from 'lucide-react';
-import YolNextLogo from '../common/yolnextLogo';
-import { useBadgeCounts } from '../../hooks/useBadgeCounts';
+import YolNextLogo from '../shared-ui-elements/yolnextLogo';
+import { useNotificationBadgeCounts } from '../../hooks/useNotificationBadgeCounts';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface TasiyiciSidebarProps {
@@ -33,7 +33,7 @@ interface TasiyiciSidebarProps {
 const TasiyiciSidebar: React.FC<TasiyiciSidebarProps> = ({ onLogout }) => {
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { badgeCounts } = useBadgeCounts();
+  const { badgeCounts } = useNotificationBadgeCounts();
   const { user } = useAuth();
 
   useEffect(() => {
@@ -49,7 +49,7 @@ const TasiyiciSidebar: React.FC<TasiyiciSidebarProps> = ({ onLogout }) => {
         { name: 'İş Pazarı', href: '/tasiyici/market', icon: MapPin,
           badge: badgeCounts.pendingShipments > 0 ? badgeCounts.pendingShipments : undefined,
         },
-        { name: 'İşlerim', href: '/tasiyici/islerim', icon: Package },
+        { name: 'İşlerim', href: '/tasiyici/my-jobs', icon: Package },
         { name: 'Tamamlanan İşler', href: '/tasiyici/completed-jobs', icon: CheckCircle },
         { name: 'Mesajlar', href: '/tasiyici/messages', icon: MessageSquare,
           badge: badgeCounts.newMessages > 0 ? badgeCounts.newMessages : undefined,
@@ -71,7 +71,7 @@ const TasiyiciSidebar: React.FC<TasiyiciSidebarProps> = ({ onLogout }) => {
         <button
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
           className='w-12 h-12 bg-white rounded-xl shadow-lg border border-slate-200 flex items-center justify-center hover:bg-slate-50 transition-colors'
-          aria-label={isMobileMenuOpen ? 'Menüyü kapat' : 'Menüyü aç'}
+          aria-label={isMobileMenuOpen ? 'Men?y? kapat' : 'Men?y? a?'}
           aria-expanded={isMobileMenuOpen}
           data-testid='mobile-menu-button'
         >
@@ -121,7 +121,7 @@ const TasiyiciSidebar: React.FC<TasiyiciSidebarProps> = ({ onLogout }) => {
             </div>
             <div className='flex-1 min-w-0'>
               <div className='text-xs lg:text-sm font-bold text-slate-900 truncate'>
-                {user?.firstName || user?.fullName?.split(' ')[0] || 'Kullanıcı'}
+                {user?.firstName || user?.fullName?.split(' ')[0] || 'Kullan?c?'}
               </div>
               <div className='text-xs text-slate-500'>Taşıyıcı Hesap</div>
             </div>
@@ -192,3 +192,17 @@ const TasiyiciSidebar: React.FC<TasiyiciSidebarProps> = ({ onLogout }) => {
 };
 
 export default TasiyiciSidebar;
+
+
+
+
+
+
+
+
+
+
+
+
+
+

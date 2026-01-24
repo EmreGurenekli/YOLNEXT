@@ -1,4 +1,15 @@
-// Currency formatting
+/**
+ * BUSINESS PURPOSE: Formats monetary amounts for display in Turkish Lira
+ * Used throughout the platform for shipment prices, carrier earnings, etc.
+ * 
+ * @param amount - Numeric amount to format (accepts any type, converts to number)
+ * @param currency - Currency code (default: 'TRY' for Turkish Lira)
+ * @returns Formatted currency string (e.g., "₺1.250,50")
+ * 
+ * @example
+ * formatCurrency(1250.5) // "₺1.250,50"
+ * formatCurrency("invalid") // "₺0,00" (safe fallback)
+ */
 export const formatCurrency = (
   amount: any,
   currency: string = 'TRY'
@@ -18,7 +29,22 @@ export const formatNumber = (number: number, decimals: number = 0): string => {
   }).format(number);
 };
 
-// Date formatting
+/**
+ * BUSINESS PURPOSE: Formats dates for Turkish users (shipment dates, tracking times, etc.)
+ * Critical for pickup dates, delivery dates, and tracking timeline displays
+ * 
+ * @param date - Date input (string, number, or Date object)
+ * @param format - Display format type
+ *   - 'short': 15.01.2024 (most common for shipment lists)
+ *   - 'long': 15 Ocak 2024 (for detailed views)  
+ *   - 'time': 14:30 (for real-time tracking)
+ * @returns Turkish-formatted date string
+ * 
+ * @example
+ * formatDate('2024-01-15') // "15.01.2024"
+ * formatDate(new Date(), 'long') // "15 Ocak 2024"
+ * formatDate('2024-01-15T14:30:00Z', 'time') // "14:30"
+ */
 export const formatDate = (
   date: any,
   format: 'short' | 'long' | 'time' = 'short'
@@ -225,28 +251,50 @@ export const formatAddress = (address: {
   return parts.join(', ');
 };
 
+/**
+ * BUSINESS PURPOSE: Cleans shipment titles entered by users for display
+ * Removes test data artifacts, automation strings, and invalid characters
+ * Essential for professional appearance in shipment lists and tracking
+ * 
+ * CLEANS OUT:
+ * - Test automation strings (AUTO, PW-EXCL-xxx, MCP, etc.)
+ * - Development artifacts (Regression, Test, Deneme)
+ * - System-generated prefixes that users shouldn't see
+ * - Excessive whitespace and special characters
+ * 
+ * @param value - Raw shipment title input from user
+ * @returns Clean, display-ready shipment title
+ * 
+ * @example
+ * sanitizeShipmentTitle('AUTO PW-EXCL-123 Test Shipment Istanbul->Ankara') 
+ * // Returns: "Istanbul->Ankara"
+ * 
+ * sanitizeShipmentTitle('   MCP Ultra - Elektronik Gönderim   ')
+ * // Returns: "Elektronik Gönderim"
+ */
 export const sanitizeShipmentTitle = (value: unknown): string => {
   const raw = String(value ?? '').trim();
   if (!raw) return '';
 
+  // Remove test automation and development artifacts
   const cleaned = raw
-    .replace(/^\s*AUTO\s+PW-EXCL-\d+\s*/i, '')
-    .replace(/\bPW-EXCL-\d+\b/gi, '')
-    .replace(/^\s*MCP(\s+Ultra)?\s*-\s*/i, '')
+    .replace(/^\s*AUTO\s+PW-EXCL-\d+\s*/i, '')           // Remove automation prefixes
+    .replace(/\bPW-EXCL-\d+\b/gi, '')                     // Remove test exclusion IDs
+    .replace(/^\s*MCP(\s+Ultra)?\s*-\s*/i, '')            // Remove MCP system prefixes
     .replace(/^\s*MCP\s+/i, '')
     .replace(/^\s*Ultra\s*[-\u2010\u2011\u2012\u2013\u2014\u2212:]\s*/i, '')
     .replace(/^\s*Ultra\b\s*/i, '')
-    .replace(/^\s*Kapsamlı\s+İş\s+Akışı\s+Testi\s*-\s*/i, '')
-    .replace(/^\s*4-Panel\s+Flow\s*/i, '')
-    .replace(/\bUI\s+Regression\s+Shipment\b/gi, '')
-    .replace(/\bComms\/Tracking\b/gi, '')
-    .replace(/\bRegression\b/gi, '')
-    .replace(/\bShipment\b/gi, '')
-    .replace(/\bTest\b/gi, '')
-    .replace(/\bDeneme\b/gi, '')
-    .replace(/\bWorkflow\b/gi, '')
-    .replace(/^\s*[-\u2010\u2011\u2012\u2013\u2014\u2212]\s*/i, '')
-    .replace(/\s+/g, ' ')
+    .replace(/^\s*Kapsamlı\s+İş\s+Akışı\s+Testi\s*-\s*/i, '') // Remove test workflow strings
+    .replace(/^\s*4-Panel\s+Flow\s*/i, '')                // Remove UI test artifacts
+    .replace(/\bUI\s+Regression\s+Shipment\b/gi, '')      // Remove regression test strings
+    .replace(/\bComms\/Tracking\b/gi, '')                 // Remove system component names
+    .replace(/\bRegression\b/gi, '')                      // Remove "Regression" words
+    .replace(/\bShipment\b/gi, '')                        // Remove redundant "Shipment" word
+    .replace(/\bTest\b/gi, '')                            // Remove "Test" words
+    .replace(/\bDeneme\b/gi, '')                          // Remove "Deneme" (Turkish test)
+    .replace(/\bWorkflow\b/gi, '')                        // Remove "Workflow" words
+    .replace(/^\s*[-\u2010\u2011\u2012\u2013\u2014\u2212]\s*/i, '') // Remove leading dashes
+    .replace(/\s+/g, ' ')                                 // Normalize whitespace
     .trim();
 
   if (!cleaned) return 'Gönderi';
@@ -311,3 +359,12 @@ export const sanitizeAddressLabel = (value: unknown): string => {
 
   return cleaned;
 };
+
+
+
+
+
+
+
+
+

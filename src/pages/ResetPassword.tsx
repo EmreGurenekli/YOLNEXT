@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Lock, Eye, EyeOff, CheckCircle, AlertCircle, ArrowLeft } from 'lucide-react';
-import YolNextLogo from '../components/common/yolnextLogo';
+import YolNextLogo from '../components/shared-ui-elements/yolnextLogo';
 import { createApiUrl } from '../config/api';
 // Temporary workaround
 const authAPI = {
@@ -261,4 +261,15 @@ export default function ResetPassword() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
 

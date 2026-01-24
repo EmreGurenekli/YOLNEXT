@@ -304,3 +304,12 @@ export const commonValidationRules = {
     message: 'Açıklama 10-500 karakter arasında olmalıdır',
   },
 };
+
+
+
+
+
+
+
+
+

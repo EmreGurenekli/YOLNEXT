@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import {
   Calculator,
   MapPin,
@@ -273,7 +273,7 @@ const CostCalculator: React.FC = () => {
                   !formData.category ||
                   isCalculating
                 }
-                className='w-full bg-blue-600 text-white py-4 px-6 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center'
+                className='w-full bg-gradient-to-r from-slate-800 to-blue-900 text-white py-4 px-6 rounded-lg font-medium hover:from-blue-900 hover:to-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center'
               >
                 {isCalculating ? (
                   <>
@@ -386,3 +386,14 @@ const CostCalculator: React.FC = () => {
 };
 
 export default CostCalculator;
+
+
+
+
+
+
+
+
+
+
+

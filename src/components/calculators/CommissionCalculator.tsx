@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import {
   Calculator,
   Percent,
@@ -408,3 +408,14 @@ const CommissionCalculator: React.FC = () => {
 };
 
 export default CommissionCalculator;
+
+
+
+
+
+
+
+
+
+
+

@@ -1,4 +1,4 @@
-// CorporateShipmentsCard.tsx
+﻿// CorporateShipmentsCard.tsx
 // Mobile card component for Corporate Shipments page - displays shipment in card format
 // Used in: src/pages/corporate/Shipments.tsx
 
@@ -132,4 +132,15 @@ export default function CorporateShipmentsCard({
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
 

@@ -1,4 +1,4 @@
-// CorporateShipmentsHeader.tsx
+﻿// CorporateShipmentsHeader.tsx
 // Header component for Corporate Shipments page - displays title and description
 // Used in: src/pages/corporate/Shipments.tsx
 
@@ -25,4 +25,15 @@ export default function CorporateShipmentsHeader() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
 

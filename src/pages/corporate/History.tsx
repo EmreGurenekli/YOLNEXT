@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 import {
   History as HistoryIcon,
@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createApiUrl } from '../../config/api';
-import Pagination from '../../components/common/Pagination';
+import Pagination from '../../components/shared-ui-elements/Pagination';
 import { logger } from '../../utils/logger';
 
 interface ShipmentHistory {
@@ -509,3 +509,13 @@ const CorporateHistory: React.FC = () => {
 };
 
 export default CorporateHistory;
+
+
+
+
+
+
+
+
+
+

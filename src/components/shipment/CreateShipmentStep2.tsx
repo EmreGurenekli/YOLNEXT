@@ -1,4 +1,4 @@
-// Step 2: Adres Bilgileri Component
+﻿// Step 2: Adres Bilgileri Component
 // Extracted from CreateShipment.tsx for better code organization
 
 import React from 'react';
@@ -315,4 +315,15 @@ export default function CreateShipmentStep2({
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
 

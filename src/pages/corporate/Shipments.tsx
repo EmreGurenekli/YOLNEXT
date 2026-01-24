@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 // import { Helmet } from 'react-helmet-async';
 import { createApiUrl } from '../../config/api';
 import { formatDate } from '../../utils/format';
@@ -94,14 +94,14 @@ import {
   User,
 } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
-import Breadcrumb from '../../components/common/Breadcrumb';
-import EmptyState from '../../components/common/EmptyState';
-import LoadingState from '../../components/common/LoadingState';
-// import SuccessMessage from '../../components/common/SuccessMessage';
+import Breadcrumb from '../../components/shared-ui-elements/Breadcrumb';
+import EmptyState from '../../components/shared-ui-elements/EmptyState';
+import LoadingState from '../../components/shared-ui-elements/LoadingState';
+// import SuccessMessage from '../../components/shared-ui-elements/SuccessMessage';
 import RatingModal from '../../components/RatingModal';
-import Pagination from '../../components/common/Pagination';
+import Pagination from '../../components/shared-ui-elements/Pagination';
 import { useAuth } from '../../contexts/AuthContext';
-import GuidanceOverlay from '../../components/common/GuidanceOverlay';
+import GuidanceOverlay from '../../components/shared-ui-elements/GuidanceOverlay';
 import { useToast } from '../../contexts/ToastContext';
 import { TOAST_MESSAGES, showProfessionalToast } from '../../utils/toastMessages';
 import CorporateShipmentsHeader from '../../components/shipment/CorporateShipmentsHeader';
@@ -1779,3 +1779,13 @@ export default function CorporateShipments() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+

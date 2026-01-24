@@ -61,3 +61,12 @@ export const formatShipmentRoute = (row: AnyShipmentLike): string => {
   const { from, to } = resolveShipmentRoute(row);
   return `${from} → ${to}`;
 };
+
+
+
+
+
+
+
+
+

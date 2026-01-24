@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   Users,
@@ -10,7 +10,7 @@ import {
   X,
   LayoutDashboard,
 } from 'lucide-react';
-import YolNextLogo from '../common/yolnextLogo';
+import YolNextLogo from '../shared-ui-elements/yolnextLogo';
 import { useAuth } from '../../contexts/AuthContext';
 import { getAdminBasePath } from '../../config/admin';
 
@@ -151,3 +151,14 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({ onLogout }) => {
 };
 
 export default AdminSidebar;
+
+
+
+
+
+
+
+
+
+
+

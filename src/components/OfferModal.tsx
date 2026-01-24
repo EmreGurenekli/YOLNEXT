@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { X, Send, DollarSign, Calendar, MessageSquare } from 'lucide-react';
 
 interface OfferModalProps {
@@ -139,7 +139,7 @@ const OfferModal: React.FC<OfferModalProps> = ({
               disabled={
                 isSubmitting || !formData.price || !formData.estimatedDelivery
               }
-              className='flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2'
+              className='flex-1 px-4 py-3 bg-gradient-to-r from-slate-800 to-blue-900 text-white rounded-lg hover:from-blue-900 hover:to-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2'
             >
               {isSubmitting ? (
                 <div className='w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin' />
@@ -158,3 +158,14 @@ const OfferModal: React.FC<OfferModalProps> = ({
 };
 
 export default OfferModal;
+
+
+
+
+
+
+
+
+
+
+

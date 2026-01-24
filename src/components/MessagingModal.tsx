@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { X, Send, MessageSquare, User, Clock } from 'lucide-react';
 import { createApiUrl } from '../config/api';
 import { sanitizeMessageText, sanitizeShipmentTitle } from '../utils/format';
@@ -305,7 +305,7 @@ const MessagingModal: React.FC<MessagingModalProps> = ({
                 <div
                   className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
                     message.sender_id === currentUser.id
-                      ? 'bg-blue-600 text-white'
+                      ? 'bg-gradient-to-r from-slate-800 to-blue-900 text-white'
                       : 'bg-gray-100 text-gray-900'
                   }`}
                 >
@@ -349,7 +349,7 @@ const MessagingModal: React.FC<MessagingModalProps> = ({
             <button
               type='submit'
               disabled={!newMessage.trim() || isSending}
-              className='px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2'
+              className='px-4 py-2 bg-gradient-to-r from-slate-800 to-blue-900 text-white rounded-lg hover:from-blue-900 hover:to-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2'
             >
               {isSending ? (
                 <div className='w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin' />
@@ -365,3 +365,14 @@ const MessagingModal: React.FC<MessagingModalProps> = ({
 };
 
 export default MessagingModal;
+
+
+
+
+
+
+
+
+
+
+

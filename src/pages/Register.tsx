@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -15,9 +15,9 @@ import {
   Loader2,
   XCircle,
 } from 'lucide-react';
-import YolNextLogo from '../components/common/yolnextLogo';
+import YolNextLogo from '../components/shared-ui-elements/yolnextLogo';
 import { createApiUrl } from '../config/api';
-import { analytics } from '../services/analytics';
+import { analytics } from '../services/businessAnalytics';
 
 const Register = () => {
   const navigate = useNavigate();
@@ -764,7 +764,7 @@ const Register = () => {
                       type='button'
                       onClick={verifyCode}
                       disabled={verificationCode.length !== 6}
-                      className='px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-700'
+                      className='px-4 py-2 bg-gradient-to-r from-slate-800 to-blue-900 text-white rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:from-blue-900 hover:to-slate-800'
                     >
                       Doğrula
                     </button>
@@ -1413,3 +1413,13 @@ const Register = () => {
 };
 
 export default Register;
+
+
+
+
+
+
+
+
+
+

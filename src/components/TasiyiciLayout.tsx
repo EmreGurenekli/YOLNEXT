@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { Outlet } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import TasiyiciSidebar from './navigation/TasiyiciSidebar';
@@ -23,3 +23,14 @@ const TasiyiciLayout: React.FC = () => {
 };
 
 export default TasiyiciLayout;
+
+
+
+
+
+
+
+
+
+
+

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useAuth } from '../../contexts/AuthContext';
@@ -27,10 +27,10 @@ import {
   Briefcase,
   Copy,
 } from 'lucide-react';
-import Breadcrumb from '../../components/common/Breadcrumb';
-import LoadingState from '../../components/common/LoadingState';
+import Breadcrumb from '../../components/shared-ui-elements/Breadcrumb';
+import LoadingState from '../../components/shared-ui-elements/LoadingState';
 import { formatDate } from '../../utils/format';
-import EmptyState from '../../components/common/EmptyState';
+import EmptyState from '../../components/shared-ui-elements/EmptyState';
 
 type RecentJob = {
   id: string;
@@ -489,4 +489,15 @@ const TasiyiciDashboard: React.FC = () => {
 };
 
 export default TasiyiciDashboard;
+
+
+
+
+
+
+
+
+
+
+
 

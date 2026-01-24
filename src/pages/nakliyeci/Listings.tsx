@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -21,14 +21,14 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import Breadcrumb from '../../components/common/Breadcrumb';
-import LoadingState from '../../components/common/LoadingState';
-import EmptyState from '../../components/common/EmptyState';
-import SuccessMessage from '../../components/common/SuccessMessage';
-import Modal from '../../components/common/Modal';
+import Breadcrumb from '../../components/shared-ui-elements/Breadcrumb';
+import LoadingState from '../../components/shared-ui-elements/LoadingState';
+import EmptyState from '../../components/shared-ui-elements/EmptyState';
+import SuccessMessage from '../../components/shared-ui-elements/SuccessMessage';
+import Modal from '../../components/shared-ui-elements/Modal';
 import { createApiUrl } from '../../config/api';
-import GuidanceOverlay from '../../components/common/GuidanceOverlay';
-import TrustScore from '../../components/TrustScore';
+import GuidanceOverlay from '../../components/shared-ui-elements/GuidanceOverlay';
+import UserTrustRating from '../../components/UserTrustRating';
 
 interface Listing {
   id: number;
@@ -563,7 +563,7 @@ const Listings: React.FC = () => {
                                       {/* TrustScore Entegrasyonu */}
                                       {bid.carrierId ? (
                                         <div className="mb-3">
-                                          <TrustScore
+                                          <UserTrustRating
                                             userId={String(bid.carrierId)}
                                             userType="tasiyici"
                                             averageRating={carrierRatings[String(bid.carrierId)]?.averageRating || 0}
@@ -792,3 +792,14 @@ const Listings: React.FC = () => {
 };
 
 export default Listings;
+
+
+
+
+
+
+
+
+
+
+

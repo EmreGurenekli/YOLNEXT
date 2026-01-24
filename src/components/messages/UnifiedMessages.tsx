@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+﻿import React, { useMemo, useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
@@ -36,11 +36,11 @@ import {
   CheckCheck,
 } from 'lucide-react';
 import { createApiUrl } from '../../config/api';
-import GuidanceOverlay from '../../components/common/GuidanceOverlay';
-import { messageAPI } from '../../services/api';
-import Breadcrumb from '../../components/common/Breadcrumb';
-import EmptyState from '../../components/common/EmptyState';
-import LoadingState from '../../components/common/LoadingState';
+import GuidanceOverlay from '../../components/shared-ui-elements/GuidanceOverlay';
+import { messageAPI } from '../../services/apiClient';
+import Breadcrumb from '../../components/shared-ui-elements/Breadcrumb';
+import EmptyState from '../../components/shared-ui-elements/EmptyState';
+import LoadingState from '../../components/shared-ui-elements/LoadingState';
 import { sanitizeMessageText } from '../../utils/format';
 
 interface Message {
@@ -1260,7 +1260,7 @@ export default function UnifiedMessages({ userType }: UnifiedMessagesProps) {
                             <div
                               className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
                                 message.from === 'Siz'
-                                  ? 'bg-blue-600 text-white'
+                                  ? 'bg-gradient-to-r from-slate-800 to-blue-900 text-white'
                                   : message.fromType === 'system'
                                     ? 'bg-slate-100 text-slate-900'
                                     : 'bg-slate-200 text-slate-900'
@@ -1310,7 +1310,7 @@ export default function UnifiedMessages({ userType }: UnifiedMessagesProps) {
                       <button
                         onClick={handleSendMessage}
                         disabled={!newMessage.trim() || sendingMessage}
-                        className='px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors flex items-center gap-2'
+                        className='px-6 py-3 bg-gradient-to-r from-slate-800 to-blue-900 text-white rounded-xl hover:from-blue-900 hover:to-slate-800 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors flex items-center gap-2'
                       >
                         {sendingMessage ? (
                           <span className='text-sm'>Gönderiliyor...</span>
@@ -1362,3 +1362,14 @@ export default function UnifiedMessages({ userType }: UnifiedMessagesProps) {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+

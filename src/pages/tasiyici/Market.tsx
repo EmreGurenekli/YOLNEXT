@@ -1,13 +1,13 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { MapPin, DollarSign, Truck, ArrowRight, Search, X, Package } from 'lucide-react';
 import { useToast } from '../../contexts/ToastContext';
 import { TOAST_MESSAGES, showProfessionalToast } from '../../utils/toastMessages';
-import Breadcrumb from '../../components/common/Breadcrumb';
-import LoadingState from '../../components/common/LoadingState';
-import EmptyState from '../../components/common/EmptyState';
-import Modal from '../../components/common/Modal';
-import GuidanceOverlay from '../../components/common/GuidanceOverlay';
+import Breadcrumb from '../../components/shared-ui-elements/Breadcrumb';
+import LoadingState from '../../components/shared-ui-elements/LoadingState';
+import EmptyState from '../../components/shared-ui-elements/EmptyState';
+import Modal from '../../components/shared-ui-elements/Modal';
+import GuidanceOverlay from '../../components/shared-ui-elements/GuidanceOverlay';
 import { createApiUrl } from '../../config/api';
 
 interface Listing {
@@ -843,3 +843,14 @@ const Market: React.FC = () => {
 };
 
 export default Market;
+
+
+
+
+
+
+
+
+
+
+

@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import { Mail, ArrowLeft, CheckCircle, AlertCircle } from 'lucide-react';
-import YolNextLogo from '../components/common/yolnextLogo';
-import { authAPI } from '../services/api';
+import YolNextLogo from '../components/shared-ui-elements/yolnextLogo';
+import { authAPI } from '../services/apiClient';
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');
@@ -158,3 +158,13 @@ export default function ForgotPassword() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+

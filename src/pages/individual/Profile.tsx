@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useAuth } from '../../contexts/AuthContext';
 import {
@@ -13,9 +13,9 @@ import {
   Shield,
   CheckCircle,
 } from 'lucide-react';
-import Breadcrumb from '../../components/common/Breadcrumb';
-import LoadingState from '../../components/common/LoadingState';
-import SuccessMessage from '../../components/common/SuccessMessage';
+import Breadcrumb from '../../components/shared-ui-elements/Breadcrumb';
+import LoadingState from '../../components/shared-ui-elements/LoadingState';
+import SuccessMessage from '../../components/shared-ui-elements/SuccessMessage';
 import { createApiUrl } from '../../config/api';
 
 export default function Profile() {
@@ -107,7 +107,7 @@ export default function Profile() {
             {!isEditing ? (
               <button
                 onClick={() => setIsEditing(true)}
-                className='flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors'
+                className='flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-slate-800 to-blue-900 text-white rounded-lg hover:from-blue-900 hover:to-slate-800 transition-colors'
               >
                 <Edit className='w-4 h-4' />
                 Düzenle
@@ -157,7 +157,7 @@ export default function Profile() {
                   )}
                 </div>
                 {isEditing && (
-                  <button className='absolute bottom-0 right-0 bg-blue-600 text-white rounded-full p-2 hover:bg-blue-700 transition-colors'>
+                  <button className='absolute bottom-0 right-0 bg-gradient-to-r from-slate-800 to-blue-900 text-white rounded-full p-2 hover:from-blue-900 hover:to-slate-800 transition-colors'>
                     <Camera className='w-4 h-4' />
                   </button>
                 )}
@@ -312,3 +312,14 @@ export default function Profile() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+

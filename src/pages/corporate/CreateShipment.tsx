@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import {
@@ -38,8 +38,8 @@ import {
   Settings,
   type LucideIcon
 } from 'lucide-react';
-import Breadcrumb from '../../components/common/Breadcrumb';
-import SuccessMessage from '../../components/common/SuccessMessage';
+import Breadcrumb from '../../components/shared-ui-elements/Breadcrumb';
+import SuccessMessage from '../../components/shared-ui-elements/SuccessMessage';
 import { turkeyCities } from '../../data/turkey-cities-districts';
 import CorporateCreateShipmentStep2 from '../../components/shipment/CorporateCreateShipmentStep2';
 import CorporateCreateShipmentStep3 from '../../components/shipment/CorporateCreateShipmentStep3';
@@ -2170,3 +2170,14 @@ export default function CreateShipment() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+

@@ -51,3 +51,12 @@ export const LEGAL_CONTACT: LegalContact = {
 };
 
 export const LEGAL_DOCUMENT_VERSION = requireEnv('VITE_LEGAL_DOC_VERSION', ['v1.0'], 'v1.0.0');
+
+
+
+
+
+
+
+
+

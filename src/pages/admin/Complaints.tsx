@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { Helmet } from 'react-helmet-async';
 
 const Complaints: React.FC = () => {
@@ -25,3 +25,14 @@ const Complaints: React.FC = () => {
 };
 
 export default Complaints;
+
+
+
+
+
+
+
+
+
+
+

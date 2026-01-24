@@ -13,50 +13,7 @@ import {
 import { formatCurrency, formatDate } from '../../utils/format';
 import CarrierInfoCard from '../../components/CarrierInfoCard';
 import { getStatusInfo as getStatusInfoBase } from '../../utils/shipmentStatus';
-
-interface Shipment {
-  id: string;
-  title: string;
-  from: string;
-  to: string;
-  status: 'preparing' | 'waiting' | 'waiting_for_offers' | 'offer_accepted' | 'accepted' | 'in_progress' | 'picked_up' | 'in_transit' | 'delivered' | 'completed' | 'cancelled';
-  createdAt: string;
-  estimatedDelivery: string;
-  actualDelivery?: string;
-  price: number;
-  carrierName?: string;
-  carrierId?: string;
-  carrierPhone?: string;
-  carrierEmail?: string;
-  carrierCompany?: string;
-  driverName?: string;
-  driverId?: string;
-  driverPhone?: string;
-  driverEmail?: string;
-  vehiclePlate?: string;
-  vehicleType?: string;
-  trackingNumber?: string;
-  description: string;
-  category: string;
-  weight: string;
-  dimensions: string;
-  specialRequirements: string[];
-  trackingCode: string;
-  subCategory: string;
-  rating?: number;
-  volume: string;
-  pickupDate?: string;
-  deliveryDate?: string;
-  pickupAddress?: string;
-  deliveryAddress?: string;
-  pickupCity?: string;
-  deliveryCity?: string;
-  carrierRating?: number;
-  carrierReviews?: number;
-  carrierVerified?: boolean;
-  completedJobs?: number;
-  successRate?: number;
-}
+import { Shipment } from '../../hooks/useMyShipments';
 
 interface MyShipmentsTableRowProps {
   shipment: Shipment;
@@ -270,4 +227,15 @@ export default function MyShipmentsTableRow({
     </tr>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
 

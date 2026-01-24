@@ -1,9 +1,36 @@
-// Shipment status utility functions
+/**
+ * 📊 SHIPMENT STATUS MANAGEMENT - CORE BUSINESS LOGIC
+ * 
+ * BUSINESS PURPOSE: Manages the lifecycle states of cargo shipments
+ * This is CRITICAL business logic that determines what users see and what actions they can take
+ * 
+ * SHIPMENT LIFECYCLE (Business Flow):
+ * 1️⃣ pending/waiting_for_offers → User created shipment, waiting for carrier offers
+ * 2️⃣ offer_accepted/accepted → User accepted a carrier's price quote  
+ * 3️⃣ in_progress/assigned → Carrier assigned, preparing for pickup
+ * 4️⃣ in_transit → Package picked up, being transported
+ * 5️⃣ delivered → Package delivered, awaiting confirmation
+ * 6️⃣ completed → Job finished, payments processed, ratings done
+ * ❌ cancelled → Shipment cancelled by user or system
+ * 
+ * UI/UX IMPACT:
+ * - Status colors provide immediate visual feedback to users
+ * - Text is localized for Turkish users
+ * - Descriptions help users understand next steps
+ * - Different statuses enable/disable different actions (messaging, rating, etc.)
+ * 
+ * BUSINESS RULES:
+ * - Only "pending" and "waiting_for_offers" shipments can be cancelled by users
+ * - Messaging is only enabled after "offer_accepted" status
+ * - Rating is only available after "completed" status
+ * - Real-time tracking is active during "in_transit" status
+ */
+
 export interface StatusInfo {
-  text: string;
-  color: string;
-  description: string;
-  icon?: string;
+  text: string;         // Human-readable Turkish status text (shown to users)
+  color: string;        // Tailwind CSS classes for visual styling
+  description: string;  // Detailed explanation for user guidance
+  icon?: string;        // Optional icon identifier (future use)
 }
 
 export const getStatusInfo = (status: string): StatusInfo => {
@@ -70,6 +97,15 @@ export const getStatusInfo = (status: string): StatusInfo => {
 export const getStatusDescription = (status: string): string => {
   return getStatusInfo(status).description;
 };
+
+
+
+
+
+
+
+
+
 
 
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import {
@@ -33,7 +33,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { createApiUrl } from '../../config/api';
-import { authAPI as authService } from '../../services/api';
+import { authAPI as authService } from '../../services/apiClient';
 import { useToast } from '../../contexts/ToastContext';
 import { TOAST_MESSAGES, showProfessionalToast } from '../../utils/toastMessages';
 
@@ -886,3 +886,14 @@ export default function CorporateSettings() {
     </>
   );
 }
+
+
+
+
+
+
+
+
+
+
+

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+﻿import React, { useState, useEffect, useCallback } from 'react';
 import {
   Package,
   MapPin,
@@ -1204,3 +1204,14 @@ const IndividualShipmentDetail: React.FC = () => {
 };
 
 export default IndividualShipmentDetail;
+
+
+
+
+
+
+
+
+
+
+

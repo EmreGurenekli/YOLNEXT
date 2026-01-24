@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { X, Star, User, MessageSquare, ThumbsUp, CheckCircle } from 'lucide-react';
 import { createApiUrl } from '../config/api';
 
@@ -378,3 +378,14 @@ const RatingModal: React.FC<RatingModalProps> = ({
 };
 
 export default RatingModal;
+
+
+
+
+
+
+
+
+
+
+

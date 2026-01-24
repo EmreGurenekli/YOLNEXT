@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -22,8 +22,8 @@ import {
   AlertTriangle,
   X
 } from 'lucide-react';
-import YolNextLogo from '../components/common/yolnextLogo';
-import { analytics } from '../services/analytics';
+import YolNextLogo from '../components/shared-ui-elements/yolnextLogo';
+import { analytics } from '../services/businessAnalytics';
 
 export default function Login() {
   const [formData, setFormData] = useState({
@@ -455,3 +455,14 @@ export default function Login() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+

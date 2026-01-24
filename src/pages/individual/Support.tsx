@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import { 
@@ -240,7 +240,7 @@ const Support: React.FC = () => {
               </div>
               <button
                 onClick={() => setShowCreateForm(true)}
-                className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 flex items-center gap-2"
+                className="bg-gradient-to-r from-slate-800 to-blue-900 text-white px-6 py-3 rounded-lg hover:from-blue-900 hover:to-slate-800 flex items-center gap-2"
               >
                 <Plus className="w-5 h-5" />
                 Yeni Destek Talebi
@@ -332,7 +332,7 @@ const Support: React.FC = () => {
                 </p>
                 <button
                   onClick={() => setShowCreateForm(true)}
-                  className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700"
+                  className="bg-gradient-to-r from-slate-800 to-blue-900 text-white px-6 py-3 rounded-lg hover:from-blue-900 hover:to-slate-800"
                 >
                   Destek Talebi Oluştur
                 </button>
@@ -523,7 +523,7 @@ const Support: React.FC = () => {
                   </button>
                   <button
                     type="submit"
-                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                    className="px-6 py-2 bg-gradient-to-r from-slate-800 to-blue-900 text-white rounded-lg hover:from-blue-900 hover:to-slate-800"
                   >
                     Destek Talebi Oluştur
                   </button>
@@ -538,3 +538,14 @@ const Support: React.FC = () => {
 };
 
 export default Support;
+
+
+
+
+
+
+
+
+
+
+

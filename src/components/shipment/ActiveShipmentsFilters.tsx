@@ -1,4 +1,4 @@
-// ActiveShipmentsFilters.tsx
+﻿// ActiveShipmentsFilters.tsx
 // Filters component for ActiveShipments page (nakliyeci) - search and status filter
 // Used in: src/pages/nakliyeci/ActiveShipments.tsx
 
@@ -50,4 +50,15 @@ export default function ActiveShipmentsFilters({
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
 

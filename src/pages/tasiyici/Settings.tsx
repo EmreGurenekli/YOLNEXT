@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useToast } from '../../contexts/ToastContext';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { createApiUrl } from '../../config/api';
-import { authAPI as authService } from '../../services/api';
+import { authAPI as authService } from '../../services/apiClient';
 import { TOAST_MESSAGES, showProfessionalToast } from '../../utils/toastMessages';
 import {
   Settings,
@@ -31,11 +31,11 @@ import {
   Copy,
   FileText,
 } from 'lucide-react';
-import Breadcrumb from '../../components/common/Breadcrumb';
-import EmptyState from '../../components/common/EmptyState';
-import LoadingState from '../../components/common/LoadingState';
-import Modal from '../../components/common/Modal';
-import SuccessMessage from '../../components/common/SuccessMessage';
+import Breadcrumb from '../../components/shared-ui-elements/Breadcrumb';
+import EmptyState from '../../components/shared-ui-elements/EmptyState';
+import LoadingState from '../../components/shared-ui-elements/LoadingState';
+import Modal from '../../components/shared-ui-elements/Modal';
+import SuccessMessage from '../../components/shared-ui-elements/SuccessMessage';
 // Temporary workaround
 const kvkkAPI = {
   requestDataAccess: async () => {
@@ -686,3 +686,13 @@ export default function TasiyiciSettings() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+

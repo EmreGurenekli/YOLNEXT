@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   User,
@@ -20,8 +20,8 @@ import {
   X,
   Clock,
 } from 'lucide-react';
-import YolNextLogo from '../common/yolnextLogo';
-import { useBadgeCounts } from '../../hooks/useBadgeCounts';
+import YolNextLogo from '../shared-ui-elements/yolnextLogo';
+import { useNotificationBadgeCounts } from '../../hooks/useNotificationBadgeCounts';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface IndividualSidebarProps {
@@ -31,7 +31,7 @@ interface IndividualSidebarProps {
 const IndividualSidebar: React.FC<IndividualSidebarProps> = ({ onLogout }) => {
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { badgeCounts } = useBadgeCounts();
+  const { badgeCounts } = useNotificationBadgeCounts();
   const { user } = useAuth();
 
   useEffect(() => {
@@ -96,7 +96,7 @@ const IndividualSidebar: React.FC<IndividualSidebarProps> = ({ onLogout }) => {
         <button
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
           className='w-12 h-12 bg-white rounded-xl shadow-lg border border-slate-200 flex items-center justify-center hover:bg-slate-50 transition-colors'
-          aria-label={isMobileMenuOpen ? 'Menüyü kapat' : 'Menüyü aç'}
+          aria-label={isMobileMenuOpen ? 'Men?y? kapat' : 'Men?y? a?'}
           aria-expanded={isMobileMenuOpen}
           data-testid='mobile-menu-button'
         >
@@ -146,7 +146,7 @@ const IndividualSidebar: React.FC<IndividualSidebarProps> = ({ onLogout }) => {
             </div>
             <div className='flex-1 min-w-0'>
               <div className='text-xs lg:text-sm font-bold text-slate-900 truncate'>
-                {user?.firstName || user?.fullName?.split(' ')[0] || 'Kullanıcı'}
+                {user?.firstName || user?.fullName?.split(' ')[0] || 'Kullan?c?'}
               </div>
               <div className='text-xs text-slate-500'>Bireysel Hesap</div>
             </div>
@@ -217,3 +217,17 @@ const IndividualSidebar: React.FC<IndividualSidebarProps> = ({ onLogout }) => {
 };
 
 export default IndividualSidebar;
+
+
+
+
+
+
+
+
+
+
+
+
+
+

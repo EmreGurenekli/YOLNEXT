@@ -1,6 +1,6 @@
-import React from 'react';
+﻿import React from 'react';
 import { Star, MessageCircle, Shield, CheckCircle, AlertTriangle } from 'lucide-react';
-import TrustScore from './TrustScore';
+import UserTrustRating from './UserTrustRating';
 
 // Kompakt TrustScore Badge Component
 interface TrustScoreBadgeProps {
@@ -245,7 +245,7 @@ const CarrierInfoCard: React.FC<CarrierInfoCardProps> = ({
           {/* TrustScore */}
           {carrierId && (
             <div className="mb-4">
-              <TrustScore
+              <UserTrustRating
                 userId={carrierId}
                 userType="nakliyeci"
                 averageRating={carrierRating}
@@ -281,4 +281,15 @@ const CarrierInfoCard: React.FC<CarrierInfoCardProps> = ({
 };
 
 export default CarrierInfoCard;
+
+
+
+
+
+
+
+
+
+
+
 

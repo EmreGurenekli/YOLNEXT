@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Mail, Lock, AlertCircle, Shield } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import YolNextLogo from '../../components/common/yolnextLogo';
+import YolNextLogo from '../../components/shared-ui-elements/yolnextLogo';
 import { getAdminBasePath } from '../../config/admin';
 
 const AdminLogin: React.FC = () => {
@@ -120,3 +120,14 @@ const AdminLogin: React.FC = () => {
 };
 
 export default AdminLogin;
+
+
+
+
+
+
+
+
+
+
+

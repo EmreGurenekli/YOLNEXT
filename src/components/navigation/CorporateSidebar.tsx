@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   Building2,
@@ -21,8 +21,8 @@ import {
   X,
   CheckCircle,
 } from 'lucide-react';
-import YolNextLogo from '../common/yolnextLogo';
-import { useBadgeCounts } from '../../hooks/useBadgeCounts';
+import YolNextLogo from '../shared-ui-elements/yolnextLogo';
+import { useNotificationBadgeCounts } from '../../hooks/useNotificationBadgeCounts';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface CorporateSidebarProps {
@@ -32,7 +32,7 @@ interface CorporateSidebarProps {
 const CorporateSidebar: React.FC<CorporateSidebarProps> = ({ onLogout }) => {
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { badgeCounts } = useBadgeCounts();
+  const { badgeCounts } = useNotificationBadgeCounts();
   const { user } = useAuth();
 
   useEffect(() => {
@@ -45,8 +45,8 @@ const CorporateSidebar: React.FC<CorporateSidebarProps> = ({ onLogout }) => {
       title: 'Ana Menü',
       items: [
         { name: 'Ana Sayfa', href: '/corporate/dashboard', icon: Building2 },
-        {
-          name: 'Gönderi Oluştur',
+        { 
+          name: 'Gönderi Oluştur', 
           href: '/corporate/create-shipment',
           icon: Plus,
         },
@@ -152,7 +152,7 @@ const CorporateSidebar: React.FC<CorporateSidebarProps> = ({ onLogout }) => {
             </div>
             <div className='flex-1 min-w-0'>
               <div className='text-xs lg:text-sm font-bold text-slate-900 truncate'>
-                {user?.companyName || user?.firstName || user?.fullName?.split(' ')[0] || 'Kullanıcı'}
+                {user?.companyName || user?.firstName || user?.fullName?.split(' ')[0] || 'Kullan?c?'}
               </div>
               <div className='text-xs text-slate-500'>Kurumsal Hesap</div>
             </div>
@@ -223,3 +223,17 @@ const CorporateSidebar: React.FC<CorporateSidebarProps> = ({ onLogout }) => {
 };
 
 export default CorporateSidebar;
+
+
+
+
+
+
+
+
+
+
+
+
+
+

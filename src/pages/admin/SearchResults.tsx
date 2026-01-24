@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { createApiUrl } from '../../config/api';
@@ -109,3 +109,14 @@ const SearchResults: React.FC = () => {
 };
 
 export default SearchResults;
+
+
+
+
+
+
+
+
+
+
+

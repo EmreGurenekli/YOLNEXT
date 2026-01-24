@@ -1,4 +1,4 @@
-// CorporateShipmentsTableRow.tsx
+﻿// CorporateShipmentsTableRow.tsx
 // Desktop table row component for Corporate Shipments page - displays shipment in table format
 // Used in: src/pages/corporate/Shipments.tsx
 
@@ -196,4 +196,15 @@ export default function CorporateShipmentsTableRow({
     </tr>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
 

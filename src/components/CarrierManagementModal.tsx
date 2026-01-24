@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { createApiUrl } from '../config/api';
 import {
   X,
@@ -354,7 +354,7 @@ const CarrierManagementModal: React.FC<CarrierManagementModalProps> = ({
                         </div>
                         <button
                           onClick={() => handleAssignLoad(suggestion.id)}
-                          className='px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2'
+                          className='px-4 py-2 bg-gradient-to-r from-slate-800 to-blue-900 text-white rounded-lg hover:from-blue-900 hover:to-slate-800 transition-colors flex items-center gap-2'
                         >
                           <Plus className='w-4 h-4' />
                           Yük Ata
@@ -373,3 +373,14 @@ const CarrierManagementModal: React.FC<CarrierManagementModalProps> = ({
 };
 
 export default CarrierManagementModal;
+
+
+
+
+
+
+
+
+
+
+

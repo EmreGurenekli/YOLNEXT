@@ -1,4 +1,4 @@
-// ActiveShipmentsHeader.tsx
+﻿// ActiveShipmentsHeader.tsx
 // Header component for ActiveShipments page (nakliyeci) - displays title and description
 // Used in: src/pages/nakliyeci/ActiveShipments.tsx
 
@@ -22,4 +22,15 @@ export default function ActiveShipmentsHeader() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
 

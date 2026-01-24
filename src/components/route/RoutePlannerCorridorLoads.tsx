@@ -1,4 +1,4 @@
-// RoutePlannerCorridorLoads.tsx
+﻿// RoutePlannerCorridorLoads.tsx
 // Corridor loads component for Route Planner page - displays loads available on the corridor
 // Used in: src/pages/nakliyeci/RoutePlanner.tsx
 
@@ -118,4 +118,15 @@ export default function RoutePlannerCorridorLoads({
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
 

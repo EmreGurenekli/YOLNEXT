@@ -1,4 +1,4 @@
-// Step 3: Önizleme ve Yayınlama Component
+﻿// Step 3: Önizleme ve Yayınlama Component
 // Extracted from CreateShipment.tsx for better code organization
 
 import React from 'react';
@@ -224,7 +224,7 @@ export default function CreateShipmentStep3({
       {/* Önemli Bilgilendirme - Sorumluluk Reddi */}
       <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-6 space-y-4 shadow-sm">
         <div className="flex items-start gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center flex-shrink-0">
+          <div className="w-10 h-10 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center flex-shrink-0">
             <AlertTriangle className="w-5 h-5 text-white" />
           </div>
           <div className="flex-1">
@@ -318,4 +318,15 @@ export default function CreateShipmentStep3({
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
 

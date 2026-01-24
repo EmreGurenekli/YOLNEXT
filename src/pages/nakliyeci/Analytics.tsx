@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import {
   BarChart3,
@@ -11,8 +11,8 @@ import {
   Route,
   CheckCircle2,
 } from 'lucide-react';
-import Breadcrumb from '../../components/common/Breadcrumb';
-import LoadingState from '../../components/common/LoadingState';
+import Breadcrumb from '../../components/shared-ui-elements/Breadcrumb';
+import LoadingState from '../../components/shared-ui-elements/LoadingState';
 import { createApiUrl } from '../../config/api';
 
 type Period = '7days' | '30days' | '90days' | '1year';
@@ -394,3 +394,14 @@ const NakliyeciAnalytics: React.FC = () => {
 };
 
 export default NakliyeciAnalytics;
+
+
+
+
+
+
+
+
+
+
+

@@ -1,5 +1,5 @@
-import React from 'react';
-import Footer from '../components/common/Footer';
+﻿import React from 'react';
+import Footer from '../components/shared-ui-elements/Footer';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import { Truck, Users, Shield } from 'lucide-react';
@@ -44,7 +44,7 @@ const About = () => {
           <div className='text-center'>
             <Link
               to='/'
-              className='inline-flex items-center px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors min-h-[44px]'
+              className='inline-flex items-center px-6 py-3 bg-gradient-to-r from-slate-800 to-blue-900 text-white rounded-lg hover:from-blue-900 hover:to-slate-800 transition-colors min-h-[44px]'
             >
               Ana Sayfaya Dön
             </Link>
@@ -57,6 +57,17 @@ const About = () => {
 };
 
 export default About;
+
+
+
+
+
+
+
+
+
+
+
 
 
 

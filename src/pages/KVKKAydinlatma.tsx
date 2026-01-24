@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import { Shield, FileText, Lock, Eye, Trash2, Download, AlertCircle } from 'lucide-react';
@@ -360,3 +360,14 @@ const KVKKAydinlatma: React.FC = () => {
 };
 
 export default KVKKAydinlatma;
+
+
+
+
+
+
+
+
+
+
+

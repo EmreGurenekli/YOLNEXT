@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useAuth } from '../../contexts/AuthContext';
 import {
@@ -11,12 +11,12 @@ import {
   Download,
   ArrowRight,
 } from 'lucide-react';
-import Breadcrumb from '../../components/common/Breadcrumb';
-import LoadingState from '../../components/common/LoadingState';
+import Breadcrumb from '../../components/shared-ui-elements/Breadcrumb';
+import LoadingState from '../../components/shared-ui-elements/LoadingState';
 import RatingModal from '../../components/RatingModal';
 import { Link } from 'react-router-dom';
 import { createApiUrl } from '../../config/api';
-import GuidanceOverlay from '../../components/common/GuidanceOverlay';
+import GuidanceOverlay from '../../components/shared-ui-elements/GuidanceOverlay';
 
 interface Job {
   id: number;
@@ -307,3 +307,14 @@ const TasiyiciCompletedJobs: React.FC = () => {
 };
 
 export default TasiyiciCompletedJobs;
+
+
+
+
+
+
+
+
+
+
+

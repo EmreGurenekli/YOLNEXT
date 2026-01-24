@@ -5,7 +5,17 @@
 import React from 'react';
 import { Package } from 'lucide-react';
 
-export default function MyShipmentsHeader() {
+interface MyShipmentsHeaderProps {
+  title?: string;
+  totalCount?: number;
+  actions?: React.ReactNode;
+}
+
+export default function MyShipmentsHeader({ 
+  title = "Gönderilerim", 
+  totalCount, 
+  actions 
+}: MyShipmentsHeaderProps) {
   return (
     <div className='text-center mb-12'>
       <div className='flex justify-center mb-6'>
@@ -14,14 +24,16 @@ export default function MyShipmentsHeader() {
         </div>
       </div>
       <h1 className='text-4xl md:text-5xl font-bold text-slate-900 mb-3'>
-        Gönderilerinizi{' '}
-        <span className='text-transparent bg-clip-text bg-gradient-to-r from-slate-800 to-blue-900'>
-          Takip Edin
-        </span>
+        {title}
       </h1>
       <p className='text-lg text-slate-600'>
         Gönderilerinizin durumunu takip edin ve yönetin
       </p>
+      {actions && (
+        <div className="mt-6">
+          {actions}
+        </div>
+      )}
     </div>
   );
 }

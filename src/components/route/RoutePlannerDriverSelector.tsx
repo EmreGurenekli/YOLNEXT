@@ -1,4 +1,4 @@
-// RoutePlannerDriverSelector.tsx
+﻿// RoutePlannerDriverSelector.tsx
 // Driver selector component for Route Planner page - displays driver list and allows selection
 // Used in: src/pages/nakliyeci/RoutePlanner.tsx
 
@@ -85,7 +85,7 @@ export default function RoutePlannerDriverSelector({
                   )}
                 </div>
                 {corridor && selectedDriverId === driver.id && (
-                  <div className='ml-3 px-3 py-1 bg-blue-600 text-white text-xs font-medium rounded-full'>
+                  <div className='ml-3 px-3 py-1 bg-gradient-to-r from-slate-800 to-blue-900 text-white text-xs font-medium rounded-full'>
                     Aktif
                   </div>
                 )}
@@ -97,4 +97,15 @@ export default function RoutePlannerDriverSelector({
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
 

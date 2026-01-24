@@ -1,4 +1,4 @@
-// Step 1: Yük Bilgileri Component
+﻿// Step 1: Yük Bilgileri Component
 // Extracted from CreateShipment.tsx for better code organization
 
 import React from 'react';
@@ -470,4 +470,15 @@ export default function CreateShipmentStep1({
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
 

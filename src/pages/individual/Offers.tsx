@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+﻿import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createApiUrl } from '../../config/api';
 import { useNavigate, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
@@ -41,14 +41,14 @@ import {
   Flag,
   CheckCircle2,
 } from 'lucide-react';
-import Breadcrumb from '../../components/common/Breadcrumb';
-import EmptyState from '../../components/common/EmptyState';
-import ErrorDisplay from '../../components/common/ErrorDisplay';
-import LoadingState from '../../components/common/LoadingState';
-import Modal from '../../components/common/Modal';
-import SuccessMessage from '../../components/common/SuccessMessage';
+import Breadcrumb from '../../components/shared-ui-elements/Breadcrumb';
+import EmptyState from '../../components/shared-ui-elements/EmptyState';
+import ErrorDisplay from '../../components/shared-ui-elements/ErrorDisplay';
+import LoadingState from '../../components/shared-ui-elements/LoadingState';
+import Modal from '../../components/shared-ui-elements/Modal';
+import SuccessMessage from '../../components/shared-ui-elements/SuccessMessage';
 import RatingModal from '../../components/RatingModal';
-import GuidanceOverlay from '../../components/common/GuidanceOverlay';
+import GuidanceOverlay from '../../components/shared-ui-elements/GuidanceOverlay';
 import CarrierInfoCard from '../../components/CarrierInfoCard';
 import { normalizeTrackingCode } from '../../utils/trackingCode';
 
@@ -1089,7 +1089,7 @@ export default function Offers() {
                 </h5>
                 <div className='bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6'>
                   <div className='flex items-start gap-3'>
-                    <div className='w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0'>
+                    <div className='w-8 h-8 bg-gradient-to-r from-slate-800 to-blue-900 rounded-full flex items-center justify-center flex-shrink-0'>
                       <MessageSquare className='w-4 h-4 text-white' />
                     </div>
                     <p className='text-slate-700 leading-relaxed'>
@@ -1372,3 +1372,14 @@ export default function Offers() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+

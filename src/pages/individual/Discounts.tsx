@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Tag } from 'lucide-react';
 
@@ -42,3 +42,14 @@ const IndividualDiscounts: React.FC = () => {
 };
 
 export default IndividualDiscounts;
+
+
+
+
+
+
+
+
+
+
+

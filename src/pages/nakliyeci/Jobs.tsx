@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 import {
   Truck,
@@ -26,12 +26,12 @@ import {
   Shield,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import Breadcrumb from '../../components/common/Breadcrumb';
-import LoadingState from '../../components/common/LoadingState';
-import EmptyState from '../../components/common/EmptyState';
-import Modal from '../../components/common/Modal';
-import SuccessMessage from '../../components/common/SuccessMessage';
-import GuidanceOverlay from '../../components/common/GuidanceOverlay';
+import Breadcrumb from '../../components/shared-ui-elements/Breadcrumb';
+import LoadingState from '../../components/shared-ui-elements/LoadingState';
+import EmptyState from '../../components/shared-ui-elements/EmptyState';
+import Modal from '../../components/shared-ui-elements/Modal';
+import SuccessMessage from '../../components/shared-ui-elements/SuccessMessage';
+import GuidanceOverlay from '../../components/shared-ui-elements/GuidanceOverlay';
 import { createApiUrl } from '../../config/api';
 import { logger } from '../../utils/logger';
 import { formatCurrency, formatDate, sanitizeAddressLabel, sanitizeShipmentTitle } from '../../utils/format';
@@ -1415,7 +1415,7 @@ const Jobs: React.FC = () => {
             <button
               onClick={loadMore}
               disabled={isLoadingMore}
-              className='px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-slate-400 disabled:cursor-not-allowed transition-colors font-medium'
+              className='px-6 py-3 bg-gradient-to-r from-slate-800 to-blue-900 text-white rounded-lg hover:from-blue-900 hover:to-slate-800 disabled:bg-slate-400 disabled:cursor-not-allowed transition-colors font-medium'
             >
               {isLoadingMore ? 'Yükleniyor...' : 'Daha fazla yükle'}
             </button>
@@ -1775,5 +1775,16 @@ const Jobs: React.FC = () => {
 };
 
 export default Jobs;
+
+
+
+
+
+
+
+
+
+
+
 
 
