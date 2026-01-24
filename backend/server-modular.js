@@ -55,10 +55,12 @@ const PORT = process.env.PORT || 5000;
 // Debug: Database connection info - DETAILED
 console.log('🔍 DATABASE DEBUG DETAILED:', {
   DATABASE_URL: process.env.DATABASE_URL ? 'SET' : 'NOT_SET',
-  URL_START: process.env.DATABASE_URL ? process.env.DATABASE_URL.substring(0, 30) + '...' : 'NONE',
+  URL_START: process.env.DATABASE_URL ? process.env.DATABASE_URL.substring(0, 40) + '...' : 'NONE',
   URL_LENGTH: process.env.DATABASE_URL ? process.env.DATABASE_URL.length : 0,
   NODE_ENV: process.env.NODE_ENV,
   PORT: PORT,
+  PGSSLMODE: process.env.PGSSLMODE,
+  SSL_REQUIRED: process.env.NODE_ENV === 'production',
   ALL_DB_VARS: {
     DATABASE_HOST: process.env.DATABASE_HOST,
     DATABASE_PORT: process.env.DATABASE_PORT,
@@ -66,6 +68,27 @@ console.log('🔍 DATABASE DEBUG DETAILED:', {
     DATABASE_USER: process.env.DATABASE_USER
   }
 });
+
+// Test database connection immediately
+console.log('🔍 TESTING DATABASE CONNECTION...');
+const testConnection = async () => {
+  try {
+    const { getPool } = require('./database/connection');
+    const pool = getPool();
+    const result = await pool.query('SELECT NOW() as current_time');
+    console.log('✅ DATABASE CONNECTION SUCCESS:', result.rows[0]);
+  } catch (error) {
+    console.error('❌ DATABASE CONNECTION FAILED:', {
+      message: error.message,
+      code: error.code,
+      errno: error.errno,
+      syscall: error.syscall,
+      address: error.address,
+      port: error.port
+    });
+  }
+};
+testConnection();
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const IS_TEST = NODE_ENV === 'test' || !!process.env.JEST_WORKER_ID;
 // Security: No default values for production secrets
