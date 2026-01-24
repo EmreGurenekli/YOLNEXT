@@ -324,10 +324,11 @@ export const useMyShipments = (basePath: string) => {
     refreshShipments();
   }, [refreshShipments]);
 
-  // Load shipments when component mounts or dependencies change
+  // EMERGENCY FIX: Load shipments only once on mount
   useEffect(() => {
+    console.log('🔧 useMyShipments: Loading shipments (ONE TIME ONLY)');
     loadShipments();
-  }, [loadShipments]); // Only re-run when loadShipments callback changes
+  }, []); // EMPTY ARRAY - NO DEPENDENCIES - NO LOOPS!
 
   useEffect(() => {
     document.addEventListener('visibilitychange', handleVisibilityChange);

@@ -20,5 +20,5 @@ RUN npm run build
 # Expose port
 EXPOSE 10000
 
-# Start backend (minimal mode to prevent crashes)
-CMD ["node", "backend/minimal-server.js"]
+# Start backend (full production mode)
+CMD ["node", "backend/server-modular.js"]

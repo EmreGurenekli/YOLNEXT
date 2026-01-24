@@ -78,11 +78,8 @@ console.log('🔍 DATABASE DEBUG DETAILED:', {
   }
 });
 
-// TEMPORARILY DISABLED: Database connection test (causing crashes)
-// Will enable after backend is stable
-console.log('⚠️ DATABASE CONNECTION TEST DISABLED (preventing crashes)');
-console.log('🔧 Backend will start without initial database test');
-console.log('🔧 Database connections will be tested when first API call is made');
+// Database connection test - NOW ENABLED AGAIN for real production testing
+console.log('🔧 DATABASE CONNECTION TEST: ENABLED for real production environment');
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const IS_TEST = NODE_ENV === 'test' || !!process.env.JEST_WORKER_ID;
 // Security: No default values for production secrets
@@ -490,6 +487,35 @@ async function startServer() {
   
   try {
     errorLogger.info('Starting Modular PostgreSQL Backend');
+
+    // TEST DATABASE CONNECTION FIRST (Real Production Test)
+    if (pool && DATABASE_URL) {
+      console.log('🔧 TESTING DATABASE CONNECTION...');
+      try {
+        const testClient = await pool.connect();
+        await testClient.query('SELECT NOW() as current_time, version() as db_version');
+        testClient.release();
+        console.log('✅ DATABASE CONNECTION TEST: SUCCESS');
+        errorLogger.info('✅ Database connection verified successfully');
+      } catch (dbTestError) {
+        console.error('❌ DATABASE CONNECTION TEST: FAILED', dbTestError.message);
+        errorLogger.error('Database connection test failed', { 
+          error: dbTestError.message, 
+          code: dbTestError.code,
+          detail: dbTestError.detail
+        });
+        
+        if (NODE_ENV === 'production') {
+          errorLogger.error('CRITICAL: Database connection failed in production');
+          throw new Error(`Database connection failed: ${dbTestError.message}`);
+        } else {
+          errorLogger.warn('Database connection failed in development, continuing with limited functionality');
+        }
+      }
+    } else {
+      console.log('⚠️ SKIPPING DATABASE TEST: No pool or DATABASE_URL available');
+      errorLogger.warn('Database connection test skipped - no pool or DATABASE_URL');
+    }
 
     // Run migrations (skip if no pool)
     if (!IS_TEST && NODE_ENV !== 'production' && pool) {
