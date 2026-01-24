@@ -104,6 +104,64 @@ app.get('/api/info', (req, res) => {
   });
 });
 
+// Shipments API
+app.get('/api/shipments', (req, res) => {
+  console.log('🔧 MINIMAL SERVER: Shipments API called');
+  
+  // Demo shipments data
+  const demoShipments = [
+    {
+      id: 'SHIP001',
+      title: 'Ev Eşyası Taşıması',
+      fromCity: 'İstanbul',
+      toCity: 'Ankara', 
+      status: 'in_progress',
+      createdAt: '2026-01-20',
+      price: 850,
+      category: 'ev_tasimasi'
+    },
+    {
+      id: 'SHIP002', 
+      title: 'Ofis Taşıması',
+      fromCity: 'Ankara',
+      toCity: 'İzmir',
+      status: 'completed',
+      createdAt: '2026-01-18',
+      price: 1200,
+      category: 'ofis_tasimasi'
+    }
+  ];
+  
+  res.json({
+    success: true,
+    shipments: demoShipments,
+    total: demoShipments.length
+  });
+});
+
+// Offers API  
+app.get('/api/offers/individual', (req, res) => {
+  console.log('🔧 MINIMAL SERVER: Individual offers API called');
+  
+  const demoOffers = [
+    {
+      id: 'OFFER001',
+      shipmentId: 'SHIP001',
+      carrierName: 'Mehmet Nakliyat',
+      price: 800,
+      rating: 4.8,
+      message: 'Deneyimli ekibimizle güvenli taşıma',
+      createdAt: '2026-01-21'
+    }
+  ];
+  
+  res.json({
+    success: true,
+    offers: demoOffers,
+    total: demoOffers.length
+  });
+});
+
 // Basic demo login endpoint
 app.post('/api/auth/login', (req, res) => {
   const { email, password } = req.body;
@@ -146,6 +204,35 @@ app.post('/api/auth/login', (req, res) => {
     res.status(401).json({
       success: false,
       message: 'Geçersiz giriş bilgileri'
+    });
+  } else {
+    res.status(401).json({
+      success: false,
+      message: 'Geçersiz giriş bilgileri'
+    });
+  }
+});
+
+// User profile API
+app.get('/api/user/profile', (req, res) => {
+  // Simple token validation (demo)
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  
+  if (token?.startsWith('demo_token_')) {
+    const userId = token.split('_')[2];
+    res.json({
+      success: true,
+      user: {
+        id: userId,
+        name: 'Demo User',
+        email: 'demo@example.com',
+        role: 'individual'
+      }
+    });
+  } else {
+    res.status(401).json({
+      success: false,
+      message: 'Unauthorized'
     });
   }
 });
