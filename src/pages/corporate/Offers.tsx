@@ -106,52 +106,7 @@ export default function Offers() {
   const paymentModalOpenRef = useRef(false);
   const loadingRef = useRef(false);
 
-  useEffect(() => {
-    const userId = (user as any)?.id;
-    const role = String((user as any)?.role || 'corporate').toLowerCase();
-    if (!userId) return;
-    localStorage.setItem(`yolnext:lastSeen:offers:${userId}:${role}`, new Date().toISOString());
-    window.dispatchEvent(new Event('yolnext:refresh-badges'));
-  }, [user]);
-
-  useEffect(() => {
-    paymentModalOpenRef.current = showPaymentModal;
-  }, [showPaymentModal]);
-
-  useEffect(() => {
-    loadOffers();
-  }, [loadOffers]);
-
-  useEffect(() => {
-    const handleVisibilityOrFocus = () => {
-      if (document.visibilityState === 'visible') {
-        loadOffers();
-      }
-    };
-
-    const handleGlobalRefresh = () => {
-      loadOffers();
-    };
-
-    window.addEventListener('focus', handleVisibilityOrFocus);
-    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
-    window.addEventListener('yolnext:refresh-badges', handleGlobalRefresh);
-
-    return () => {
-      window.removeEventListener('focus', handleVisibilityOrFocus);
-      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
-      window.removeEventListener('yolnext:refresh-badges', handleGlobalRefresh);
-    };
-  }, [loadOffers]);
-
-  useEffect(() => {
-    return () => {
-      if (navigateTimerRef.current) {
-        clearTimeout(navigateTimerRef.current);
-      }
-    };
-  }, []);
-
+  // Define loadOffers BEFORE useEffect to prevent hoisting issues
   const loadOffers = useCallback(async () => {
     // Prevent multiple simultaneous calls using ref
     if (loadingRef.current) return;
@@ -294,7 +249,33 @@ export default function Offers() {
       loadingRef.current = false;
       clearTimeout(timeoutId);
     }
-  }, [filterStatus, searchTerm]);
+  }, []); // EMPTY ARRAY - No dependencies to prevent circular dependency
+
+  // useEffect hooks - AFTER loadOffers definition
+  useEffect(() => {
+    const userId = (user as any)?.id;
+    const role = String((user as any)?.role || 'corporate').toLowerCase();
+    if (!userId) return;
+    localStorage.setItem(`yolnext:lastSeen:offers:${userId}:${role}`, new Date().toISOString());
+    window.dispatchEvent(new Event('yolnext:refresh-badges'));
+  }, [user]);
+
+  useEffect(() => {
+    paymentModalOpenRef.current = showPaymentModal;
+  }, [showPaymentModal]);
+
+  // Load offers only once on mount - prevent circular dependency
+  useEffect(() => {
+    loadOffers();
+  }, []); // EMPTY ARRAY - Only run once on mount
+
+  useEffect(() => {
+    return () => {
+      if (navigateTimerRef.current) {
+        clearTimeout(navigateTimerRef.current);
+      }
+    };
+  }, []);
 
   const filteredOffers = offers.filter(offer => {
     const matchesStatus =
