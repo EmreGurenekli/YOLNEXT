@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -117,8 +117,8 @@ export default function Login() {
   };
 
   const handleDemoLogin = async (userType: string) => {
-    // Production kontrolü: Netlify'da PROD flag'i kullan
-    const isProduction = import.meta.env.PROD || import.meta.env.MODE === 'production' || window.location.hostname !== 'localhost';
+    // Demo hesaplar canlı ortamda da aktif (test için)
+    const isProduction = false; // Demo butonları her yerde görünür
     if (isProduction) {
       setError('Hızlı giriş production ortamında devre dışı');
       return;
@@ -299,8 +299,8 @@ export default function Login() {
               </p>
             </div>
 
-            {/* Demo Login Section - Sadece development'ta göster */}
-            {(!import.meta.env.PROD && import.meta.env.MODE !== 'production' && window.location.hostname === 'localhost') && (
+            {/* Demo Login Section - Canlı ortamda da aktif */}
+            {true && (
               <>
                 <div className='mb-8'>
                   <h3 className='text-lg font-semibold text-gray-900 mb-4'>
