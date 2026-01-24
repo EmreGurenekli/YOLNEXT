@@ -78,8 +78,8 @@ console.log('🔍 DATABASE DEBUG DETAILED:', {
   }
 });
 
-// Database connection test - NOW ENABLED AGAIN for real production testing
-console.log('🔧 DATABASE CONNECTION TEST: ENABLED for real production environment');
+// 🚨 EMERGENCY MODE: Database operations completely disabled for crash isolation
+console.log('🚨 EMERGENCY MODE: ALL DATABASE OPERATIONS DISABLED TO ISOLATE CRASH SOURCE');
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const IS_TEST = NODE_ENV === 'test' || !!process.env.JEST_WORKER_ID;
 // Security: No default values for production secrets
