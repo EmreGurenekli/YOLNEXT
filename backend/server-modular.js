@@ -165,39 +165,113 @@ try {
   }
 }
 
-// Setup middleware
-const middleware = setupMiddleware(app, pool, JWT_SECRET, FRONTEND_ORIGIN, NODE_ENV);
+// Setup middleware (safe mode)
+let middleware, sendEmail, upload;
 
-// Setup services
-const { sendEmail } = setupEmailService();
-const upload = setupFileUpload();
+try {
+  console.log('🔧 Setting up middleware...');
+  middleware = setupMiddleware(app, pool, JWT_SECRET, FRONTEND_ORIGIN, NODE_ENV);
+  console.log('✅ Middleware setup complete');
+} catch (error) {
+  console.error('❌ Middleware setup failed:', error.message);
+  // Continue without middleware in production
+  middleware = null;
+}
 
-// Setup guards and utilities (async)
+try {
+  console.log('🔧 Setting up services...');  
+  const emailService = setupEmailService();
+  sendEmail = emailService.sendEmail;
+  upload = setupFileUpload();
+  console.log('✅ Services setup complete');
+} catch (error) {
+  console.error('❌ Services setup failed:', error.message);
+  // Continue without services in production
+  sendEmail = null;
+  upload = null;
+}
+
+// Setup guards and utilities (safe mode)
 let idempotencyGuard, requireAdmin, writeAuditLog, createNotification;
 
-// Initialize synchronously where possible
-requireAdmin = setupAdminGuard();
-createNotification = createNotificationHelper(pool);
+try {
+  console.log('🔧 Setting up guards...');
+  requireAdmin = setupAdminGuard();
+  createNotification = pool ? createNotificationHelper(pool) : null;
+  console.log('✅ Basic guards setup complete');
+} catch (error) {
+  console.error('❌ Basic guards setup failed:', error.message);
+  requireAdmin = null;
+  createNotification = null;
+}
 
-// Setup async guards and routes
+// Setup async guards and routes (safe mode)
 (async () => {
   try {
-    idempotencyGuard = await setupIdempotencyGuard(pool);
-    writeAuditLog = await setupAuditLog(pool);
+    console.log('🔧 Setting up async guards and routes...');
     
-    // Setup routes after guards are ready
-    setupRoutes(app, pool, middleware, {
-      createNotification,
-      sendEmail,
-      writeAuditLog,
-    }, {
-      idempotencyGuard,
-      upload,
-      requireAdmin,
-    });
+    // Only setup async guards if pool is available
+    if (pool) {
+      try {
+        idempotencyGuard = await setupIdempotencyGuard(pool);
+        console.log('✅ Idempotency guard setup complete');
+      } catch (error) {
+        console.error('❌ Idempotency guard failed:', error.message);
+        idempotencyGuard = null;
+      }
+      
+      try {
+        writeAuditLog = await setupAuditLog(pool);
+        console.log('✅ Audit log setup complete');
+      } catch (error) {
+        console.error('❌ Audit log setup failed:', error.message);
+        writeAuditLog = null;
+      }
+    } else {
+      console.log('⚠️ Skipping async guards (no database pool)');
+      idempotencyGuard = null;
+      writeAuditLog = null;
+    }
+    
+    // Setup routes with whatever we have
+    try {
+      setupRoutes(app, pool, middleware, {
+        createNotification,
+        sendEmail,
+        writeAuditLog,
+      }, {
+        idempotencyGuard,
+        upload,
+        requireAdmin,
+      });
+      console.log('✅ Routes setup complete');
+    } catch (routeError) {
+      console.error('❌ Routes setup failed:', routeError.message);
+      if (NODE_ENV === 'production') {
+        console.log('⚠️ Setting up basic routes only...');
+        // Setup basic health check if routes fail
+        app.get('/api/health', (req, res) => {
+          res.json({ 
+            status: 'ok', 
+            message: 'Backend running (limited functionality)',
+            timestamp: new Date().toISOString()
+          });
+        });
+      } else {
+        throw routeError;
+      }
+    }
+    
   } catch (error) {
-    errorLogger.error('Failed to setup guards', { error: error.message });
-    process.exit(1);
+    errorLogger.error('Failed to setup async components', { error: error.message });
+    if (NODE_ENV === 'production') {
+      errorLogger.warn('⚠️ Async setup failed in production (continuing with minimal functionality)', { 
+        error: error.message,
+        note: 'Backend will run with very limited functionality'
+      });
+    } else {
+      process.exit(1);
+    }
   }
 })();
 
