@@ -98,13 +98,33 @@ try {
   setupRoutes = null;
 }
 
-// Still disabled for now (optional features)
+// Step 4b: Load guards and services (required for routes)
 let setupEmailService = null;
 let setupFileUpload = null;
 let setupIdempotencyGuard = null;
 let setupAdminGuard = null;
 let setupAuditLog = null;
 let createNotificationHelper = null;
+
+try {
+  console.log('🔧 Step 4b: Loading guards and services...');
+  const servicesConfig = require('./config/services');
+  setupEmailService = servicesConfig.setupEmailService;
+  setupFileUpload = servicesConfig.setupFileUpload;
+  
+  const guardsConfig = require('./config/guards');
+  setupIdempotencyGuard = guardsConfig.setupIdempotencyGuard;
+  setupAdminGuard = guardsConfig.setupAdminGuard;
+  setupAuditLog = guardsConfig.setupAuditLog;
+  
+  const notificationUtils = require('./utils/userNotificationUtils');
+  createNotificationHelper = notificationUtils.createNotificationHelper;
+  
+  console.log('✅ Guards and services modules loaded successfully');
+} catch (error) {
+  console.error('❌ Guards/services modules failed to load:', error.message);
+  // Continue with null values - routes will handle gracefully
+}
 
 // Environment variables
 const PORT = process.env.PORT || 5000;
@@ -227,13 +247,54 @@ if (setupMiddleware) {
   console.log('⚠️ Skipping middleware setup (module not loaded)');
 }
 
-// Services are optional for now
-sendEmail = null;
-upload = null;
+// Setup services (safe mode)
+if (setupEmailService) {
+  try {
+    console.log('🔧 Setting up services...');
+    const emailService = setupEmailService();
+    sendEmail = emailService.sendEmail;
+    console.log('✅ Email service setup complete');
+  } catch (error) {
+    console.error('❌ Email service setup failed:', error.message);
+    sendEmail = null;
+  }
+}
 
-// Guards are optional for now
+if (setupFileUpload) {
+  try {
+    upload = setupFileUpload();
+    console.log('✅ File upload service setup complete');
+  } catch (error) {
+    console.error('❌ File upload setup failed:', error.message);
+    upload = null;
+  }
+}
+
+// Setup guards (async - will be set up in async block)
 requireAdmin = null;
-createNotification = null;
+if (setupAdminGuard) {
+  try {
+    requireAdmin = setupAdminGuard();
+    console.log('✅ Admin guard setup complete');
+  } catch (error) {
+    console.error('❌ Admin guard setup failed:', error.message);
+    requireAdmin = null;
+  }
+}
+
+if (createNotificationHelper && pool) {
+  try {
+    createNotification = createNotificationHelper(pool);
+    console.log('✅ Notification helper setup complete');
+  } catch (error) {
+    console.error('❌ Notification helper setup failed:', error.message);
+    createNotification = null;
+  }
+}
+
+// Async guards (will be set up in async block)
+idempotencyGuard = null;
+writeAuditLog = null;
 
 // Step 6: Setup routes (REAL API ENDPOINTS)
 console.log('🔧 Step 6: Setting up routes for REAL API endpoints...');
@@ -253,6 +314,31 @@ app.get('/api/health', (req, res) => {
 if (setupRoutes) {
   (async () => {
     try {
+      // Setup async guards first (before routes)
+      if (pool) {
+        if (setupIdempotencyGuard) {
+          try {
+            console.log('🔧 Setting up idempotency guard...');
+            idempotencyGuard = await setupIdempotencyGuard(pool);
+            console.log('✅ Idempotency guard setup complete');
+          } catch (error) {
+            console.error('❌ Idempotency guard setup failed:', error.message);
+            idempotencyGuard = null;
+          }
+        }
+        
+        if (setupAuditLog) {
+          try {
+            console.log('🔧 Setting up audit log...');
+            writeAuditLog = await setupAuditLog(pool);
+            console.log('✅ Audit log setup complete');
+          } catch (error) {
+            console.error('❌ Audit log setup failed:', error.message);
+            writeAuditLog = null;
+          }
+        }
+      }
+      
       console.log('🔧 Setting up routes...');
       setupRoutes(app, pool, middleware, {
         createNotification,
@@ -267,7 +353,7 @@ if (setupRoutes) {
       errorLogger.info('✅ All routes registered successfully');
     } catch (routeError) {
       console.error('❌ Routes setup failed:', routeError.message);
-      errorLogger.error('Routes setup failed', { error: routeError.message });
+      errorLogger.error('Routes setup failed', { error: routeError.message, stack: routeError.stack });
       // Continue with basic health check only
     }
   })();
