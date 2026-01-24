@@ -24,7 +24,7 @@
  * @version 1.0.0
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { createApiUrl } from '../config/api';
 import { normalizeTrackingCode } from '../utils/trackingCode';
@@ -226,21 +226,21 @@ export const useMyShipments = (basePath: string) => {
   const toTrackingCode = normalizeTrackingCode;
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const showNotification = (type: 'success' | 'error' | 'info', message: string) => {
+  const showNotification = useCallback((type: 'success' | 'error' | 'info', message: string) => {
     setNotification({ type, message });
     const t = setTimeout(() => setNotification(null), 1800);
     return () => clearTimeout(t);
-  };
+  }, []);
 
-  const loadShipments = async () => {
+  const loadShipments = useCallback(async () => {
     try {
       setLoading(true);
-      
       
       const token = localStorage.getItem('authToken');
       if (!token) {
         console.warn('No auth token found');
         setShipments([]);
+        setLoading(false);
         return;
       }
 
@@ -281,49 +281,53 @@ export const useMyShipments = (basePath: string) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [pagination.currentPage, searchTerm, statusFilter, sortBy, isCorporateView, showNotification]);
 
-  const handleSearch = (term: string) => {
+  const handleSearch = useCallback((term: string) => {
     setSearchTerm(term);
     setPagination(prev => ({ ...prev, currentPage: 1 }));
-  };
+    // loadShipments will be triggered automatically by useEffect dependency
+  }, []);
 
-  const handleStatusFilter = (status: string) => {
+  const handleStatusFilter = useCallback((status: string) => {
     setStatusFilter(status);
     setPagination(prev => ({ ...prev, currentPage: 1 }));
-  };
+    // loadShipments will be triggered automatically by useEffect dependency
+  }, []);
 
-  const handleSort = (sort: string) => {
+  const handleSort = useCallback((sort: string) => {
     setSortBy(sort);
     setPagination(prev => ({ ...prev, currentPage: 1 }));
-  };
+    // loadShipments will be triggered automatically by useEffect dependency
+  }, []);
 
-  const handlePageChange = (page: number) => {
+  const handlePageChange = useCallback((page: number) => {
     setPagination(prev => ({ ...prev, currentPage: page }));
-  };
+  }, []);
 
-  const refreshShipments = () => {
+  const refreshShipments = useCallback(() => {
     if (refreshTimerRef.current) {
       clearTimeout(refreshTimerRef.current);
     }
-    refreshTimerRef.current = setTimeout(loadShipments, 100);
-  };
+    // Direct call instead of setTimeout
+    loadShipments();
+  }, [loadShipments]);
 
   // Auto-refresh için visibility change handler
-  const handleVisibilityChange = () => {
+  const handleVisibilityChange = useCallback(() => {
     if (!document.hidden) {
       refreshShipments();
     }
-  };
+  }, [refreshShipments]);
 
-  const handleFocus = () => {
+  const handleFocus = useCallback(() => {
     refreshShipments();
-  };
+  }, [refreshShipments]);
 
-  // DEMO FIX: Prevent infinite loop by removing problematic dependencies
+  // Load shipments when component mounts or dependencies change
   useEffect(() => {
     loadShipments();
-  }, []); // Empty dependency array - load only once
+  }, [loadShipments]); // Only re-run when loadShipments callback changes
 
   useEffect(() => {
     document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -336,7 +340,7 @@ export const useMyShipments = (basePath: string) => {
         clearTimeout(refreshTimerRef.current);
       }
     };
-  }, []);
+  }, [handleVisibilityChange, handleFocus]);
 
   return {
     // Data
