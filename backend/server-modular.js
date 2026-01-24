@@ -506,8 +506,15 @@ async function startServer() {
         });
         
         if (NODE_ENV === 'production') {
-          errorLogger.error('CRITICAL: Database connection failed in production');
-          throw new Error(`Database connection failed: ${dbTestError.message}`);
+          errorLogger.error('CRITICAL: Database connection failed in production - CONTINUING WITH LIMITED FUNCTIONALITY', {
+            error: dbTestError.message,
+            code: dbTestError.code,
+            detail: dbTestError.detail,
+            hint: dbTestError.hint,
+            note: 'Server will start but database operations will fail'
+          });
+          // Don't crash in production, continue with limited functionality
+          console.log('⚠️ PRODUCTION: Database failed, continuing without database operations');
         } else {
           errorLogger.warn('Database connection failed in development, continuing with limited functionality');
         }
