@@ -15,8 +15,8 @@ services:
     name: yolnext-backend
     runtime: node
     plan: starter  # free tier için "starter"
-    buildCommand: cd backend && npm install
-    startCommand: cd backend && node server-modular.js
+    buildCommand: npm install --prefix backend
+    startCommand: node backend/server-modular.js
     envVars:
       - key: NODE_ENV
         value: production
