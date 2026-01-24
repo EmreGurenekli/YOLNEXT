@@ -78,7 +78,7 @@ console.log('🔍 DATABASE DEBUG DETAILED:', {
   }
 });
 
-// Test database connection immediately
+// Test database connection immediately (with proper error handling)
 console.log('🔍 TESTING DATABASE CONNECTION...');
 const testConnection = async () => {
   try {
@@ -95,9 +95,16 @@ const testConnection = async () => {
       address: error.address,
       port: error.port
     });
+    // Don't crash the app, just log the error
+    console.warn('⚠️ Backend will continue without database (limited functionality)');
   }
 };
-testConnection();
+
+// Run connection test without blocking startup
+testConnection().catch((error) => {
+  console.error('🚨 Connection test failed to execute:', error.message);
+  console.warn('⚠️ Backend will continue without database connection test');
+});
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const IS_TEST = NODE_ENV === 'test' || !!process.env.JEST_WORKER_ID;
 // Security: No default values for production secrets

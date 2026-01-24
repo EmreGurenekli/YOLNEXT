@@ -65,9 +65,21 @@ try {
     cfg.ssl = { rejectUnauthorized: false };
   }
   
-  // Force SSL for Render.com PostgreSQL in production
-  if (process.env.NODE_ENV === 'production' && connectionString && connectionString.includes('render.com')) {
-    cfg.ssl = { rejectUnauthorized: false };
+  // Force SSL for Render.com PostgreSQL in production  
+  if (process.env.NODE_ENV === 'production' && connectionString) {
+    // Enhanced SSL config for Render PostgreSQL
+    cfg.ssl = { 
+      rejectUnauthorized: false,
+      sslmode: 'require'
+    };
+    console.log('🔧 PRODUCTION SSL: Enabled with rejectUnauthorized: false');
+  }
+  
+  // Add connection timeout for production to prevent hanging
+  if (process.env.NODE_ENV === 'production') {
+    cfg.connectionTimeoutMillis = 10000; // 10 seconds
+    cfg.idleTimeoutMillis = 30000; // 30 seconds
+    cfg.max = 5; // Limit pool size in production
   }
  
    return cfg;
