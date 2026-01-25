@@ -1,7 +1,7 @@
 // Kill processes on specified ports (Windows compatible)
-const { exec } = require('child_process');
-const util = require('util');
-const execPromise = util.promisify(exec);
+import { exec } from 'child_process';
+import { promisify } from 'util';
+const execPromise = promisify(exec);
 
 async function killPort(port) {
   try {
