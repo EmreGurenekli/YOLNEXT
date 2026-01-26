@@ -15,12 +15,11 @@ const API_CONFIG = {
 
 const getViteEnv = (): any => {
   try {
-    const isJest =
-      typeof process !== 'undefined' &&
-      !!(process as any)?.env &&
-      ((process as any).env.JEST_WORKER_ID != null || (process as any).env.NODE_ENV === 'test');
-    if (isJest) return null;
-    return (0, eval)('import.meta.env');
+    // IMPORTANT:
+    // Do NOT use eval() here. Production CSP can block 'unsafe-eval',
+    // which would make the app think it's in development and break API base URL resolution.
+    // `import.meta.env` is safe in Vite runtime.
+    return (import.meta as any)?.env ?? null;
   } catch {
     return null;
   }
@@ -47,6 +46,8 @@ const resolveBaseUrl = (env: keyof typeof API_CONFIG) => {
     return baseUrl;
   }
   if (env === 'production') {
+    // Default to same-origin for monolith deployments (e.g. Render single-service)
+    if (typeof window !== 'undefined' && window.location?.origin) return window.location.origin;
     return 'https://yolnext-backend.onrender.com';
   }
   if (env === 'development') {
