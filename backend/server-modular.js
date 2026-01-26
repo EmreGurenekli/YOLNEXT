@@ -310,6 +310,16 @@ if (setupRoutes) {
         requireAdmin,
       });
       errorLogger.info('All routes registered successfully');
+
+      // Serve frontend in production (MUST be registered after API routes)
+      // IMPORTANT: Also do NOT swallow /api/* requests with the SPA catch-all.
+      if (NODE_ENV === 'production') {
+        app.use(express.static(path.join(__dirname, '../dist')));
+        // Any non-API route should return the SPA shell.
+        app.get(/^\/(?!api\/).*/, (req, res) => {
+          res.sendFile(path.resolve(__dirname, '../dist', 'index.html'));
+        });
+      }
     } catch (routeError) {
       errorLogger.error('Routes setup failed', { error: routeError.message, stack: routeError.stack });
     }
@@ -326,12 +336,7 @@ if (Sentry) {
 }
 
 // Serve frontend in production (after API routes)
-if (NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, '../dist')));
-  app.get('*', (req, res) => {
-    res.sendFile(path.resolve(__dirname, '../dist', 'index.html'));
-  });
-}
+// NOTE: Moved inside the async setupRoutes block above to guarantee ordering.
 
 // Sentry error handler (must be before other error middleware)
 if (Sentry) {
