@@ -1,60 +1,19 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { Link, useNavigate } from 'react-router-dom';
-import { 
-  Package, 
-  MapPin, 
-  Check,
-  ArrowLeft,
-  ArrowRight,
-  Send,
-  Weight,
-  Ruler,
-  Thermometer,
-  AlertTriangle,
-  Star,
-  Calendar,
-  Clock,
-  Plus,
-  FileText,
-  X,
-  ShoppingCart
-} from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Package, MapPin, Check, ArrowLeft, ArrowRight, Send, AlertTriangle, X } from 'lucide-react';
 import Breadcrumb from '../../components/shared-ui-elements/Breadcrumb';
 import SuccessMessage from '../../components/shared-ui-elements/SuccessMessage';
-import { turkeyCities } from '../../data/turkey-cities-districts';
-import { useAuth } from '../../contexts/AuthContext';
+import GuidanceOverlay from '../../components/shared-ui-elements/GuidanceOverlay';
 import { normalizeTrackingCode } from '../../utils/trackingCode';
-
-// Shipment data interface
-interface ShipmentData {
-  title: string;
-  description: string;
-  productDescription: string;
-  category: string;
-  pickupCity: string;
-  pickupDistrict: string;
-  pickupAddress: string;
-  pickupDate: string;
-  deliveryCity: string;
-  deliveryDistrict: string;
-  deliveryAddress: string;
-  deliveryDate: string;
-  weight: number;
-  volume: number;
-  dimensions: string | null;
-  value: number;
-  specialRequirements: string;
-}
-
-import { createApiUrl } from '../../config/api';
+import { analytics } from '../../services/businessAnalytics';
 import { shipmentAPI } from '../../services/apiClient';
 import CreateShipmentStep1 from '../../components/shipment/CreateShipmentStep1';
 import CreateShipmentStep2 from '../../components/shipment/CreateShipmentStep2';
 import CreateShipmentStep3 from '../../components/shipment/CreateShipmentStep3';
+
 export default function CreateShipment() {
   const navigate = useNavigate();
-  const { token: authTokenFromContext } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
@@ -67,11 +26,7 @@ export default function CreateShipment() {
     productDescription: '',
     weight: '',
     quantity: '',
-    dimensions: {
-      length: '',
-      width: '',
-      height: ''
-    },
+    dimensions: { length: '', width: '', height: '' },
     specialRequirements: '',
     pickupCity: '',
     pickupDistrict: '',
@@ -93,37 +48,33 @@ export default function CreateShipment() {
     specialItems: '',
     // Mobilya Taşıma için
     furniturePieces: '',
-    isDisassembled: false
+    isDisassembled: false,
   });
 
   const steps = [
     { id: 1, title: 'Form Doldurma', subtitle: 'Yük Bilgileri', icon: <Package size={20} /> },
     { id: 2, title: 'Adres ve Tarih', subtitle: 'Adres Bilgileri', icon: <MapPin size={20} /> },
-    { id: 3, title: 'Ön İzleme ve Yayınlama', subtitle: 'Yayınla & Önizleme', icon: <Send size={20} /> }
+    { id: 3, title: 'Ön İzleme ve Yayınlama', subtitle: 'Yayınla & Önizleme', icon: <Send size={20} /> },
   ];
 
   const mainCategories = [
     { id: 'house_move', name: 'Ev Taşınması' },
     { id: 'furniture_goods', name: 'Mobilya Taşıma' },
     { id: 'special_cargo', name: 'Özel Yük' },
-    { id: 'other', name: 'Diğer' }
+    { id: 'other', name: 'Diğer' },
   ];
 
-
   const handleInputChange = (field: string, value: string | number | boolean) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleDimensionsChange = (field: string, value: string) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       dimensions: {
         ...prev.dimensions,
-        [field]: value
-      }
+        [field]: value,
+      },
     }));
   };
 
@@ -142,24 +93,13 @@ export default function CreateShipment() {
     return dt;
   };
 
-  // Streamlined essential validation - Nakliyeci-style simplified checks
   const validateEssentialFields = (): boolean => {
     const newErrors: { [key: string]: string } = {};
-
-    // Only check truly essential fields to reduce friction
-    if (!formData.mainCategory) {
-      newErrors.mainCategory = 'Lütfen yük kategorisini seçiniz';
-    }
-    if (!formData.productDescription?.trim()) {
+    if (!formData.mainCategory) newErrors.mainCategory = 'Lütfen yük kategorisini seçiniz';
+    if (!formData.productDescription?.trim())
       newErrors.productDescription = 'Lütfen yük açıklamasını giriniz';
-    }
-    if (!formData.pickupCity) {
-      newErrors.pickupCity = 'Lütfen toplama ilini seçiniz';
-    }
-    if (!formData.deliveryCity) {
-      newErrors.deliveryCity = 'Lütfen teslimat ilini seçiniz';
-    }
-
+    if (!formData.pickupCity) newErrors.pickupCity = 'Lütfen toplama ilini seçiniz';
+    if (!formData.deliveryCity) newErrors.deliveryCity = 'Lütfen teslimat ilini seçiniz';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -168,94 +108,58 @@ export default function CreateShipment() {
     const newErrors: { [key: string]: string } = {};
 
     if (step === 1) {
-      // Step 1: Yük Bilgileri validasyonu
       if (!formData.mainCategory) {
-        newErrors.mainCategory = 'Yük kategorisi seçimi zorunludur. Doğru kategori seçimi, size en uygun fiyat tekliflerinin alınması için kritik öneme sahiptir.';
+        newErrors.mainCategory =
+          'Yük kategorisi seçimi zorunludur. Doğru kategori seçimi, size en uygun fiyat tekliflerinin alınması için kritik öneme sahiptir.';
       }
       if (!formData.productDescription || formData.productDescription.trim() === '') {
-        newErrors.productDescription = 'Yük açıklaması zorunludur. Lütfen taşınacak eşyalar hakkında detaylı bilgi veriniz.';
+        newErrors.productDescription =
+          'Yük açıklaması zorunludur. Lütfen taşınacak eşyalar hakkında detaylı bilgi veriniz.';
       }
 
-      // Kategoriye göre özel validasyonlar
       if (formData.mainCategory === 'house_move') {
-        if (!formData.roomCount) {
-          newErrors.roomCount = 'Oda sayısı bilgisi zorunludur. Bu bilgi, fiyat tekliflerinin doğruluğu için gereklidir.';
-        }
-        if (!formData.buildingType) {
-          newErrors.buildingType = 'Bina tipi bilgisi zorunludur. Bu bilgi, daha doğru fiyat teklifleri almanızı sağlar.';
-        }
-        if (!formData.pickupFloor || formData.pickupFloor.trim() === '') {
-          newErrors.pickupFloor = 'Toplama adresi kat bilgisi zorunludur. Asansör durumu fiyatı etkileyebilir.';
-        }
-        if (!formData.deliveryFloor || formData.deliveryFloor.trim() === '') {
-          newErrors.deliveryFloor = 'Teslimat adresi kat bilgisi zorunludur. Kat bilgisi, fiyat hesaplamasında önemlidir.';
-        }
+        if (!formData.roomCount) newErrors.roomCount = 'Oda sayısı bilgisi zorunludur.';
+        if (!formData.buildingType) newErrors.buildingType = 'Bina tipi bilgisi zorunludur.';
+        if (!formData.pickupFloor || formData.pickupFloor.trim() === '')
+          newErrors.pickupFloor = 'Toplama adresi kat bilgisi zorunludur.';
+        if (!formData.deliveryFloor || formData.deliveryFloor.trim() === '')
+          newErrors.deliveryFloor = 'Teslimat adresi kat bilgisi zorunludur.';
       } else if (formData.mainCategory === 'furniture_goods') {
-        if (!formData.furniturePieces) {
-          newErrors.furniturePieces = 'Mobilya parça sayısı bilgisi zorunludur. Bu bilgi, fiyat tekliflerinin doğruluğu için gereklidir.';
-        }
+        if (!formData.furniturePieces) newErrors.furniturePieces = 'Mobilya parça sayısı zorunludur.';
       } else if (formData.mainCategory === 'special_cargo') {
-        if (!formData.weight || formData.weight.trim() === '') {
-          newErrors.weight = 'Ağırlık bilgisi zorunludur. Nakliyeciler, ağırlık bilgisine göre size en uygun teklifi sunacaktır.';
-        }
+        if (!formData.weight || formData.weight.trim() === '')
+          newErrors.weight = 'Ağırlık bilgisi zorunludur.';
       }
     } else if (step === 2) {
-      // Step 2: Adres Bilgileri validasyonu
-      if (!formData.pickupCity) {
-        newErrors.pickupCity = 'Toplama ili seçimi zorunludur. Lütfen yükünüzün alınacağı ili seçiniz.';
-      }
-      if (!formData.pickupDistrict) {
-        newErrors.pickupDistrict = 'Toplama ilçesi seçimi zorunludur. Mesafe hesaplaması için ilçe bilgisi gereklidir.';
-      }
-      if (!formData.pickupAddress || formData.pickupAddress.trim() === '') {
-        newErrors.pickupAddress = 'Toplama adresi zorunludur. Lütfen tam adres bilgilerini giriniz.';
-      }
-      if (!formData.deliveryCity) {
-        newErrors.deliveryCity = 'Teslimat ili seçimi zorunludur. Lütfen yükünüzün teslim edileceği ili seçiniz.';
-      }
-      if (!formData.deliveryDistrict) {
-        newErrors.deliveryDistrict = 'Teslimat ilçesi seçimi zorunludur. Mesafe hesaplaması için ilçe bilgisi gereklidir.';
-      }
-      if (!formData.deliveryAddress || formData.deliveryAddress.trim() === '') {
-        newErrors.deliveryAddress = 'Teslimat adresi zorunludur. Lütfen tam adres bilgilerini giriniz.';
-      }
+      if (!formData.pickupCity) newErrors.pickupCity = 'Toplama ili seçimi zorunludur.';
+      if (!formData.pickupDistrict) newErrors.pickupDistrict = 'Toplama ilçesi seçimi zorunludur.';
+      if (!formData.pickupAddress || formData.pickupAddress.trim() === '')
+        newErrors.pickupAddress = 'Toplama adresi zorunludur.';
+      if (!formData.deliveryCity) newErrors.deliveryCity = 'Teslimat ili seçimi zorunludur.';
+      if (!formData.deliveryDistrict) newErrors.deliveryDistrict = 'Teslimat ilçesi seçimi zorunludur.';
+      if (!formData.deliveryAddress || formData.deliveryAddress.trim() === '')
+        newErrors.deliveryAddress = 'Teslimat adresi zorunludur.';
+
       if (!formData.pickupDate) {
-        newErrors.pickupDate = 'Toplama tarihi seçimi zorunludur. Lütfen yükünüzün alınmasını istediğiniz tarihi seçiniz.';
+        newErrors.pickupDate = 'Toplama tarihi seçimi zorunludur.';
       } else {
         const pickupDate = parseISODateStrict(formData.pickupDate);
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
-        if (!pickupDate) {
-          newErrors.pickupDate = 'Takvimden tarih seç';
-        }
-        
-        // Geçmiş tarih kontrolü
-        if (pickupDate && pickupDate < today) {
-          newErrors.pickupDate = 'Geçmiş tarih seçemezsiniz - bugünden itibaren seçebilirsiniz';
-        }
-        
-        // 20 gün sonrası kontrolü
+        if (!pickupDate) newErrors.pickupDate = 'Takvimden tarih seç';
+        if (pickupDate && pickupDate < today) newErrors.pickupDate = 'Geçmiş tarih seçemezsiniz';
+
         const maxDate = new Date(today);
         maxDate.setDate(maxDate.getDate() + 20);
-        if (pickupDate && pickupDate > maxDate) {
-          newErrors.pickupDate = 'En fazla 20 gün sonrası için planlayabilirsiniz - daha yakın tarih seçin';
-        }
-        
-        // Teslimat tarihi kontrolü
+        if (pickupDate && pickupDate > maxDate)
+          newErrors.pickupDate = 'En fazla 20 gün sonrası için planlayabilirsiniz';
+
         if (formData.deliveryDate) {
           const deliveryDate = parseISODateStrict(formData.deliveryDate);
-          if (!deliveryDate) {
-            newErrors.deliveryDate = 'Takvimden tarih seç';
-          } else if (pickupDate && deliveryDate < pickupDate) {
+          if (!deliveryDate) newErrors.deliveryDate = 'Takvimden tarih seç';
+          else if (pickupDate && deliveryDate < pickupDate)
             newErrors.deliveryDate = 'Teslimat tarihi alım tarihinden önce olamaz';
-          } else if (pickupDate) {
-            const maxDeliveryDate = new Date(pickupDate);
-            maxDeliveryDate.setDate(maxDeliveryDate.getDate() + 30);
-            if (deliveryDate > maxDeliveryDate) {
-              newErrors.deliveryDate = 'Teslimat tarihi alım tarihinden en fazla 30 gün sonra olabilir';
-            }
-          }
         }
       }
     }
@@ -265,56 +169,28 @@ export default function CreateShipment() {
   };
 
   const handleNext = () => {
-    if (validateStep(currentStep)) {
-      if (currentStep < steps.length) {
-        setCurrentStep(currentStep + 1);
-        setErrors({});
-      }
+    if (validateStep(currentStep) && currentStep < steps.length) {
+      setCurrentStep(currentStep + 1);
+      setErrors({});
     }
   };
 
   const handlePrev = () => {
-    if (currentStep > 1) {
-      setCurrentStep(currentStep - 1);
-    }
+    if (currentStep > 1) setCurrentStep(currentStep - 1);
   };
 
   const handlePublish = async () => {
-    // Streamlined validation - only check essential fields like Nakliyeci panel
-    const essentialValid = validateEssentialFields();
-    if (!essentialValid) {
-      return;
-    }
+    if (!validateEssentialFields()) return;
 
     setIsLoading(true);
     const timeoutId = setTimeout(() => {
       setIsLoading(false);
       setErrors({ publish: 'Gönderi oluşturma işlemi zaman aşımına uğradı. Lütfen tekrar deneyin.' });
-    }, 30000); // 30 seconds timeout for shipment creation
-    
+    }, 30000);
+
     try {
-      // Debug: Log formData to see what values are actually set (development only)
-      if (import.meta.env.DEV) {
-        console.log('🔍 DEBUG - FormData before API call:', {
-          pickupCity: formData.pickupCity,
-          pickupDistrict: formData.pickupDistrict,
-          deliveryCity: formData.deliveryCity,
-          deliveryDistrict: formData.deliveryDistrict,
-          pickupAddress: formData.pickupAddress,
-          deliveryAddress: formData.deliveryAddress,
-          pickupDate: formData.pickupDate,
-          deliveryDate: formData.deliveryDate
-        });
-      }
-      // Use form data directly for city and district
-      const pickupLocation = {
-        city: formData.pickupCity || 'İstanbul',
-        district: formData.pickupDistrict || ''
-      };
-      const deliveryLocation = {
-        city: formData.deliveryCity || 'İstanbul',
-        district: formData.deliveryDistrict || ''
-      };
+      const pickupLocation = { city: formData.pickupCity || 'İstanbul', district: formData.pickupDistrict || '' };
+      const deliveryLocation = { city: formData.deliveryCity || 'İstanbul', district: formData.deliveryDistrict || '' };
 
       const shipmentData = {
         title: `${pickupLocation.city} → ${deliveryLocation.city}`,
@@ -331,13 +207,15 @@ export default function CreateShipment() {
         deliveryDate: formData.deliveryDate,
         weight: formData.weight ? parseFloat(formData.weight) : 0,
         volume: 0,
-        dimensions: formData.dimensions.length && formData.dimensions.width && formData.dimensions.height
-          ? `${formData.dimensions.length}x${formData.dimensions.width}x${formData.dimensions.height}`
-          : null,
+        dimensions:
+          formData.dimensions.length && formData.dimensions.width && formData.dimensions.height
+            ? `${formData.dimensions.length}x${formData.dimensions.width}x${formData.dimensions.height}`
+            : null,
         value: 0,
         specialRequirements: (() => {
-          // Combine button-selected requirements with form-specific requirements
-          const buttonRequirements = formData.specialRequirements ? formData.specialRequirements.split(',').filter(r => r.trim()) : [];
+          const buttonRequirements = formData.specialRequirements
+            ? formData.specialRequirements.split(',').filter((r) => r.trim())
+            : [];
           const formRequirements = [
             formData.roomCount ? `Oda Sayısı: ${formData.roomCount}` : null,
             formData.buildingType ? `Bina Tipi: ${formData.buildingType}` : null,
@@ -348,26 +226,25 @@ export default function CreateShipment() {
             formData.needsPackaging ? 'Ambalaj ve paketleme hizmeti gerekli' : null,
             formData.specialItems || null,
           ].filter(Boolean);
-          // Map button IDs to readable names
           const reqMap: { [key: string]: string } = {
-            'fragile': 'Kırılgan',
-            'urgent': 'Acil',
-            'signature': 'İmzalı Teslimat',
-            'temperature': 'Soğuk Zincir',
-            'valuable': 'Değerli'
+            fragile: 'Kırılgan',
+            urgent: 'Acil',
+            signature: 'İmzalı Teslimat',
+            temperature: 'Soğuk Zincir',
+            valuable: 'Değerli',
           };
-          const mappedButtonReqs = buttonRequirements.map(r => reqMap[r.trim()] || r.trim()).filter(Boolean);
+          const mappedButtonReqs = buttonRequirements
+            .map((r) => reqMap[r.trim()] || r.trim())
+            .filter(Boolean);
           return [...mappedButtonReqs, ...formRequirements].join(', ');
         })(),
       };
 
-      // Use centralized API service
       const result = await shipmentAPI.create(shipmentData);
-      
+
       clearTimeout(timeoutId);
       setIsLoading(false);
-      
-      // Verify success
+
       if (result.success && (result.data?.shipment || result.data?.id)) {
         const shipment = result.data?.shipment || result.data;
         const rawTracking =
@@ -384,78 +261,45 @@ export default function CreateShipment() {
 
         const trackingNumber = normalizeTrackingCode(rawTracking, shipment?.id);
         const trackingText = trackingNumber ? `Takip kodunuz: ${trackingNumber}` : '';
-        // Professional but warm success feedback
-        setSuccessMessage(`Gönderiniz başarıyla yayınlandı. ${trackingText ? trackingText + '. ' : ''}Platformdaki sertifikalı nakliyeciler gönderinizi inceleyecek ve size teklif sunmaya başlayacaktır. Ortalama bekleme süresi 5-15 dakikadır. 24 saat içinde teklif gelmezse otomatik olarak bilgilendirileceksiniz. Teklifler sayfasına yönlendiriliyorsunuz...`);
+
+        analytics.track('shipment_create_success', {
+          shipmentId: shipment?.id || null,
+          category: formData.mainCategory || null,
+          publishType: formData.publishType || null,
+        });
+
+        setSuccessMessage(
+          `Gönderiniz başarıyla yayınlandı. ${trackingText ? trackingText + '. ' : ''}` +
+            'Platformdaki sertifikalı nakliyeciler gönderinizi inceleyecek ve size teklif sunmaya başlayacaktır. ' +
+            'Ortalama bekleme süresi 5-15 dakikadır. Teklifler sayfasına yönlendiriliyorsunuz...'
+        );
         setShowSuccessMessage(true);
-        
-        // Quick transition - direct to offers for immediate engagement
+
         setTimeout(() => {
           setShowSuccessMessage(false);
           navigate('/individual/offers');
         }, 2000);
       } else {
-        throw new Error(result.message || 'Gönderi oluşturuldu ama bir sorun var - destek ile iletişime geç');
+        throw new Error(result.message || 'Gönderi oluşturuldu ama doğrulanamadı');
       }
-      
-      setTimeout(() => {
-        // Reset form (only if not redirecting)
-        setFormData({
-          mainCategory: '',
-          productDescription: '',
-          weight: '',
-          quantity: '',
-          dimensions: { length: '', width: '', height: '' },
-          specialRequirements: '',
-          pickupCity: '',
-          pickupDistrict: '',
-          pickupAddress: '',
-          deliveryCity: '',
-          deliveryDistrict: '',
-          deliveryAddress: '',
-          pickupDate: '',
-          deliveryDate: '',
-          publishType: 'all',
-          roomCount: '',
-          pickupFloor: '',
-          deliveryFloor: '',
-          buildingType: '',
-          hasElevatorPickup: false,
-          hasElevatorDelivery: false,
-          needsPackaging: false,
-          specialItems: '',
-          furniturePieces: '',
-          isDisassembled: false
-        });
-        setCurrentStep(1);
-        setShowSuccessMessage(false);
-        setErrors({});
-      }, 3000);
-    } catch (error) {
+    } catch (error: unknown) {
       clearTimeout(timeoutId);
       setIsLoading(false);
-      let errorMessage = 'Bir sorun oluştu - tekrar dene';
-      if ((error as any)?.status === 429) {
-        const dataMsg = (error as any)?.data?.message || (error as any)?.message;
+      const e = error as any;
+
+      if (e?.status === 429) {
+        const dataMsg = e?.data?.message || e?.message;
         setLimitMessage(dataMsg || 'Günlük limit aşıldı. Lütfen yarın tekrar deneyin.');
         setShowLimitModal(true);
-        setErrors(prev => ({ ...prev, publish: '' }));
+        setErrors((prev) => ({ ...prev, publish: '' }));
         return;
       }
-      
-      if (error instanceof Error) {
-        errorMessage = error.message;
-        // Check for network errors
-        if (error.message.includes('fetch') || error.message.includes('network') || error.message.includes('Failed to fetch')) {
-          errorMessage = 'İnternet bağlantınızı kontrol edin ve tekrar deneyin.';
-        }
-      }
-      
-      setErrors({ publish: errorMessage });
-      setSuccessMessage('');
+
+      const msg = error instanceof Error ? error.message : 'Bir sorun oluştu - tekrar dene';
+      setErrors({ publish: msg });
       setShowSuccessMessage(false);
     }
   };
-
 
   const renderStepContent = () => {
     switch (currentStep) {
@@ -470,7 +314,6 @@ export default function CreateShipment() {
             mainCategories={mainCategories}
           />
         );
-
       case 2:
         return (
           <CreateShipmentStep2
@@ -480,7 +323,6 @@ export default function CreateShipment() {
             setErrors={setErrors}
           />
         );
-
       case 3:
         return (
           <CreateShipmentStep3
@@ -491,19 +333,34 @@ export default function CreateShipment() {
             handlePublish={handlePublish}
           />
         );
-
       default:
         return null;
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
+    <div className='min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50'>
       <Helmet>
         <title>Gönderi Oluştur - YolNext</title>
       </Helmet>
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-6">
-        <Breadcrumb items={[{ label: 'Ana Sayfa', href: '/individual/dashboard' }, { label: 'Gönderi Oluştur', href: '/individual/create-shipment' }]} />
+      <div className='max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-6'>
+        <Breadcrumb
+          items={[
+            { label: 'Ana Sayfa', href: '/individual/dashboard' },
+            { label: 'Gönderi Oluştur', href: '/individual/create-shipment' },
+          ]}
+        />
+
+        <div className='mt-4 mb-6'>
+          <GuidanceOverlay
+            storageKey='individual.create-shipment'
+            icon={Package}
+            title='Gönderi Oluşturma İpucu'
+            description='Doğru şehir/ilçe ve net tarih aralığı, daha hızlı ve daha doğru teklifler getirir. Ölçü/ağırlık bilgisini mümkün olduğunca gerçek gir.'
+            primaryAction={{ label: 'Yardım Merkezi', to: '/individual/help' }}
+            secondaryAction={{ label: 'Teklifler', to: '/individual/offers' }}
+          />
+        </div>
         
         {/* Page Header */}
         <div className="mb-8 text-center">

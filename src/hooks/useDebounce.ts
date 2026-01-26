@@ -5,17 +5,14 @@ export function useDebounce<T>(value: T, delay: number): T {
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    // Clear previous timeout
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
     }
 
-    // Set new timeout
     timeoutRef.current = setTimeout(() => {
       setDebouncedValue(value);
     }, delay);
 
-    // Cleanup on unmount
     return () => {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
@@ -33,19 +30,16 @@ export function useDebouncedCallback<T extends (...args: any[]) => any>(
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const callbackRef = useRef(callback);
 
-  // Update callback ref when callback changes
   useEffect(() => {
     callbackRef.current = callback;
   }, [callback]);
 
   const debouncedCallback = useCallback(
     (...args: Parameters<T>) => {
-      // Clear previous timeout
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
 
-      // Set new timeout
       timeoutRef.current = setTimeout(() => {
         callbackRef.current(...args);
       }, delay);
@@ -53,7 +47,6 @@ export function useDebouncedCallback<T extends (...args: any[]) => any>(
     [delay]
   ) as T;
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (timeoutRef.current) {
@@ -66,12 +59,3 @@ export function useDebouncedCallback<T extends (...args: any[]) => any>(
 }
 
 export default useDebounce;
-
-
-
-
-
-
-
-
-

@@ -10,6 +10,9 @@ function createDisputeRoutes(pool, authenticateToken, requireAdmin, writeAuditLo
   router.use(authenticateToken);
   router.use(requireAdmin);
 
+  // Socket.io removed - REST only
+  const io = null;
+
   // Dispute statuses
   const DISPUTE_STATUS = {
     PENDING: 'pending',

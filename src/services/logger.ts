@@ -1,11 +1,11 @@
+import { createApiUrl } from '../config/api';
+
 export enum LogLevel {
   ERROR = 'error',
   WARN = 'warn',
   INFO = 'info',
   DEBUG = 'debug',
 }
-
-import { createApiUrl } from '../config/api';
 
 export interface LogEntry {
   level: LogLevel;
@@ -103,7 +103,6 @@ class Logger {
         body: JSON.stringify(logEntry),
       });
     } catch (error) {
-      // Fallback to console in case of network issues
       console.error('Log sunucuya gönderilemedi:', error);
     }
   }
@@ -124,7 +123,6 @@ class Logger {
     this.log(LogLevel.DEBUG, message, data);
   }
 
-  // API logging
   apiRequest(method: string, url: string, data?: any) {
     this.info(`API Request: ${method} ${url}`, data);
   }
@@ -134,24 +132,20 @@ class Logger {
     this.log(level, `API Response: ${method} ${url} - ${status}`, data);
   }
 
-  // User action logging
   userAction(action: string, data?: any) {
     this.info(`User Action: ${action}`, data);
   }
 
-  // Performance logging
   performance(operation: string, duration: number, data?: any) {
     if (this.enableMetrics) {
       this.info(`Performance: ${operation} took ${duration}ms`, data);
     }
   }
 
-  // Security logging
   security(event: string, data?: any) {
     this.warn(`Security Event: ${event}`, data);
   }
 
-  // Business metrics
   businessMetric(metric: string, value: number, data?: any) {
     if (this.enableMetrics) {
       this.info(`Business Metric: ${metric} = ${value}`, data);
@@ -161,12 +155,3 @@ class Logger {
 
 export const logger = new Logger();
 export default logger;
-
-
-
-
-
-
-
-
-

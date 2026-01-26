@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useAuth } from '../../contexts/AuthContext';
@@ -39,6 +39,7 @@ import {
   Zap,
   TrendingDown,
   Copy,
+  Share2,
   CheckCircle,
 } from 'lucide-react';
 import Breadcrumb from '../../components/shared-ui-elements/Breadcrumb';
@@ -85,9 +86,11 @@ interface Notification {
 }
 
 const Dashboard = () => {
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const navigate = useNavigate();
   const { showToast } = useToast();
+  const [showShareMenu, setShowShareMenu] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
   const [showNotificationModal, setShowNotificationModal] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [stats, setStats] = useState({
@@ -102,6 +105,95 @@ const Dashboard = () => {
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Ensure we have nakliyeciCode on the user object - fetch profile if missing
+  useEffect(() => {
+    const ensureNakliyeciCode = async () => {
+      try {
+        const token = localStorage.getItem('authToken');
+        if (!token) return;
+
+        const existing =
+          (user as any)?.nakliyeciCode ||
+          (user as any)?.nakliyeci_code ||
+          (user as any)?.carrierCode ||
+          (user as any)?.carrier_code ||
+          '';
+        if (existing) return;
+
+        const res = await fetch(createApiUrl('/api/users/profile'), {
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        });
+        if (!res.ok) return;
+        const resp = await res.json().catch(() => null);
+        const profile = resp?.data?.user || resp?.user || resp?.data || resp;
+        const code =
+          profile?.nakliyeciCode ||
+          profile?.nakliyecicode ||
+          profile?.nakliyeci_code ||
+          profile?.carrierCode ||
+          profile?.carrier_code ||
+          '';
+        if (!code) return;
+
+        // Update in-memory auth user so UI updates immediately
+        try {
+          updateUser({ nakliyeciCode: String(code) } as any);
+        } catch {
+          // ignore
+        }
+
+        // Persist into localStorage user snapshot used by AuthContext
+        try {
+          const storedRaw = localStorage.getItem('user');
+          const stored = storedRaw ? JSON.parse(storedRaw) : {};
+          const next = { ...(stored || {}), nakliyeciCode: String(code) };
+          localStorage.setItem('user', JSON.stringify(next));
+        } catch {
+          // ignore
+        }
+      } catch {
+        // ignore
+      }
+    };
+
+    ensureNakliyeciCode();
+  }, [user, updateUser]);
+
+  const nakliyeciCode =
+    (user as any)?.nakliyeciCode ||
+    (user as any)?.nakliyeci_code ||
+    (user as any)?.carrierCode ||
+    (user as any)?.carrier_code ||
+    (user as any)?.code ||
+    '';
+
+  const copyNakliyeciCode = async () => {
+    if (!nakliyeciCode) return;
+    try {
+      await navigator.clipboard.writeText(String(nakliyeciCode));
+    } catch {
+      // Fallback
+      try {
+        window.prompt('Nakliyeci kodunu kopyala:', String(nakliyeciCode));
+      } catch {
+        // ignore
+      }
+    }
+    setCopiedCode(true);
+    setTimeout(() => setCopiedCode(false), 1200);
+  };
+
+  const shareNakliyeciCode = async () => {
+    if (!nakliyeciCode) return;
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const shareUrl = origin ? `${origin}/?ref=${encodeURIComponent(String(nakliyeciCode))}` : '';
+    const text = `YolNext'te nakliyeci kodum: ${String(nakliyeciCode)}${shareUrl ? `\n${shareUrl}` : ''}`;
+
+    // User expectation: show social share options menu.
+    // We keep text/url ready; menu can optionally trigger native share too.
+    setShowShareMenu(v => !v);
+  };
 
   const markNotificationsAsRead = async () => {
     try {
@@ -155,9 +247,82 @@ const Dashboard = () => {
                     <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse shadow-lg"></div>
                     <span className="text-slate-200 font-medium">Çevrimiçi</span>
                   </div>
-                  <div className="bg-white/10 backdrop-blur-sm rounded-2xl px-4 py-2 border border-white/20">
-                    <span className="text-slate-200 font-medium">{stats.totalShipments} Aktif Yük</span>
-                  </div>
+                  {nakliyeciCode ? (
+                    <div className="relative flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-2xl px-4 py-2 border border-white/20">
+                      <span className="text-slate-200 font-medium">
+                        Nakliyeci Kodu: <span className="text-white font-bold">{String(nakliyeciCode)}</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={copyNakliyeciCode}
+                        className="ml-1 inline-flex items-center justify-center w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 transition"
+                        title="Kopyala"
+                      >
+                        {copiedCode ? <CheckCircle className="w-4 h-4 text-emerald-200" /> : <Copy className="w-4 h-4 text-white" />}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={shareNakliyeciCode}
+                        className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 transition"
+                        title="Paylaş"
+                      >
+                        <Share2 className="w-4 h-4 text-white" />
+                      </button>
+
+                      {showShareMenu ? (
+                        <div className="absolute left-0 top-full mt-3 w-64 rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden z-50">
+                          <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+                            <div className="text-sm font-bold text-slate-900">Paylaş</div>
+                            <button
+                              type="button"
+                              onClick={() => setShowShareMenu(false)}
+                              className="w-8 h-8 inline-flex items-center justify-center rounded-lg hover:bg-slate-100"
+                              title="Kapat"
+                            >
+                              <X className="w-4 h-4 text-slate-600" />
+                            </button>
+                          </div>
+
+                          <div className="p-2">
+                            <a
+                              className="block px-3 py-2 rounded-xl hover:bg-slate-50 text-sm font-semibold text-slate-800"
+                              target="_blank"
+                              rel="noreferrer"
+                              href={`https://wa.me/?text=${encodeURIComponent(`YolNext'te nakliyeci kodum: ${String(nakliyeciCode)}`)}`}
+                            >
+                              WhatsApp
+                            </a>
+                            <a
+                              className="block px-3 py-2 rounded-xl hover:bg-slate-50 text-sm font-semibold text-slate-800"
+                              target="_blank"
+                              rel="noreferrer"
+                              href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`YolNext'te nakliyeci kodum: ${String(nakliyeciCode)}`)}`}
+                            >
+                              X (Twitter)
+                            </a>
+                            <a
+                              className="block px-3 py-2 rounded-xl hover:bg-slate-50 text-sm font-semibold text-slate-800"
+                              target="_blank"
+                              rel="noreferrer"
+                              href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(`${window.location.origin}/?ref=${encodeURIComponent(String(nakliyeciCode))}`)}`}
+                            >
+                              LinkedIn
+                            </a>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                await copyNakliyeciCode();
+                                setShowShareMenu(false);
+                              }}
+                              className="w-full text-left px-3 py-2 rounded-xl hover:bg-slate-50 text-sm font-semibold text-slate-800"
+                            >
+                              Kodu kopyala
+                            </button>
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
                   {walletBalance !== null && (
                     <div className="bg-white/10 backdrop-blur-sm rounded-2xl px-4 py-2 border border-white/20">
                       <span className="text-slate-200 font-medium">₺{walletBalance.toFixed(0)} Bakiye</span>
@@ -181,6 +346,7 @@ const Dashboard = () => {
                     </span>
                   )}
                 </button>
+
                 <Link to='/nakliyeci/jobs'>
                   <button className='bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 text-white px-6 py-3 rounded-lg font-medium transition-all duration-300 flex items-center gap-2 text-base shadow-lg hover:shadow-xl w-full sm:w-auto'>
                     <Plus size={20} />

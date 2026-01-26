@@ -20,7 +20,7 @@ class MigrationRunner {
         connectionString:
           process.env.DATABASE_URL ||
           process.env.DB_URL ||
-          'postgresql://postgres:2563@localhost:5432/yolnext',
+          'postgresql://postgres:postgres@localhost:5432/postgres',
       });
     }
     this.migrationsPath = __dirname;

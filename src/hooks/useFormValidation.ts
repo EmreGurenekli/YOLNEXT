@@ -30,7 +30,6 @@ export const useFormValidation = (rules: ValidationRules) => {
       const rule = rules[name];
       if (!rule) return null;
 
-      // Required validation
       if (
         rule.required &&
         (!value || (typeof value === 'string' && value.trim() === ''))
@@ -38,12 +37,10 @@ export const useFormValidation = (rules: ValidationRules) => {
         return rule.message || 'Bu alan zorunludur';
       }
 
-      // Skip other validations if value is empty and not required
       if (!value || (typeof value === 'string' && value.trim() === '')) {
         return null;
       }
 
-      // Min length validation
       if (
         rule.minLength &&
         typeof value === 'string' &&
@@ -54,7 +51,6 @@ export const useFormValidation = (rules: ValidationRules) => {
         );
       }
 
-      // Max length validation
       if (
         rule.maxLength &&
         typeof value === 'string' &&
@@ -66,7 +62,6 @@ export const useFormValidation = (rules: ValidationRules) => {
         );
       }
 
-      // Pattern validation
       if (
         rule.pattern &&
         typeof value === 'string' &&
@@ -75,7 +70,6 @@ export const useFormValidation = (rules: ValidationRules) => {
         return rule.message || `${name} geçerli bir format değil`;
       }
 
-      // Custom validation
       if (rule.custom) {
         return rule.custom(value);
       }
@@ -173,10 +167,7 @@ export const useFormValidation = (rules: ValidationRules) => {
   };
 };
 
-// Common validation rules
 export const commonValidationRules = {
-  
-  
   email: {
     required: true,
     pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
@@ -304,12 +295,3 @@ export const commonValidationRules = {
     message: 'Açıklama 10-500 karakter arasında olmalıdır',
   },
 };
-
-
-
-
-
-
-
-
-

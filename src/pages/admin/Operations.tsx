@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { createApiUrl } from '../../config/api';
 import { AlertTriangle, Layers, Search, Shield, Command, Zap, Users, FileText, Activity, X } from 'lucide-react';
@@ -14,6 +14,7 @@ const Operations: React.FC = () => {
   const [briefing, setBriefing] = useState<any>(null);
   const [items, setItems] = useState<any[]>([]);
   const [selected, setSelected] = useState<any>(null);
+  const [inboxCounts, setInboxCounts] = useState<any>(null);
 
   // Shipments table data
   const [shipments, setShipments] = useState<any[]>([]);
@@ -72,6 +73,7 @@ const Operations: React.FC = () => {
       const list = inboxPayload?.data?.items || [];
       setItems(Array.isArray(list) ? list : []);
       setSelected((prev: any) => prev || (Array.isArray(list) && list.length ? list[0] : null));
+      setInboxCounts(inboxPayload?.data?.counts || null);
     } catch (e: any) {
       setError(e?.message || 'Operasyon masası yüklenemedi');
     } finally {
@@ -155,13 +157,25 @@ const Operations: React.FC = () => {
     load();
   }, []);
 
-  const loadShipments = async () => {
+  const statusFilterRef = useRef(statusFilter);
+  useEffect(() => {
+    statusFilterRef.current = statusFilter;
+  }, [statusFilter]);
+
+  const queryRef = useRef(query);
+  useEffect(() => {
+    queryRef.current = query;
+  }, [query]);
+
+  const loadShipments = useCallback(async (opts?: { status?: string; q?: string }) => {
     try {
       setShipmentsLoading(true);
       setShipmentsError('');
       const qs = new URLSearchParams();
-      if (statusFilter !== 'all') qs.set('status', statusFilter);
-      if (query.trim()) qs.set('q', query.trim());
+      const st = (opts?.status ?? statusFilterRef.current ?? 'all') as string;
+      const qv = String(opts?.q ?? queryRef.current ?? '').trim();
+      if (st !== 'all') qs.set('status', st);
+      if (qv) qs.set('q', qv);
       qs.set('limit', '100');
       const token = localStorage.getItem('token') || localStorage.getItem('authToken') || '';
       const res = await fetch(createApiUrl(`/api/admin/shipments?${qs.toString()}`), {
@@ -178,15 +192,15 @@ const Operations: React.FC = () => {
     } finally {
       setShipmentsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    loadShipments();
-  }, [statusFilter, loadShipments]);
+    loadShipments({ status: statusFilter, q: query });
+  }, [statusFilter, loadShipments, query]);
 
   useEffect(() => {
     const t = setTimeout(() => {
-      loadShipments();
+      loadShipments({ status: statusFilterRef.current, q: queryRef.current });
     }, 300);
     return () => clearTimeout(t);
   }, [query, loadShipments]);
@@ -227,14 +241,15 @@ const Operations: React.FC = () => {
   };
 
   const queueCounts = useMemo(() => {
-    const complaint = items.filter(x => x?.type === 'complaint').length;
-    const security = items.filter(x => x?.type === 'flag' || x?.type === 'audit').length;
+    const complaint = inboxCounts?.complaintOpen != null ? Number(inboxCounts.complaintOpen) : items.filter(x => x?.type === 'complaint').length;
+    const dispute = inboxCounts?.disputeOpen != null ? Number(inboxCounts.disputeOpen) : items.filter(x => x?.type === 'dispute').length;
+    const security = inboxCounts?.flagOpen != null ? Number(inboxCounts.flagOpen) : items.filter(x => x?.type === 'flag' || x?.type === 'audit').length;
     return {
-      operasyon: items.length,
+      operasyon: inboxCounts?.totalOpen != null ? Number(inboxCounts.totalOpen) : items.length,
       guvenlik: security,
-      sikayet: complaint,
+      sikayet: complaint + dispute,
     } as Record<QueueKey, number>;
-  }, [items]);
+  }, [items, inboxCounts]);
 
   const filteredShipments = useMemo(() => {
     if (statusFilter === 'all') return shipments;
@@ -280,6 +295,13 @@ const Operations: React.FC = () => {
           'inline-flex items-center px-2 py-1 rounded-md bg-amber-50 text-amber-800 border border-amber-200 text-[11px] font-semibold',
       };
     }
+    if (t === 'dispute') {
+      return {
+        label: 'Anlaşmazlık',
+        className:
+          'inline-flex items-center px-2 py-1 rounded-md bg-amber-50 text-amber-800 border border-amber-200 text-[11px] font-semibold',
+      };
+    }
     if (t === 'flag') {
       return {
         label: 'Kritik',
@@ -310,7 +332,7 @@ const Operations: React.FC = () => {
 
   const filtered = useMemo(() => {
     if (queue === 'sikayet') {
-      return items.filter(x => x?.type === 'complaint');
+      return items.filter(x => x?.type === 'complaint' || x?.type === 'dispute');
     }
     if (queue === 'guvenlik') {
       return items.filter(x => x?.type === 'flag' || x?.type === 'audit');
@@ -344,21 +366,36 @@ const Operations: React.FC = () => {
       return {
         title: 'Şikayet incele',
         desc: hasUser
-          ? 'Önce ilgili kullanıcı(ları) aç, hızlı aksiyonları değerlendir. Gerekirse vaka oluştur.'
-          : 'Şikayet kaydında kullanıcı bağlantısı yok. Kullanıcı araması ile ilerle.',
-        primary: hasUser
-          ? {
-              label: 'İlgili kullanıcıyı aç',
-              onClick: () => {
-                const openId = selected?.relatedUserId || selected?.userId;
-                if (!openId) return;
-                navigate(`${base}/users?openUserId=${encodeURIComponent(String(openId))}`);
-              },
-            }
-          : {
-              label: 'Komut aramasına dön',
-              onClick: () => window.scrollTo({ top: 0, behavior: 'smooth' }),
-            },
+          ? 'Şikayetler ekranından kaydı açıp detayları incele. Gerekirse kullanıcı panelinden hızlı aksiyon al.'
+          : 'Şikayetler ekranından kaydı açıp detayları incele. Kullanıcı bağlantısı yoksa arama ile ilerle.',
+        primary: {
+          label: 'Şikayetleri aç',
+          onClick: () => {
+            const raw = String(selected?.id || '');
+            const m = raw.match(/^complaint-(.+)$/);
+            const openComplaintId = (m?.[1] || '').trim();
+            const qs = openComplaintId ? `?openComplaintId=${encodeURIComponent(openComplaintId)}` : '';
+            navigate(`${base}/complaints${qs}`);
+          },
+        },
+      };
+    }
+
+    if (t === 'dispute') {
+      return {
+        title: 'Anlaşmazlık incele',
+        desc: 'Detay için “Vakalar” ekranını açabilir veya arama ile dispute_ref üzerinden ilerleyebilirsin.',
+        primary: {
+          label: 'Vakaları aç',
+          onClick: () => {
+            const ref = String(selected?.disputeRef || '').trim();
+            const raw = String(selected?.id || '');
+            const m = raw.match(/^dispute-(.+)$/);
+            const openDisputeRef = (ref || m?.[1] || '').trim();
+            const qs = openDisputeRef ? `?openDisputeRef=${encodeURIComponent(openDisputeRef)}` : '';
+            navigate(`${base}/cases${qs}`);
+          },
+        },
       };
     }
 

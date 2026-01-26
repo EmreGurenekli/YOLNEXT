@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 import {
   History as HistoryIcon,
@@ -28,6 +28,7 @@ import Breadcrumb from '../../components/shared-ui-elements/Breadcrumb';
 import { sanitizeShipmentTitle } from '../../utils/format';
 import { logger } from '../../utils/logger';
 import { normalizeTrackingCode } from '../../utils/trackingCode';
+import { getStatusText as getShipmentStatusText } from '../../utils/shipmentStatus';
 
 // Breadcrumb items tanımlaması
 const breadcrumbItems = [
@@ -165,15 +166,15 @@ const IndividualHistory: React.FC = () => {
   const getStatusInfo = (status: string) => {
     switch (status) {
       case 'delivered':
-        return { text: 'Teslim Edildi', color: 'bg-green-100 text-green-800' };
+        return { text: getShipmentStatusText(status), color: 'bg-green-100 text-green-800' };
       case 'cancelled':
-        return { text: 'İptal Edildi', color: 'bg-red-100 text-red-800' };
+        return { text: getShipmentStatusText(status), color: 'bg-red-100 text-red-800' };
       case 'failed':
         return { text: 'Başarısız', color: 'bg-red-100 text-red-800' };
       case 'in_progress':
-        return { text: 'Devam Ediyor', color: 'bg-yellow-100 text-yellow-800' };
+        return { text: getShipmentStatusText(status), color: 'bg-yellow-100 text-yellow-800' };
       default:
-        return { text: 'Bilinmiyor', color: 'bg-gray-100 text-gray-800' };
+        return { text: getShipmentStatusText(status), color: 'bg-gray-100 text-gray-800' };
     }
   };
 

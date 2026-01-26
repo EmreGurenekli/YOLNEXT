@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { cn } from '@/lib/utils';
 
 interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -87,7 +87,6 @@ const CardFooter = React.forwardRef<HTMLDivElement, CardProps>(
 );
 CardFooter.displayName = 'CardFooter';
 
-// Named exports
 export {
   Card,
   CardHeader,
@@ -97,16 +96,4 @@ export {
   CardContent,
 };
 
-// Default export
 export default Card;
-
-
-
-
-
-
-
-
-
-
-

@@ -1083,17 +1083,19 @@ export default function CorporateCarriers() {
             )}
           </>
         ) : (
-          <div className='min-h-[50vh] flex items-center justify-center'>
-            <div className='bg-white rounded-2xl shadow-xl border border-slate-200 p-6 text-center col-span-full'>
-              <EmptyState
-                icon={Users}
-                title='Nakliyeci bulunamadı'
-                description='Arama kriterlerinize uygun nakliyeci bulunamadı'
-                action={{
-                  label: 'Yeni Nakliyeci Ekle',
-                  onClick: () => setShowAddModal(true),
-                }}
-              />
+          <div className='bg-white rounded-2xl p-8 shadow-xl border border-slate-200'>
+            <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6'>
+              <div className='bg-white rounded-xl p-4 sm:p-6 border border-slate-200 hover:shadow-lg hover:border-slate-300 transition-all duration-300 w-full max-w-full overflow-hidden flex flex-col col-span-full'>
+                <EmptyState
+                  icon={Users}
+                  title='Nakliyeci bulunamadı'
+                  description='Arama kriterlerinize uygun nakliyeci bulunamadı'
+                  action={{
+                    label: 'Yeni Nakliyeci Ekle',
+                    onClick: () => setShowAddModal(true),
+                  }}
+                />
+              </div>
             </div>
           </div>
         )}

@@ -1,4 +1,3 @@
-// Custom hook for shipment form logic
 import { useState } from 'react';
 import { useFormValidation, commonValidationRules } from './useFormValidation';
 
@@ -111,7 +110,6 @@ export function useShipmentForm() {
 
   const handleInputChange = (field: string, value: any) => {
     if (field.includes('.')) {
-      // Nested field (e.g., 'vehicleInfo.brand')
       const [parent, child] = field.split('.');
       setFormData(prev => {
         const parentValue = prev[parent as keyof ShipmentFormData];
@@ -153,15 +151,3 @@ export function useShipmentForm() {
     resetForm,
   };
 }
-
-
-
-
-
-
-
-
-
-
-
-

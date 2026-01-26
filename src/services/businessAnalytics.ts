@@ -26,8 +26,25 @@ function getOrCreateAbVariant(key: string, variants: string[] = ['A', 'B']): str
   return v;
 }
 
+function getUserContext(): { userId?: number; role?: string } {
+  try {
+    const raw = localStorage.getItem('user');
+    if (!raw) return {};
+    const u = JSON.parse(raw);
+    const userId = u?.id != null ? Number(u.id) : undefined;
+    const role = u?.role != null ? String(u.role).toLowerCase() : undefined;
+    return {
+      userId: Number.isFinite(userId) ? userId : undefined,
+      role,
+    };
+  } catch {
+    return {};
+  }
+}
+
 async function postEvent(event: string, data?: AnalyticsPayload) {
   if (!hasAnalyticsConsent()) return;
+  const userCtx = getUserContext();
   const payload = {
     event,
     data: data || {},
@@ -36,14 +53,23 @@ async function postEvent(event: string, data?: AnalyticsPayload) {
     href: window.location.href,
     referrer: document.referrer || '',
     ua: navigator.userAgent,
+    ...userCtx,
   };
 
   try {
     const url = createApiUrl('/api/analytics/event');
+    const body = JSON.stringify(payload);
+
+    // Prefer sendBeacon to avoid navigation-cancelled requests showing up as errors.
+    if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
+      const ok = navigator.sendBeacon(url, new Blob([body], { type: 'application/json' }));
+      if (ok) return;
+    }
+
     await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      body,
       keepalive: true,
     });
   } catch {
@@ -64,13 +90,3 @@ export const analytics = {
       getOrCreateAbVariant(experimentKey, variants),
   },
 };
-
-
-
-
-
-
-
-
-
-

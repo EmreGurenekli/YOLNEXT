@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 import {
   History as HistoryIcon,
@@ -24,6 +24,7 @@ import { Link } from 'react-router-dom';
 import { createApiUrl } from '../../config/api';
 import Pagination from '../../components/shared-ui-elements/Pagination';
 import { logger } from '../../utils/logger';
+import { getStatusText as getShipmentStatusText } from '../../utils/shipmentStatus';
 
 interface ShipmentHistory {
   id: string;
@@ -121,15 +122,15 @@ const CorporateHistory: React.FC = () => {
     switch (status) {
       case 'completed':
       case 'delivered':
-        return { text: 'Teslim Edildi', color: 'bg-green-100 text-green-800' };
+        return { text: getShipmentStatusText(status), color: 'bg-green-100 text-green-800' };
       case 'cancelled':
-        return { text: 'İptal Edildi', color: 'bg-red-100 text-red-800' };
+        return { text: getShipmentStatusText(status), color: 'bg-red-100 text-red-800' };
       case 'failed':
         return { text: 'Başarısız', color: 'bg-red-100 text-red-800' };
       case 'in_progress':
-        return { text: 'Devam Ediyor', color: 'bg-yellow-100 text-yellow-800' };
+        return { text: getShipmentStatusText(status), color: 'bg-yellow-100 text-yellow-800' };
       default:
-        return { text: 'Bilinmiyor', color: 'bg-gray-100 text-gray-800' };
+        return { text: getShipmentStatusText(status), color: 'bg-gray-100 text-gray-800' };
     }
   };
 

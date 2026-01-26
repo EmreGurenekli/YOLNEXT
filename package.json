@@ -5,20 +5,18 @@
   "version": "1.0.2",
   "type": "module",
   "scripts": {
-    "//": "=== PRODUCTION DEPLOYMENT ===",
     "dev": "vite",
     "dev:frontend": "vite",
     "dev:backend": "node backend/server-modular.js",
     "dev:all": "npm run kill:ports && concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
     "kill:ports": "node scripts/kill-ports.js 5000 5173",
     "build": "vite build",
-    "preview": "vite preview", 
-    "start:platform": "npm run dev:all",
+    "preview": "vite preview",
     "start": "node backend/server-modular.js",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "lint:fix": "eslint . --ext ts,tsx --fix",
     "install:all": "npm install && npm install --prefix backend",
-    "setup": "npm run install:all && npm run build:all",
+    "setup": "npm run install:all && npm run build",
     "clean": "rimraf dist node_modules/.vite",
     "db:reset": "node backend/scripts/db-reset.js"
   },
@@ -38,13 +36,9 @@
     "jsonwebtoken": "^9.0.2",
     "multer": "^1.4.5-lts.1",
     "nodemailer": "^7.0.10",
-    "pg": "^8.16.3",
-    "stripe": "^20.2.0"
+    "pg": "^8.16.3"
   },
   "devDependencies": {
-    "@testing-library/jest-dom": "^6.9.1",
-    "@testing-library/react": "^16.3.2",
-    "@testing-library/user-event": "^14.6.1",
     "@types/react": "^18.2.37",
     "@types/react-dom": "^18.2.15",
     "@typescript-eslint/eslint-plugin": "^6.21.0",
@@ -55,13 +49,10 @@
     "eslint": "^8.57.0",
     "eslint-plugin-react": "^7.34.1",
     "eslint-plugin-react-hooks": "^4.6.0",
-    "jest": "^30.2.0",
-    "jest-environment-jsdom": "^30.2.0",
     "postcss": "^8.4.32",
     "rimraf": "^5.0.5",
     "tailwindcss": "^3.3.6",
     "tailwindcss-animate": "^1.0.7",
-    "ts-jest": "^29.4.6",
     "typescript": "5.3.3",
     "vite": "^5.0.0"
   }

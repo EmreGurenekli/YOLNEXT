@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import {
@@ -84,10 +84,10 @@ const TasiyiciHelp = () => {
       link: '/tasiyici/market',
     },
     {
-      title: 'Aktif İşlerim',
+      title: 'İşlerim',
       description: 'Kabul ettiğiniz işleri yönetin ve teslim edin',
       icon: Truck,
-      link: '/tasiyici/jobs',
+      link: '/tasiyici/islerim',
     },
     {
       title: 'Gelir Takibi',
@@ -173,7 +173,7 @@ const TasiyiciHelp = () => {
         },
         {
           question: 'Aktif işlerimi nereden yönetirim?',
-          answer: 'Panelinizdeki “Aktif İşlerim” alanından kabul ettiğiniz işleri görüntüleyip süreç adımlarını yönetebilirsiniz.',
+          answer: 'Panelinizdeki “İşlerim” alanından kabul ettiğiniz işleri görüntüleyip süreç adımlarını yönetebilirsiniz.',
         },
       ],
     },

@@ -87,6 +87,8 @@ function createAuthRoutes(pool, JWT_SECRET, createNotification, sendEmail) {
     try {
       const body = req.body || {};
       const panelType = body.panelType || body.userType || 'individual';
+      const desiredCityForDemo =
+        String(panelType || '').toLowerCase() === 'nakliyeci' ? 'İstanbul' : null;
 
       // Map demo profiles
       const profiles = {
@@ -147,6 +149,7 @@ function createAuthRoutes(pool, JWT_SECRET, createNotification, sendEmail) {
           const usersTable = `"${users.schema}".users`;
           const emailCol = users.qCol(users.email);
           const roleCol = users.qCol(users.role);
+          const cityCol = users.city ? users.qCol(users.city) : null;
 
           // Try to find existing demo user by email
           const existingByEmail = await pool.query(
@@ -162,6 +165,11 @@ function createAuthRoutes(pool, JWT_SECRET, createNotification, sendEmail) {
             const updParams = [effectiveUserId, role];
             if (users.isActive) updParts.push(`${users.qCol(users.isActive)} = true`);
             updParts.push(`${roleCol} = COALESCE(${roleCol}, $2)`);
+            // Ensure demo nakliyeci has a city so city-rule offers can be tested.
+            if (cityCol && desiredCityForDemo) {
+              updParts.push(`${cityCol} = COALESCE(NULLIF(${cityCol}, ''), $3)`);
+              updParams.push(desiredCityForDemo);
+            }
             if (users.updatedAt) updParts.push(`${users.qCol(users.updatedAt)} = CURRENT_TIMESTAMP`);
             await pool.query(
               `UPDATE ${usersTable} SET ${updParts.join(', ')} WHERE id = $1`,
@@ -190,6 +198,7 @@ function createAuthRoutes(pool, JWT_SECRET, createNotification, sendEmail) {
             if (users.lastName) push(users.lastName, null, null);
             if (users.role) push(users.role, null, role);
             if (users.companyName) push(users.companyName, null, selected.company_name || null);
+            if (users.city) push(users.city, null, desiredCityForDemo);
             if (users.isActive) push(users.isActive, null, true);
             if (users.createdAt) push(users.createdAt, 'CURRENT_TIMESTAMP');
             if (users.updatedAt) push(users.updatedAt, 'CURRENT_TIMESTAMP');

@@ -193,4 +193,3 @@ class ErrorLogger {
 
 // Export singleton instance
 module.exports = new ErrorLogger();
-

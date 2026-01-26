@@ -85,10 +85,10 @@ const NakliyeciHelp = () => {
       link: '/nakliyeci/jobs',
     },
     {
-      title: 'Aktif İşlerim',
+      title: 'Aktif Yüklerim',
       description: 'Kabul ettiğiniz işleri yönetin ve takip edin',
       icon: Truck,
-      link: '/nakliyeci/active-jobs',
+      link: '/nakliyeci/active-shipments',
     },
     {
       title: 'Tekliflerim',
@@ -126,7 +126,7 @@ const NakliyeciHelp = () => {
     {
       step: 4,
       title: 'İşi Planlayın',
-      description: 'Kazanılan işleri Aktif İşler’den yönetin, rota ve kaynak planı yapın',
+      description: 'Kazanılan işleri Aktif Yükler’den yönetin, rota ve kaynak planı yapın',
       icon: MapPin,
     },
     {
@@ -174,7 +174,7 @@ const NakliyeciHelp = () => {
         },
         {
           question: 'İş kazanınca ne olur?',
-          answer: 'Teklifiniz kabul edildiğinde iş, Aktif İşler bölümüne düşer. Buradan süreç adımlarını, mesajlaşmaları ve planlamayı yönetirsiniz.',
+          answer: 'Teklifiniz kabul edildiğinde iş, Aktif Yükler bölümüne düşer. Buradan süreç adımlarını, mesajlaşmaları ve planlamayı yönetirsiniz.',
         },
       ],
     },
@@ -184,7 +184,7 @@ const NakliyeciHelp = () => {
       items: [
         {
           question: 'İş durumlarını nasıl güncellerim?',
-          answer: 'Aktif İşler ekranından ilgili işi açıp süreç adımlarına göre durum güncellemelerini yapabilirsiniz. Böylece hem siz hem gönderici süreci şeffaf şekilde takip eder.',
+          answer: 'Aktif Yükler ekranından ilgili işi açıp süreç adımlarına göre durum güncellemelerini yapabilirsiniz. Böylece hem siz hem gönderici süreci şeffaf şekilde takip eder.',
         },
         {
           question: 'Rota planlayıcı ne işe yarar?',

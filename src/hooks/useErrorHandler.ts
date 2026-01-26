@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { useToast } from '../contexts/ToastContext';
+
 export interface ErrorInfo {
   message: string;
   code?: string;
@@ -20,11 +21,11 @@ export const useErrorHandler = () => {
   const handleError = useCallback(
     (error: any, options: ErrorHandlerOptions = {}) => {
       const {
-        showToast: shouldShowToast = true,        logError = true,
+        showToast: shouldShowToast = true,
+        logError = true,
         fallbackMessage = 'Beklenmeyen bir hata oluştu',
       } = options;
 
-      // Extract error information
       const errorInfo: ErrorInfo = {
         message: error?.message || error?.error || fallbackMessage,
         code: error?.code || error?.status?.toString(),
@@ -33,30 +34,24 @@ export const useErrorHandler = () => {
         timestamp: new Date().toISOString(),
       };
 
-      // Log error to console in development
       if (logError && process.env.NODE_ENV === 'development') {
         console.error('Hata işlendi:', errorInfo);
         console.error('Hata detayı:', error);
       }
 
-      // Show toast notification
       if (shouldShowToast) {
         const message = getErrorMessage(errorInfo);
         showToast({
           type: 'error',
           title: 'Hata',
           message: message,
-          duration: 5000,        });
-      }
-
-      // In production, you might want to send errors to an external service
-      if (logError && process.env.NODE_ENV === 'production') {
-        // sendErrorToService(errorInfo);
+          duration: 5000,
+        });
       }
 
       return errorInfo;
     },
-    []
+    [showToast]
   );
 
   const handleApiError = useCallback(
@@ -155,7 +150,6 @@ export const useErrorHandler = () => {
 };
 
 const getErrorMessage = (errorInfo: ErrorInfo): string => {
-  // Customize error messages based on error type
   if (errorInfo.status === 401) {
     return 'Oturum süreniz dolmuş, lütfen tekrar giriş yapın';
   }
@@ -178,11 +172,3 @@ const getErrorMessage = (errorInfo: ErrorInfo): string => {
 
   return errorInfo.message;
 };
-
-
-
-
-
-
-
-

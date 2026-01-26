@@ -1,7 +1,8 @@
 // Shipments routes - Modular version
 const express = require('express');
 const { getPagination, generateTrackingNumber } = require('../../utils/routeHelpers');
-const { isValidTransition } = require('../../utils/shipmentStatus');
+const { isValidTransition, SHIPMENT_STATUS } = require('../../utils/shipmentStatus');
+const { normalizeCityKey } = require('../../utils/corridor');
 
 function createShipmentRoutes(pool, authenticateToken, createNotification, idempotencyGuard) {
   const router = express.Router();
@@ -1361,7 +1362,7 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
         add(insert, priceCol, priceValue);
       }
 
-      add(insert, pickCol('status'), 'waiting_for_offers');
+      add(insert, pickCol('status'), SHIPMENT_STATUS.WAITING_FOR_OFFERS);
       add(insert, pickCol('trackingNumber', 'tracking_number'), trackingNumber);
       add(insert, pickCol('tracking_code'), trackingNumber);
       const categoryDataCol = pickCol('categoryData', 'category_data');
@@ -1815,11 +1816,35 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
         });
       }
 
+      // Ensure carrier_drivers exists (best-effort)
+      try {
+        await pool.query(
+          `CREATE TABLE IF NOT EXISTS carrier_drivers (
+            id SERIAL PRIMARY KEY,
+            carrier_id INTEGER NOT NULL,
+            driver_id INTEGER NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE (carrier_id, driver_id)
+          )`
+        );
+      } catch (_) {
+        // ignore
+      }
+
       // Verify shipment belongs to this nakliyeci
-      const shipmentCheck = await pool.query(
-        'SELECT id, "carrierId", status FROM shipments WHERE id = $1',
-        [id]
-      );
+      let shipmentCheck;
+      try {
+        shipmentCheck = await pool.query(
+          'SELECT id, "carrierId" as "carrierId", status, driver_id, metadata, "pickupCity" as "pickupCity" FROM shipments WHERE id = $1',
+          [id]
+        );
+      } catch (_e1) {
+        shipmentCheck = await pool.query(
+          'SELECT id, carrier_id as "carrierId", status, driver_id, metadata, pickup_city as "pickupCity" FROM shipments WHERE id = $1',
+          [id]
+        );
+      }
 
       if (shipmentCheck.rows.length === 0) {
         return res.status(404).json({
@@ -1845,6 +1870,13 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
         });
       }
 
+      if (shipment.driver_id) {
+        return res.status(409).json({
+          success: false,
+          message: 'Bu gönderiye zaten taşıyıcı atanmış',
+        });
+      }
+
       // Verify driver exists and is linked to this nakliyeci
       const driverCheck = await pool.query(
         `SELECT cd.driver_id, u."fullName", u.phone
@@ -1861,76 +1893,83 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
         });
       }
 
-      // Get shipment owner ID for notification
-      const shipmentOwner = await pool.query(
-        'SELECT "userId" FROM shipments WHERE id = $1',
-        [id]
-      );
-      const userId = shipmentOwner.rows[0]?.userId;
+      // Create a 30-minute driver acceptance offer (do NOT immediately assign the driver)
+      let meta = shipment.metadata;
+      if (typeof meta === 'string') {
+        try {
+          meta = JSON.parse(meta);
+        } catch {
+          meta = null;
+        }
+      }
+      if (!meta || typeof meta !== 'object') meta = {};
 
-      // Validate status transition before updating
-      const currentStatus = shipment.status;
-      const transitionCheck = isValidTransition(currentStatus, 'in_progress');
-      
-      if (!transitionCheck.valid) {
-        return res.status(400).json({
-          success: false,
-          message: transitionCheck.error || 'Gönderi durumu taşıyıcı ataması için uygun değil. Gönderi "offer_accepted" durumunda olmalıdır.',
-        });
+      const existingOffer = meta.driverOffer && typeof meta.driverOffer === 'object' ? meta.driverOffer : null;
+      const existingPending = existingOffer && existingOffer.status === 'pending' ? existingOffer : null;
+      if (existingPending && existingPending.expiresAt) {
+        const t = Date.parse(String(existingPending.expiresAt));
+        if (Number.isFinite(t) && t > Date.now()) {
+          return res.status(409).json({
+            success: false,
+            message: 'Bu gönderi için zaten bekleyen bir taşıyıcı teklifi var (30dk içinde).',
+          });
+        }
       }
 
-      // Update shipment with driver assignment
-      // Change status to 'in_progress' when driver is assigned
-      const updateResult = await pool.query(
-        `UPDATE shipments 
-         SET driver_id = $1, 
-             status = 'in_progress',
-             "updatedAt" = CURRENT_TIMESTAMP
-         WHERE id = $2 AND status = $3`,
-        [driverId, id, currentStatus]
-      );
-      
-      // Check if update was successful
-      if (updateResult.rowCount === 0) {
-        return res.status(400).json({
-          success: false,
-          message: 'Gönderi durumu taşıyıcı ataması için uygun değil. Gönderi "offer_accepted" durumunda olmalıdır.',
-        });
+      const now = Date.now();
+      const expiresAt = new Date(now + 30 * 60 * 1000);
+      meta.driverOffer = {
+        status: 'pending',
+        driverId: Number(driverId),
+        createdAt: new Date(now).toISOString(),
+        expiresAt: expiresAt.toISOString(),
+        carrierId: Number(nakliyeciId),
+        shipmentId: Number(id),
+        source: 'manual_assign',
+      };
+
+      // Persist metadata update (schema/column-name tolerant)
+      const metaJson = JSON.stringify({ driverOffer: meta.driverOffer });
+      try {
+        await pool.query(
+          `UPDATE shipments
+           SET metadata = COALESCE(metadata, '{}'::jsonb) || $1::jsonb,
+               "updatedAt" = CURRENT_TIMESTAMP
+           WHERE id = $2`,
+          [metaJson, id]
+        );
+      } catch (_e2) {
+        await pool.query(
+          `UPDATE shipments
+           SET metadata = COALESCE(metadata, '{}'::jsonb) || $1::jsonb,
+               updated_at = CURRENT_TIMESTAMP
+           WHERE id = $2`,
+          [metaJson, id]
+        );
       }
 
-      // Create notification for driver if createNotification is available
+      // Notify driver (best-effort)
       if (createNotification) {
         try {
           await createNotification({
-            userId: driverId,
-            type: 'driver_assigned',
-            title: 'Yeni İş Atandı',
-            message: `Gönderi #${id} size atandı. Detayları görüntüleyin.`,
+            userId: Number(driverId),
+            type: 'driver_assignment_offer',
+            title: 'Yeni İş Teklifi',
+            message: `Gönderi #${id} için iş teklifi aldınız. 30 dakika içinde kabul etmeniz gerekiyor.`,
+            linkUrl: `/tasiyici/jobs/${id}`,
+            priority: 'high',
             shipmentId: parseInt(id),
+            driverId: Number(driverId),
           });
         } catch (notifError) {
-          console.error('Notification creation failed:', notifError);
-        }
-
-        // Create notification for shipment owner (sender)
-        if (userId) {
-          try {
-            await createNotification({
-              userId: userId,
-              type: 'driver_assigned',
-              title: 'Taşıyıcı Atandı',
-              message: `Gönderinize taşıyıcı atandı. Detayları görüntüleyin.`,
-              shipmentId: parseInt(id),
-            });
-          } catch (notifError) {
-            console.error('Notification creation for owner failed:', notifError);
-          }
+          console.error('Notification creation failed (non-critical):', notifError);
         }
       }
 
       res.json({
         success: true,
-        message: 'Taşıyıcı başarıyla atandı',
+        message: 'Taşıyıcıya iş teklifi gönderildi (30dk kabul süresi)',
+        data: { expiresAt: expiresAt.toISOString() },
       });
     } catch (error) {
       console.error('Error assigning driver:', error);
@@ -1939,6 +1978,442 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
         message: 'Taşıyıcı atanamadı',
         details: error.message,
       });
+    }
+  });
+
+  // Get pending driver assignment offers for tasiyici (driver)
+  router.get('/tasiyici/assignment-offers', authenticateToken, async (req, res) => {
+    try {
+      if (!pool) {
+        return res.status(500).json({ success: false, error: 'Database not available' });
+      }
+      if (!req.user || !req.user.id) {
+        return res.status(401).json({ success: false, error: 'User not authenticated' });
+      }
+
+      const userId = req.user.id;
+      const { limit = 50 } = req.query;
+      const safeLimit = Math.max(1, Math.min(parseInt(limit, 10) || 50, 100));
+
+      let result;
+      try {
+        result = await pool.query(
+          `
+          SELECT s.*,
+                 u."fullName" as "ownerName",
+                 u."companyName" as "ownerCompany",
+                 c."fullName" as "carrierName",
+                 c."companyName" as "carrierCompany",
+                 c."phone" as "carrierPhone",
+                 c."email" as "carrierEmail"
+          FROM shipments s
+          LEFT JOIN users u ON s."userId" = u.id
+          LEFT JOIN users c ON s."carrierId" = c.id
+          WHERE (s.metadata->'driverOffer'->>'driverId')::text = $1
+            AND (s.metadata->'driverOffer'->>'status') = 'pending'
+          ORDER BY s."createdat" DESC
+          LIMIT ${safeLimit}
+          `,
+          [String(userId)]
+        );
+      } catch (_e1) {
+        // Fallback for snake_case deployments
+        result = await pool.query(
+          `
+          SELECT s.*,
+                 u.full_name as "ownerName",
+                 u.company_name as "ownerCompany",
+                 c.full_name as "carrierName",
+                 c.company_name as "carrierCompany",
+                 c.phone as "carrierPhone",
+                 c.email as "carrierEmail"
+          FROM shipments s
+          LEFT JOIN users u ON s.user_id = u.id
+          LEFT JOIN users c ON s.carrier_id = c.id
+          WHERE (s.metadata->'driverOffer'->>'driverId')::text = $1
+            AND (s.metadata->'driverOffer'->>'status') = 'pending'
+          ORDER BY s.createdat DESC
+          LIMIT ${safeLimit}
+          `,
+          [String(userId)]
+        );
+      }
+
+      const now = Date.now();
+      const rows = (result.rows || []).filter((r) => {
+        let meta = r.metadata;
+        if (typeof meta === 'string') {
+          try {
+            meta = JSON.parse(meta);
+          } catch {
+            meta = null;
+          }
+        }
+        const offer = meta && typeof meta === 'object' ? meta.driverOffer : null;
+        const exp = offer?.expiresAt;
+        if (!exp) return true;
+        const t = Date.parse(String(exp));
+        if (!Number.isFinite(t)) return true;
+        return t > now;
+      });
+
+      const normalizedRows = attachCategoryData(rows || []);
+      res.status(200).json({
+        success: true,
+        data: normalizedRows,
+        shipments: normalizedRows,
+      });
+    } catch (error) {
+      res.status(500).json({ success: false, error: error.message, details: error.message });
+    }
+  });
+
+  // Driver accepts a pending assignment offer (30dk + şehir kuralı)
+  router.post('/:id/assignment/accept', authenticateToken, async (req, res) => {
+    const shipmentId = Number(req.params.id);
+    try {
+      if (!pool) return res.status(500).json({ success: false, error: 'Database not available' });
+      if (!req.user || !req.user.id) {
+        return res.status(401).json({ success: false, message: 'Authentication required' });
+      }
+      if (!Number.isFinite(shipmentId) || shipmentId <= 0) {
+        return res.status(400).json({ success: false, message: 'Geçersiz gönderi ID' });
+      }
+
+      const driverUserId = req.user.id;
+      const role = String(req.user?.role || '').toLowerCase();
+      if (role && role !== 'tasiyici') {
+        return res.status(403).json({ success: false, message: 'Forbidden' });
+      }
+
+      const client = await pool.connect();
+      let carrierId = null;
+      let ownerId = null;
+
+      try {
+        await client.query('BEGIN');
+
+        let shipRes;
+        try {
+          shipRes = await client.query(
+            `SELECT id, status,
+                    "carrierId" as "carrierId",
+                    "userId" as "userId",
+                    driver_id,
+                    metadata,
+                    "pickupCity" as "pickupCity"
+             FROM shipments
+             WHERE id = $1
+             FOR UPDATE`,
+            [shipmentId]
+          );
+        } catch (_e1) {
+          shipRes = await client.query(
+            `SELECT id, status,
+                    carrier_id as "carrierId",
+                    user_id as "userId",
+                    driver_id,
+                    metadata,
+                    pickup_city as "pickupCity"
+             FROM shipments
+             WHERE id = $1
+             FOR UPDATE`,
+            [shipmentId]
+          );
+        }
+
+        if (!shipRes.rows || shipRes.rows.length === 0) {
+          await client.query('ROLLBACK');
+          return res.status(404).json({ success: false, message: 'Gönderi bulunamadı' });
+        }
+
+        const ship = shipRes.rows[0];
+        carrierId = ship.carrierId || ship.carrier_id || null;
+        ownerId = ship.userId || ship.user_id || null;
+
+        if (ship.driver_id) {
+          await client.query('ROLLBACK');
+          return res.status(409).json({ success: false, message: 'Bu gönderiye zaten taşıyıcı atanmış' });
+        }
+
+        const allowed = new Set([SHIPMENT_STATUS.OFFER_ACCEPTED, SHIPMENT_STATUS.ACCEPTED, 'offer_accepted', 'accepted']);
+        if (!allowed.has(String(ship.status || '').trim())) {
+          await client.query('ROLLBACK');
+          return res.status(409).json({ success: false, message: 'Gönderi durumu kabul için uygun değil' });
+        }
+
+        let meta = ship.metadata;
+        if (typeof meta === 'string') {
+          try {
+            meta = JSON.parse(meta);
+          } catch {
+            meta = null;
+          }
+        }
+        if (!meta || typeof meta !== 'object') meta = {};
+        const offer = meta.driverOffer && typeof meta.driverOffer === 'object' ? { ...meta.driverOffer } : null;
+
+        if (!offer || offer.status !== 'pending') {
+          await client.query('ROLLBACK');
+          return res.status(400).json({ success: false, message: 'Bekleyen iş teklifi bulunamadı' });
+        }
+
+        if (String(offer.driverId || '') !== String(driverUserId)) {
+          await client.query('ROLLBACK');
+          return res.status(403).json({ success: false, message: 'Bu iş teklifi size ait değil' });
+        }
+
+        const expMs = offer.expiresAt ? Date.parse(String(offer.expiresAt)) : NaN;
+        if (Number.isFinite(expMs) && expMs <= Date.now()) {
+          offer.status = 'expired';
+          offer.expiredAt = new Date().toISOString();
+          try {
+            const metaJson = JSON.stringify({ driverOffer: offer });
+            await client.query(
+              `UPDATE shipments SET metadata = COALESCE(metadata, '{}'::jsonb) || $1::jsonb WHERE id = $2`,
+              [metaJson, shipmentId]
+            );
+          } catch (_) {
+            // ignore
+          }
+          await client.query('COMMIT');
+          return res.status(409).json({ success: false, message: 'Teklif süresi dolmuş (30dk)' });
+        }
+
+        // Şehir geçmeden: minimum uygulanabilir kontrol
+        // - Eğer taşıyıcının profil şehri set edilmişse, yükleme şehri ile eşleşmeli.
+        const pickupCity = ship.pickupCity || ship.pickup_city || '';
+        if (pickupCity) {
+          try {
+            const cityRes = await client.query('SELECT city FROM users WHERE id = $1 LIMIT 1', [driverUserId]);
+            const driverCity = cityRes.rows?.[0]?.city || '';
+            if (driverCity && normalizeCityKey(driverCity) !== normalizeCityKey(pickupCity)) {
+              await client.query('ROLLBACK');
+              return res.status(409).json({
+                success: false,
+                message: `Bu işin yükleme şehri ${pickupCity}. Profil şehriniz ${driverCity}. Şehir dışında kabul edemezsiniz.`,
+              });
+            }
+          } catch (_) {
+            // If city column doesn't exist, skip this check.
+          }
+        }
+
+        offer.status = 'accepted';
+        offer.acceptedAt = new Date().toISOString();
+        const metaJson = JSON.stringify({ driverOffer: offer });
+
+        // Assign driver + start job
+        try {
+          await client.query(
+            `UPDATE shipments
+             SET driver_id = $1,
+                 status = $2,
+                 metadata = COALESCE(metadata, '{}'::jsonb) || $3::jsonb,
+                 "updatedAt" = CURRENT_TIMESTAMP
+             WHERE id = $4`,
+            [driverUserId, SHIPMENT_STATUS.IN_PROGRESS, metaJson, shipmentId]
+          );
+        } catch (_e2) {
+          await client.query(
+            `UPDATE shipments
+             SET driver_id = $1,
+                 status = $2,
+                 metadata = COALESCE(metadata, '{}'::jsonb) || $3::jsonb,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE id = $4`,
+            [driverUserId, SHIPMENT_STATUS.IN_PROGRESS, metaJson, shipmentId]
+          );
+        }
+
+        await client.query('COMMIT');
+      } catch (e) {
+        try {
+          await client.query('ROLLBACK');
+        } catch (_) {
+          // ignore
+        }
+        throw e;
+      } finally {
+        client.release();
+      }
+
+      // Notifications (best-effort)
+      if (createNotification) {
+        try {
+          if (carrierId) {
+            await createNotification({
+              userId: Number(carrierId),
+              type: 'driver_assignment_accepted',
+              title: 'Taşıyıcı İşi Kabul Etti',
+              message: `Gönderi #${shipmentId} için taşıyıcı işi kabul etti. İş başlatıldı.`,
+              linkUrl: `/nakliyeci/active-shipments?shipmentId=${shipmentId}`,
+              priority: 'high',
+              shipmentId,
+              driverId: Number(driverUserId),
+            });
+          }
+        } catch (_) {
+          // ignore
+        }
+        try {
+          if (ownerId) {
+            await createNotification({
+              userId: Number(ownerId),
+              type: 'driver_assigned',
+              title: 'Taşıyıcı Atandı',
+              message: `Gönderinize taşıyıcı atandı. Takip sayfasından durumu izleyebilirsiniz.`,
+              linkUrl: `/shipments/${shipmentId}`,
+              priority: 'normal',
+              shipmentId,
+              driverId: Number(driverUserId),
+            });
+          }
+        } catch (_) {
+          // ignore
+        }
+      }
+
+      return res.json({ success: true, message: 'İş kabul edildi ve başlatıldı' });
+    } catch (error) {
+      return res.status(500).json({ success: false, message: 'İş kabul edilemedi', details: error.message });
+    }
+  });
+
+  // Driver rejects a pending assignment offer
+  router.post('/:id/assignment/reject', authenticateToken, async (req, res) => {
+    const shipmentId = Number(req.params.id);
+    try {
+      if (!pool) return res.status(500).json({ success: false, error: 'Database not available' });
+      if (!req.user || !req.user.id) {
+        return res.status(401).json({ success: false, message: 'Authentication required' });
+      }
+      if (!Number.isFinite(shipmentId) || shipmentId <= 0) {
+        return res.status(400).json({ success: false, message: 'Geçersiz gönderi ID' });
+      }
+
+      const driverUserId = req.user.id;
+      const role = String(req.user?.role || '').toLowerCase();
+      if (role && role !== 'tasiyici') {
+        return res.status(403).json({ success: false, message: 'Forbidden' });
+      }
+
+      const reasonRaw = req.body?.reason;
+      const reason = reasonRaw != null ? String(reasonRaw).slice(0, 500) : '';
+
+      const client = await pool.connect();
+      let carrierId = null;
+      try {
+        await client.query('BEGIN');
+
+        let shipRes;
+        try {
+          shipRes = await client.query(
+            `SELECT id, driver_id, metadata, "carrierId" as "carrierId"
+             FROM shipments
+             WHERE id = $1
+             FOR UPDATE`,
+            [shipmentId]
+          );
+        } catch (_e1) {
+          shipRes = await client.query(
+            `SELECT id, driver_id, metadata, carrier_id as "carrierId"
+             FROM shipments
+             WHERE id = $1
+             FOR UPDATE`,
+            [shipmentId]
+          );
+        }
+
+        if (!shipRes.rows || shipRes.rows.length === 0) {
+          await client.query('ROLLBACK');
+          return res.status(404).json({ success: false, message: 'Gönderi bulunamadı' });
+        }
+
+        const ship = shipRes.rows[0];
+        carrierId = ship.carrierId || ship.carrier_id || null;
+
+        if (ship.driver_id) {
+          await client.query('ROLLBACK');
+          return res.status(409).json({ success: false, message: 'Bu gönderiye zaten taşıyıcı atanmış' });
+        }
+
+        let meta = ship.metadata;
+        if (typeof meta === 'string') {
+          try {
+            meta = JSON.parse(meta);
+          } catch {
+            meta = null;
+          }
+        }
+        if (!meta || typeof meta !== 'object') meta = {};
+        const offer = meta.driverOffer && typeof meta.driverOffer === 'object' ? { ...meta.driverOffer } : null;
+
+        if (!offer || offer.status !== 'pending') {
+          await client.query('ROLLBACK');
+          return res.status(400).json({ success: false, message: 'Bekleyen iş teklifi bulunamadı' });
+        }
+
+        if (String(offer.driverId || '') !== String(driverUserId)) {
+          await client.query('ROLLBACK');
+          return res.status(403).json({ success: false, message: 'Bu iş teklifi size ait değil' });
+        }
+
+        offer.status = 'rejected';
+        offer.rejectedAt = new Date().toISOString();
+        if (reason) offer.rejectReason = reason;
+
+        const metaJson = JSON.stringify({ driverOffer: offer });
+        try {
+          await client.query(
+            `UPDATE shipments
+             SET metadata = COALESCE(metadata, '{}'::jsonb) || $1::jsonb,
+                 "updatedAt" = CURRENT_TIMESTAMP
+             WHERE id = $2`,
+            [metaJson, shipmentId]
+          );
+        } catch (_e2) {
+          await client.query(
+            `UPDATE shipments
+             SET metadata = COALESCE(metadata, '{}'::jsonb) || $1::jsonb,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE id = $2`,
+            [metaJson, shipmentId]
+          );
+        }
+
+        await client.query('COMMIT');
+      } catch (e) {
+        try {
+          await client.query('ROLLBACK');
+        } catch (_) {
+          // ignore
+        }
+        throw e;
+      } finally {
+        client.release();
+      }
+
+      if (createNotification && carrierId) {
+        try {
+          await createNotification({
+            userId: Number(carrierId),
+            type: 'driver_assignment_rejected',
+            title: 'Taşıyıcı İşi Reddetti',
+            message: `Gönderi #${shipmentId} için taşıyıcı işi reddetti. ${reason ? `Sebep: ${reason}` : ''}`.trim(),
+            linkUrl: `/nakliyeci/active-shipments?shipmentId=${shipmentId}`,
+            priority: 'high',
+            shipmentId,
+            driverId: Number(driverUserId),
+          });
+        } catch (_) {
+          // ignore
+        }
+      }
+
+      return res.json({ success: true, message: 'İş teklifi reddedildi' });
+    } catch (error) {
+      return res.status(500).json({ success: false, message: 'İş reddedilemedi', details: error.message });
     }
   });
 
@@ -2850,6 +3325,100 @@ function createShipmentRoutes(pool, authenticateToken, createNotification, idemp
       res.status(500).json({
         success: false,
         error: 'Tracking update could not be added',
+        details: error.message,
+      });
+    }
+  });
+
+  // Save Route Planner plans (Nakliyeci)
+  // Frontend calls: POST /api/shipments/route-plan with body { plans: [...] }
+  // We persist the latest snapshot under users.settings.routePlanner (JSONB) to avoid extra tables.
+  router.post('/route-plan', authenticateToken, async (req, res) => {
+    try {
+      if (!pool) {
+        return res.status(500).json({ success: false, message: 'Database not available' });
+      }
+
+      const userId = req.user?.id;
+      const role = String(req.user?.role || '').toLowerCase();
+      if (!userId) {
+        return res.status(401).json({ success: false, message: 'Authentication required' });
+      }
+      if (role && role !== 'nakliyeci') {
+        return res.status(403).json({ success: false, message: 'Forbidden' });
+      }
+
+      const plans = req.body?.plans;
+      if (!Array.isArray(plans) || plans.length === 0) {
+        return res.status(400).json({ success: false, message: 'plans gerekli' });
+      }
+
+      // Keep payload small and deterministic (best-effort validation)
+      const safePlans = plans
+        .map((p) => {
+          const shipmentIds = Array.isArray(p?.shipmentIds) ? p.shipmentIds.filter(Boolean) : [];
+          const points = Array.isArray(p?.points) ? p.points : [];
+          return {
+            shipmentIds: shipmentIds.map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0),
+            points: points.slice(0, 500),
+            vehicle: p?.vehicle ?? null,
+            summary: p?.summary ?? null,
+          };
+        })
+        .filter((p) => Array.isArray(p.shipmentIds) && p.shipmentIds.length > 0);
+
+      if (!safePlans.length) {
+        return res.status(400).json({ success: false, message: 'Geçerli plan bulunamadı' });
+      }
+
+      // Fetch existing settings
+      let currentSettings = {};
+      try {
+        const sRes = await pool.query('SELECT settings FROM users WHERE id = $1 LIMIT 1', [userId]);
+        const raw = sRes.rows && sRes.rows[0] ? sRes.rows[0].settings : null;
+        if (raw && typeof raw === 'object') {
+          currentSettings = raw;
+        } else if (typeof raw === 'string') {
+          try {
+            const parsed = JSON.parse(raw);
+            if (parsed && typeof parsed === 'object') currentSettings = parsed;
+          } catch (_) {
+            currentSettings = {};
+          }
+        }
+      } catch (_) {
+        currentSettings = {};
+      }
+
+      const nextSettings =
+        currentSettings && typeof currentSettings === 'object' ? { ...currentSettings } : {};
+      nextSettings.routePlanner = {
+        savedAt: new Date().toISOString(),
+        plans: safePlans,
+      };
+
+      const settingsJson = JSON.stringify(nextSettings);
+      try {
+        await pool.query(
+          `UPDATE users SET settings = $1::jsonb, "updatedAt" = CURRENT_TIMESTAMP WHERE id = $2`,
+          [settingsJson, userId]
+        );
+      } catch (_eCamel) {
+        try {
+          await pool.query(
+            `UPDATE users SET settings = $1::jsonb, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+            [settingsJson, userId]
+          );
+        } catch (_eSnake) {
+          await pool.query(`UPDATE users SET settings = $1::jsonb WHERE id = $2`, [settingsJson, userId]);
+        }
+      }
+
+      return res.json({ success: true, message: 'Rota planı kaydedildi' });
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message: 'Rota planı kaydedilemedi',
         details: error.message,
       });
     }

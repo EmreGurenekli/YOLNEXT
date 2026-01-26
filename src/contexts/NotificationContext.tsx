@@ -1,4 +1,4 @@
-﻿import React, {
+import React, {
   createContext,
   useContext,
   useReducer,
@@ -53,7 +53,6 @@ interface NotificationContextType extends NotificationState {
     message?: string,
     options?: Partial<Notification>
   ) => string;
-  // Push notification methods
   requestPermission: () => Promise<boolean>;
   isEnabled: () => boolean;
   getPermissionStatus: () => NotificationPermission;
@@ -106,7 +105,6 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const [state, dispatch] = useReducer(notificationReducer, initialState);
 
-  // Initialize push notifications
   useEffect(() => {
     if (typeof window === 'undefined' || !window.localStorage) return;
     try {
@@ -138,7 +136,6 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
 
       dispatch({ type: 'ADD_NOTIFICATION', payload: newNotification });
 
-      // Auto remove after duration (unless persistent)
       if (!newNotification.persistent && newNotification.duration) {
         setTimeout(() => {
           dispatch({ type: 'REMOVE_NOTIFICATION', payload: id });
@@ -176,7 +173,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
         type: 'error',
         title,
         message,
-        duration: 7000, // Longer duration for errors
+        duration: 7000,
         ...options,
       });
     },
@@ -207,7 +204,6 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({
     [addNotification]
   );
 
-  // Push notification methods
   const requestPermission = useCallback(async () => {
     return await notificationService.requestPermission();
   }, []);
@@ -266,13 +262,3 @@ export const useNotification = () => {
   }
   return context;
 };
-
-
-
-
-
-
-
-
-
-

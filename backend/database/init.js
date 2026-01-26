@@ -6,6 +6,47 @@ async function createTables(pool) {
   }
 
   try {
+    // If a previous run created a UUID-based schema (from SQL migrations),
+    // it will conflict with this runtime schema (integer PKs).
+    // In development, self-heal by dropping the legacy UUID schema tables.
+    try {
+      const idColRes = await pool.query(
+        `SELECT data_type, udt_name
+         FROM information_schema.columns
+         WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'id'
+         LIMIT 1`
+      );
+      const usersIdType = idColRes.rows?.[0]?.data_type || '';
+      const usersIdUdt = idColRes.rows?.[0]?.udt_name || '';
+      const isUuidUsers =
+        String(usersIdType).toLowerCase() === 'uuid' || String(usersIdUdt).toLowerCase() === 'uuid';
+
+      if (isUuidUsers) {
+        console.warn(
+          '⚠️ Detected UUID-based users.id. Resetting legacy UUID schema (development self-heal)...'
+        );
+        await pool.query(`
+          DROP TABLE IF EXISTS
+            commissions,
+            cities,
+            ratings,
+            transactions,
+            wallets,
+            tracking_updates,
+            notifications,
+            messages,
+            agreements,
+            offers,
+            shipments,
+            users,
+            migrations
+          CASCADE
+        `);
+      }
+    } catch (_) {
+      // ignore (fresh DB)
+    }
+
     // Canonical schema version (runtime)
     const CANONICAL_SCHEMA_VERSION = 'runtime_v1';
 
@@ -39,7 +80,32 @@ async function createTables(pool) {
       )
     `);
 
-    // Forward-compatible ALTERs for users (legacy DBs may not have these columns)
+    // Forward-compatible ALTERs for users.
+    // IMPORTANT: Many queries use quoted camelCase columns like u."fullName".
+    // Unquoted CREATE TABLE turns them into lowercase (fullname), so we add the quoted versions and backfill.
+    try { await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS "firstName" VARCHAR(100)'); } catch (_) {}
+    try { await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS "lastName" VARCHAR(100)'); } catch (_) {}
+    try { await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS "fullName" VARCHAR(255)'); } catch (_) {}
+    try { await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS "companyName" VARCHAR(255)'); } catch (_) {}
+    try { await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS "taxNumber" VARCHAR(50)'); } catch (_) {}
+    try { await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS "taxOffice" VARCHAR(100)'); } catch (_) {}
+    try { await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS "isActive" BOOLEAN DEFAULT true'); } catch (_) {}
+    try { await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP'); } catch (_) {}
+    try { await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS "updatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP'); } catch (_) {}
+
+    // Backfill quoted columns from lowercase ones (created by unquoted schema).
+    // Use COALESCE so we don't overwrite real data.
+    try { await pool.query('UPDATE users SET "firstName" = COALESCE("firstName", firstname)'); } catch (_) {}
+    try { await pool.query('UPDATE users SET "lastName" = COALESCE("lastName", lastname)'); } catch (_) {}
+    try { await pool.query('UPDATE users SET "fullName" = COALESCE("fullName", fullname)'); } catch (_) {}
+    try { await pool.query('UPDATE users SET "companyName" = COALESCE("companyName", companyname)'); } catch (_) {}
+    try { await pool.query('UPDATE users SET "taxNumber" = COALESCE("taxNumber", taxnumber)'); } catch (_) {}
+    try { await pool.query('UPDATE users SET "taxOffice" = COALESCE("taxOffice", taxoffice)'); } catch (_) {}
+    try { await pool.query('UPDATE users SET "isActive" = COALESCE("isActive", isactive)'); } catch (_) {}
+    try { await pool.query('UPDATE users SET "createdAt" = COALESCE("createdAt", createdat)'); } catch (_) {}
+    try { await pool.query('UPDATE users SET "updatedAt" = COALESCE("updatedAt", updatedat)'); } catch (_) {}
+
+    // Additional optional columns
     try {
       await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS "nakliyeciCode" VARCHAR(50)');
     } catch (_) {
@@ -166,6 +232,13 @@ async function createTables(pool) {
       // ignore
     }
 
+    // Legacy/compatibility: some routes still use driver_id (snake_case)
+    try {
+      await pool.query('ALTER TABLE shipments ADD COLUMN IF NOT EXISTS driver_id INTEGER');
+    } catch (_) {
+      // ignore
+    }
+
     try {
       await pool.query('ALTER TABLE shipments ADD COLUMN IF NOT EXISTS "userId" INTEGER');
     } catch (_) {
@@ -204,6 +277,14 @@ async function createTables(pool) {
       if (shipCols.has('carrier_id')) {
         await pool.query('UPDATE shipments SET "carrierId" = carrier_id WHERE "carrierId" IS NULL');
       }
+
+      // Backfill driver_id from any existing driver columns
+      if (shipCols.has('driverid')) {
+        await pool.query('UPDATE shipments SET driver_id = driverid WHERE driver_id IS NULL');
+      }
+      if (shipCols.has('driverId')) {
+        await pool.query('UPDATE shipments SET driver_id = "driverId" WHERE driver_id IS NULL');
+      }
     } catch (_) {
       // ignore
     }
@@ -236,6 +317,22 @@ async function createTables(pool) {
     }
     try {
       await pool.query('ALTER TABLE offers ADD COLUMN IF NOT EXISTS "carrierId" INTEGER');
+    } catch (_) {
+      // ignore
+    }
+    // RoutePlanner / driver-targeted offers (optional)
+    try {
+      const offerColsResForDriver = await pool.query(
+        `SELECT column_name FROM information_schema.columns WHERE table_name = 'offers'`
+      );
+      const offerColsForDriver = new Set((offerColsResForDriver.rows || []).map(r => r.column_name));
+      const hasDriverCol =
+        offerColsForDriver.has('driverId') ||
+        offerColsForDriver.has('driver_id') ||
+        offerColsForDriver.has('driverid');
+      if (!hasDriverCol) {
+        await pool.query('ALTER TABLE offers ADD COLUMN IF NOT EXISTS "driverId" INTEGER');
+      }
     } catch (_) {
       // ignore
     }
@@ -389,6 +486,94 @@ async function createTables(pool) {
       // ignore
     }
 
+    // Support Center (Help & Tickets)
+    // NOTE: These are core tables required by `backend/routes/v1/support.js`.
+    // They are intentionally created empty (no seed/mock data).
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS support_categories (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100) UNIQUE NOT NULL,
+        description TEXT,
+        expected_response_time_hours INTEGER DEFAULT 24,
+        auto_response_template TEXT,
+        parent_id INTEGER REFERENCES support_categories(id) ON DELETE SET NULL,
+        sort_order INTEGER DEFAULT 0,
+        is_active BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS support_tickets (
+        id SERIAL PRIMARY KEY,
+        ticket_number VARCHAR(50) UNIQUE NOT NULL,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        user_type VARCHAR(50),
+        user_email VARCHAR(255),
+        user_name VARCHAR(255),
+        user_phone VARCHAR(50),
+        category VARCHAR(100),
+        priority VARCHAR(20) DEFAULT 'medium',
+        status VARCHAR(20) DEFAULT 'open',
+        subject VARCHAR(500),
+        description TEXT,
+        related_shipment_id INTEGER,
+        related_offer_id INTEGER,
+        related_transaction_id INTEGER,
+        browser_info TEXT,
+        url_context TEXT,
+        assigned_admin_id INTEGER,
+        first_response_at TIMESTAMP,
+        resolved_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS support_ticket_messages (
+        id SERIAL PRIMARY KEY,
+        ticket_id INTEGER REFERENCES support_tickets(id) ON DELETE CASCADE,
+        sender_type VARCHAR(20) NOT NULL,
+        sender_id INTEGER,
+        sender_name VARCHAR(255),
+        message_content TEXT NOT NULL,
+        message_type VARCHAR(20) DEFAULT 'message',
+        is_internal BOOLEAN DEFAULT false,
+        is_auto_generated BOOLEAN DEFAULT false,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS support_ticket_attachments (
+        id SERIAL PRIMARY KEY,
+        ticket_id INTEGER REFERENCES support_tickets(id) ON DELETE CASCADE,
+        message_id INTEGER REFERENCES support_ticket_messages(id) ON DELETE CASCADE,
+        filename VARCHAR(255) NOT NULL,
+        original_filename VARCHAR(255),
+        file_size INTEGER,
+        file_type VARCHAR(100),
+        file_path TEXT,
+        uploaded_by_id INTEGER,
+        uploaded_by_type VARCHAR(20),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS user_support_references (
+        user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+        support_reference_code VARCHAR(50) UNIQUE,
+        phone_verification_code VARCHAR(10),
+        total_tickets INTEGER DEFAULT 0,
+        resolved_tickets INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     // Admin Flags (needed by admin panel)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS admin_flags (
@@ -409,6 +594,210 @@ async function createTables(pool) {
     }
     try {
       await pool.query("CREATE INDEX IF NOT EXISTS idx_admin_flags_target ON admin_flags(target_type, target_id)");
+    } catch (_) {
+      // ignore
+    }
+
+    // Trust & Safety (Complaints + Disputes + Suspicious Activities)
+    // These tables back `/api/complaints`, `/api/disputes`, `/api/suspicious-activity` and admin views.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS complaints (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        related_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        shipment_id INTEGER REFERENCES shipments(id) ON DELETE SET NULL,
+        type VARCHAR(50),
+        title TEXT,
+        description TEXT,
+        priority VARCHAR(20) DEFAULT 'medium',
+        status VARCHAR(20) DEFAULT 'pending',
+        attachments JSONB,
+        metadata JSONB,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    try {
+      await pool.query("CREATE INDEX IF NOT EXISTS idx_complaints_status ON complaints(status)");
+    } catch (_) {
+      // ignore
+    }
+    try {
+      await pool.query("CREATE INDEX IF NOT EXISTS idx_complaints_user ON complaints(user_id)");
+    } catch (_) {
+      // ignore
+    }
+    try {
+      await pool.query("CREATE INDEX IF NOT EXISTS idx_complaints_related_user ON complaints(related_user_id)");
+    } catch (_) {
+      // ignore
+    }
+    try {
+      await pool.query("CREATE INDEX IF NOT EXISTS idx_complaints_shipment ON complaints(shipment_id)");
+    } catch (_) {
+      // ignore
+    }
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS disputes (
+        id SERIAL PRIMARY KEY,
+        dispute_ref VARCHAR(50) UNIQUE NOT NULL,
+        shipment_id INTEGER REFERENCES shipments(id) ON DELETE SET NULL,
+        complainant_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        respondent_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        dispute_type VARCHAR(50) NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT,
+        amount DECIMAL(10,2) DEFAULT 0,
+        priority VARCHAR(20) DEFAULT 'low',
+        status VARCHAR(20) DEFAULT 'pending',
+        evidence_urls JSONB,
+        assigned_to INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        resolution_notes TEXT,
+        resolution_amount DECIMAL(10,2),
+        resolved_at TIMESTAMP,
+        resolved_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    try {
+      await pool.query("CREATE INDEX IF NOT EXISTS idx_disputes_status ON disputes(status)");
+    } catch (_) {
+      // ignore
+    }
+    try {
+      await pool.query("CREATE INDEX IF NOT EXISTS idx_disputes_shipment ON disputes(shipment_id)");
+    } catch (_) {
+      // ignore
+    }
+    try {
+      await pool.query("CREATE INDEX IF NOT EXISTS idx_disputes_users ON disputes(complainant_id, respondent_id)");
+    } catch (_) {
+      // ignore
+    }
+    try {
+      await pool.query("CREATE INDEX IF NOT EXISTS idx_disputes_assigned_to ON disputes(assigned_to)");
+    } catch (_) {
+      // ignore
+    }
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS dispute_activities (
+        id SERIAL PRIMARY KEY,
+        dispute_id INTEGER REFERENCES disputes(id) ON DELETE CASCADE,
+        activity_type VARCHAR(50) NOT NULL,
+        description TEXT,
+        created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    try {
+      await pool.query("CREATE INDEX IF NOT EXISTS idx_dispute_activities_dispute ON dispute_activities(dispute_id)");
+    } catch (_) {
+      // ignore
+    }
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS dispute_messages (
+        id SERIAL PRIMARY KEY,
+        dispute_id INTEGER REFERENCES disputes(id) ON DELETE CASCADE,
+        sender_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        recipient_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        message TEXT NOT NULL,
+        attachments JSONB,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    try {
+      await pool.query("CREATE INDEX IF NOT EXISTS idx_dispute_messages_dispute ON dispute_messages(dispute_id)");
+    } catch (_) {
+      // ignore
+    }
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS suspicious_activities (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        activity_type VARCHAR(50) NOT NULL,
+        risk_level VARCHAR(20) NOT NULL,
+        details TEXT,
+        status VARCHAR(20) DEFAULT 'active',
+        resolution_notes TEXT,
+        resolved_at TIMESTAMP,
+        resolved_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    try {
+      await pool.query("CREATE INDEX IF NOT EXISTS idx_suspicious_activities_status ON suspicious_activities(status)");
+    } catch (_) {
+      // ignore
+    }
+    try {
+      await pool.query("CREATE INDEX IF NOT EXISTS idx_suspicious_activities_user ON suspicious_activities(user_id)");
+    } catch (_) {
+      // ignore
+    }
+    try {
+      await pool.query("CREATE INDEX IF NOT EXISTS idx_suspicious_activities_risk ON suspicious_activities(risk_level)");
+    } catch (_) {
+      // ignore
+    }
+
+    // Product Analytics (events + client metrics)
+    // Used by `backend/routes/v1/analytics.js` and `src/services/businessAnalytics.ts`.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS analytics_events (
+        id SERIAL PRIMARY KEY,
+        event VARCHAR(100) NOT NULL,
+        ts BIGINT,
+        path TEXT,
+        href TEXT,
+        referrer TEXT,
+        ua TEXT,
+        ip TEXT,
+        user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        role VARCHAR(50),
+        data JSONB,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    try {
+      await pool.query("CREATE INDEX IF NOT EXISTS idx_analytics_events_event ON analytics_events(event)");
+    } catch (_) {
+      // ignore
+    }
+    try {
+      await pool.query("CREATE INDEX IF NOT EXISTS idx_analytics_events_user ON analytics_events(user_id)");
+    } catch (_) {
+      // ignore
+    }
+    try {
+      await pool.query("CREATE INDEX IF NOT EXISTS idx_analytics_events_created_at ON analytics_events(created_at)");
+    } catch (_) {
+      // ignore
+    }
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS analytics_metrics (
+        id SERIAL PRIMARY KEY,
+        ts BIGINT,
+        path TEXT,
+        href TEXT,
+        ua TEXT,
+        ip TEXT,
+        user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        role VARCHAR(50),
+        metrics JSONB,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    try {
+      await pool.query("CREATE INDEX IF NOT EXISTS idx_analytics_metrics_created_at ON analytics_metrics(created_at)");
     } catch (_) {
       // ignore
     }

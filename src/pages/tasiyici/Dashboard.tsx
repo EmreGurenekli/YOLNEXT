@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useAuth } from '../../contexts/AuthContext';
@@ -31,6 +31,7 @@ import Breadcrumb from '../../components/shared-ui-elements/Breadcrumb';
 import LoadingState from '../../components/shared-ui-elements/LoadingState';
 import { formatDate } from '../../utils/format';
 import EmptyState from '../../components/shared-ui-elements/EmptyState';
+import { getStatusText as getShipmentStatusText } from '../../utils/shipmentStatus';
 
 type RecentJob = {
   id: string;
@@ -215,18 +216,8 @@ const TasiyiciDashboard: React.FC = () => {
   };
 
   const getStatusText = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return 'Tamamlandı';
-      case 'in_progress':
-        return 'Devam Ediyor';
-      case 'pending':
-        return 'Bekliyor';
-      case 'cancelled':
-        return 'İptal Edildi';
-      default:
-        return status;
-    }
+    const base = getShipmentStatusText(status);
+    return base !== 'Bilinmiyor' ? base : status;
   };
 
   if (isLoading) {
@@ -424,7 +415,7 @@ const TasiyiciDashboard: React.FC = () => {
                 En son aldığınız işler
               </p>
             </div>
-            <Link to='/tasiyici/active-jobs'>
+            <Link to='/tasiyici/islerim'>
               <button className='px-4 py-2 bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 text-white rounded-lg font-medium transition-all duration-300 flex items-center gap-2 shadow-lg hover:shadow-xl'>
                 Tümünü Gör
                 <ArrowRight className='w-4 h-4' />

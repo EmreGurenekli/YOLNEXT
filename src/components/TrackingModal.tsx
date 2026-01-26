@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
   MapPin,
@@ -10,6 +10,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { createApiUrl } from '../config/api';
+import { getStatusText as getShipmentStatusText } from '../utils/shipmentStatus';
 
 interface TrackingModalProps {
   isOpen: boolean;
@@ -202,24 +203,8 @@ const TrackingModal: React.FC<TrackingModalProps> = ({
   };
 
   const getStatusText = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return 'Beklemede';
-      case 'offer_accepted':
-      case 'accepted':
-        return 'Kabul Edildi';
-      case 'picked_up':
-      case 'in_progress':
-        return 'Alındı';
-      case 'in_transit':
-        return 'Yolda';
-      case 'delivered':
-        return 'Teslim Edildi';
-      case 'completed':
-        return 'Tamamlandı';
-      default:
-        return status;
-    }
+    const base = getShipmentStatusText(status);
+    return base !== 'Bilinmiyor' ? base : status;
   };
 
   const formatDateTime = (dateString: string) => {

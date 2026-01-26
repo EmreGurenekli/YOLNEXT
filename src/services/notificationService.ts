@@ -1,4 +1,3 @@
-// Notification service - temporarily disabled
 const notificationService = {
   show: () => {},
   hide: () => {},
@@ -16,12 +15,3 @@ const notificationService = {
 };
 
 export default notificationService;
-
-
-
-
-
-
-
-
-

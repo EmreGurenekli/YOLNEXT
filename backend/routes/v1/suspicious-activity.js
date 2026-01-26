@@ -9,6 +9,45 @@ function createSuspiciousActivityRoutes(pool, authenticateToken, requireAdmin, w
   router.use(authenticateToken);
   router.use(requireAdmin);
 
+  // Schema helpers (offers/shipments column name variability)
+  const q = (c) => (c && /[A-Z]/.test(c) ? `"${c}"` : c);
+  const resolveCols = async (tableName) => {
+    if (!pool) return new Set();
+    try {
+      const r = await pool.query(
+        `SELECT column_name FROM information_schema.columns WHERE table_name = $1`,
+        [tableName]
+      );
+      return new Set((r.rows || []).map(x => x.column_name));
+    } catch (_) {
+      return new Set();
+    }
+  };
+  const pickCol = (cols, ...names) => names.find(n => cols.has(n)) || null;
+
+  let cachedOfferMeta = null;
+  const resolveOfferMeta = async () => {
+    if (cachedOfferMeta) return cachedOfferMeta;
+    const cols = await resolveCols('offers');
+    const userCol =
+      pickCol(cols, 'carrierId', 'carrier_id', 'nakliyeci_id', 'nakliyeciId', 'userId', 'user_id', 'userid');
+    const createdCol = pickCol(cols, 'createdAt', 'created_at', 'createdat');
+    cachedOfferMeta = { userCol, createdCol };
+    return cachedOfferMeta;
+  };
+
+  let cachedShipMeta = null;
+  const resolveShipMeta = async () => {
+    if (cachedShipMeta) return cachedShipMeta;
+    const cols = await resolveCols('shipments');
+    const ownerCol = pickCol(cols, 'userId', 'user_id', 'ownerId', 'owner_id', 'sender_id', 'senderId');
+    const createdCol = pickCol(cols, 'createdAt', 'created_at', 'createdat', 'createdat');
+    const pickupCol = pickCol(cols, 'pickupCity', 'pickup_city', 'pickupcity');
+    const deliveryCol = pickCol(cols, 'deliveryCity', 'delivery_city', 'deliverycity');
+    cachedShipMeta = { ownerCol, createdCol, pickupCol, deliveryCol };
+    return cachedShipMeta;
+  };
+
   // Suspicious activity types
   const ACTIVITY_TYPES = {
     RAPID_OFFERS: 'rapid_offers',
@@ -41,22 +80,36 @@ function createSuspiciousActivityRoutes(pool, authenticateToken, requireAdmin, w
 
   // Real-time monitoring algorithms
   async function detectRapidOffers(userId) {
-    const result = await safeQuery(`
+    const meta = await resolveOfferMeta();
+    if (!meta.userCol) return null;
+    const userExpr = q(meta.userCol);
+    const createdExpr = meta.createdCol ? q(meta.createdCol) : 'created_at';
+    const result = await safeQuery(
+      `
       SELECT COUNT(*) as offer_count
       FROM offers 
-      WHERE user_id = $1 AND created_at >= NOW() - INTERVAL '1 hour'
-    `, [userId]);
+      WHERE ${userExpr} = $1 AND ${createdExpr} >= NOW() - INTERVAL '1 hour'
+    `,
+      [userId]
+    );
     
     const offerCount = parseInt(result.rows[0]?.offer_count || 0);
     return offerCount > 50 ? { detected: true, severity: RISK_LEVELS.HIGH, details: `${offerCount} offers in 1 hour` } : null;
   }
 
   async function detectUnusualPricing(userId) {
-    const result = await safeQuery(`
+    const meta = await resolveOfferMeta();
+    if (!meta.userCol) return null;
+    const userExpr = q(meta.userCol);
+    const createdExpr = meta.createdCol ? q(meta.createdCol) : 'created_at';
+    const result = await safeQuery(
+      `
       SELECT AVG(price) as avg_price, COUNT(*) as count
       FROM offers 
-      WHERE user_id = $1 AND created_at >= NOW() - INTERVAL '24 hours'
-    `, [userId]);
+      WHERE ${userExpr} = $1 AND ${createdExpr} >= NOW() - INTERVAL '24 hours'
+    `,
+      [userId]
+    );
     
     const avgPrice = parseFloat(result.rows[0]?.avg_price || 0);
     const count = parseInt(result.rows[0]?.count || 0);
@@ -72,13 +125,23 @@ function createSuspiciousActivityRoutes(pool, authenticateToken, requireAdmin, w
   }
 
   async function detectLocationAnomaly(userId) {
-    const result = await safeQuery(`
-      SELECT DISTINCT pickup_city, delivery_city, COUNT(*) as count
+    const meta = await resolveShipMeta();
+    if (!meta.ownerCol || !meta.pickupCol || !meta.deliveryCol) return null;
+    const ownerExpr = q(meta.ownerCol);
+    const pickupExpr = q(meta.pickupCol);
+    const deliveryExpr = q(meta.deliveryCol);
+    const createdExpr = meta.createdCol ? q(meta.createdCol) : 'created_at';
+
+    const result = await safeQuery(
+      `
+      SELECT DISTINCT ${pickupExpr} as pickup_city, ${deliveryExpr} as delivery_city, COUNT(*) as count
       FROM shipments 
-      WHERE sender_id = $1 AND created_at >= NOW() - INTERVAL '7 days'
-      GROUP BY pickup_city, delivery_city
+      WHERE ${ownerExpr} = $1 AND ${createdExpr} >= NOW() - INTERVAL '7 days'
+      GROUP BY ${pickupExpr}, ${deliveryExpr}
       ORDER BY count DESC
-    `, [userId]);
+    `,
+      [userId]
+    );
     
     const uniqueRoutes = result.rows.length;
     return uniqueRoutes > 20 ? { 

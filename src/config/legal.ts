@@ -23,14 +23,12 @@ function requireEnv(key: string, placeholderValues: string[] = [], fallback?: st
   const value = env(key);
   if (!value) {
     if (fallback) {
-      // Silently use fallback in development
       return fallback;
     }
     throw new Error(`Missing required env: ${key}`);
   }
   if (placeholderValues.includes(value)) {
     if (fallback) {
-      // Silently use fallback in development
       return fallback;
     }
     throw new Error(`Invalid placeholder value for env: ${key}`);
@@ -51,12 +49,3 @@ export const LEGAL_CONTACT: LegalContact = {
 };
 
 export const LEGAL_DOCUMENT_VERSION = requireEnv('VITE_LEGAL_DOC_VERSION', ['v1.0'], 'v1.0.0');
-
-
-
-
-
-
-
-
-

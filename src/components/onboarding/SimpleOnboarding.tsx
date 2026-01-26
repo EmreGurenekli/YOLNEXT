@@ -1,5 +1,4 @@
-﻿import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useMemo, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   CheckCircle,
@@ -24,8 +23,17 @@ const SimpleOnboarding: React.FC<SimpleOnboardingProps> = ({
   onComplete,
 }) => {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(1);
+
+  const perUserStorageKey = useMemo(() => {
+    const userId = user?.id ? String((user as any).id) : 'anonymous';
+    return `onboardingCompleted:${userId}:${userType}`;
+  }, [user, userType]);
+
+  const perUserPendingKey = useMemo(() => {
+    const userId = user?.id ? String((user as any).id) : 'anonymous';
+    return `onboardingPending:${userId}:${userType}`;
+  }, [user, userType]);
 
   const getSteps = () => {
     const baseSteps = [
@@ -44,7 +52,7 @@ const SimpleOnboarding: React.FC<SimpleOnboardingProps> = ({
       },
     ];
 
-    if (userType === 'individual' || userType === 'corporate') {
+    if (userType === 'individual') {
       baseSteps.push(
         {
           id: 2,
@@ -61,7 +69,7 @@ const SimpleOnboarding: React.FC<SimpleOnboardingProps> = ({
                   <li>Gönderi oluşturun (nereden, nereye, ne taşınacak)</li>
                   <li>Nakliyeciler size teklif verecek</li>
                   <li>En uygun teklifi seçin</li>
-                  <li>Gönderinizi takip edin</li>
+                  <li>Gönderinizi takip edin ve mesajlaşın</li>
                 </ol>
               </div>
             </div>
@@ -88,6 +96,50 @@ const SimpleOnboarding: React.FC<SimpleOnboardingProps> = ({
           ),
         }
       );
+    } else if (userType === 'corporate') {
+      baseSteps.push(
+        {
+          id: 2,
+          title: 'Kurumsal Gönderi Oluşturun',
+          description: 'İhtiyacınıza uygun gönderiyi yayınlayın',
+          icon: <Building2 className='w-12 h-12 text-blue-500' />,
+          content: (
+            <div className='space-y-4'>
+              <div className='bg-blue-50 rounded-xl p-6'>
+                <h3 className='font-semibold text-slate-900 mb-2'>
+                  Kurumsal Akış
+                </h3>
+                <ol className='list-decimal list-inside space-y-2 text-slate-700'>
+                  <li>Gönderi detaylarını girin (kategori/ölçüler)</li>
+                  <li>Adres ve tarih bilgilerini ekleyin</li>
+                  <li>Yayınlayın ve teklifleri toplayın</li>
+                  <li>Seçiminizi yapın ve süreci yönetin</li>
+                </ol>
+              </div>
+            </div>
+          ),
+        },
+        {
+          id: 3,
+          title: 'Teklif & İletişim',
+          description: 'Teklifleri yönetip nakliyecilerle iletişim kurun',
+          icon: <MessageSquare className='w-12 h-12 text-green-500' />,
+          content: (
+            <div className='space-y-4'>
+              <div className='bg-green-50 rounded-xl p-6'>
+                <h3 className='font-semibold text-slate-900 mb-2'>
+                  İpuçları
+                </h3>
+                <ul className='list-disc list-inside space-y-2 text-slate-700'>
+                  <li>Teklifleri SLA/süre, fiyat ve güven puanına göre kıyaslayın</li>
+                  <li>Gerekirse mesajlaşma ile netleştirin</li>
+                  <li>Seçimden sonra gönderiyi takip ekranından yönetin</li>
+                </ul>
+              </div>
+            </div>
+          ),
+        }
+      );
     } else if (userType === 'nakliyeci') {
       baseSteps.push(
         {
@@ -107,6 +159,12 @@ const SimpleOnboarding: React.FC<SimpleOnboardingProps> = ({
                   <li>Teklifiniz kabul edilirse taşıyıcı atayın</li>
                   <li>Gönderiyi takip edin ve tamamlayın</li>
                 </ol>
+                <div className='mt-4 text-sm text-slate-600'>
+                  <span className='inline-flex items-center gap-2'>
+                    <MapPin className='w-4 h-4 text-slate-700' />
+                    Not: Şehir kuralı gereği, genelde sadece kendi şehrinizdeki gönderilere teklif verebilirsiniz.
+                  </span>
+                </div>
               </div>
             </div>
           ),
@@ -211,7 +269,16 @@ const SimpleOnboarding: React.FC<SimpleOnboardingProps> = ({
 
   const handleComplete = () => {
     // Mark onboarding as completed
-    localStorage.setItem('onboardingCompleted', 'true');
+    try {
+      // Legacy key (backward compatibility)
+      localStorage.setItem('onboardingCompleted', 'true');
+      // Role + user specific key (prevents cross-panel collisions)
+      localStorage.setItem(perUserStorageKey, 'true');
+      // Only show after first registration; consume the "pending" flag
+      localStorage.removeItem(perUserPendingKey);
+    } catch {
+      // ignore
+    }
     onComplete();
   };
 

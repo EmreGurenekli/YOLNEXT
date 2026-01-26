@@ -37,6 +37,7 @@ import ErrorToast from '../../components/error/ErrorToast';
 import { createApiUrl } from '../../config/api';
 import { safeJsonParse } from '../../utils/safeFetch';
 import { normalizeTrackingCode } from '../../utils/trackingCode';
+import { analytics } from '../../services/businessAnalytics';
 import RoutePlannerHeader from '../../components/route/RoutePlannerHeader';
 import RoutePlannerDriverSelector from '../../components/route/RoutePlannerDriverSelector';
 import RoutePlannerCorridorInfo from '../../components/route/RoutePlannerCorridorInfo';
@@ -75,6 +76,9 @@ interface AvailableLoad {
   price: number;
   deadline: string;
   distance: number;
+  corridorDirection?: 'outbound' | 'backhaul' | null;
+  corridorFromIndex?: number | null;
+  corridorToIndex?: number | null;
   driver: {
     id: string;
     name: string;
@@ -482,6 +486,12 @@ export default function RoutePlanner() {
       if (!response.ok || !data.success) {
         throw new Error(data.message || 'Teklif gönderilemedi');
       }
+
+      analytics.track('offer_create_success', {
+        shipmentId: selectedLoadForOffer?.id || null,
+        driverId: selectedDriverId || null,
+        source: 'route_planner',
+      });
 
       setToastType('success');
       setErrorMessage('Teklif başarıyla gönderildi. 30 dakika içinde yanıt bekleniyor.');
@@ -1032,6 +1042,19 @@ export default function RoutePlanner() {
         throw new Error(resp.message || 'Rota planı kaydedilemedi');
       }
 
+      try {
+        const uniqShipments = new Set<number>();
+        for (const p of payloadPlans) {
+          for (const sid of p.shipmentIds || []) uniqShipments.add(Number(sid));
+        }
+        analytics.track('route_plan_saved', {
+          plansCount: payloadPlans.length,
+          shipmentsCount: uniqShipments.size,
+        });
+      } catch {
+        // ignore
+      }
+
       setToastType('success');
       setErrorMessage(payloadPlans.length > 1 ? 'Rota planları kaydedildi' : 'Rota planı kaydedildi');
       setShowError(true);
@@ -1122,6 +1145,14 @@ export default function RoutePlanner() {
 
         {/* Header */}
         <RoutePlannerHeader />
+
+        <div className='max-w-4xl mx-auto mt-4'>
+          <div className='bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800'>
+            <strong>Kural:</strong> Varsayılan olarak yalnızca profil şehrindeki yükler için teklif verilebilir.
+            <br />
+            <strong>İstisna:</strong> Bu ekrandaki koridor (gidiş/dönüş) yükleri, rota üzerinde olduğu için teklif verebilmenizi sağlar.
+          </div>
+        </div>
 
         {/* Ana İçerik */}
         <div className='max-w-4xl mx-auto space-y-6'>

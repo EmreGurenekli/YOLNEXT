@@ -58,6 +58,7 @@ interface ActiveShipment {
   description?: string;
   category?: string;
   categoryData?: any;
+  metadata?: any;
   from: string;
   to: string;
   pickupAddress?: string;
@@ -370,6 +371,7 @@ const ActiveShipments = () => {
             description: shipment.description || undefined,
             category: shipment.category || shipment.categoryType || shipment.shipmentType || undefined,
             categoryData: shipment.categoryData || shipment.category_data || undefined,
+            metadata: shipment.metadata ?? shipment.meta ?? undefined,
             from,
             to,
             pickupAddress: shipment.pickupAddress || shipment.pickup_address || shipment.pickupCity || shipment.pickup_city || shipment.from_address || undefined,
@@ -552,7 +554,7 @@ const ActiveShipments = () => {
 
       if (response.ok) {
         clearTimeout(timeoutId);
-        setSuccessMessage('Taşıyıcı başarıyla atandı. İşlem başlatıldı.');
+        setSuccessMessage('Taşıyıcıya iş teklifi gönderildi. 30 dk içinde kabul etmesi bekleniyor.');
         setShowSuccess(true);
         setTimeout(() => setShowSuccess(false), 3000);
         setShowAssignModal(false);
@@ -675,47 +677,6 @@ const ActiveShipments = () => {
     }
   };
 
-  // Use utility function for status info
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return 'text-yellow-600 bg-yellow-100';
-      case 'offer_accepted':
-      case 'accepted':
-        return 'text-blue-600 bg-blue-100';
-      case 'in_progress':
-        return 'text-indigo-600 bg-indigo-100';
-      case 'in_transit':
-        return 'text-blue-600 bg-blue-100';
-      case 'delivered':
-        return 'text-green-600 bg-green-100';
-      case 'cancelled':
-        return 'text-red-600 bg-red-100';
-      default:
-        return 'text-gray-600 bg-gray-100';
-    }
-  };
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return 'Bekliyor';
-      case 'offer_accepted':
-      case 'accepted':
-        return 'Teklif Kabul Edildi';
-      case 'in_progress':
-        return 'Hazırlanıyor';
-      case 'in_transit':
-        return 'Yolda';
-      case 'delivered':
-        return 'Teslim Edildi';
-      case 'cancelled':
-        return 'İptal Edildi';
-      default:
-        return status;
-    }
-  };
-
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case 'high':
@@ -750,6 +711,25 @@ const ActiveShipments = () => {
     if (k === 'furniture' || k === 'furniture_transport') return 'Mobilya';
     if (k === 'general' || k === 'general_cargo') return 'Genel Yük';
     return categoryRaw;
+  };
+
+  const parseMetadata = (raw: any) => {
+    if (!raw) return null;
+    if (typeof raw === 'object') return raw;
+    if (typeof raw === 'string') {
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  };
+
+  const getDriverOffer = (shipment: ActiveShipment) => {
+    const meta = parseMetadata((shipment as any).metadata);
+    const offer = meta && typeof meta === 'object' ? (meta as any).driverOffer : null;
+    return offer && typeof offer === 'object' ? offer : null;
   };
 
   const filteredShipments = shipments.filter(shipment => {
@@ -858,7 +838,37 @@ const ActiveShipments = () => {
         {/* Shipments List */}
         {filteredShipments.length > 0 ? (
           <div className='grid gap-6'>
-            {filteredShipments.map((shipment, index) => (
+            {filteredShipments.map((shipment, index) => {
+              const driverOffer = getDriverOffer(shipment);
+              const offerExpiresAtMs = driverOffer?.expiresAt ? Date.parse(String(driverOffer.expiresAt)) : NaN;
+              const offerIsExpired = Number.isFinite(offerExpiresAtMs) ? offerExpiresAtMs <= Date.now() : false;
+              const pendingDriverOffer =
+                driverOffer && driverOffer.status === 'pending' && !offerIsExpired ? driverOffer : null;
+              const pendingMinutesLeft =
+                pendingDriverOffer && Number.isFinite(offerExpiresAtMs)
+                  ? Math.max(0, Math.ceil((offerExpiresAtMs - Date.now()) / 60000))
+                  : null;
+
+              const nextStepText = (() => {
+                const s = String(shipment.status || '');
+                if (s === 'cancelled' || s === 'canceled') return null;
+                if ((s === 'waiting_for_offers' || s === 'open' || s === 'pending') && !shipment.driver_id) {
+                  return 'Sıradaki adım: Teklifleri yönet veya kabul ettir.';
+                }
+                if ((s === 'offer_accepted' || s === 'accepted') && !shipment.driver_id) {
+                  return pendingDriverOffer
+                    ? 'Sıradaki adım: Taşıyıcı 30 dk içinde kabul edecek.'
+                    : 'Sıradaki adım: Taşıyıcıya teklif gönder.';
+                }
+                if ((s === 'assigned' || s === 'in_progress') && shipment.driver_id) return 'Sıradaki adım: Yükleme (taşıyıcı “Yükü Aldım”).';
+                if (s === 'picked_up') return 'Sıradaki adım: Yola çıkış / takip.';
+                if (s === 'in_transit') return 'Sıradaki adım: Teslimat.';
+                if (s === 'delivered') return 'Sıradaki adım: Teslimat onayı / kapanış.';
+                if (s === 'completed') return 'Süreç tamamlandı.';
+                return null;
+              })();
+
+              return (
               <div
                 key={`${shipment.id}-${shipment.trackingNumber}-${index}`}
                 id={`shipment-${shipment.id}`}
@@ -1019,6 +1029,12 @@ const ActiveShipments = () => {
                     </div>
                   )}
 
+                  {nextStepText && (
+                    <div className='text-xs sm:text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-lg p-2 sm:p-3'>
+                      <strong>Şimdi ne olacak?</strong> {nextStepText}
+                    </div>
+                  )}
+
                   <div className='grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4'>
                     <div>
                       <h4 className='text-sm sm:text-base font-semibold text-gray-900 mb-2'>
@@ -1045,6 +1061,13 @@ const ActiveShipments = () => {
                               <strong>Tel:</strong> {shipment.driver.phone}
                             </p>
                           )}
+                        </div>
+                      ) : pendingDriverOffer ? (
+                        <div className='text-xs sm:text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2 sm:p-3'>
+                          <p className='font-medium'>⏳ Taşıyıcı Onayı Bekleniyor</p>
+                          <p className='text-xs mt-1 text-amber-700'>
+                            {pendingMinutesLeft != null ? `Kalan süre: ${pendingMinutesLeft} dk` : '30 dk içinde kabul etmesi gerekiyor.'}
+                          </p>
                         </div>
                       ) : (
                         <div className='text-xs sm:text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-lg p-2 sm:p-3'>
@@ -1103,10 +1126,13 @@ const ActiveShipments = () => {
                       ) : shipment.status !== 'waiting_for_offers' ? (
                         <button
                           onClick={() => handleAssignClick(shipment)}
-                          className='w-full bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white px-3 sm:px-4 py-2 sm:py-3 rounded-lg font-medium transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center gap-2 text-sm sm:text-base'
+                          disabled={!!pendingDriverOffer}
+                          className={`w-full bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white px-3 sm:px-4 py-2 sm:py-3 rounded-lg font-medium transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center gap-2 text-sm sm:text-base ${
+                            pendingDriverOffer ? 'opacity-60 cursor-not-allowed hover:shadow-lg' : ''
+                          }`}
                         >
                           <UserPlus className='w-4 h-4' />
-                          Taşıyıcıya Ata
+                          {pendingDriverOffer ? 'Onay Bekleniyor' : 'Taşıyıcıya Teklif Gönder'}
                         </button>
                       ) : null}
                       
@@ -1140,6 +1166,7 @@ const ActiveShipments = () => {
                             <span className='xs:hidden'>📞</span>
                           </a>
                         )}
+
                       </div>
                       
                       {shipment.driver_id && (
@@ -1177,7 +1204,8 @@ const ActiveShipments = () => {
                   )}
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <div className='min-h-[50vh] flex items-center justify-center'>

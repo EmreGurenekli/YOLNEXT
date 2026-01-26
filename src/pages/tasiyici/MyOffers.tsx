@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import {
   CheckCircle,
@@ -191,10 +191,10 @@ const MyOffers: React.FC = () => {
             isEmpty={!loading && offers.length === 0}
             icon={DollarSign}
             title='Tekliflerim'
-            description='Verdiğin tekliflerin durumunu buradan takip et. Kabul edilen işleri “Aktif İşler”de yönet; yeni iş almak için “Pazar”a dön.'
+            description='Verdiğin tekliflerin durumunu buradan takip et. Kabul edilen işleri “İşlerim”de yönet; yeni iş almak için “Pazar”a dön.'
             primaryAction={{
-              label: 'Aktif İşler',
-              to: '/tasiyici/active-jobs',
+              label: 'İşlerim',
+              to: '/tasiyici/islerim',
             }}
             secondaryAction={{
               label: 'Pazar',

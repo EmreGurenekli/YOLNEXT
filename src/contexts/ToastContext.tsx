@@ -1,4 +1,4 @@
-﻿import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode } from 'react';
 import { ToastContainer } from '../components/shared-ui-elements/Toast';
 
 export type ToastType = 'success' | 'error' | 'warning' | 'info';
@@ -59,13 +59,3 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
     </ToastContext.Provider>
   );
 };
-
-
-
-
-
-
-
-
-
-

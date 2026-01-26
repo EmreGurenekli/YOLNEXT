@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useAuth } from '../../contexts/AuthContext';
 import {
@@ -162,14 +162,14 @@ const TasiyiciCompletedJobs: React.FC = () => {
             isEmpty={!loading && jobs.length === 0}
             icon={CheckCircle}
             title='Tamamlanan İşler'
-            description='Tamamlanan işlerini buradan inceleyebilirsin. Yeni iş almak için “Pazar”a geç; devam eden operasyonlar için “Aktif İşler”e bak.'
+            description='Tamamlanan işlerini buradan inceleyebilirsin. Yeni iş almak için “Pazar”a geç; devam eden operasyonlar için “İşlerim”e bak.'
             primaryAction={{
               label: 'Pazar',
               to: '/tasiyici/market',
             }}
             secondaryAction={{
-              label: 'Aktif İşler',
-              to: '/tasiyici/active-jobs',
+              label: 'İşlerim',
+              to: '/tasiyici/islerim',
             }}
           />
         </div>
@@ -270,12 +270,12 @@ const TasiyiciCompletedJobs: React.FC = () => {
                 Tamamlanan işin yok
               </h3>
               <p className='text-gray-600 mb-6'>
-                Tamamlanan işler burada listelenir. Önce “Aktif İşler”den iş alıp tamamlayabilirsin.
+                Tamamlanan işler burada listelenir. Önce “İşlerim” sayfasından iş alıp tamamlayabilirsin.
               </p>
               <div className='flex flex-col sm:flex-row gap-3 justify-center'>
-                <Link to='/tasiyici/active-jobs'>
+                <Link to='/tasiyici/islerim'>
                   <button className='px-6 py-3 bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 text-white rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl'>
-                    Aktif İşlere Git
+                    İşlerime Git
                   </button>
                 </Link>
               </div>

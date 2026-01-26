@@ -1,4 +1,4 @@
-﻿// Step 2: Adres Bilgileri Component
+// Step 2: Adres Bilgileri Component
 // Extracted from CreateShipment.tsx for better code organization
 
 import React from 'react';
@@ -40,11 +40,12 @@ export default function CreateShipmentStep2({
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                <label htmlFor="pickupCity" className="block text-sm font-semibold text-slate-700 mb-2">
                   <MapPin className="w-4 h-4 inline mr-2" />
                   İl *
                 </label>
                 <select
+                  id="pickupCity"
                   value={formData.pickupCity ?? ''}
                   onChange={(e) => {
                     handleInputChange('pickupCity', e.target.value);
@@ -77,11 +78,12 @@ export default function CreateShipmentStep2({
                 )}
               </div>
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                <label htmlFor="pickupDistrict" className="block text-sm font-semibold text-slate-700 mb-2">
                   <MapPin className="w-4 h-4 inline mr-2" />
                   İlçe *
                 </label>
                 <select
+                  id="pickupDistrict"
                   value={formData.pickupDistrict ?? ''}
                   onChange={(e) => {
                     handleInputChange('pickupDistrict', e.target.value);
@@ -115,11 +117,12 @@ export default function CreateShipmentStep2({
               </div>
             </div>
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">
+              <label htmlFor="pickupAddress" className="block text-sm font-semibold text-slate-700 mb-2">
                 <MapPin className="w-4 h-4 inline mr-2" />
                 Adres *
               </label>
               <textarea
+                id="pickupAddress"
                 value={formData.pickupAddress}
                 onChange={(e) => {
                   handleInputChange('pickupAddress', e.target.value);
@@ -143,11 +146,12 @@ export default function CreateShipmentStep2({
             </div>
             
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">
+              <label htmlFor="pickupDate" className="block text-sm font-semibold text-slate-700 mb-2">
                 <Calendar className="w-4 h-4 inline mr-2" />
                 Toplama Tarihi *
               </label>
               <input
+                id="pickupDate"
                 type="date"
                 value={formData.pickupDate}
                 onChange={(e) => {
@@ -166,6 +170,9 @@ export default function CreateShipmentStep2({
                   errors.pickupDate ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-slate-200 focus:ring-blue-500 focus:border-blue-500'
                 }`}
               />
+              <p className="mt-1 text-xs text-slate-500">
+                Takvimden seçin. Format \(YYYY-AA-GG\) — örn: 2026-01-24
+              </p>
               {errors.pickupDate && (
                 <p id="pickupDate-error" className="mt-2 text-sm text-red-600" role="alert">{errors.pickupDate}</p>
               )}
@@ -187,11 +194,12 @@ export default function CreateShipmentStep2({
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                <label htmlFor="deliveryCity" className="block text-sm font-semibold text-slate-700 mb-2">
                   <MapPin className="w-4 h-4 inline mr-2" />
                   İl *
                 </label>
                 <select
+                  id="deliveryCity"
                   value={formData.deliveryCity ?? ''}
                   onChange={(e) => {
                     handleInputChange('deliveryCity', e.target.value);
@@ -224,11 +232,12 @@ export default function CreateShipmentStep2({
                 )}
               </div>
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                <label htmlFor="deliveryDistrict" className="block text-sm font-semibold text-slate-700 mb-2">
                   <MapPin className="w-4 h-4 inline mr-2" />
                   İlçe *
                 </label>
                 <select
+                  id="deliveryDistrict"
                   value={formData.deliveryDistrict ?? ''}
                   onChange={(e) => {
                     handleInputChange('deliveryDistrict', e.target.value);
@@ -262,11 +271,12 @@ export default function CreateShipmentStep2({
               </div>
             </div>
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">
+              <label htmlFor="deliveryAddress" className="block text-sm font-semibold text-slate-700 mb-2">
                 <MapPin className="w-4 h-4 inline mr-2" />
                 Adres *
               </label>
               <textarea
+                id="deliveryAddress"
                 value={formData.deliveryAddress}
                 onChange={(e) => {
                   handleInputChange('deliveryAddress', e.target.value);
@@ -275,22 +285,27 @@ export default function CreateShipmentStep2({
                   }
                 }}
                 rows={4}
+                aria-label="Teslimat adresi"
+                aria-required="true"
+                aria-invalid={!!errors.deliveryAddress}
+                aria-describedby={errors.deliveryAddress ? 'deliveryAddress-error' : undefined}
                 className={`w-full p-4 border-2 rounded-xl focus:ring-2 transition-all duration-200 bg-white shadow-sm hover:shadow-md text-slate-700 resize-none ${
                   errors.deliveryAddress ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-slate-200 focus:ring-emerald-500 focus:border-emerald-500'
                 }`}
                 placeholder="Mahalle, sokak, bina numarası, daire numarası ve varsa kat bilgisi gibi tüm detayları eksiksiz olarak giriniz..."
               />
               {errors.deliveryAddress && (
-                <p className="mt-2 text-sm text-red-600">{errors.deliveryAddress}</p>
+                <p id="deliveryAddress-error" className="mt-2 text-sm text-red-600" role="alert">{errors.deliveryAddress}</p>
               )}
             </div>
             
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">
+              <label htmlFor="deliveryDate" className="block text-sm font-semibold text-slate-700 mb-2">
                 <Calendar className="w-4 h-4 inline mr-2" />
                 Teslimat Tarihi *
               </label>
               <input
+                id="deliveryDate"
                 type="date"
                 value={formData.deliveryDate}
                 onChange={(e) => {
@@ -301,12 +316,19 @@ export default function CreateShipmentStep2({
                 }}
                 min={formData.pickupDate ? new Date(new Date(formData.pickupDate).getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]}
                 max={new Date(Date.now() + 20 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
+                aria-label="Teslimat tarihi"
+                aria-required="true"
+                aria-invalid={!!errors.deliveryDate}
+                aria-describedby={errors.deliveryDate ? 'deliveryDate-error' : undefined}
                 className={`w-full p-4 border-2 rounded-xl focus:ring-2 transition-all duration-200 bg-white shadow-sm hover:shadow-md text-slate-700 ${
                   errors.deliveryDate ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-slate-200 focus:ring-emerald-500 focus:border-emerald-500'
                 }`}
               />
+              <p className="mt-1 text-xs text-slate-500">
+                Takvimden seçin. Format \(YYYY-AA-GG\) — örn: 2026-01-24
+              </p>
               {errors.deliveryDate && (
-                <p className="mt-2 text-sm text-red-600">{errors.deliveryDate}</p>
+                <p id="deliveryDate-error" className="mt-2 text-sm text-red-600" role="alert">{errors.deliveryDate}</p>
               )}
             </div>
           </div>

@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 
 interface ModalProps {
@@ -31,9 +31,7 @@ const Modal: React.FC<ModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
-      // Store previously focused element
       previousFocusRef.current = document.activeElement as HTMLElement;
-      // Focus the modal
       setTimeout(() => {
         if (modalRef.current) {
           const firstFocusable = modalRef.current.querySelector(
@@ -48,7 +46,6 @@ const Modal: React.FC<ModalProps> = ({
       }, 100);
     } else {
       document.body.style.overflow = 'unset';
-      // Restore focus
       if (previousFocusRef.current) {
         previousFocusRef.current.focus();
       }
@@ -75,7 +72,6 @@ const Modal: React.FC<ModalProps> = ({
     };
   }, [isOpen, onClose]);
 
-  // Focus trap
   useEffect(() => {
     if (!isOpen || !modalRef.current) return;
 
@@ -119,14 +115,12 @@ const Modal: React.FC<ModalProps> = ({
       aria-labelledby={title ? 'modal-title' : undefined}
       aria-describedby={title ? undefined : 'modal-description'}
     >
-      {/* Backdrop */}
       <div
         className='fixed inset-0 bg-black bg-opacity-50 transition-opacity'
         onClick={onClose}
         aria-hidden='true'
       />
 
-      {/* Modal */}
       <div className='flex min-h-full items-center justify-center p-2 sm:p-4'>
         <div
           ref={modalRef}
@@ -134,7 +128,6 @@ const Modal: React.FC<ModalProps> = ({
           tabIndex={-1}
         >
           <div className='bg-white rounded-xl shadow-xl'>
-            {/* Header */}
             {title && (
               <div className='flex items-center justify-between p-6 border-b border-gray-200'>
                 <h3 id='modal-title' className='text-lg font-semibold text-gray-900'>
@@ -150,7 +143,6 @@ const Modal: React.FC<ModalProps> = ({
               </div>
             )}
 
-            {/* Content */}
             <div className='p-6'>{children}</div>
           </div>
         </div>
@@ -160,14 +152,3 @@ const Modal: React.FC<ModalProps> = ({
 };
 
 export default Modal;
-
-
-
-
-
-
-
-
-
-
-

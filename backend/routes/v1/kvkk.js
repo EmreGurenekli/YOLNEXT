@@ -3,12 +3,12 @@ const express = require('express');
 function createKvkkRoutes(pool, authenticateToken) {
   const router = express.Router();
 
-  router.post('/cookie-consent', authenticateToken, async (req, res) => {
+  // Cookie consent is allowed without authentication (landing page uses it).
+  // If a user is logged in, we can optionally store it; otherwise we treat it as anonymous and return success.
+  router.post('/cookie-consent', async (req, res) => {
     try {
-      const userId = req.user?.id;
-      if (!userId) {
-        return res.status(401).json({ success: false, message: 'Authentication required' });
-      }
+      // No auth context here by default (public endpoint).
+      const userId = null;
 
       const analytics = Boolean(req.body?.analytics);
       const version = typeof req.body?.version === 'string' && req.body.version.trim()
@@ -26,6 +26,12 @@ function createKvkkRoutes(pool, authenticateToken) {
 
       if (!pool) {
         return res.json({ success: true, message: 'Consent recorded (no DB pool)' });
+      }
+
+      // Anonymous consent: store locally only (frontend already stores in localStorage).
+      // If later needed, add an "anonymous_consents" table keyed by IP+UA.
+      if (!userId) {
+        return res.json({ success: true });
       }
 
       try {

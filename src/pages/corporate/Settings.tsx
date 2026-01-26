@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import {
@@ -82,10 +82,6 @@ export default function CorporateSettings() {
       'Maslak Mahallesi, Büyükdere Caddesi No: 123, 34485 Sarıyer/İstanbul',
     taxNumber: '1234567890',
     website: 'www.abcteknoloji.com',
-    industry: 'Teknoloji',
-    employeeCount: '500-1000',
-    establishedYear: '2010',
-    companyLogo: '',
 
     // Notification Settings
     emailNotifications: true,
@@ -113,14 +109,14 @@ export default function CorporateSettings() {
     contactMethod: 'email',
     emergencyContact: '+90 212 555 9999',
 
-    // Shipment Preferences
+    // NOTE: Shipment/Invoice UI sections are removed from this page, but these
+    // fields are kept temporarily to avoid breaking legacy code paths that may
+    // still reference them.
     defaultShipmentType: 'general_cargo',
     defaultWeight: '1000',
     defaultVolume: '5',
     autoAcceptOffers: false,
-    preferredCarriers: [],
-
-    // Invoice Settings
+    preferredCarriers: [] as any[],
     invoiceEmail: 'fatura@abcteknoloji.com',
     invoiceFormat: 'pdf',
     autoInvoice: true,
@@ -129,8 +125,6 @@ export default function CorporateSettings() {
 
   const tabs = [
     { id: 'profile', name: 'Profil', icon: <User className='w-5 h-5' /> },
-    { id: 'shipment', name: 'Gönderi', icon: <Truck className='w-5 h-5' /> },
-    { id: 'invoice', name: 'Fatura', icon: <FileText className='w-5 h-5' /> },
   ];
 
   const handleInputChange = (field: string, value: any) => {
@@ -150,66 +144,10 @@ export default function CorporateSettings() {
     window.location.reload();
   };
 
-  const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = e => {
-        handleInputChange('companyLogo', e.target?.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
+  // Logo upload removed (not used in corporate settings UI).
 
   const renderProfileTab = () => (
     <div className='space-y-8'>
-      {/* Company Logo */}
-      <div className='bg-gradient-to-br from-white to-slate-50 rounded-2xl p-8 border border-slate-200'>
-        <div className='flex items-center gap-4 mb-6'>
-          <div className='w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-xl flex items-center justify-center'>
-            <Camera className='w-6 h-6 text-white' />
-          </div>
-          <div>
-            <h3 className='text-xl font-bold text-slate-900'>Şirket Logosu</h3>
-            <p className='text-slate-600'>Şirketinizin logosunu yükleyin</p>
-          </div>
-        </div>
-
-        <div className='flex items-center gap-6'>
-          <div className='w-24 h-24 bg-slate-100 rounded-xl border-2 border-dashed border-slate-300 flex items-center justify-center overflow-hidden'>
-            {settings.companyLogo ? (
-              <img
-                src={settings.companyLogo}
-                alt='Company Logo'
-                className='w-full h-full object-cover'
-              />
-            ) : (
-              <ImageIcon className='w-8 h-8 text-slate-400' />
-            )}
-          </div>
-
-          <div className='flex-1'>
-            <input
-              type='file'
-              accept='image/*'
-              onChange={handleLogoUpload}
-              className='hidden'
-              id='logo-upload'
-            />
-            <label
-              htmlFor='logo-upload'
-              className='inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-slate-800 to-blue-900 text-white rounded-lg hover:from-slate-900 hover:to-blue-950 transition-all cursor-pointer'
-            >
-              <Upload className='w-4 h-4' />
-              Logo Yükle
-            </label>
-            <p className='text-sm text-slate-500 mt-2'>
-              PNG, JPG veya SVG formatında, max 2MB
-            </p>
-          </div>
-        </div>
-      </div>
-
       {/* Company Information */}
       <div className='bg-gradient-to-br from-white to-slate-50 rounded-2xl p-8 border border-slate-200'>
         <div className='flex items-center gap-4 mb-6'>
@@ -313,73 +251,6 @@ export default function CorporateSettings() {
         </div>
       </div>
 
-      {/* Business Information */}
-      <div className='bg-gradient-to-br from-white to-slate-50 rounded-2xl p-8 border border-slate-200'>
-        <div className='flex items-center gap-4 mb-6'>
-          <div className='w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-xl flex items-center justify-center'>
-            <Info className='w-6 h-6 text-white' />
-          </div>
-          <div>
-            <h3 className='text-xl font-bold text-slate-900'>İş Bilgileri</h3>
-            <p className='text-slate-600'>
-              Şirketinizin iş profilini tanımlayın
-            </p>
-          </div>
-        </div>
-
-        <div className='grid grid-cols-1 md:grid-cols-3 gap-6'>
-          <div className='space-y-2'>
-            <label className='block text-sm font-semibold text-slate-700'>
-              Sektör *
-            </label>
-            <select
-              value={settings.industry}
-              onChange={e => handleInputChange('industry', e.target.value)}
-              className='w-full p-4 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md text-slate-700'
-            >
-              <option value='Teknoloji'>Teknoloji</option>
-              <option value='Perakende'>Perakende</option>
-              <option value='Üretim'>Üretim</option>
-              <option value='Lojistik'>Lojistik</option>
-              <option value='E-ticaret'>E-ticaret</option>
-              <option value='Diğer'>Diğer</option>
-            </select>
-          </div>
-
-          <div className='space-y-2'>
-            <label className='block text-sm font-semibold text-slate-700'>
-              Çalışan Sayısı
-            </label>
-            <select
-              value={settings.employeeCount}
-              onChange={e => handleInputChange('employeeCount', e.target.value)}
-              className='w-full p-4 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md text-slate-700'
-            >
-              <option value='1-10'>1-10</option>
-              <option value='11-50'>11-50</option>
-              <option value='51-200'>51-200</option>
-              <option value='201-500'>201-500</option>
-              <option value='500-1000'>500-1000</option>
-              <option value='1000+'>1000+</option>
-            </select>
-          </div>
-
-          <div className='space-y-2'>
-            <label className='block text-sm font-semibold text-slate-700'>
-              Kuruluş Yılı
-            </label>
-            <input
-              type='number'
-              value={settings.establishedYear}
-              onChange={e =>
-                handleInputChange('establishedYear', e.target.value)
-              }
-              className='w-full p-4 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md text-slate-700'
-            />
-          </div>
-        </div>
-      </div>
-
       <div className='bg-gradient-to-br from-white to-slate-50 rounded-2xl p-8 border border-slate-200'>
         <div className='flex items-center gap-4 mb-6'>
           <div className='w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-xl flex items-center justify-center'>
@@ -420,63 +291,6 @@ export default function CorporateSettings() {
         </div>
       </div>
 
-      {/* Account Deletion */}
-      <div className='bg-gradient-to-br from-red-50 to-red-100 rounded-2xl p-8 border-2 border-red-200 mt-8'>
-        <div className='flex items-center gap-4 mb-6'>
-          <div className='w-12 h-12 bg-gradient-to-br from-red-600 to-red-800 rounded-xl flex items-center justify-center'>
-            <AlertCircle className='w-6 h-6 text-white' />
-          </div>
-          <div>
-            <h3 className='text-xl font-bold text-red-900'>
-              Tehlikeli Bölge
-            </h3>
-            <p className='text-red-700'>
-              Hesap silme işlemi geri alınamaz
-            </p>
-          </div>
-        </div>
-
-        <div className='bg-white rounded-xl p-6 border-2 border-red-200'>
-          <h4 className='font-semibold text-red-900 mb-2 text-lg'>Hesabı Sil</h4>
-              <p className='text-sm text-red-800 mb-4'>
-                Hesabınızı silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
-                Tüm verileriniz silinecek ve hesabınıza bir daha erişemeyeceksiniz.
-              </p>
-              <button
-                onClick={async () => {
-                  const confirmed = window.confirm(
-                    'Hesabınızı silmek istediğinizden emin misiniz? Bu işlem geri alınamaz!'
-                  );
-                  if (confirmed) {
-                    const password = window.prompt('Güvenlik için şifrenizi girin:');
-                    if (password) {
-                      try {
-                        setIsSaving(true);
-                        const response = await authAPI.deleteAccount({ password, reason: 'Kullanıcı talebi' });
-                        if (response.success) {
-                          showProfessionalToast(showToast, 'ACTION_COMPLETED', 'success');
-                          setTimeout(() => {
-                            localStorage.clear();
-                            window.location.href = '/';
-                          }, 2000);
-                        } else {
-                          showProfessionalToast(showToast, 'OPERATION_FAILED', 'error');
-                        }
-                      } catch (err: any) {
-                        showProfessionalToast(showToast, 'OPERATION_FAILED', 'error');
-                      } finally {
-                        setIsSaving(false);
-                      }
-                    }
-                  }
-                }}
-                disabled={isSaving}
-            className='px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed shadow-lg'
-              >
-                {isSaving ? 'Siliniyor...' : 'Hesabımı Sil'}
-              </button>
-        </div>
-      </div>
     </div>
   );
 
@@ -876,8 +690,6 @@ export default function CorporateSettings() {
               {/* Content */}
               <div className='flex-1 p-8'>
                 {activeTab === 'profile' && renderProfileTab()}
-                {activeTab === 'shipment' && renderShipmentTab()}
-                {activeTab === 'invoice' && renderInvoiceTab()}
               </div>
             </div>
           </div>

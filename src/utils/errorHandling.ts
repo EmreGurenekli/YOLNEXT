@@ -1,4 +1,3 @@
-// Error handling utilities
 export interface ApiError {
   message: string;
   status?: number;
@@ -26,7 +25,6 @@ export class AppError extends Error {
 }
 
 export const handleApiError = (error: any): ApiError => {
-  // Only log in development
   if (import.meta.env.DEV) {
     console.error('API hatası:', error);
   }
@@ -41,7 +39,6 @@ export const handleApiError = (error: any): ApiError => {
   }
 
   if (error.response) {
-    // Axios error
     return {
       message: error.response.data?.message || 'Sunucu hatası oluştu',
       status: error.response.status,
@@ -51,7 +48,6 @@ export const handleApiError = (error: any): ApiError => {
   }
 
   if (error.request) {
-    // Network error
     return {
       message: 'Sunucuya bağlanılamıyor. İnternet bağlantınızı kontrol edin.',
       status: 0,
@@ -59,7 +55,6 @@ export const handleApiError = (error: any): ApiError => {
     };
   }
 
-  // Generic error
   return {
     message: error.message || 'Beklenmeyen bir hata oluştu',
     status: 500,
@@ -69,8 +64,7 @@ export const handleApiError = (error: any): ApiError => {
 
 export const getErrorMessage = (error: ApiError): string => {
   const errorMessages: { [key: string]: string } = {
-    NETWORK_ERROR:
-      'Sunucuya bağlanılamıyor. İnternet bağlantınızı kontrol edin.',
+    NETWORK_ERROR: 'Sunucuya bağlanılamıyor. İnternet bağlantınızı kontrol edin.',
     UNAUTHORIZED: 'Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.',
     FORBIDDEN: 'Bu işlem için yetkiniz bulunmuyor.',
     NOT_FOUND: 'Aradığınız kaynak bulunamadı.',
@@ -86,16 +80,13 @@ export const getErrorMessage = (error: ApiError): string => {
   return errorMessages[code as keyof typeof errorMessages] || error.message;
 };
 
-export const getErrorSeverity = (
-  error: ApiError
-): 'low' | 'medium' | 'high' => {
+export const getErrorSeverity = (error: ApiError): 'low' | 'medium' | 'high' => {
   if (error.status && error.status >= 500) return 'high';
   if (error.status && error.status >= 400) return 'medium';
   return 'low';
 };
 
 export const shouldRetry = (error: ApiError): boolean => {
-  // Network errors and 5xx errors should be retried
   return (
     error.code === 'NETWORK_ERROR' ||
     (error.status !== undefined && error.status >= 500 && error.status < 600)
@@ -103,21 +94,13 @@ export const shouldRetry = (error: ApiError): boolean => {
 };
 
 export const getRetryDelay = (attempt: number): number => {
-  // Exponential backoff: 1s, 2s, 4s, 8s, 16s
   return Math.min(1000 * Math.pow(2, attempt), 16000);
 };
 
-// Error boundary helper
 export const logError = (error: Error, errorInfo?: any) => {
   console.error('Hata sınırı bir hata yakaladı:', error, errorInfo);
-
-  // In production, you might want to send this to an error reporting service
-  if (process.env.NODE_ENV === 'production') {
-    // Example: Sentry.captureException(error, { extra: errorInfo });
-  }
 };
 
-// Form validation error helper
 export const getFieldError = (
   errors: { [key: string]: string },
   fieldName: string
@@ -125,7 +108,6 @@ export const getFieldError = (
   return errors[fieldName];
 };
 
-// API response helper
 export const handleApiResponse = async (response: Response) => {
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
@@ -140,7 +122,6 @@ export const handleApiResponse = async (response: Response) => {
   return response.json();
 };
 
-// Loading state helper
 export const withLoading = async <T>(
   asyncFn: () => Promise<T>,
   setLoading: (loading: boolean) => void
@@ -153,7 +134,6 @@ export const withLoading = async <T>(
   }
 };
 
-// Retry helper
 export const withRetry = async <T>(
   asyncFn: () => Promise<T>,
   maxRetries: number = 3
@@ -181,12 +161,3 @@ export const withRetry = async <T>(
 
   throw lastError;
 };
-
-
-
-
-
-
-
-
-

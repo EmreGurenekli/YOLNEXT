@@ -94,7 +94,10 @@ function setupMiddleware(app, pool, jwtSecret, frontendOrigin, nodeEnv) {
   // Rate limiters
   const generalLimiter = simpleRateLimit({
     windowMs: 15 * 60 * 1000,
-    max: nodeEnv === 'production' ? 100 : 10000,
+    // Dev note: UI route-by-route smoke tests and admin panels can legitimately
+    // generate high request volumes (polling + list refresh). Keep production strict,
+    // but avoid 429 noise in development.
+    max: nodeEnv === 'production' ? 100 : 1_000_000,
     message: { success: false, message: 'Too many requests' },
   });
 

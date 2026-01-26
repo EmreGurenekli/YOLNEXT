@@ -8,7 +8,6 @@ import {
   CreateShipmentForm,
 } from '../types/api';
 
-// Zod schemas for validation
 export const UserSchema = z.object({
   id: z.string().min(1),
   fullName: z.string().min(1),
@@ -106,7 +105,6 @@ export const CreateShipmentFormSchema = z.object({
   email: z.string().email('Geçerli bir email adresi giriniz'),
 });
 
-// Validation functions
 export const validateUser = (data: unknown): ValidationResult => {
   try {
     UserSchema.parse(data);
@@ -214,19 +212,14 @@ export const validateCreateShipmentForm = (
   }
 };
 
-// Type-safe API response parser
 export const parseApiResponse = <T>(data: unknown): ApiResponse<T> | null => {
   const validation = validateApiResponse(data);
-
   if (!validation.isValid) {
-    // Invalid API response - handled by error boundary
     return null;
   }
-
   return data as ApiResponse<T>;
 };
 
-// Safe data accessor
 export const safeGet = <T>(obj: any, path: string, defaultValue: T): T => {
   try {
     const keys = path.split('.');
@@ -245,7 +238,6 @@ export const safeGet = <T>(obj: any, path: string, defaultValue: T): T => {
   }
 };
 
-// Type guards
 export const isUser = (data: unknown): data is User => {
   return validateUser(data).isValid;
 };
@@ -262,42 +254,6 @@ export const isApiResponse = (data: unknown): data is ApiResponse => {
   return validateApiResponse(data).isValid;
 };
 
-// Utility functions
 export const sanitizeInput = (input: string): string => {
   return input.trim().replace(/[<>]/g, '');
 };
-
-export const validateEmail = (email: string): boolean => {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
-};
-
-export const validatePhone = (phone: string): boolean => {
-  const phoneRegex = /^[+]?[0-9\s\-()]{10,}$/;
-  return phoneRegex.test(phone);
-};
-
-export const validatePrice = (price: string): boolean => {
-  const priceRegex = /^\d+(\.\d{1,2})?$/;
-  return priceRegex.test(price);
-};
-
-export const validateDate = (date: string): boolean => {
-  const dateObj = new Date(date);
-  return dateObj instanceof Date && !isNaN(dateObj.getTime());
-};
-
-export const validateFutureDate = (date: string): boolean => {
-  const dateObj = new Date(date);
-  const now = new Date();
-  return dateObj > now;
-};
-
-
-
-
-
-
-
-
-

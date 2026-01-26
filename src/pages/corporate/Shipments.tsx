@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 // import { Helmet } from 'react-helmet-async';
 import { createApiUrl } from '../../config/api';
 import { formatDate } from '../../utils/format';
@@ -1449,7 +1449,7 @@ export default function CorporateShipments() {
                           <div className='flex-1'>
                             <h4 className='text-sm font-semibold text-emerald-900 mb-2'>Teslimat Onayı</h4>
                             <p className='text-xs text-emerald-800 leading-relaxed mb-3'>
-                              Yükünüz teslim edildi. Lütfen yükü kontrol edip onaylayın. Onayladığınızda ödeme nakliyeciye aktarılır.
+                              Yükünüz teslim edildi. Lütfen yükü kontrol edip onaylayın. Onay sonrası süreç kapanır.
                             </p>
                             <p className='text-xs text-emerald-700'>
                               <span className='font-semibold'>Sorun varsa:</span> Yükü onaylamadan önce nakliyeci ile mesajlaşarak durumu netleştirin. Sorunlar taraflar arasında çözülmelidir.
@@ -1467,7 +1467,7 @@ export default function CorporateShipments() {
                           <div className='flex-1'>
                             <h4 className='text-sm font-semibold text-blue-900 mb-2'>Ödeme Detayları</h4>
                             <p className='text-xs text-blue-800 leading-relaxed mb-2'>
-                              Ödeme tutarı güvence altına alınmıştır. Ödeme yöntemi (IBAN, alıcı adı, açıklama) ve yükleme saatini nakliyeci ile mesajlaşma üzerinden netleştirin.
+                              YolNext ödeme altyapısı sunmaz; ödeme işlemi gönderici ile nakliyeci arasında gerçekleşir. Ödeme yöntemi (IBAN, alıcı adı, açıklama) ve yükleme saatini nakliyeci ile mesajlaşma üzerinden yazılı olarak netleştirin.
                             </p>
                             <p className='text-xs text-blue-700'>
                               <span className='font-semibold'>Önemli:</span> Ödeme detaylarını yazılı olarak teyit edin. Sorun olursa nakliyeci ile mesajlaşarak çözüm bulun. Platform sadece tarafları buluşturan bir pazaryeridir.
@@ -1729,7 +1729,7 @@ export default function CorporateShipments() {
                         </li>
                         <li className='flex items-start gap-2'>
                           <span className='font-semibold'>•</span>
-                          <span>Teklif kabul edildikten sonra: İptal işlemi ilgili taraflara bildirilir. Ödeme güvence altındaysa iade süreci başlatılır.</span>
+                          <span>Teklif kabul edildikten sonra: İptal işlemi ilgili taraflara bildirilir. Ödeme/iade şartlarını nakliyeci ile yazılı olarak netleştirmeniz önerilir.</span>
                         </li>
                         <li className='flex items-start gap-2'>
                           <span className='font-semibold'>•</span>

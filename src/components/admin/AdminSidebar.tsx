@@ -1,10 +1,12 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   Users,
   Shield,
   FileText,
   Activity,
+  AlertTriangle,
+  MessageSquare,
   LogOut,
   Menu,
   X,
@@ -38,6 +40,8 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({ onLogout }) => {
       items: [
         { name: 'Kullanıcılar', href: `${base}/users`, icon: Users },
         { name: 'Vakalar', href: `${base}/cases`, icon: FileText },
+        { name: 'Şikayetler', href: `${base}/complaints`, icon: AlertTriangle },
+        { name: 'Destek', href: `${base}/support`, icon: MessageSquare },
         { name: 'Sistem', href: `${base}/system`, icon: Activity },
       ],
     },

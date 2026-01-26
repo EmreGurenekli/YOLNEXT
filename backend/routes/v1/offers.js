@@ -3,6 +3,8 @@ const express = require('express');
 const router = express.Router();
 
 const { getPagination } = require('../../utils/routeHelpers');
+const { OFFER_STATUS, SHIPMENT_STATUS } = require('../../utils/domain');
+const { normalizeCityKey, getCorridorPathKeys, isShipmentOnCorridor } = require('../../utils/corridor');
 
 function createOfferRoutes(pool, authenticateToken, createNotification, sendEmail, writeAuditLog, offerSpeedLimiter, idempotencyGuard) {
   const router = require('express').Router();
@@ -10,6 +12,26 @@ function createOfferRoutes(pool, authenticateToken, createNotification, sendEmai
   // Simplified signature - io parameter removed (Socket.io no longer used)
 
   const commissionPercentage = 0.01;
+
+  let carrierDriversEnsured = false;
+  const ensureCarrierDriversTable = async () => {
+    if (!pool || carrierDriversEnsured) return;
+    try {
+      await pool.query(
+        `CREATE TABLE IF NOT EXISTS carrier_drivers (
+          id SERIAL PRIMARY KEY,
+          carrier_id INTEGER NOT NULL,
+          driver_id INTEGER NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE (carrier_id, driver_id)
+        )`
+      );
+    } catch (_) {
+      // ignore
+    }
+    carrierDriversEnsured = true;
+  };
 
   let cachedUsersCompanyCol = null;
   let cachedUsersSchema = null;
@@ -261,6 +283,7 @@ function createOfferRoutes(pool, authenticateToken, createNotification, sendEmai
         userId: pick('userId'),
         ownerid: pick('ownerid'),
         carrierId: pick('carrierId', 'carrier_id', 'carrierid', 'nakliyeciId', 'nakliyeci_id', 'nakliyeciid'),
+        driverId: pick('driverId', 'driver_id', 'driverid'),
         status: pick('status'),
         pickupCity: pick('pickupCity', 'pickup_city', 'pickupcity', 'fromCity', 'from_city', 'fromcity', 'from'),
         fromCity: pick('fromCity', 'from_city', 'fromcity', 'from'),
@@ -284,6 +307,7 @@ function createOfferRoutes(pool, authenticateToken, createNotification, sendEmai
         userId: null,
         ownerid: null,
         carrierId: null,
+        driverId: null,
         status: null,
         pickupCity: null,
         fromCity: null,
@@ -378,6 +402,7 @@ function createOfferRoutes(pool, authenticateToken, createNotification, sendEmai
         id: pick('id'),
         shipmentId: pick('shipment_id', 'shipmentId', 'shipmentid', 'shipmentID'),
         carrierId: pick('nakliyeci_id', 'carrier_id', 'carrierId', 'nakliyeciId', 'nakliyeciid'),
+        driverId: pick('driverId', 'driver_id', 'driverid'),
         price: pick('price'),
         message: pick('message'),
         estimatedDelivery: pick('estimatedDelivery', 'estimated_delivery', 'estimateddelivery'),
@@ -392,6 +417,7 @@ function createOfferRoutes(pool, authenticateToken, createNotification, sendEmai
         id: 'id',
         shipmentId: 'shipment_id',
         carrierId: 'nakliyeci_id',
+        driverId: null,
         price: 'price',
         message: 'message',
         estimatedDelivery: 'estimatedDelivery',
@@ -469,10 +495,12 @@ function createOfferRoutes(pool, authenticateToken, createNotification, sendEmai
         id: pick('id'),
         shipmentId: pick('shipment_id', 'shipmentId', 'shipmentid'),
         carrierId: pick('nakliyeci_id', 'carrier_id', 'carrierId', 'carrierid', 'nakliyeciId', 'nakliyeciid'),
+        driverId: pick('driverId', 'driver_id', 'driverid'),
         price: pick('price'),
         message: pick('message'),
         estimatedDelivery: estCol,
         estimatedDeliveryType,
+        expiresAt: pick('expiresAt', 'expires_at', 'expiresat'),
         status: pick('status'),
         createdAt: pick('createdAt', 'created_at', 'createdat'),
         updatedAt: pick('updatedAt', 'updated_at', 'updatedat'),
@@ -483,10 +511,12 @@ function createOfferRoutes(pool, authenticateToken, createNotification, sendEmai
         id: 'id',
         shipmentId: 'shipment_id',
         carrierId: 'nakliyeci_id',
+        driverId: null,
         price: 'price',
         message: 'message',
         estimatedDelivery: null,
         estimatedDeliveryType: null,
+        expiresAt: null,
         status: 'status',
         createdAt: 'created_at',
         updatedAt: 'updated_at',
@@ -945,6 +975,7 @@ function createOfferRoutes(pool, authenticateToken, createNotification, sendEmai
       const offerShipmentExpr = offersCols.shipmentId ? qOfferCol(offersCols.shipmentId) : 'shipment_id';
       const offerCarrierExpr = offersCols.carrierId ? qOfferCol(offersCols.carrierId) : 'nakliyeci_id';
       const offerEstimatedExpr = offersCols.estimatedDelivery ? qOfferCol(offersCols.estimatedDelivery) : null;
+      const offerExpiresExpr = offersCols.expiresAt ? qOfferCol(offersCols.expiresAt) : null;
       const offerCreatedExpr = offersCols.createdAt ? qOfferCol(offersCols.createdAt) : 'created_at';
       const offerUpdatedExpr = offersCols.updatedAt ? qOfferCol(offersCols.updatedAt) : 'updated_at';
 
@@ -1097,7 +1128,7 @@ function createOfferRoutes(pool, authenticateToken, createNotification, sendEmai
                NULL as "estimatedDuration",
                NULL as "specialNotes",
                o.status,
-               NULL as "expiresAt",
+               ${offerExpiresExpr ? `o.${offerExpiresExpr}` : 'NULL'} as "expiresAt",
                NULL as "isCounterOffer",
                NULL as "parentOfferId",
                ${carrierRatingSelectCamel},
@@ -1526,6 +1557,175 @@ function createOfferRoutes(pool, authenticateToken, createNotification, sendEmai
         });
       }
 
+      // ROLE + CITY RULE (hard enforce)
+      // - Default: nakliyeci can only bid on shipments whose pickupCity equals their registered city
+      // - Exception: Route Planner corridor offers (driverId provided) are allowed only if the shipment lies on the driver's corridor
+      const role = String(req.user?.role || '').toLowerCase();
+      if (role && role !== 'nakliyeci') {
+        return res.status(403).json({
+          success: false,
+          message: 'Sadece nakliyeci gönderilere teklif verebilir',
+        });
+      }
+
+      const shipmentRow = shipmentResult.rows && shipmentResult.rows[0] ? shipmentResult.rows[0] : {};
+      const pickFirst = (obj, keys) => {
+        for (const k of keys) {
+          if (obj && obj[k] != null && String(obj[k]).trim() !== '') return obj[k];
+        }
+        return null;
+      };
+      const pickupCityRaw = pickFirst(shipmentRow, [
+        'pickupCity',
+        'pickup_city',
+        'pickupcity',
+        'fromCity',
+        'from_city',
+        'fromcity',
+        'from',
+      ]);
+      const deliveryCityRaw = pickFirst(shipmentRow, [
+        'deliveryCity',
+        'delivery_city',
+        'deliverycity',
+        'toCity',
+        'to_city',
+        'tocity',
+        'to',
+      ]);
+
+      const driverIdNum =
+        driverId != null && String(driverId).trim() !== ''
+          ? Number.parseInt(String(driverId), 10)
+          : null;
+      const isRoutePlannerOffer = Number.isFinite(driverIdNum);
+
+      // Fetch nakliyeci city (must be set for default rule)
+      let carrierCityRaw = null;
+      try {
+        const uRes = await pool.query('SELECT city FROM users WHERE id = $1 LIMIT 1', [carrierId]);
+        carrierCityRaw = uRes.rows && uRes.rows[0] ? uRes.rows[0].city : null;
+      } catch (_) {
+        carrierCityRaw = null;
+      }
+
+      const carrierCityKey = normalizeCityKey(carrierCityRaw);
+      const pickupCityKey = normalizeCityKey(pickupCityRaw);
+      const deliveryCityKey = normalizeCityKey(deliveryCityRaw);
+
+      if (!isRoutePlannerOffer) {
+        if (!carrierCityKey) {
+          return res.status(400).json({
+            success: false,
+            message: 'Şehir bilginiz eksik. Teklif verebilmek için profilinizden şehir bilginizi güncelleyin.',
+          });
+        }
+        if (!pickupCityKey) {
+          return res.status(400).json({
+            success: false,
+            message: 'Gönderinin alış şehri bulunamadı. Lütfen destek ile iletişime geçin.',
+          });
+        }
+        if (carrierCityKey !== pickupCityKey) {
+          return res.status(403).json({
+            success: false,
+            message:
+              'Bu gönderiye teklif veremezsiniz. Kural: Nakliyeci yalnızca kayıtlı olduğu şehirdeki gönderilere teklif verebilir.',
+          });
+        }
+      } else {
+        // Route Planner exception: validate driver link + corridor membership
+        if (!pickupCityKey || !deliveryCityKey) {
+          return res.status(400).json({
+            success: false,
+            message: 'Koridor kontrolü için gönderi şehir bilgileri eksik.',
+          });
+        }
+
+        await ensureCarrierDriversTable();
+        let isLinked = false;
+        try {
+          const linkRes = await pool.query(
+            'SELECT 1 FROM carrier_drivers WHERE carrier_id = $1 AND driver_id = $2 LIMIT 1',
+            [carrierId, driverIdNum]
+          );
+          isLinked = (linkRes.rows || []).length > 0;
+        } catch (_eSnake) {
+          try {
+            const linkRes = await pool.query(
+              'SELECT 1 FROM carrier_drivers WHERE "carrierId" = $1 AND "driverId" = $2 LIMIT 1',
+              [carrierId, driverIdNum]
+            );
+            isLinked = (linkRes.rows || []).length > 0;
+          } catch (_) {
+            isLinked = false;
+          }
+        }
+
+        if (!isLinked) {
+          return res.status(403).json({
+            success: false,
+            message: 'Bu taşıyıcı size bağlı değil. Koridor üzerinden teklif verilemez.',
+          });
+        }
+
+        const shipMeta = await resolveShipCols();
+        const shipSchema = shipMeta?.schema || 'public';
+        const driverCol = shipMeta?.driverId;
+        const carrierCol = shipMeta?.carrierId;
+        const pickupCol = shipMeta?.pickupCity;
+        const deliveryCol = shipMeta?.deliveryCity;
+        const statusExpr = shipMeta?.status ? `s.${qShipCol(shipMeta.status)}` : 's.status';
+
+        if (!driverCol || !carrierCol || !pickupCol || !deliveryCol) {
+          return res.status(409).json({
+            success: false,
+            message: 'Koridor hesaplanamadı (veri şeması uyumsuz).',
+          });
+        }
+
+        const activeCorridorStatuses = [
+          SHIPMENT_STATUS.OFFER_ACCEPTED,
+          SHIPMENT_STATUS.ACCEPTED,
+          SHIPMENT_STATUS.ASSIGNED,
+          SHIPMENT_STATUS.IN_PROGRESS,
+          SHIPMENT_STATUS.PICKED_UP,
+          SHIPMENT_STATUS.IN_TRANSIT,
+        ];
+
+        const baseRes = await pool.query(
+          `SELECT s.${qShipCol(pickupCol)} as pickup_city,
+                  s.${qShipCol(deliveryCol)} as delivery_city
+           FROM "${shipSchema}".shipments s
+           WHERE s.${qShipCol(driverCol)}::text = $1
+             AND s.${qShipCol(carrierCol)}::text = $2
+             AND ${statusExpr} = ANY($3::text[])
+           ORDER BY s.id DESC
+           LIMIT 1`,
+          [String(driverIdNum), String(carrierId), activeCorridorStatuses]
+        );
+
+        const baseRow = baseRes.rows && baseRes.rows[0] ? baseRes.rows[0] : null;
+        const basePickup = baseRow?.pickup_city;
+        const baseDelivery = baseRow?.delivery_city;
+        if (!basePickup || !baseDelivery) {
+          return res.status(409).json({
+            success: false,
+            message: 'Bu taşıyıcı için aktif bir koridor bulunamadı. Önce taşıyıcıya bir iş atayın.',
+          });
+        }
+
+        const corridorKeys = getCorridorPathKeys(basePickup, baseDelivery);
+        const corridorCheck = isShipmentOnCorridor(pickupCityRaw, deliveryCityRaw, corridorKeys);
+        if (!corridorCheck.ok) {
+          return res.status(403).json({
+            success: false,
+            message:
+              'Bu gönderi taşıyıcının koridorunda değil. Rota planlayıcı sadece koridor üzerindeki yüklerde teklif oluşturabilir.',
+          });
+        }
+      }
+
       // Check for duplicate offer
       const offersCols = await resolveOffersCols();
       const offerShipmentExpr = offersCols.shipmentId ? qOfferCol(offersCols.shipmentId) : 'shipment_id';
@@ -1533,7 +1733,7 @@ function createOfferRoutes(pool, authenticateToken, createNotification, sendEmai
       const offerStatusExpr = offersCols.status ? qOfferCol(offersCols.status) : 'status';
       const existingOffer = await pool.query(
         `SELECT ${offersCols.id ? qOfferCol(offersCols.id) : 'id'} as id FROM offers WHERE ${offerShipmentExpr} = $1 AND ${offerCarrierExpr} = $2 AND ${offerStatusExpr} = $3`,
-        [shipmentId, carrierId, 'pending']
+        [shipmentId, carrierId, OFFER_STATUS.PENDING]
       );
 
       if (existingOffer.rows.length > 0) {
@@ -1595,7 +1795,7 @@ function createOfferRoutes(pool, authenticateToken, createNotification, sendEmai
         nextParamIndex += 1;
         insertCols.push(statusCol);
         insertVals.push(`$${nextParamIndex}`);
-        insertParams.push('pending');
+        insertParams.push(OFFER_STATUS.PENDING);
 
         insertCols.push(createdCol, updatedCol);
         insertVals.push('CURRENT_TIMESTAMP', 'CURRENT_TIMESTAMP');
@@ -1616,11 +1816,24 @@ function createOfferRoutes(pool, authenticateToken, createNotification, sendEmai
           expiresAtReturn = `${expiresAtExpr} as "expiresAt"`;
         }
 
+        // Optional: store planned driver for RoutePlanner offers
+        const driverIdCol = cols.driverId || cols.driver_id || null;
+        const driverIdExpr = driverIdCol ? qOfferCol(driverIdCol) : null;
+        let driverIdReturn = 'NULL as "driverId"';
+        if (driverIdExpr && driverId != null && String(driverId).trim() !== '') {
+          nextParamIndex += 1;
+          insertCols.push(driverIdExpr);
+          insertVals.push(`$${nextParamIndex}`);
+          insertParams.push(Number(driverId));
+          driverIdReturn = `${driverIdExpr} as "driverId"`;
+        }
+
         const insertSql = `INSERT INTO offers (${insertCols.join(', ')})
            VALUES (${insertVals.join(', ')})
            RETURNING ${cols.id ? qOfferCol(cols.id) : 'id'} as id,
                      ${shipCol} as "shipmentId",
                      ${carCol} as "carrierId",
+                     ${driverIdReturn},
                      ${priceCol} as price,
                      ${returningMessage} as message,
                      ${returningEstimated} as "estimatedDelivery",
@@ -1731,6 +1944,11 @@ function createOfferRoutes(pool, authenticateToken, createNotification, sendEmai
         return res.status(401).json({ success: false, message: 'Authentication required' });
       }
 
+      // If this offer was created via RoutePlanner, it may include a planned driver.
+      // We will convert that into a 30-minute driver acceptance offer stored on the shipment metadata.
+      let plannedDriverIdForSla = null;
+      let plannedDriverOfferExpiresAt = null;
+
       // Get offer with shipment info
       const oCols = await resolveOfferCols();
       if (!oCols?.shipmentId || !oCols?.carrierId) {
@@ -1739,6 +1957,7 @@ function createOfferRoutes(pool, authenticateToken, createNotification, sendEmai
       const offerTable = `"${oCols.schema}".offers`;
       const oShipmentExpr = `o.${oCols.qCol(oCols.shipmentId)}`;
       const oCarrierExpr = `o.${oCols.qCol(oCols.carrierId)}`;
+      const oDriverExpr = oCols.driverId ? `o.${oCols.qCol(oCols.driverId)}` : 'NULL';
       const oEstimatedExpr = oCols.estimatedDelivery ? `o.${oCols.qCol(oCols.estimatedDelivery)}` : 'NULL';
       const oCreatedExpr = oCols.createdAt ? `o.${oCols.qCol(oCols.createdAt)}` : 'NULL';
       const oUpdatedExpr = oCols.updatedAt ? `o.${oCols.qCol(oCols.updatedAt)}` : 'NULL';
@@ -1754,6 +1973,7 @@ function createOfferRoutes(pool, authenticateToken, createNotification, sendEmai
         `SELECT o.id,
                ${oShipmentExpr} as "shipmentId",
                ${oCarrierExpr} as "carrierId",
+               ${oDriverExpr} as "driverId",
                o.price,
                o.message,
                ${oEstimatedExpr} as "estimatedDelivery",
@@ -1784,6 +2004,8 @@ function createOfferRoutes(pool, authenticateToken, createNotification, sendEmai
       // Map column names for compatibility
       const shipmentId = offer.shipmentId || offer.shipment_id;
       const carrierId = offer.carrierId || offer.nakliyeci_id || offer.carrier_id;
+      plannedDriverIdForSla =
+        offer.driverId || offer.driver_id || offer.driverid || req.body?.driverId || null;
 
       // Offer must be pending to be accepted (prevents double-accept)
       // Allow retry if previous attempt failed but shipment wasn't updated
@@ -1844,6 +2066,7 @@ function createOfferRoutes(pool, authenticateToken, createNotification, sendEmai
         const updatedAtCol = pickCol('updatedAt', 'updated_at');
         const priceCol = pickCol('price');
         const statusCol = pickCol('status');
+        const metadataCol = pickCol('metadata');
 
         if (!idCol || !statusCol) {
           throw new Error('Shipments table schema not compatible for offer accept');
@@ -1930,7 +2153,13 @@ function createOfferRoutes(pool, authenticateToken, createNotification, sendEmai
           }
         }
 
-        if (!['pending', 'open', 'waiting_for_offers'].includes(String(lockedStatus || ''))) {
+        if (
+          ![
+            SHIPMENT_STATUS.PENDING,
+            SHIPMENT_STATUS.OPEN,
+            SHIPMENT_STATUS.WAITING_FOR_OFFERS,
+          ].includes(String(lockedStatus || ''))
+        ) {
           await client.query('ROLLBACK');
           return res.status(409).json({
             success: false,
@@ -1948,7 +2177,7 @@ function createOfferRoutes(pool, authenticateToken, createNotification, sendEmai
         const otherOffersRes = await client.query(
           `SELECT id, ${carrierColExpr} as carrier_id, price
            FROM ${offerTableTx}
-           WHERE ${shipColExpr} = $1 AND id != $2 AND status = 'pending'
+           WHERE ${shipColExpr} = $1 AND id != $2 AND status = '${OFFER_STATUS.PENDING}'
            FOR UPDATE`,
           [shipmentId, id]
         );
@@ -1961,8 +2190,8 @@ function createOfferRoutes(pool, authenticateToken, createNotification, sendEmai
 
         const rejectSetUpdated = updatedAtColExpr ? `, ${updatedAtColExpr} = CURRENT_TIMESTAMP` : '';
         const rejectResult = await client.query(
-          `UPDATE ${offerTableTx} SET status = 'rejected'${rejectSetUpdated}
-           WHERE ${shipColExpr} = $1 AND id != $2 AND status = 'pending'`,
+          `UPDATE ${offerTableTx} SET status = '${OFFER_STATUS.REJECTED}'${rejectSetUpdated}
+           WHERE ${shipColExpr} = $1 AND id != $2 AND status = '${OFFER_STATUS.PENDING}'`,
           [shipmentId, id]
         );
         console.log(`✅ Rejected ${rejectResult.rowCount} other offers for shipment ${shipmentId}`);
@@ -1970,8 +2199,8 @@ function createOfferRoutes(pool, authenticateToken, createNotification, sendEmai
         // Accept this offer
         const acceptSetUpdated = updatedAtColExpr ? `, ${updatedAtColExpr} = CURRENT_TIMESTAMP` : '';
         const acceptResult = await client.query(
-          `UPDATE ${offerTableTx} SET status = 'accepted'${acceptSetUpdated}
-           WHERE id = $1 AND status = 'pending'`,
+          `UPDATE ${offerTableTx} SET status = '${OFFER_STATUS.ACCEPTED}'${acceptSetUpdated}
+           WHERE id = $1 AND status = '${OFFER_STATUS.PENDING}'`,
           [id]
         );
         console.log(`✅ Accepted offer ${id}, rows affected: ${acceptResult.rowCount}`);
@@ -1983,7 +2212,7 @@ function createOfferRoutes(pool, authenticateToken, createNotification, sendEmai
             [id]
           );
           const currentStatus = currentOfferRes.rows && currentOfferRes.rows[0] ? currentOfferRes.rows[0].status : null;
-          if (currentStatus !== 'accepted') {
+          if (currentStatus !== OFFER_STATUS.ACCEPTED) {
             throw new Error('Offer is no longer available to accept');
           }
         }
@@ -1999,7 +2228,7 @@ function createOfferRoutes(pool, authenticateToken, createNotification, sendEmai
           sets.push(`${colExpr} = ${placeholder}`);
         };
 
-        addSet(statusCol, 'offer_accepted');
+        addSet(statusCol, SHIPMENT_STATUS.OFFER_ACCEPTED);
         (carrierColsAll.length ? carrierColsAll : [carrierCol]).filter(Boolean).forEach(c => addSet(c, carrierId));
         (acceptedOfferColsAll.length ? acceptedOfferColsAll : [acceptedOfferCol]).filter(Boolean).forEach(c => addSet(c, offer.id));
         addSet(priceCol, offer.price);
@@ -2011,7 +2240,9 @@ function createOfferRoutes(pool, authenticateToken, createNotification, sendEmai
 
         params.push(shipmentId);
         const whereParts = [`${idExpr} = $${params.length}`];
-        whereParts.push(`${statusExpr} IN ('pending','open','waiting_for_offers')`);
+        whereParts.push(
+          `${statusExpr} IN ('${SHIPMENT_STATUS.PENDING}','${SHIPMENT_STATUS.OPEN}','${SHIPMENT_STATUS.WAITING_FOR_OFFERS}')`
+        );
         // Allow update when carrier is preassigned to the same carrier (publishType=specific).
         if (carrierNullGuard && !carrierPreassignedSame) whereParts.push(carrierNullGuard);
         if (acceptedOfferNullGuard) whereParts.push(acceptedOfferNullGuard);
@@ -2045,52 +2276,46 @@ function createOfferRoutes(pool, authenticateToken, createNotification, sendEmai
           throw new Error('Shipment status did not update to offer_accepted');
         }
 
-        // Auto-assign driver if driverId is provided in request body (for corridor-based offers)
-        const driverId = req.body?.driverId || null;
-        if (driverId) {
+        // If the accepted offer includes a planned driver (RoutePlanner), create a 30-minute
+        // driver acceptance offer on the shipment metadata (no immediate assignment).
+        if (plannedDriverIdForSla && metadataCol) {
           try {
-            // Check if shipment_driver_assignments table exists
-            const assignmentSchemaRes = await client.query(`
-              SELECT table_schema FROM information_schema.tables
-              WHERE table_name = 'shipment_driver_assignments'
-              ORDER BY (table_schema = 'public') DESC, table_schema ASC
-              LIMIT 1
-            `);
-            const assignSchema = assignmentSchemaRes.rows?.[0]?.table_schema || null;
-            
-            if (assignSchema) {
-              // Check if assignment already exists
-              const existingAssign = await client.query(
-                `SELECT id FROM "${assignSchema}".shipment_driver_assignments 
-                 WHERE shipment_id::text = $1::text AND driver_id::text = $2::text`,
-                [shipmentId, driverId]
-              );
-              
-              if (existingAssign.rows.length === 0) {
-                // Create assignment
-                await client.query(
-                  `INSERT INTO "${assignSchema}".shipment_driver_assignments 
-                   (shipment_id, driver_id, carrier_id, created_at, updated_at)
-                   VALUES ($1, $2, $3, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
-                  [shipmentId, driverId, carrierId]
-                );
-                console.log(`✅ Auto-assigned driver ${driverId} to shipment ${shipmentId}`);
-              }
+            await ensureCarrierDriversTable();
+            const linked = await client.query(
+              'SELECT 1 FROM carrier_drivers WHERE carrier_id = $1 AND driver_id = $2 LIMIT 1',
+              [carrierId, plannedDriverIdForSla]
+            );
+            if (!linked.rows || linked.rows.length === 0) {
+              // If the driver isn't linked anymore, don't block acceptance; carrier can assign manually.
+              plannedDriverIdForSla = null;
             } else {
-              // Fallback: try to update shipment's driver_id column directly
-              const driverCol = shipMeta?.driverId || shipMeta?.driver_id || null;
-              if (driverCol) {
-                const driverColExpr = /[A-Z]/.test(driverCol) ? `"${driverCol}"` : driverCol;
-                await client.query(
-                  `UPDATE "${shipSchema}".shipments SET ${driverColExpr} = $1 WHERE ${idExpr} = $2`,
-                  [driverId, shipmentId]
-                );
-                console.log(`✅ Auto-assigned driver ${driverId} to shipment ${shipmentId} (direct column)`);
-              }
+              const now = Date.now();
+              const expiresAt = new Date(now + 30 * 60 * 1000);
+              plannedDriverOfferExpiresAt = expiresAt.toISOString();
+
+              const driverOffer = {
+                status: 'pending',
+                driverId: Number(plannedDriverIdForSla),
+                createdAt: new Date(now).toISOString(),
+                expiresAt: plannedDriverOfferExpiresAt,
+                carrierId: Number(carrierId),
+                offerId: Number(offer.id),
+                source: 'route_planner',
+              };
+
+              const metaExpr = /[A-Z]/.test(metadataCol) ? `"${metadataCol}"` : metadataCol;
+              await client.query(
+                `UPDATE "${shipSchema}".shipments
+                 SET ${metaExpr} = COALESCE(${metaExpr}, '{}'::jsonb) || $1::jsonb
+                 WHERE ${idExpr} = $2`,
+                [JSON.stringify({ driverOffer }), shipmentId]
+              );
             }
           } catch (assignError) {
-            // Log but don't fail the offer acceptance
-            console.error('Error auto-assigning driver (non-critical):', assignError);
+            // Non-critical: offer acceptance should still succeed.
+            console.error('Error creating driver acceptance offer (non-critical):', assignError);
+            plannedDriverIdForSla = null;
+            plannedDriverOfferExpiresAt = null;
           }
         }
 
@@ -2265,6 +2490,25 @@ function createOfferRoutes(pool, authenticateToken, createNotification, sendEmai
             );
           } catch (notifError) {
             console.error('Error creating notification (non-critical):', notifError);
+          }
+        }
+
+        // If we created a driver acceptance offer, notify the driver (non-blocking)
+        if (createNotification && plannedDriverIdForSla) {
+          try {
+            await createNotification({
+              userId: Number(plannedDriverIdForSla),
+              type: 'driver_assignment_offer',
+              title: 'Yeni İş Teklifi',
+              message: `Gönderi #${shipmentId} için iş teklifi aldınız. ${plannedDriverOfferExpiresAt ? '30 dakika içinde kabul etmeniz gerekiyor.' : ''}`,
+              linkUrl: `/tasiyici/jobs/${shipmentId}`,
+              priority: 'high',
+              shipmentId: Number(shipmentId),
+              driverId: Number(plannedDriverIdForSla),
+              offerId: Number(offer.id),
+            });
+          } catch (notifError) {
+            console.error('Error creating driver notification (non-critical):', notifError);
           }
         }
 

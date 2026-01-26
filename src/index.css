@@ -59,6 +59,13 @@
   }
 }
 
+/* When cookie banner is open, avoid covering bottom CTAs */
+@layer base {
+  .yolnext-cookie-open body {
+    padding-bottom: calc(140px + env(safe-area-inset-bottom));
+  }
+}
+
 @layer components {
   /* Custom scrollbar */
   .custom-scrollbar::-webkit-scrollbar {

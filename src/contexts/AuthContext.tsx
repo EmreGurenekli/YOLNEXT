@@ -176,6 +176,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   useEffect(() => {
     const initAuth = async () => {
       try {
+        // If user is on an auth page, don't hydrate old sessions.
+        // This prevents background 401/403 spam on /login when a stale token exists.
+        const pathname =
+          typeof window !== 'undefined' && window.location ? window.location.pathname : '';
+        const isAuthPage =
+          pathname === '/login' ||
+          pathname === '/register' ||
+          pathname === '/forgot-password' ||
+          pathname === '/reset-password' ||
+          pathname === '/email-verification' ||
+          pathname.endsWith('/login'); // e.g. /{ADMIN_SLUG}/login
+
+        if (isAuthPage) {
+          safeLocalStorage.removeItem('authToken');
+          safeLocalStorage.removeItem('token');
+          safeLocalStorage.removeItem('user');
+          setUser(null);
+          setToken(null);
+          return;
+        }
+
         const storedToken =
           safeLocalStorage.getItem('authToken') ||
           safeLocalStorage.getItem('token');
@@ -187,6 +208,38 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             const parsedUser = JSON.parse(storedUser);
             
             if (parsedUser && storedToken) {
+              // IMPORTANT:
+              // Do not trust localStorage blindly. If the token is expired/invalid,
+              // background hooks will spam 401/403 requests even on /login.
+              // Validate token once, then hydrate state.
+              const validateTokenAndGetProfile = async (): Promise<User | null> => {
+                try {
+                  const response = await fetch(createApiUrl('/api/users/profile'), {
+                    headers: { Authorization: `Bearer ${storedToken}` },
+                  });
+                  if (!response.ok) return null;
+                  const raw = await response.json().catch(() => null);
+                  const candidate =
+                    raw?.user ||
+                    raw?.data?.user ||
+                    raw?.data ||
+                    raw;
+                  return candidate && typeof candidate === 'object' ? (candidate as User) : null;
+                } catch {
+                  return null;
+                }
+              };
+
+              const verifiedProfile = await validateTokenAndGetProfile();
+              if (!verifiedProfile) {
+                safeLocalStorage.removeItem('authToken');
+                safeLocalStorage.removeItem('token');
+                safeLocalStorage.removeItem('user');
+                setUser(null);
+                setToken(null);
+                return;
+              }
+
               const sanitizeDisplayName = (value: unknown) => {
                 const s = String(value || '').trim();
                 if (!s) return '';
@@ -213,6 +266,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               // Handle potential case sensitivity issues with nakliyeciCode and driverCode
               const userWithFixedCase = {
                 ...parsedUser,
+                ...verifiedProfile,
                 fullName: shouldOverrideFullName ? hydratedFullName : parsedUser.fullName,
                 firstName: shouldOverrideFirstName ? hydratedFirstName : parsedUser.firstName,
                 lastName: shouldOverrideLastName ? hydratedLastName : parsedUser.lastName,
@@ -490,79 +544,41 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       setIsLoading(true);
 
-      // Demo hesapları - Database olmadan da çalışır
-      const demoUsers: Record<string, any> = {
-        individual: {
-          id: 'demo-individual',
-          email: 'demo-bireysel@yolnext.com',
-          fullName: 'Demo Bireysel Kullanıcı',
-          role: 'individual',
-          isVerified: true
-        },
-        corporate: {
-          id: 'demo-corporate',
-          email: 'demo-kurumsal@yolnext.com', 
-          fullName: 'Demo Kurumsal Kullanıcı',
-          role: 'corporate',
-          isVerified: true
-        },
-        nakliyeci: {
-          id: 'demo-nakliyeci',
-          email: 'demo-nakliyeci@yolnext.com',
-          fullName: 'Demo Nakliyeci',
-          role: 'nakliyeci', 
-          isVerified: true
-        },
-        tasiyici: {
-          id: 'demo-tasiyici',
-          email: 'demo-tasiyici@yolnext.com',
-          fullName: 'Demo Taşıyıcı',
-          role: 'tasiyici',
-          isVerified: true
-        }
-      };
+      // Demo login MUST use backend to obtain a real JWT.
+      // Local "demo-token-*" causes 401/403 noise and breaks the "no mock" requirement.
+      const raw = await authAPI.demoLogin(userType);
 
-      const rawUser = demoUsers[userType];
-      const token = `demo-token-${userType}-${Date.now()}`;
+      const tokenFromServer =
+        raw?.token ||
+        raw?.data?.token ||
+        null;
+      const userFromServer =
+        raw?.user ||
+        raw?.data?.user ||
+        null;
 
-      if (!rawUser || !token) {
-        throw new Error('Hızlı giriş başarısız');
+      if (!tokenFromServer || !userFromServer) {
+        throw new Error(raw?.message || 'Hızlı giriş başarısız');
       }
 
       const normalizedRole =
-        (rawUser.role || rawUser.panel_type || rawUser.userType || rawUser.user_type || userType || 'individual') as User['role'];
-
-      const roleLabels: Record<string, string> = {
-        individual: 'Bireysel',
-        corporate: 'Kurumsal',
-        nakliyeci: 'Nakliyeci',
-        tasiyici: 'Taşıyıcı',
-      };
-      const normalizedRoleLabel = roleLabels[String(normalizedRole)] || 'Kullanıcı';
-      const candidateFullName = rawUser.fullName || rawUser.full_name || rawUser.name;
-      const normalizedFullNameRaw = candidateFullName || `${normalizedRoleLabel} Kullanıcı`;
-      const normalizedFullName =
-        String(normalizedFullNameRaw).trim().toLowerCase() === 'demo'
-          ? `${normalizedRoleLabel} Kullanıcı`
-          : String(normalizedFullNameRaw).includes('Demo')
-            ? String(normalizedFullNameRaw).replace(/\bDemo\b/gi, '').replace(/\s+/g, ' ').trim() || `${normalizedRoleLabel} Kullanıcı`
-            : normalizedFullNameRaw;
+        (userFromServer.role ||
+          userFromServer.panel_type ||
+          userFromServer.userType ||
+          userFromServer.user_type ||
+          userType ||
+          'individual') as User['role'];
 
       const normalizedUser: User = {
-        ...rawUser,
-        id: String(rawUser.id ?? rawUser.userId ?? rawUser.user_id ?? ''),
+        ...(userFromServer as any),
+        id: String((userFromServer as any).id ?? (userFromServer as any).userId ?? ''),
         role: normalizedRole,
-        fullName: normalizedFullName,
-        email: rawUser.email || `hizli.${normalizedRole}@yolnext.com`,
-        firstName: rawUser.firstName || rawUser.first_name || 'Kullanıcı',
-        lastName:
-          rawUser.lastName || rawUser.last_name || String(normalizedFullName).split(' ').slice(1).join(' ') || normalizedRole,
       };
 
-      safeLocalStorage.setItem('authToken', token);
-      safeLocalStorage.setItem('token', token);
+      safeLocalStorage.setItem('authToken', tokenFromServer);
+      safeLocalStorage.setItem('token', tokenFromServer);
       safeLocalStorage.setItem('user', JSON.stringify(normalizedUser));
-      setToken(token);
+      setToken(tokenFromServer);
       setUser(normalizedUser);
 
       return { success: true, user: normalizedUser };

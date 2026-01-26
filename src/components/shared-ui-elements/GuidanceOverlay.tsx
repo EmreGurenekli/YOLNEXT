@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import { X } from 'lucide-react';
 import GuidanceBanner from './GuidanceBanner';
@@ -40,13 +40,13 @@ const GuidanceOverlay: React.FC<GuidanceOverlayProps> = ({
       const dismissed = localStorage.getItem(localStorageKey) === '1';
       setIsDismissed(dismissed);
 
-      // If a page tells us whether it's empty, we only auto-open when empty.
-      // If isEmpty is not provided, keep the legacy "first visit" behavior.
-      const shouldAutoOpen = isEmpty === undefined ? !dismissed : (!dismissed && isEmpty);
+      // Only auto-open when the page explicitly tells us it's empty.
+      // Otherwise, show the inline banner and let the user open the modal manually.
+      const shouldAutoOpen = !dismissed && Boolean(isEmpty);
       setIsOverlayOpen(shouldAutoOpen);
     } catch {
       setIsDismissed(false);
-      setIsOverlayOpen(isEmpty === undefined ? true : Boolean(isEmpty));
+      setIsOverlayOpen(Boolean(isEmpty));
     }
   }, [localStorageKey, isEmpty]);
 

@@ -1,4 +1,4 @@
-﻿import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 
 type Theme = 'light' | 'dark' | 'system';
 
@@ -17,7 +17,6 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
   const [actualTheme, setActualTheme] = useState<'light' | 'dark'>('light');
 
   useEffect(() => {
-    // Load theme from localStorage (only in browser)
     if (typeof window === 'undefined' || !window.localStorage) return;
     try {
       const savedTheme = localStorage.getItem('theme') as Theme;
@@ -30,7 +29,6 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
   }, []);
 
   useEffect(() => {
-    // Save theme to localStorage (only in browser)
     if (typeof window === 'undefined' || !window.localStorage) return;
     try {
       localStorage.setItem('theme', theme);
@@ -61,7 +59,6 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
 
     updateActualTheme();
 
-    // Listen for system theme changes
     try {
       const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
       const handleChange = () => {
@@ -84,15 +81,12 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [theme]);
 
   useEffect(() => {
-    // Apply theme to document (only in browser)
     if (typeof document === 'undefined') return;
     try {
       const root = document.documentElement;
       if (!root) return;
       
-      // Check if classList exists and is a DOMTokenList
       if (!root.classList || typeof root.classList.add !== 'function') {
-        // Fallback: use className directly
         root.className = root.className.replace(/\b(light|dark)\b/g, '').trim() + ' ' + actualTheme;
         return;
       }
@@ -101,7 +95,6 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
       root.classList.add(actualTheme);
     } catch (error) {
       console.warn('Failed to apply theme to document:', error);
-      // Fallback: try className directly
       try {
         const root = document.documentElement;
         if (root) {
@@ -131,13 +124,3 @@ export const useTheme = () => {
   }
   return context;
 };
-
-
-
-
-
-
-
-
-
-

@@ -3,6 +3,7 @@ import { createApiUrl } from '../../config/api';
 import { useNavigate, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useAuth } from '../../contexts/AuthContext';
+import { analytics } from '../../services/businessAnalytics';
 import {
   Search,
   Clock,
@@ -51,6 +52,7 @@ import RatingModal from '../../components/RatingModal';
 import GuidanceOverlay from '../../components/shared-ui-elements/GuidanceOverlay';
 import CarrierInfoCard from '../../components/CarrierInfoCard';
 import { normalizeTrackingCode } from '../../utils/trackingCode';
+import { calculateCommission } from '../../utils/paymentProcessing';
 
 // Tarih formatlama fonksiyonu - ISO tarihini Türkçe formatına çevirir
 const formatDeliveryDate = (dateStr: string): string => {
@@ -81,6 +83,7 @@ interface Offer {
   carrierExperience: string;
   price: number;
   estimatedDelivery: string;
+  expiresAt?: string;
   message: string;
   status: 'pending' | 'accepted' | 'rejected';
   createdAt: string;
@@ -104,6 +107,7 @@ interface Offer {
 export default function Offers() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const [now, setNow] = useState(() => Date.now());
   const [filterStatus, setFilterStatus] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('date');
@@ -137,7 +141,6 @@ export default function Offers() {
   const navigateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const paymentModalOpenRef = useRef(false);
   const loadingRef = useRef(false);
-  const hasLoadedOnceRef = useRef(false);
 
   useEffect(() => {
     const userId = (user as any)?.id;
@@ -150,6 +153,11 @@ export default function Offers() {
   useEffect(() => {
     paymentModalOpenRef.current = showPaymentModal;
   }, [showPaymentModal]);
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(id);
+  }, []);
 
   // Cleanup timers on unmount
   useEffect(() => {
@@ -231,10 +239,8 @@ export default function Offers() {
           : 0;
       
       // Map backend data to frontend format
-      // IMPORTANT: Only show pending offers - accepted/rejected offers should not appear here
-      const mappedOffers = rawOffersArray
-        .filter((offer: any) => normalizeOfferStatus(offer?.status) === 'pending') // Only pending offers
-        .map((offer: any) => {
+      // IMPORTANT: Keep ALL offers (pending/accepted/rejected). Filtering is a UI concern.
+      const mappedOffers = rawOffersArray.map((offer: any) => {
           // Rota planlayıcı bilgisini message'dan parse et
           let message = offer.message || '';
           let isFromRoutePlanner = false;
@@ -248,6 +254,17 @@ export default function Offers() {
               message = message.replace(/^\[ROUTE_PLANNER:[^\]]+\]/, ''); // Prefix'i kaldır
             }
           }
+
+          const computeExpiresAt = (row: any): string => {
+            const direct = row?.expiresAt || row?.expires_at || row?.expiresat;
+            const directStr = String(direct || '').trim();
+            if (directStr) return directStr;
+
+            const created = row?.createdAt || row?.created_at || row?.date;
+            const createdDate = created ? new Date(created) : null;
+            if (!createdDate || !Number.isFinite(createdDate.getTime())) return '';
+            return new Date(createdDate.getTime() + 30 * 60 * 1000).toISOString();
+          };
 
           return {
             id: offer.id?.toString() || '',
@@ -264,6 +281,7 @@ export default function Offers() {
             successRate: Number(offer.successRate || 0) || 0,
             price: typeof offer.price === 'string' ? parseFloat(offer.price) || 0 : (offer.price || 0),
             estimatedDelivery: offer.estimatedDeliveryDate || offer.estimatedDelivery || '',
+            expiresAt: computeExpiresAt(offer),
             message: message,
             isFromRoutePlanner: isFromRoutePlanner,
             sourceCity: sourceCity,
@@ -289,7 +307,6 @@ export default function Offers() {
           };
         });
       
-      // Only pending offers are shown - accepted/rejected are handled elsewhere
       setOffers(mappedOffers);
       
       setStats({
@@ -340,32 +357,13 @@ export default function Offers() {
     }
   }, []);
 
-  // Load offers only once on mount - ULTRA STRICT MODE with sessionStorage
+  // Load offers on page mount.
+  // Do NOT gate with sessionStorage; it can cause stale/empty UI when user revisits the page.
   useEffect(() => {
-    // Use sessionStorage to prevent loading even across re-renders
-    const storageKey = 'yolnext_offers_loaded';
-    const alreadyLoaded = sessionStorage.getItem(storageKey);
-    
-    if (alreadyLoaded === 'true' || hasLoadedOnceRef.current) {
-      return;
-    }
-    
-    hasLoadedOnceRef.current = true;
-    sessionStorage.setItem(storageKey, 'true');
-    
-    // Load offers
-    loadOffers().catch((error) => {
-      // Reset flag on error so user can retry
-      sessionStorage.removeItem(storageKey);
-      hasLoadedOnceRef.current = false;
+    loadOffers().catch(() => {
+      // user can retry via UI
     });
-    
-    // Cleanup: Remove flag when component unmounts (optional - allows reload on navigation)
-    return () => {
-      // Don't remove on unmount - keep it for the session
-      // sessionStorage.removeItem(storageKey);
-    };
-  }, []); // EMPTY ARRAY - Only run once on mount
+  }, [loadOffers]);
 
   // Separate effect for auto-refresh (disabled to prevent loops)
   // useEffect(() => {
@@ -392,12 +390,8 @@ export default function Offers() {
   //   };
   // }, []);
 
-  // Only show pending offers - accepted/rejected should not appear
   const filteredOffers = offers.filter((offer: Offer) => {
-    // All offers here are already pending (filtered in loadOffers)
-    // But we still respect the filterStatus for UI consistency
-    const matchesStatus =
-      filterStatus === 'all' || filterStatus === 'pending' || offer.status === filterStatus;
+    const matchesStatus = filterStatus === 'all' ? true : offer.status === filterStatus;
     const matchesSearch = !searchTerm || searchTerm.trim() === '' || (
       (offer.shipmentTitle || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (offer.carrierName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -491,8 +485,15 @@ export default function Offers() {
         : (localOffer?.shipmentId ? String(localOffer.shipmentId) : null);
       const prefill = `Merhaba, ödeme detaylarını netleştirelim. İş No: #${shipmentId || ''}`.trim();
 
-      // Professional but warm success feedback with payment guarantee info
-      setSuccessMessage('Teklif başarıyla kabul edildi. Ödeme güvence altına alındı. Gönderileriniz sayfasına yönlendiriliyorsunuz...');
+      analytics.track('offer_accept_success', {
+        offerId: targetOfferId,
+        shipmentId,
+        carrierId,
+      });
+
+      setSuccessMessage(
+        'Teklif başarıyla kabul edildi. Ödeme detaylarını mesajlaşma üzerinden yazılı olarak netleştirmenizi öneririz. Gönderileriniz sayfasına yönlendiriliyorsunuz...'
+      );
       setShowSuccessMessage(true);
       
       // Remove accepted offer from list immediately (goes to MyShipments)
@@ -670,7 +671,7 @@ export default function Offers() {
             isEmpty={!isLoading && offers.length === 0}
             icon={FileText}
             title='Teklif Yönetimi'
-            description='Gelen teklifleri inceleyin, nakliyeci profillerini değerlendirin ve en uygun teklifi seçin. Teklif kabul edildikten sonra taşıma süreci başlar ve ödeme güvence altına alınır.'
+            description='Gelen teklifleri inceleyin, nakliyeci profillerini değerlendirin ve en uygun teklifi seçin. Teklif kabul edildiğinde süreç başlar; ödeme detaylarını mesajlaşma üzerinden yazılı netleştirmeniz önerilir.'
             primaryAction={{
               label: 'Gönderi Oluştur',
               to: '/individual/create-shipment',
@@ -770,6 +771,8 @@ export default function Offers() {
             >
               <option value='all'>Tüm Durumlar</option>
               <option value='pending'>Bekleyen</option>
+              <option value='accepted'>Kabul Edilen</option>
+              <option value='rejected'>Reddedilen</option>
             </select>
 
             <select
@@ -854,6 +857,29 @@ export default function Offers() {
                       </div>
                       <div className='text-sm text-slate-500'>
                         Teslimat: {formatDeliveryDate(offer.estimatedDelivery)}
+                      </div>
+                      {(() => {
+                        const expiresAt = String(offer.expiresAt || '').trim();
+                        if (!expiresAt) return null;
+                        const ts = new Date(expiresAt).getTime();
+                        if (!Number.isFinite(ts)) return null;
+                        const diffMs = ts - now;
+                        const minutes = Math.max(0, Math.ceil(diffMs / 60000));
+                        const isExpired = diffMs <= 0;
+                        const tone = isExpired
+                          ? 'text-red-600'
+                          : minutes <= 5
+                            ? 'text-amber-700'
+                            : 'text-slate-500';
+                        return (
+                          <div className={`mt-1 text-xs font-semibold ${tone}`}>
+                            Teklif süresi: {isExpired ? 'Doldu' : `${minutes} dk kaldı`}
+                          </div>
+                        );
+                      })()}
+                      <div className='mt-1 text-[11px] text-slate-500'>
+                        Platform hizmet bedeli (nakliyeci): ₺
+                        {calculateCommission(Number(offer.price || 0)).toLocaleString('tr-TR')}
                       </div>
                     </div>
                   </div>
@@ -1140,17 +1166,16 @@ export default function Offers() {
                 </div>
               </div>
 
-              {/* Ödeme Güvencesi Bilgisi - Gönderici için */}
+              {/* Ödeme Bilgisi - Gönderici için */}
               {selectedOffer.status === 'pending' && (
                 <div className='mb-8 p-5 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-xl'>
                   <div className='flex items-start gap-3'>
                     <Shield className='w-6 h-6 text-green-700 flex-shrink-0 mt-0.5' />
                     <div className='flex-1'>
-                      <h5 className='text-base font-semibold text-green-900 mb-2'>Ödeme Güvencesi</h5>
+                      <h5 className='text-base font-semibold text-green-900 mb-2'>Ödeme (taraflar arasında)</h5>
                       <p className='text-sm text-green-800 leading-relaxed'>
-                        Bu teklifi kabul ettiğinizde, ödeme tutarı güvence altına alınır. 
-                        Teslimat tamamlandığında ve siz onayladığınızda ödeme nakliyeciye aktarılır. 
-                        Bu sistem sayesinde hem siz hem de nakliyeci güvende olursunuz.
+                        YolNext ödeme altyapısı sunmaz; ödeme işlemi gönderici ile nakliyeci arasında gerçekleşir.
+                        IBAN/alıcı adı/açıklama ve yükleme saatini mesajlaşma üzerinden yazılı olarak netleştirmeniz önerilir.
                       </p>
                     </div>
                   </div>

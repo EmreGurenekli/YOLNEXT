@@ -97,4 +97,3 @@ function createDatabasePool(connectionString, nodeEnv = 'development') {
 module.exports = {
   createDatabasePool,
 };
-

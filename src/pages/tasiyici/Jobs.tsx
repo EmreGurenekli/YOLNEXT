@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
@@ -15,14 +15,17 @@ import {
   AlertCircle,
   Building2,
   DollarSign,
+  XCircle,
 } from 'lucide-react';
 import { useToast } from '../../contexts/ToastContext';
 import { TOAST_MESSAGES, showProfessionalToast } from '../../utils/toastMessages';
 import Breadcrumb from '../../components/shared-ui-elements/Breadcrumb';
 import LoadingState from '../../components/shared-ui-elements/LoadingState';
 import { createApiUrl } from '../../config/api';
+import { analytics } from '../../services/businessAnalytics';
 import { formatDate, formatDateTime } from '../../utils/format';
 import { logger } from '../../utils/logger';
+import { getStatusText as getShipmentStatusText } from '../../utils/shipmentStatus';
 
 const safeFormatDate = (dateString: string, format: 'date' | 'datetime' = 'date') => {
   if (!dateString) return 'Belirtilmemiş';
@@ -37,6 +40,29 @@ const safeFormatDate = (dateString: string, format: 'date' | 'datetime' = 'date'
     }
   } catch (error) {
     return 'Belirtilmemiş';
+  }
+};
+
+const normalizeCityKey = (input?: string | null): string => {
+  const s = String(input || '').trim();
+  if (!s) return '';
+  return s
+    .replace(/İ/g, 'I')
+    .replace(/ı/g, 'i')
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
+const getDriverProfileCity = (): string => {
+  try {
+    const userRaw = localStorage.getItem('user');
+    const u: any = userRaw ? JSON.parse(userRaw) : null;
+    return String(u?.city || u?.City || u?.il || u?.province || '').trim();
+  } catch {
+    return '';
   }
 };
 
@@ -77,6 +103,8 @@ const TasiyiciJobs: React.FC = () => {
   const [job, setJob] = useState<Job | null>(null);
   const [loading, setLoading] = useState(true);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [acceptingAssignment, setAcceptingAssignment] = useState(false);
+  const [rejectingAssignment, setRejectingAssignment] = useState(false);
 
   const loadJob = React.useCallback(async () => {
     if (!id) return;
@@ -150,14 +178,14 @@ const TasiyiciJobs: React.FC = () => {
         setJob(jobData as Job);
       } else if (response.status === 404) {
         showProfessionalToast(showToast, 'JOB_NOT_FOUND', 'error');
-        navigate('/tasiyici/active-jobs');
+        navigate('/tasiyici/islerim');
       } else {
         throw new Error('İş yüklenemedi');
       }
     } catch (error) {
       if (import.meta.env.DEV) console.error('İş yüklenirken hata:', error);
       showProfessionalToast(showToast, 'REQUEST_FAILED', 'error');
-      navigate('/tasiyici/active-jobs');
+      navigate('/tasiyici/islerim');
     } finally {
       setLoading(false);
     }
@@ -246,18 +274,9 @@ const TasiyiciJobs: React.FC = () => {
   };
 
   const getStatusText = (status: string) => {
-    const statusMap: Record<string, string> = {
-      offer_accepted: 'Teklif Kabul Edildi',
-      accepted: 'Teklif Kabul Edildi',
-      assigned: 'İşi Kabul Et',
-      in_progress: 'İşi Kabul Et',
-      picked_up: 'Yük Alındı',
-      in_transit: 'Yolda',
-      delivered: 'Teslim Edildi',
-      completed: 'Tamamlandı',
-      cancelled: 'İptal Edildi',
-    };
-    return statusMap[status] || status;
+    // Centralize shipment status names in one place
+    const base = getShipmentStatusText(status);
+    return base !== 'Bilinmiyor' ? base : status;
   };
 
   const getRoutePlan = () => {
@@ -282,6 +301,96 @@ const TasiyiciJobs: React.FC = () => {
     };
   };
 
+  const getDriverOffer = () => {
+    if (!job) return null;
+    let meta = (job as any).metadata;
+    if (typeof meta === 'string') {
+      try {
+        meta = JSON.parse(meta);
+      } catch {
+        meta = null;
+      }
+    }
+    const offer = meta && typeof meta === 'object' ? (meta as any).driverOffer : null;
+    return offer && typeof offer === 'object' ? offer : null;
+  };
+
+  const acceptAssignmentOffer = async () => {
+    if (!job) return;
+    try {
+      setAcceptingAssignment(true);
+
+      const driverCity = getDriverProfileCity();
+      const driverKey = normalizeCityKey(driverCity);
+      const pickupKey = normalizeCityKey(job.pickupCity);
+      if (driverKey && pickupKey && driverKey !== pickupKey) {
+        showToast({
+          type: 'error',
+          title: 'İş kabul edilemedi',
+          message: `Şehir kuralı: Yükleme şehri profil şehrinle aynı olmalı. Profil: ${driverCity || '—'} • Yükleme: ${job.pickupCity || '—'}`,
+          duration: 5000,
+        });
+        return;
+      }
+
+      const token = localStorage.getItem('authToken');
+      const userRaw = localStorage.getItem('user');
+      const userId = userRaw ? JSON.parse(userRaw || '{}').id : undefined;
+
+      const res = await fetch(createApiUrl(`/api/shipments/${job.id}/assignment/accept`), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token || ''}`,
+          'X-User-Id': userId || '',
+          'Content-Type': 'application/json',
+        },
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.success) {
+        const msg = json?.message || 'İş kabul edilemedi';
+        showToast({ type: 'error', title: 'İş kabul edilemedi', message: msg, duration: 4500 });
+        return;
+      }
+      analytics.track('driver_assignment_offer_accepted', { shipmentId: job.id });
+      showToast({ type: 'success', title: 'İş kabul edildi', message: 'İş başlatıldı.', duration: 3000 });
+      await loadJob();
+    } finally {
+      setAcceptingAssignment(false);
+    }
+  };
+
+  const rejectAssignmentOffer = async () => {
+    if (!job) return;
+    try {
+      setRejectingAssignment(true);
+      const reason = window.prompt('Reddetme sebebi (opsiyonel):') || '';
+      const token = localStorage.getItem('authToken');
+      const userRaw = localStorage.getItem('user');
+      const userId = userRaw ? JSON.parse(userRaw || '{}').id : undefined;
+
+      const res = await fetch(createApiUrl(`/api/shipments/${job.id}/assignment/reject`), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token || ''}`,
+          'X-User-Id': userId || '',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ reason }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.success) {
+        const msg = json?.message || 'İş reddedilemedi';
+        showToast({ type: 'error', title: 'İş reddedilemedi', message: msg, duration: 4500 });
+        return;
+      }
+      analytics.track('driver_assignment_offer_rejected', { shipmentId: job.id, reason: reason || undefined });
+      showToast({ type: 'success', title: 'Teklif reddedildi', message: 'Nakliyeci bilgilendirildi.', duration: 3000 });
+      await loadJob();
+    } finally {
+      setRejectingAssignment(false);
+    }
+  };
+
   if (loading) {
     return <LoadingState message='İş yükleniyor...' />;
   }
@@ -293,10 +402,10 @@ const TasiyiciJobs: React.FC = () => {
           <AlertCircle className='w-16 h-16 text-gray-400 mx-auto mb-4' />
           <h3 className='text-lg font-semibold text-gray-900 mb-2'>İş bulunamadı</h3>
           <Link
-            to='/tasiyici/active-jobs'
+            to='/tasiyici/islerim'
             className='inline-block mt-4 px-4 py-2 bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 text-white rounded-lg font-medium transition-all duration-300'
           >
-            Aktif İşlere Dön
+            İşlerime Dön
           </Link>
         </div>
       </div>
@@ -314,7 +423,7 @@ const TasiyiciJobs: React.FC = () => {
         <div className='mb-4 sm:mb-6'>
           <Breadcrumb
             items={[
-              { label: 'Aktif İşler', href: '/tasiyici/active-jobs' },
+              { label: 'İşlerim', href: '/tasiyici/islerim' },
               { label: job.title || `İş #${job.id}`, href: `/tasiyici/jobs/${job.id}` },
             ]}
           />
@@ -322,11 +431,11 @@ const TasiyiciJobs: React.FC = () => {
 
         {/* Back Button */}
         <Link
-          to='/tasiyici/active-jobs'
+          to='/tasiyici/islerim'
           className='inline-flex items-center gap-2 px-4 py-2 bg-white hover:bg-gray-50 text-gray-700 rounded-lg font-medium transition-all duration-300 shadow-md hover:shadow-lg border border-gray-200 mb-6'
         >
           <ArrowLeft className='w-4 h-4' />
-          Geri Dön
+          İşlerime Dön
         </Link>
 
         {/* Hero Section */}
@@ -364,6 +473,59 @@ const TasiyiciJobs: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {(() => {
+          const offer = getDriverOffer();
+          const userRaw = localStorage.getItem('user');
+          const currentUserId = userRaw ? String(JSON.parse(userRaw || '{}')?.id || '') : '';
+          const isMine = offer && currentUserId && String(offer.driverId || '') === currentUserId;
+          const expMs = offer?.expiresAt ? Date.parse(String(offer.expiresAt)) : NaN;
+          const minutesLeft = Number.isFinite(expMs) ? Math.max(0, Math.ceil((expMs - Date.now()) / 60000)) : null;
+          const isPending = offer?.status === 'pending' && (minutesLeft == null || minutesLeft > 0);
+          if (!offer || !isMine || !isPending) return null;
+
+          const driverCity = getDriverProfileCity();
+          const cityMismatch = Boolean(normalizeCityKey(driverCity)) &&
+            Boolean(normalizeCityKey(job.pickupCity)) &&
+            normalizeCityKey(driverCity) !== normalizeCityKey(job.pickupCity);
+
+          return (
+            <div className='bg-amber-50 border border-amber-200 rounded-2xl p-4 sm:p-6 mb-6'>
+              <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3'>
+                <div>
+                  <div className='text-lg font-bold text-amber-900'>Yeni İş Teklifi</div>
+                  <div className='text-sm text-amber-800'>
+                    30 dakika içinde kabul etmelisin{minutesLeft != null ? ` • Kalan: ${minutesLeft} dk` : ''}.
+                  </div>
+                  {cityMismatch && (
+                    <div className='text-xs text-rose-700 font-semibold mt-2'>
+                      Şehir kuralı: Yükleme şehri profil şehrinle aynı olmalı. Profil: {driverCity || '—'} • Yükleme: {job.pickupCity || '—'}
+                    </div>
+                  )}
+                </div>
+                <div className='flex flex-col sm:flex-row gap-2'>
+                  <button
+                    type='button'
+                    onClick={acceptAssignmentOffer}
+                    disabled={acceptingAssignment || rejectingAssignment || cityMismatch}
+                    className='px-5 py-3 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white rounded-xl font-bold transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed'
+                  >
+                    Kabul Et
+                  </button>
+                  <button
+                    type='button'
+                    onClick={rejectAssignmentOffer}
+                    disabled={acceptingAssignment || rejectingAssignment}
+                    className='px-5 py-3 bg-white border border-rose-200 text-rose-700 hover:bg-rose-50 rounded-xl font-bold transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2'
+                  >
+                    <XCircle className='w-5 h-5' />
+                    Reddet
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         <div className='grid grid-cols-1 lg:grid-cols-3 gap-6'>
           {/* Main Content */}
@@ -601,6 +763,7 @@ const TasiyiciJobs: React.FC = () => {
                   <div className='mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700'>
                     <strong>Önemli:</strong> Ödeme işlemi nakliyeci ile gönderici arasında gerçekleşir. İş tamamlandığında nakliyeci ödemeyi yapar. Ödeme detaylarını nakliyeci ile koordine edin. Platform sadece tarafları buluşturan bir pazaryeridir.
                   </div>
+
                 </div>
               </div>
             )}

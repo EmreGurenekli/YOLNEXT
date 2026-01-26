@@ -30,11 +30,9 @@
 
 import React, { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { Plus, Package, Truck, Clock, CheckCircle2, AlertCircle, XCircle, Info } from 'lucide-react';
+import { Plus, Package, Truck, Clock, CheckCircle2, AlertCircle, XCircle } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import { createApiUrl } from '../../config/api';
-import { formatCurrency, formatDate, sanitizeShipmentTitle } from '../../utils/format';
-import { resolveShipmentRoute } from '../../utils/shipmentRoute';
 import { useAuth } from '../../contexts/AuthContext';
 import LoadingState from '../../components/shared-ui-elements/LoadingState';
 import EmptyState from '../../components/shared-ui-elements/EmptyState';
@@ -74,7 +72,6 @@ const MyShipments: React.FC<MyShipmentsProps> = ({ basePath = '/individual' }) =
     refreshShipments,
     showNotification,
     toTrackingCode,
-    setShipments,
   } = useMyShipments(basePath);
 
   // Modal states
@@ -127,14 +124,6 @@ const MyShipments: React.FC<MyShipmentsProps> = ({ basePath = '/individual' }) =
     ].includes(status);
   };
 
-  const isProcessAssistantEnabledForShipment = (status: Shipment['status']) => {
-    return [
-      'preparing',
-      'waiting',
-      'waiting_for_offers'
-    ].includes(status);
-  };
-
   // Action handlers
   const handleViewDetails = async (shipmentId: string) => {
     const shipment = shipments.find(s => s.id === shipmentId);
@@ -176,11 +165,11 @@ const MyShipments: React.FC<MyShipmentsProps> = ({ basePath = '/individual' }) =
     try {
       const token = localStorage.getItem('authToken');
       const response = await fetch(createApiUrl(`/api/shipments/${selectedShipment.id}/cancel`), {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
       });
 
       if (response.ok) {
@@ -189,8 +178,7 @@ const MyShipments: React.FC<MyShipmentsProps> = ({ basePath = '/individual' }) =
       } else {
         showNotification('error', 'Gönderi iptal edilirken bir hata oluştu');
       }
-    } catch (error) {
-      console.error('Error cancelling shipment:', error);
+    } catch (_error) {
       showNotification('error', 'Gönderi iptal edilirken bir hata oluştu');
     } finally {
       setShowCancelModal(false);
@@ -213,7 +201,7 @@ const MyShipments: React.FC<MyShipmentsProps> = ({ basePath = '/individual' }) =
     return <div>Yetkilendirme hatası</div>;
   }
 
-  return (
+    return (
     <div className="min-h-screen bg-gray-50">
       <Helmet>
         <title>{isCorporateView ? 'Kurumsal Gönderiler' : 'Gönderilerim'} | YolNext</title>
@@ -221,7 +209,7 @@ const MyShipments: React.FC<MyShipmentsProps> = ({ basePath = '/individual' }) =
       </Helmet>
 
       <div className="max-w-7xl mx-auto px-4 py-6">
-        <Breadcrumb 
+        <Breadcrumb
           items={[
             { label: 'Ana Sayfa', href: isCorporateView ? '/corporate' : '/individual' },
             { label: isCorporateView ? 'Kurumsal Gönderiler' : 'Gönderilerim' }
@@ -272,7 +260,7 @@ const MyShipments: React.FC<MyShipmentsProps> = ({ basePath = '/individual' }) =
           />
         ) : (
           <div className="space-y-6">
-            {/* Desktop Table View */}
+          {/* Desktop Table View */}
             <div className="bg-white rounded-2xl p-8 shadow-xl border border-slate-200">
               {/* Tablo Başlığı ve Yeni Gönderi Butonu */}
               <div className="flex items-center justify-between mb-6">
@@ -291,7 +279,7 @@ const MyShipments: React.FC<MyShipmentsProps> = ({ basePath = '/individual' }) =
 
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead>
+                <thead>
                     <tr className="border-b border-slate-200 bg-gradient-to-r from-slate-50 to-blue-50">
                       <th className="text-left py-3 px-4 font-semibold text-slate-800">Gönderi No</th>
                       <th className="text-left py-3 px-4 font-semibold text-slate-800">Güzergah</th>
@@ -299,9 +287,9 @@ const MyShipments: React.FC<MyShipmentsProps> = ({ basePath = '/individual' }) =
                       <th className="text-left py-3 px-4 font-semibold text-slate-800">Nakliyeci</th>
                       <th className="text-left py-3 px-4 font-semibold text-slate-800">Fiyat</th>
                       <th className="text-left py-3 px-4 font-semibold text-slate-800">İşlemler</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+                  </tr>
+                </thead>
+                <tbody>
                     {shipments.map((shipment, index) => {
                       // Map data to match MyShipmentsTableRow interface
                       const mappedShipment = {
@@ -339,32 +327,32 @@ const MyShipments: React.FC<MyShipmentsProps> = ({ basePath = '/individual' }) =
                         carrierVerified: shipment.carrier_verified,
                         completedJobs: shipment.completed_jobs,
                         successRate: shipment.success_rate
-                      } as any;
+                      } as unknown as Shipment;
                       
                       return (
-                        <MyShipmentsTableRow
+                      <MyShipmentsTableRow
                           key={shipment.id}
                           shipment={mappedShipment}
-                          index={index}
-                          onViewDetails={handleViewDetails}
+                        index={index}
+                        onViewDetails={handleViewDetails}
                           onTrack={(id) => navigate(`/individual/live-tracking?shipment=${id}`)}
                           onMessage={handleOpenMessaging}
                           onConfirmDelivery={() => {}}
                           onRateCarrier={handleOpenRating}
                           onCancel={handleCancelShipment}
                           isTrackEnabled={(status) => ['in_transit', 'picked_up', 'delivered'].includes(status)}
-                          isMessagingEnabled={isMessagingEnabledForShipment}
+                        isMessagingEnabled={isMessagingEnabledForShipment}
                           canCancel={(status) => ['preparing', 'waiting', 'waiting_for_offers'].includes(status)}
                           isLocallyRated={(id) => locallyRatedShipmentIds.includes(id)}
                         />
                       );
                     })}
-                  </tbody>
-                </table>
-              </div>
+                </tbody>
+              </table>
             </div>
+          </div>
 
-            {/* Mobile Card View */}
+          {/* Mobile Card View */}
             <div className="lg:hidden space-y-4">
               {shipments.map((shipment, index) => {
                 // Map data to match MyShipmentsCard interface
@@ -390,39 +378,39 @@ const MyShipments: React.FC<MyShipmentsProps> = ({ basePath = '/individual' }) =
                   carrierVerified: shipment.carrier_verified,
                   completedJobs: shipment.completed_jobs,
                   successRate: shipment.success_rate
-                } as any;
+                } as unknown as Shipment;
                 
                 return (
-                  <MyShipmentsCard
+                <MyShipmentsCard
                     key={shipment.id}
                     shipment={mappedShipment}
-                    index={index}
-                    onViewDetails={handleViewDetails}
+                  index={index}
+                  onViewDetails={handleViewDetails}
                     onTrack={(id) => navigate(`/individual/live-tracking?shipment=${id}`)}
                     onMessage={handleOpenMessaging}
                     onConfirmDelivery={() => {}}
                     onRateCarrier={handleOpenRating}
                     onCancel={handleCancelShipment}
                     isTrackEnabled={(status) => ['in_transit', 'picked_up', 'delivered'].includes(status)}
-                    isMessagingEnabled={isMessagingEnabledForShipment}
+                  isMessagingEnabled={isMessagingEnabledForShipment}
                     canCancel={(status) => ['preparing', 'waiting', 'waiting_for_offers'].includes(status)}
                     isLocallyRated={(id) => locallyRatedShipmentIds.includes(id)}
-                    getStatusInfo={getStatusInfo}
-                    getStatusIcon={getStatusIcon}
-                  />
+                  getStatusInfo={getStatusInfo}
+                  getStatusIcon={getStatusIcon}
+                />
                 );
               })}
-            </div>
+        </div>
 
             {/* Pagination */}
             {pagination.totalPages > 1 && (
-              <Pagination
+            <Pagination
                 currentPage={pagination.currentPage}
                 totalPages={pagination.totalPages}
                 onPageChange={handlePageChange}
               />
-            )}
-          </div>
+        )}
+      </div>
         )}
 
         {/* Notification */}
@@ -473,7 +461,7 @@ const MyShipments: React.FC<MyShipmentsProps> = ({ basePath = '/individual' }) =
           }}
         />
 
-      </div>
+                </div>
     </div>
   );
 };

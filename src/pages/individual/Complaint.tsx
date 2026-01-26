@@ -1,5 +1,5 @@
-﻿import React, { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import {
   AlertTriangle,
@@ -22,8 +22,27 @@ interface ComplaintData {
 }
 
 const Complaint: React.FC = () => {
-  const { shipmentId } = useParams<{ shipmentId: string }>();
+  const { shipmentId: shipmentIdParam } = useParams<{ shipmentId: string }>();
+  const location = useLocation();
   const navigate = useNavigate();
+  const shipmentId = useMemo(() => {
+    if (shipmentIdParam) return shipmentIdParam;
+    try {
+      const sp = new URLSearchParams(location.search || '');
+      return sp.get('shipmentId') || sp.get('shipment') || undefined;
+    } catch {
+      return undefined;
+    }
+  }, [shipmentIdParam, location.search]);
+
+  const afterSubmitPath = useMemo(() => {
+    const p = String(location.pathname || '');
+    if (p.startsWith('/corporate')) return '/corporate/shipments?complaint=submitted';
+    if (p.startsWith('/nakliyeci')) return '/nakliyeci/active-shipments?complaint=submitted';
+    if (p.startsWith('/tasiyici')) return '/tasiyici/islerim?complaint=submitted';
+    return '/individual/my-shipments?complaint=submitted';
+  }, [location.pathname]);
+
   const [complaintData, setComplaintData] = useState<ComplaintData>({
     type: '',
     title: '',
@@ -33,6 +52,13 @@ const Complaint: React.FC = () => {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    // If we have a shipment context, preselect a sensible default type.
+    // Keep it minimal; user can change.
+    if (!shipmentId) return;
+    setComplaintData((prev) => (prev.type ? prev : { ...prev, type: 'service' }));
+  }, [shipmentId]);
 
   const complaintTypes = [
     { id: 'delivery_delay', name: 'Teslimat Gecikmesi', icon: '⏰' },
@@ -86,15 +112,16 @@ const Complaint: React.FC = () => {
       const response = await fetch(createApiUrl('/api/complaints'), {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${localStorage.getItem('authToken')}`,
+          Authorization: `Bearer ${localStorage.getItem('authToken') || localStorage.getItem('token') || ''}`,
         },
         body: formData,
       });
 
       if (response.ok) {
-        navigate('/individual/my-shipments?complaint=submitted');
+        navigate(afterSubmitPath, { replace: true });
       } else {
-        throw new Error('Şikayet gönderilemedi');
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.message || 'Şikayet gönderilemedi');
       }
     } catch (error: any) {
       setError(error.message);
@@ -148,7 +175,7 @@ const Complaint: React.FC = () => {
             </button>
             <h1 className='text-3xl font-bold text-gray-900'>Şikayet</h1>
             <p className='text-gray-600 mt-2'>
-              Sorununuzu detaylı bir şekilde bildirin
+              Sorununuzu detaylı bir şekilde bildirin{shipmentId ? ` (İş #${shipmentId})` : ''}
             </p>
           </div>
 

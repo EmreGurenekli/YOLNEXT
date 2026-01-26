@@ -475,7 +475,10 @@ const Jobs: React.FC = () => {
       const data = response.ok ? await safeJsonParse(response).catch(() => ({} as any)) : ({} as any);
       
       if (response.ok) {
-        setSuccessMessage(data?.message || 'Teklifiniz başarıyla iletilmiştir. Gönderici tarafından değerlendirilecektir. Kabul edildiğinde ödeme güvence altına alınır ve bildirim alırsınız.');
+        setSuccessMessage(
+          data?.message ||
+            'Teklifiniz başarıyla iletilmiştir. Gönderici tarafından değerlendirilecektir. Kabul edilirse mesajlaşma açılır; ödeme detaylarını gönderici ile yazılı olarak netleştirmeniz önerilir.'
+        );
         setShowSuccessMessage(true);
         setError(null);
 
@@ -1039,10 +1042,10 @@ const Jobs: React.FC = () => {
             isEmpty={!loading && jobs.length === 0}
             icon={Package}
             title='İş İlanları'
-            description='Açık gönderiler için teklif verin. Teklif kabul edildiğinde ödeme güvence altına alınır ve işlem başlar. Teklif durumunuzu "Tekliflerim" sayfasından takip edebilirsiniz.'
+            description='Açık gönderiler için teklif verin. Kural: Varsayılan olarak yalnızca profil şehrinizdeki yükler için teklif verilebilir; koridor istisnası için Route Planner kullanın. Teklif durumunuzu “Tekliflerim” sayfasından takip edebilirsiniz.'
             primaryAction={{
-              label: 'Aktif Yükler',
-              to: '/nakliyeci/active-shipments',
+              label: 'Route Planner',
+              to: '/nakliyeci/route-planner',
             }}
             secondaryAction={{
               label: 'Tekliflerim',
@@ -1719,19 +1722,18 @@ const Jobs: React.FC = () => {
                 />
               </div>
 
-              {/* Ödeme Güvencesi Bilgisi */}
+              {/* Ödeme Bilgisi */}
               <div className='p-4 bg-blue-50 border border-blue-200 rounded-lg'>
                 <div className='flex items-start gap-3'>
                   <Shield className='w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5' />
                   <div className='flex-1'>
-                    <h4 className='text-sm font-semibold text-blue-900 mb-2'>Ödeme Güvencesi</h4>
+                    <h4 className='text-sm font-semibold text-blue-900 mb-2'>Ödeme (taraflar arasında)</h4>
                     <div className='text-xs text-blue-800 leading-relaxed space-y-2'>
                       <p>
-                        Teklifiniz kabul edildiğinde ödeme tutarı gönderici tarafından güvence altına alınır. 
-                        Teslimat tamamlandığında ve gönderici onayı sonrasında ödemeniz hesabınıza aktarılır.
+                        YolNext ödeme altyapısı sunmaz; ödeme işlemi gönderici ile nakliyeci arasında gerçekleşir.
                       </p>
                       <p className='font-semibold mt-2'>
-                        Önemli: Ödeme detaylarını (IBAN, alıcı adı, açıklama) ve yükleme saatini gönderici ile mesajlaşma üzerinden yazılı olarak netleştirmeniz önerilir. Platform sadece tarafları buluşturan bir pazaryeridir, ödeme işlemleri taraflar arasında gerçekleşir.
+                        Önemli: Ödeme detaylarını (IBAN, alıcı adı, açıklama) ve yükleme saatini gönderici ile mesajlaşma üzerinden yazılı olarak netleştirmeniz önerilir. Platform sadece tarafları buluşturan bir pazaryeridir.
                       </p>
                     </div>
                   </div>

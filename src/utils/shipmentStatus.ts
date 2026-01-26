@@ -1,93 +1,97 @@
-/**
- * 📊 SHIPMENT STATUS MANAGEMENT - CORE BUSINESS LOGIC
- * 
- * BUSINESS PURPOSE: Manages the lifecycle states of cargo shipments
- * This is CRITICAL business logic that determines what users see and what actions they can take
- * 
- * SHIPMENT LIFECYCLE (Business Flow):
- * 1️⃣ pending/waiting_for_offers → User created shipment, waiting for carrier offers
- * 2️⃣ offer_accepted/accepted → User accepted a carrier's price quote  
- * 3️⃣ in_progress/assigned → Carrier assigned, preparing for pickup
- * 4️⃣ in_transit → Package picked up, being transported
- * 5️⃣ delivered → Package delivered, awaiting confirmation
- * 6️⃣ completed → Job finished, payments processed, ratings done
- * ❌ cancelled → Shipment cancelled by user or system
- * 
- * UI/UX IMPACT:
- * - Status colors provide immediate visual feedback to users
- * - Text is localized for Turkish users
- * - Descriptions help users understand next steps
- * - Different statuses enable/disable different actions (messaging, rating, etc.)
- * 
- * BUSINESS RULES:
- * - Only "pending" and "waiting_for_offers" shipments can be cancelled by users
- * - Messaging is only enabled after "offer_accepted" status
- * - Rating is only available after "completed" status
- * - Real-time tracking is active during "in_transit" status
- */
+import { SHIPMENT_STATUS, type ShipmentStatus } from '../types/domain';
 
 export interface StatusInfo {
-  text: string;         // Human-readable Turkish status text (shown to users)
-  color: string;        // Tailwind CSS classes for visual styling
-  description: string;  // Detailed explanation for user guidance
-  icon?: string;        // Optional icon identifier (future use)
+  text: string;
+  color: string;
+  description: string;
+  icon?: string;
 }
 
-export const getStatusInfo = (status: string): StatusInfo => {
+export const getStatusInfo = (status: ShipmentStatus | string): StatusInfo => {
+  const normalizeStatusKey = (raw: ShipmentStatus | string): string => {
+    const s = String(raw || '')
+      .trim()
+      .toLowerCase()
+      .replace(/-/g, '_');
+
+    // Backward-compatible aliases used across UI/backend
+    if (s === 'waiting') return SHIPMENT_STATUS.WAITING_FOR_OFFERS;
+    if (s === 'canceled') return SHIPMENT_STATUS.CANCELLED;
+    return s;
+  };
+
   const statusMap: Record<string, StatusInfo> = {
-    pending: {
+    [SHIPMENT_STATUS.PENDING]: {
       text: 'Beklemede',
       color: 'bg-yellow-100 text-yellow-800 border-yellow-200',
       description: 'Gönderi oluşturuldu, teklif bekleniyor',
     },
-    waiting_for_offers: {
+    [SHIPMENT_STATUS.OPEN]: {
+      text: 'İlana Açık',
+      color: 'bg-sky-100 text-sky-800 border-sky-200',
+      description: 'Gönderi yayında, teklifler toplanıyor',
+    },
+    [SHIPMENT_STATUS.WAITING_FOR_OFFERS]: {
       text: 'Teklif Bekliyor',
       color: 'bg-blue-100 text-blue-800 border-blue-200',
       description: 'Taşıyıcılardan teklif bekleniyor',
     },
-    offer_accepted: {
+    [SHIPMENT_STATUS.OFFER_ACCEPTED]: {
       text: 'Teklif Kabul Edildi',
       color: 'bg-green-100 text-green-800 border-green-200',
       description: 'Teklif kabul edildi, taşıyıcı ataması bekleniyor',
     },
-    accepted: {
+    [SHIPMENT_STATUS.ACCEPTED]: {
       text: 'Kabul Edildi',
       color: 'bg-green-100 text-green-800 border-green-200',
       description: 'Teklif kabul edildi, taşıyıcı ataması bekleniyor',
     },
-    in_progress: {
+    [SHIPMENT_STATUS.IN_PROGRESS]: {
+      text: 'Hazırlanıyor',
+      color: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+      description: 'Taşıyıcı atandı, yükleme hazırlığı devam ediyor',
+    },
+    [SHIPMENT_STATUS.ASSIGNED]: {
       text: 'Taşıyıcı Atandı',
       color: 'bg-indigo-100 text-indigo-800 border-indigo-200',
       description: 'Taşıyıcı atandı, yükleme bekleniyor',
     },
-    assigned: {
-      text: 'Taşıyıcı Atandı',
-      color: 'bg-indigo-100 text-indigo-800 border-indigo-200',
-      description: 'Taşıyıcı atandı, yükleme bekleniyor',
+    [SHIPMENT_STATUS.PICKED_UP]: {
+      text: 'Yük Alındı',
+      color: 'bg-blue-100 text-blue-800 border-blue-200',
+      description: 'Yük alındı, yola çıkış bekleniyor',
     },
-    in_transit: {
+    [SHIPMENT_STATUS.IN_TRANSIT]: {
       text: 'Yolda',
       color: 'bg-blue-100 text-blue-800 border-blue-200',
       description: 'Gönderi yolda, teslimat bekleniyor',
     },
-    delivered: {
+    [SHIPMENT_STATUS.DELIVERED]: {
       text: 'Teslim Edildi',
       color: 'bg-emerald-100 text-emerald-800 border-emerald-200',
       description: 'Gönderi teslim edildi, onay bekleniyor',
     },
-    cancelled: {
+    [SHIPMENT_STATUS.CANCELLED]: {
       text: 'İptal Edildi',
       color: 'bg-red-100 text-red-800 border-red-200',
       description: 'Gönderi iptal edildi',
     },
-    completed: {
+    [SHIPMENT_STATUS.COMPLETED]: {
       text: 'Tamamlandı',
       color: 'bg-gray-100 text-gray-800 border-gray-200',
       description: 'Gönderi başarıyla tamamlandı',
     },
+
+    // Backward-compatible aliases
+    preparing: {
+      text: 'Hazırlanıyor',
+      color: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+      description: 'Yükleme hazırlığı devam ediyor',
+    },
   };
 
-  return statusMap[status] || {
+  const key = normalizeStatusKey(status);
+  return statusMap[key] || {
     text: 'Bilinmiyor',
     color: 'bg-gray-100 text-gray-800 border-gray-200',
     description: 'Durum bilgisi mevcut değil',
@@ -98,24 +102,6 @@ export const getStatusDescription = (status: string): string => {
   return getStatusInfo(status).description;
 };
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+export const getStatusText = (status: ShipmentStatus | string): string => {
+  return getStatusInfo(status).text;
+};

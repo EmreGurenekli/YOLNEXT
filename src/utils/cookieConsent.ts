@@ -62,12 +62,3 @@ export function hasAnalyticsConsent(): boolean {
   const c = getCookieConsent();
   return Boolean(c?.analytics);
 }
-
-
-
-
-
-
-
-
-

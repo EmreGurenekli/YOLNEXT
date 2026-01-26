@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { Star, MessageCircle, Shield, CheckCircle, AlertTriangle } from 'lucide-react';
 import UserTrustRating from './UserTrustRating';
 

@@ -19,6 +19,7 @@ import {
 import LoadingState from '../../components/shared-ui-elements/LoadingState';
 import GuidanceOverlay from '../../components/shared-ui-elements/GuidanceOverlay';
 import SimpleOnboarding from '../../components/onboarding/SimpleOnboarding';
+import QuickStartChecklist from '../../components/onboarding/QuickStartChecklist';
 import { formatCurrency, formatDate, sanitizeShipmentTitle } from '../../utils/format';
 import { createApiUrl } from '../../config/api';
 import { resolveShipmentRoute } from '../../utils/shipmentRoute';
@@ -111,11 +112,25 @@ const Dashboard = () => {
   const [showOnboarding, setShowOnboarding] = useState(false);
 
   useEffect(() => {
-    // İlk giriş kontrolü - onboarding göster
-    const hasSeenOnboarding = localStorage.getItem('onboardingCompleted');
-    if (!hasSeenOnboarding && user?.id) {
-      setShowOnboarding(true);
+    // Onboarding sadece ilk kayıt sonrası 1 kez açılsın (kayıt sırasında "pending" bayrağı set edilir)
+    if (!user?.id) return;
+    const role = String((user as any)?.role || 'individual').toLowerCase();
+    const perUserKey = `onboardingCompleted:${user.id}:${role}`;
+    const perUserSeen = localStorage.getItem(perUserKey) === 'true';
+    const pendingKey = `onboardingPending:${user.id}:${role}`;
+    const isPending = localStorage.getItem(pendingKey) === 'true';
+
+    if (perUserSeen) {
+      // Stale pending cleanup
+      try {
+        localStorage.removeItem(pendingKey);
+      } catch {
+        // ignore
+      }
+      return;
     }
+
+    if (isPending) setShowOnboarding(true);
   }, [user?.id]);
 
   useEffect(() => {
@@ -384,6 +399,7 @@ const Dashboard = () => {
             icon={Package}
             title='Nasıl Başlayalım?'
             description='🚀 1) Gönderi oluştur 2) Dakikalar içinde teklifler gelecek 3) En uygununu seç - bu kadar basit!'
+            isEmpty={stats.totalShipments === 0}
             primaryAction={{
               label: 'Gönderi Oluştur',
               to: '/individual/create-shipment',
@@ -394,6 +410,39 @@ const Dashboard = () => {
             }}
           />
         </div>
+
+        {stats.totalShipments === 0 && user?.id && (
+          <div className='mb-6'>
+            <QuickStartChecklist
+              storageKey={`individual:${user.id}`}
+              title='Hızlı Başlangıç (3 adım)'
+              subtitle='İlk gönderini sorunsuz başlatmak için aşağıdaki adımları takip et.'
+              steps={[
+                {
+                  id: 'create',
+                  title: 'Gönderi Oluştur',
+                  description: 'Nereden → nereye, yük bilgileri ve tarih aralığı',
+                  to: '/individual/create-shipment',
+                  done: stats.totalShipments > 0,
+                },
+                {
+                  id: 'offers',
+                  title: 'Teklifleri İncele',
+                  description: 'Fiyat + ETA + güven sinyallerine göre karar ver',
+                  to: '/individual/offers',
+                  done: stats.totalShipments > 0 && stats.pendingShipments === 0,
+                },
+                {
+                  id: 'track',
+                  title: 'Takip & İletişim',
+                  description: 'Canlı takipten süreci izle, mesajlardan netleştir',
+                  to: '/individual/live-tracking',
+                  done: stats.activeShipments > 0 || stats.deliveredShipments > 0,
+                },
+              ]}
+            />
+          </div>
+        )}
 
         {/* Stats Grid - ANA RENK: from-slate-800 to-blue-900 */}
         <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6'>

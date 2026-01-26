@@ -74,6 +74,10 @@ async function strictQueryFallback(pool, primarySql, fallbackSql, params = []) {
 function createAdminRoutes(pool, authenticateToken, requireAdmin, writeAuditLog) {
   const router = express.Router();
 
+  // IMPORTANT: This router relies on req.user for role/permission checks.
+  // Ensure JWT is parsed for all /api/admin/* endpoints.
+  router.use(authenticateToken);
+
   // Admin caching middleware for performance optimization
   const adminCache = new Map();
   const CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache for admin data
@@ -929,18 +933,113 @@ function createAdminRoutes(pool, authenticateToken, requireAdmin, writeAuditLog)
 
   router.get('/inbox', async (_req, res) => {
     try {
-      const flagsRes = await safeQueryFallback(
+      const flagsCountRes = await safeQueryFallback(
         pool,
         "SELECT COUNT(*)::int as count FROM admin_flags WHERE status = 'open'",
         "SELECT COUNT(*)::int as count FROM adminFlags WHERE status = 'open'"
       );
-      const flagCount = safeNumber(flagsRes.rows[0]?.count);
+      const flagOpen = safeNumber(flagsCountRes.rows?.[0]?.count);
 
-      const items = flagCount > 0 ? 
-        [{ id: 'flags', type: 'flag', title: `${flagCount} açık flag`, summary: 'İnceleme gerekiyor' }] :
-        [{ id: 'inbox-empty', type: 'info', title: 'Açık iş yok', summary: 'Şu an pending şikayet/flag yok.' }];
+      const complaintsCountRes = await safeQueryFallback(
+        pool,
+        "SELECT COUNT(*)::int as count FROM complaints WHERE status IN ('pending','reviewing')",
+        "SELECT COUNT(*)::int as count FROM complaints WHERE status IN ('pending','reviewing')"
+      );
+      const complaintOpen = safeNumber(complaintsCountRes.rows?.[0]?.count);
 
-      return res.json({ success: true, data: { items } });
+      const disputesCountRes = await safeQuery(pool, "SELECT COUNT(*)::int as count FROM disputes WHERE status IN ('pending','investigating','escalated')").catch(() => ({ rows: [] }));
+      const disputeOpen = safeNumber(disputesCountRes.rows?.[0]?.count);
+
+      const counts = {
+        flagOpen,
+        complaintOpen,
+        disputeOpen,
+        totalOpen: flagOpen + complaintOpen + disputeOpen,
+      };
+
+      // Recent items (for actionable triage list)
+      const items = [];
+
+      // Flags (best-effort, schema variants exist)
+      try {
+        const flagsRows = await safeQueryFallback(
+          pool,
+          "SELECT id, type, target_type, target_id, reason, created_at FROM admin_flags WHERE status = 'open' ORDER BY created_at DESC LIMIT 10",
+          "SELECT id, type, targetType as target_type, targetId as target_id, reason, createdAt as created_at FROM adminFlags WHERE status = 'open' ORDER BY createdAt DESC LIMIT 10"
+        );
+        (flagsRows.rows || []).forEach((r) => {
+          items.push({
+            id: `flag-${r.id}`,
+            type: 'flag',
+            title: String(r.type || 'flag'),
+            summary: String(r.reason || 'İnceleme gerekiyor'),
+            userId: r.target_type === 'user' ? r.target_id : null,
+            createdAt: r.created_at || null,
+          });
+        });
+      } catch (_) {
+        // ignore
+      }
+
+      // Complaints
+      try {
+        const complaintsRows = await safeQueryFallback(
+          pool,
+          "SELECT id, title, status, user_id, related_user_id, shipment_id, created_at, updated_at FROM complaints WHERE status IN ('pending','reviewing') ORDER BY COALESCE(updated_at, created_at) DESC LIMIT 10",
+          "SELECT id, title, status, \"userId\" as user_id, \"relatedUserId\" as related_user_id, shipment_id, \"createdAt\" as created_at, \"updatedAt\" as updated_at FROM complaints WHERE status IN ('pending','reviewing') ORDER BY COALESCE(\"updatedAt\", \"createdAt\") DESC LIMIT 10"
+        );
+        (complaintsRows.rows || []).forEach((r) => {
+          items.push({
+            id: `complaint-${r.id}`,
+            type: 'complaint',
+            title: String(r.title || 'Şikayet'),
+            summary: String(r.status || 'pending'),
+            userId: r.user_id || null,
+            relatedUserId: r.related_user_id || null,
+            shipmentId: r.shipment_id || null,
+            createdAt: r.updated_at || r.created_at || null,
+          });
+        });
+      } catch (_) {
+        // ignore
+      }
+
+      // Disputes (admin-only)
+      try {
+        const disputesRows = await safeQuery(
+          pool,
+          "SELECT id, dispute_ref, title, priority, status, complainant_id, respondent_id, created_at FROM disputes WHERE status IN ('pending','investigating','escalated') ORDER BY created_at DESC LIMIT 10"
+        ).catch(() => ({ rows: [] }));
+        (disputesRows.rows || []).forEach((r) => {
+          const ref = r.dispute_ref || r.id;
+          items.push({
+            id: `dispute-${r.id}`,
+            type: 'dispute',
+            title: String(r.title || `Dispute ${ref}`),
+            summary: String(r.priority || r.status || 'pending'),
+            userId: r.respondent_id || null,
+            relatedUserId: r.complainant_id || null,
+            disputeRef: r.dispute_ref || null,
+            createdAt: r.created_at || null,
+          });
+        });
+      } catch (_) {
+        // ignore
+      }
+
+      if (items.length === 0) {
+        items.push({ id: 'inbox-empty', type: 'info', title: 'Açık iş yok', summary: 'Şu an açık şikayet/flag/anlaşmazlık yok.' });
+      }
+
+      // Sort by createdAt desc (best-effort)
+      const ts = (x) => {
+        const v = x?.createdAt;
+        const d = v ? new Date(v) : null;
+        return d && !Number.isNaN(d.valueOf()) ? d.valueOf() : 0;
+      };
+      items.sort((a, b) => ts(b) - ts(a));
+
+      return res.json({ success: true, data: { items, counts } });
     } catch (error) {
       return res.status(500).json({ success: false, message: 'Inbox load failed', error: error.message });
     }

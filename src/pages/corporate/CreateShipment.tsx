@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import {
@@ -40,9 +40,11 @@ import {
 } from 'lucide-react';
 import Breadcrumb from '../../components/shared-ui-elements/Breadcrumb';
 import SuccessMessage from '../../components/shared-ui-elements/SuccessMessage';
+import GuidanceOverlay from '../../components/shared-ui-elements/GuidanceOverlay';
 import { turkeyCities } from '../../data/turkey-cities-districts';
 import CorporateCreateShipmentStep2 from '../../components/shipment/CorporateCreateShipmentStep2';
 import CorporateCreateShipmentStep3 from '../../components/shipment/CorporateCreateShipmentStep3';
+import { analytics } from '../../services/businessAnalytics';
 
 // Shipment data interface
 interface ShipmentData {
@@ -264,10 +266,11 @@ export default function CreateShipment() {
     temperatureMax: '',
   });
 
+  // NOTE: This top stepper should match the individual create-shipment header.
   const steps = [
-    { id: 1, title: 'Yük Bilgileri', icon: <Package size={20} /> },
-    { id: 2, title: 'Adres Bilgileri', icon: <MapPin size={20} /> },
-    { id: 3, title: 'Yayınla & Önizleme', icon: <Send size={20} /> },
+    { id: 1, title: 'Form Doldurma', subtitle: 'Yük Bilgileri', icon: <Package size={20} /> },
+    { id: 2, title: 'Adres ve Tarih', subtitle: 'Adres Bilgileri', icon: <MapPin size={20} /> },
+    { id: 3, title: 'Ön İzleme ve Yayınlama', subtitle: 'Yayınla & Önizleme', icon: <Send size={20} /> },
   ];
 
   // Kapsamlı Kurumsal Kategoriler
@@ -827,6 +830,13 @@ export default function CreateShipment() {
       }
 
       if (response.data?.success || response.success) {
+        const createdShipment = (response as any)?.data?.shipment || (response as any)?.data || null;
+        analytics.track('shipment_create_success', {
+          shipmentId: createdShipment?.id || null,
+          category: formData.mainCategory || null,
+          publishType: formData.publishType || null,
+        });
+
         setSuccessMessage(
           'Gönderiniz başarıyla yayınlandı! Nakliyecilerden teklifler almaya başlayacaksınız.'
         );
@@ -2050,6 +2060,17 @@ export default function CreateShipment() {
           <Breadcrumb items={breadcrumbItems} />
         </div>
 
+        <div className='mb-6'>
+          <GuidanceOverlay
+            storageKey='corporate.create-shipment'
+            icon={Package}
+            title='Kurumsal Gönderi Oluşturma İpucu'
+            description='Kategoriye uygun alanları doğru doldurmak (ölçü, zaman penceresi, hassasiyet) daha hızlı teklif ve daha az iptal demektir. Gereksiz detay yerine net bilgi ver.'
+            primaryAction={{ label: 'Yardım Merkezi', to: '/corporate/help' }}
+            secondaryAction={{ label: 'Teklifler', to: '/corporate/offers' }}
+          />
+        </div>
+
         <div className='text-center mb-8 sm:mb-12'>
           <div className='flex justify-center mb-4 sm:mb-6'>
             <div className='w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-br from-slate-800 to-blue-900 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-lg'>
@@ -2068,49 +2089,131 @@ export default function CreateShipment() {
           </p>
         </div>
 
-        <div className='bg-white rounded-xl shadow-lg border border-slate-200 p-4 sm:p-6 mb-6 sm:mb-8'>
-          <div className='flex flex-col lg:flex-row lg:items-center lg:justify-between mb-6'>
-            <div className='mb-4 lg:mb-0'>
-              <h2 className='text-lg sm:text-xl font-bold text-slate-900 mb-1'>
-                Adım {currentStep} / {steps.length}
-              </h2>
-              <p className='text-sm sm:text-base text-slate-600'>
-                {steps[currentStep - 1].title}
-              </p>
+        {/* Step Indicator (same as individual) */}
+        <div className='mb-8'>
+          <div className='bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6'>
+            {/* Desktop View */}
+            <div className='hidden md:flex items-center justify-between'>
+              {steps.map((step, index) => (
+                <React.Fragment key={step.id}>
+                  <div className='flex flex-col items-center flex-1'>
+                    <div
+                      className={`relative flex items-center justify-center w-12 h-12 rounded-full mb-3 transition-all duration-300 ${
+                        currentStep === step.id
+                          ? 'bg-gradient-to-br from-slate-800 via-blue-900 to-indigo-900 text-white shadow-lg scale-110'
+                          : currentStep > step.id
+                            ? 'bg-gradient-to-br from-slate-700 to-blue-800 text-white'
+                            : 'bg-gray-200 text-gray-500'
+                      }`}
+                    >
+                      {currentStep > step.id ? (
+                        <Check size={20} className='text-white' />
+                      ) : (
+                        step.icon
+                      )}
+                    </div>
+                    <div className='text-center'>
+                      <div
+                        className={`text-sm font-semibold mb-1 ${
+                          currentStep === step.id
+                            ? 'text-slate-800'
+                            : currentStep > step.id
+                              ? 'text-gray-700'
+                              : 'text-gray-400'
+                        }`}
+                      >
+                        {step.title}
+                      </div>
+                      <div
+                        className={`text-xs ${
+                          currentStep === step.id
+                            ? 'text-blue-600'
+                            : currentStep > step.id
+                              ? 'text-gray-600'
+                              : 'text-gray-400'
+                        }`}
+                      >
+                        {(step as any).subtitle || ''}
+                      </div>
+                    </div>
+                  </div>
+                  {index < steps.length - 1 && (
+                    <div
+                      className={`flex-1 h-0.5 mx-4 mt-[-24px] transition-all duration-300 ${
+                        currentStep > step.id
+                          ? 'bg-gradient-to-r from-slate-800 to-blue-900'
+                          : 'bg-gray-200'
+                      }`}
+                    />
+                  )}
+                </React.Fragment>
+              ))}
             </div>
-            <div className='w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-br from-slate-800 to-blue-900 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-lg'>
-              {steps[currentStep - 1].icon}
-            </div>
-          </div>
 
-          <div className='flex flex-wrap gap-2 sm:gap-4'>
-            {steps.map((step) => (
-              <div
-                key={step.id}
-                className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-sm sm:text-base font-medium transition-all duration-300 ${
-                  currentStep >= step.id
-                    ? 'bg-blue-100 text-blue-900'
-                    : 'bg-slate-100 text-slate-600'
-                }`}
-              >
+            {/* Mobile View */}
+            <div className='md:hidden'>
+              <div className='flex items-center justify-between mb-4'>
+                {steps.map((step, index) => (
+                  <React.Fragment key={step.id}>
+                    <div className='flex flex-col items-center flex-1'>
+                      <div
+                        className={`relative flex items-center justify-center w-10 h-10 rounded-full mb-2 transition-all duration-300 ${
+                          currentStep === step.id
+                            ? 'bg-gradient-to-br from-slate-800 via-blue-900 to-indigo-900 text-white shadow-lg scale-110'
+                            : currentStep > step.id
+                              ? 'bg-gradient-to-br from-slate-700 to-blue-800 text-white'
+                              : 'bg-gray-200 text-gray-500'
+                        }`}
+                      >
+                        {currentStep > step.id ? (
+                          <Check size={18} className='text-white' />
+                        ) : (
+                          <div className='scale-75'>{step.icon}</div>
+                        )}
+                      </div>
+                      <div className='text-center'>
+                        <div
+                          className={`text-xs font-semibold ${
+                            currentStep === step.id
+                              ? 'text-slate-800'
+                              : currentStep > step.id
+                                ? 'text-gray-700'
+                                : 'text-gray-400'
+                          }`}
+                        >
+                          {index + 1}. Adım
+                        </div>
+                      </div>
+                    </div>
+                    {index < steps.length - 1 && (
+                      <div
+                        className={`flex-1 h-0.5 mx-2 mt-[-20px] transition-all duration-300 ${
+                          currentStep > step.id
+                            ? 'bg-gradient-to-r from-slate-800 to-blue-900'
+                            : 'bg-gray-200'
+                        }`}
+                      />
+                    )}
+                  </React.Fragment>
+                ))}
+              </div>
+              <div className='text-center mt-2'>
                 <div
-                  className={`w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center ${
-                    currentStep >= step.id
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-slate-300 text-slate-600'
+                  className={`text-sm font-semibold ${
+                    currentStep === steps[0].id
+                      ? 'text-slate-800'
+                      : currentStep === steps[1].id
+                        ? 'text-blue-700'
+                        : 'text-indigo-700'
                   }`}
                 >
-                  {currentStep > step.id ? (
-                    <Check className='w-3 h-3 sm:w-4 sm:h-4' />
-                  ) : (
-                    <span className='text-xs sm:text-sm font-bold'>
-                      {step.id}
-                    </span>
-                  )}
+                  {steps[currentStep - 1].title}
                 </div>
-                <span className='hidden sm:block'>{step.title}</span>
+                <div className='text-xs text-gray-600 mt-1'>
+                  {(steps[currentStep - 1] as any).subtitle || ''}
+                </div>
               </div>
-            ))}
+            </div>
           </div>
         </div>
 

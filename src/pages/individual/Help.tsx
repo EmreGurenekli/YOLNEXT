@@ -1,5 +1,5 @@
-﻿import React, { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useToast } from '../../contexts/ToastContext';
 import { 
@@ -32,6 +32,7 @@ interface SupportCategory {
 
 const IndividualHelp: React.FC = () => {
   const { showToast } = useToast();
+  const [searchParams] = useSearchParams();
   const [openFAQ, setOpenFAQ] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [isSupportOpen, setIsSupportOpen] = useState(false);
@@ -303,11 +304,47 @@ const IndividualHelp: React.FC = () => {
     loadTickets();
   }, []);
 
+  // Deep-link into support form (e.g. from contextual CTA)
+  useEffect(() => {
+    const open = String(searchParams.get('openSupport') || '').toLowerCase();
+    const shouldOpen = open === '1' || open === 'true' || open === 'yes';
+    const category = searchParams.get('category');
+    const priority = searchParams.get('priority');
+    const subject = searchParams.get('subject');
+    const description = searchParams.get('description');
+    const relatedShipmentId = searchParams.get('relatedShipmentId') || searchParams.get('shipmentId');
+
+    if (category || priority || subject || description || relatedShipmentId) {
+      setFormData((prev) => ({
+        ...prev,
+        category: category ?? prev.category,
+        priority: priority ?? prev.priority,
+        subject: subject ?? prev.subject,
+        description: description ?? prev.description,
+        relatedShipmentId: relatedShipmentId ?? prev.relatedShipmentId,
+      }));
+    }
+
+    if (shouldOpen) {
+      setIsSupportOpen(true);
+      window.setTimeout(() => {
+        document.getElementById('support-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        const el =
+          (document.getElementById('support-category') as HTMLSelectElement | HTMLInputElement | null) ||
+          (document.getElementById('support-category-text') as HTMLInputElement | null);
+        el?.focus?.();
+      }, 50);
+    }
+  }, [searchParams]);
+
   const openSupport = useCallback(() => {
     setIsSupportOpen(true);
     window.setTimeout(() => {
       document.getElementById('support-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      (document.getElementById('support-category') as HTMLSelectElement | null)?.focus();
+      const el =
+        (document.getElementById('support-category') as HTMLSelectElement | HTMLInputElement | null) ||
+        (document.getElementById('support-category-text') as HTMLInputElement | null);
+      el?.focus?.();
     }, 50);
   }, []);
 
@@ -583,18 +620,32 @@ const IndividualHelp: React.FC = () => {
               <form onSubmit={handleSubmit} className='space-y-4'>
                 <div>
                   <label className='block text-sm font-medium text-slate-900 mb-2'>Kategori *</label>
-                  <select
-                    id='support-category'
-                    value={formData.category}
-                    onChange={(e) => setFormData({...formData, category: e.target.value})}
-                    className='w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all bg-white text-slate-900'
-                    required
-                  >
-                    <option value="">Kategori seçin</option>
-                    {categories.map((cat) => (
-                      <option key={cat.id} value={cat.name}>{cat.name}</option>
-                    ))}
-                  </select>
+                  {categories.length > 0 ? (
+                    <select
+                      id='support-category'
+                      value={formData.category}
+                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                      className='w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all bg-white text-slate-900'
+                      required
+                    >
+                      <option value="">Kategori seçin</option>
+                      {categories.map((cat) => (
+                        <option key={cat.id} value={cat.name}>
+                          {cat.name}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      id='support-category-text'
+                      type='text'
+                      value={formData.category}
+                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                      className='w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all bg-white text-slate-900'
+                      placeholder='Örn: İptal, Hasar, Ödeme, Şikâyet'
+                      required
+                    />
+                  )}
                 </div>
 
                 <div>

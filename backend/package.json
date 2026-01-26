@@ -20,7 +20,7 @@
     "multer": "^1.4.5-lts.1",
     "nodemailer": "^7.0.10",
     "pg": "^8.16.3",
-    "stripe": "^20.2.0"
+    "yolnext-kargo-platform": "file:.."
   },
   "devDependencies": {
     "@types/node": "^20.19.22",

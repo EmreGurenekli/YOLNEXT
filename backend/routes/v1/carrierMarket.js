@@ -2,6 +2,10 @@
 // Permanent implementation: uses carrier_market_listings and carrier_market_bids tables.
 
 const express = require('express');
+const {
+  CARRIER_MARKET_LISTING_STATUS,
+  CARRIER_MARKET_BID_STATUS,
+} = require('../../utils/domain');
 
 function createCarrierMarketRoutes(pool, authenticateToken, createNotification) {
   const router = express.Router();
@@ -207,7 +211,7 @@ function createCarrierMarketRoutes(pool, authenticateToken, createNotification) 
       }
       if (listings.cols.statusCol) {
         insertCols.push(listings.qCol(listings.cols.statusCol));
-        params.push('open');
+        params.push(CARRIER_MARKET_LISTING_STATUS.OPEN);
         insertVals.push(`$${params.length}`);
       }
       if (listings.cols.updatedAtCol) insertCols.push(listings.qCol(listings.cols.updatedAtCol));
@@ -222,7 +226,7 @@ function createCarrierMarketRoutes(pool, authenticateToken, createNotification) 
         setParts.push(`${listings.qCol(listings.cols.minPriceCol)} = $${params.length}`);
       }
       if (listings.cols.statusCol) {
-        params.push('open');
+        params.push(CARRIER_MARKET_LISTING_STATUS.OPEN);
         setParts.push(`${listings.qCol(listings.cols.statusCol)} = $${params.length}`);
       }
       if (listings.cols.updatedAtCol) setParts.push(`${listings.qCol(listings.cols.updatedAtCol)} = ${nowExpr}`);
@@ -513,7 +517,7 @@ function createCarrierMarketRoutes(pool, authenticateToken, createNotification) 
       );
       const listing = listRes.rows && listRes.rows[0] ? listRes.rows[0] : null;
       if (!listing) return res.status(404).json({ success: false, message: 'İlan bulunamadı' });
-      if (listing.status && String(listing.status) !== 'open') {
+      if (listing.status && String(listing.status) !== CARRIER_MARKET_LISTING_STATUS.OPEN) {
         return res.status(409).json({ success: false, message: 'İlan kapalı' });
       }
       
@@ -533,7 +537,7 @@ function createCarrierMarketRoutes(pool, authenticateToken, createNotification) 
       }
       if (bids.cols.statusCol) {
         insertCols.push(bids.qCol(bids.cols.statusCol));
-        params.push('pending');
+        params.push(CARRIER_MARKET_BID_STATUS.PENDING);
         insertVals.push(`$${params.length}`);
       }
       if (bids.cols.createdAtCol) insertCols.push(bids.qCol(bids.cols.createdAtCol));
@@ -616,13 +620,13 @@ function createCarrierMarketRoutes(pool, authenticateToken, createNotification) 
           // Accept this bid
           if (bids.cols.statusCol) {
             await client.query(
-              `UPDATE "${bids.schema}".carrier_market_bids SET ${bids.qCol(bids.cols.statusCol)} = 'accepted'${bids.cols.updatedAtCol ? `, ${bids.qCol(bids.cols.updatedAtCol)} = CURRENT_TIMESTAMP` : ''}
+              `UPDATE "${bids.schema}".carrier_market_bids SET ${bids.qCol(bids.cols.statusCol)} = '${CARRIER_MARKET_BID_STATUS.ACCEPTED}'${bids.cols.updatedAtCol ? `, ${bids.qCol(bids.cols.updatedAtCol)} = CURRENT_TIMESTAMP` : ''}
                WHERE ${bids.qCol(bids.cols.idCol || 'id')} = $1`,
               [bidId]
             );
             // Reject others
             await client.query(
-              `UPDATE "${bids.schema}".carrier_market_bids SET ${bids.qCol(bids.cols.statusCol)} = 'rejected'${bids.cols.updatedAtCol ? `, ${bids.qCol(bids.cols.updatedAtCol)} = CURRENT_TIMESTAMP` : ''}
+              `UPDATE "${bids.schema}".carrier_market_bids SET ${bids.qCol(bids.cols.statusCol)} = '${CARRIER_MARKET_BID_STATUS.REJECTED}'${bids.cols.updatedAtCol ? `, ${bids.qCol(bids.cols.updatedAtCol)} = CURRENT_TIMESTAMP` : ''}
                WHERE ${bids.qCol(bids.cols.listingIdCol)} = $1 AND ${bids.qCol(bids.cols.idCol || 'id')} <> $2`,
               [bidRow.listing_id, bidId]
             );
@@ -631,7 +635,7 @@ function createCarrierMarketRoutes(pool, authenticateToken, createNotification) 
           // Close listing
           if (listings.cols.statusCol) {
             await client.query(
-              `UPDATE "${listings.schema}".carrier_market_listings SET ${listings.qCol(listings.cols.statusCol)} = 'closed'${listings.cols.updatedAtCol ? `, ${listings.qCol(listings.cols.updatedAtCol)} = CURRENT_TIMESTAMP` : ''}
+              `UPDATE "${listings.schema}".carrier_market_listings SET ${listings.qCol(listings.cols.statusCol)} = '${CARRIER_MARKET_LISTING_STATUS.CLOSED}'${listings.cols.updatedAtCol ? `, ${listings.qCol(listings.cols.updatedAtCol)} = CURRENT_TIMESTAMP` : ''}
                WHERE ${listings.qCol(listings.cols.idCol || 'id')} = $1`,
               [bidRow.listing_id]
             );

@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useAuth } from '../../contexts/AuthContext';
@@ -41,6 +41,7 @@ import EmptyState from '../../components/shared-ui-elements/EmptyState';
 import LoadingState from '../../components/shared-ui-elements/LoadingState';
 import Modal from '../../components/shared-ui-elements/Modal';
 import SimpleOnboarding from '../../components/onboarding/SimpleOnboarding';
+import QuickStartChecklist from '../../components/onboarding/QuickStartChecklist';
 import SuccessMessage from '../../components/shared-ui-elements/SuccessMessage';
 import GuidanceOverlay from '../../components/shared-ui-elements/GuidanceOverlay';
 import CommissionManager from '../../components/PlatformEarningsManager';
@@ -48,6 +49,7 @@ import StatusManager from '../../components/ShipmentStatusManager';
 import { resolveShipmentRoute } from '../../utils/shipmentRoute';
 import NotificationCenter from '../../components/NotificationCenter';
 import { logger } from '../../utils/logger';
+import { getStatusText as getShipmentStatusText } from '../../utils/shipmentStatus';
 
 interface Shipment {
   id: string;
@@ -201,11 +203,25 @@ const Dashboard = () => {
   };
 
   useEffect(() => {
-    // İlk giriş kontrolü - onboarding göster
-    const hasSeenOnboarding = localStorage.getItem('onboardingCompleted');
-    if (!hasSeenOnboarding && user?.id) {
-      setShowOnboarding(true);
+    // Onboarding sadece ilk kayıt sonrası 1 kez açılsın (kayıt sırasında "pending" bayrağı set edilir)
+    if (!user?.id) return;
+    const role = String((user as any)?.role || 'corporate').toLowerCase();
+    const perUserKey = `onboardingCompleted:${user.id}:${role}`;
+    const perUserSeen = localStorage.getItem(perUserKey) === 'true';
+    const pendingKey = `onboardingPending:${user.id}:${role}`;
+    const isPending = localStorage.getItem(pendingKey) === 'true';
+
+    if (perUserSeen) {
+      // Stale pending cleanup
+      try {
+        localStorage.removeItem(pendingKey);
+      } catch {
+        // ignore
+      }
+      return;
     }
+
+    if (isPending) setShowOnboarding(true);
   }, [user?.id]);
 
   useEffect(() => {
@@ -398,18 +414,8 @@ const Dashboard = () => {
   };
 
   const getStatusText = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return 'Bekliyor';
-      case 'in_transit':
-        return 'Yolda';
-      case 'delivered':
-        return 'Teslim Edildi';
-      case 'cancelled':
-        return 'İptal';
-      default:
-        return 'Bilinmiyor';
-    }
+    const base = getShipmentStatusText(status);
+    return base !== 'Bilinmiyor' ? base : 'Bilinmiyor';
   };
 
   const getStatusIcon = (status: string) => {
@@ -546,6 +552,7 @@ const Dashboard = () => {
             icon={Package}
             title='Kurumsal Panel'
             description='Gönderi oluştur, teklifleri topla ve operasyonu takip et. Düzenli çalıştığın nakliyecileri “Nakliyeciler” bölümünden yönetebilirsin.'
+            isEmpty={stats.totalShipments === 0}
             primaryAction={{
               label: 'Gönderi Oluştur',
               to: '/corporate/create-shipment',
@@ -556,6 +563,39 @@ const Dashboard = () => {
             }}
           />
         </div>
+
+        {stats.totalShipments === 0 && user?.id && (
+          <div className='mb-6'>
+            <QuickStartChecklist
+              storageKey={`corporate:${user.id}`}
+              title='Kurumsal Hızlı Başlangıç (3 adım)'
+              subtitle='İlk kurumsal gönderini sorunsuz başlatmak için hızlı akış.'
+              steps={[
+                {
+                  id: 'create',
+                  title: 'Gönderi Oluştur',
+                  description: 'Kategori + adres + tarih + bütçe bilgilerini gir',
+                  to: '/corporate/create-shipment',
+                  done: stats.totalShipments > 0,
+                },
+                {
+                  id: 'carriers',
+                  title: 'Nakliyeciler',
+                  description: 'Sık çalıştığın nakliyecileri yönet ve performansı izle',
+                  to: '/corporate/carriers',
+                  done: stats.activeCarriers > 0,
+                },
+                {
+                  id: 'offers',
+                  title: 'Teklifleri İncele',
+                  description: 'Gelen teklifleri karşılaştır ve en uygunu seç',
+                  to: '/corporate/offers',
+                  done: stats.totalShipments > 0 && stats.pendingShipments === 0,
+                },
+              ]}
+            />
+          </div>
+        )}
 
         {/* Stats Grid - Ana Tasarım */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">

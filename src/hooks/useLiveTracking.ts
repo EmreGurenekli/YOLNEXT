@@ -1,40 +1,8 @@
-/**
- * @fileoverview useLiveTracking Hook - Real-time shipment tracking system
- * 
- * PURPOSE: Provides real-time tracking functionality for shipments using
- * tracking codes. Supports both authenticated and anonymous tracking.
- * 
- * BUSINESS VALUE:
- * - Customers can track their shipments anytime
- * - Real-time updates via polling for active shipments  
- * - Public tracking (no login required)
- * - Mobile-friendly tracking interface
- * 
- * KEY FEATURES:
- * - Track shipments by tracking code (e.g., YN123456)
- * - Real-time polling for active shipments
- * - Automatic URL state management
- * - Works for both logged-in and anonymous users
- * - Auto-stop polling when shipment is delivered
- * - Error handling for invalid tracking codes
- * 
- * TECHNICAL IMPLEMENTATION:
- * - Uses URLSearchParams for deep linking
- * - Implements smart polling (only for active shipments)
- * - Manages visibility change detection for performance
- * - Handles both authenticated and public API calls
- * 
- * API ENDPOINTS:
- * - GET /api/shipments/track/:trackingCode (main endpoint)
- * 
- * @author YolNext Development Team
- * @version 1.0.0
- */
-
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { createApiUrl } from '../config/api';
 import { normalizeTrackingCode } from '../utils/trackingCode';
+import { getStatusText as getShipmentStatusText } from '../utils/shipmentStatus';
 
 interface TrackingEvent {
   id: string;
@@ -132,14 +100,12 @@ export const useLiveTracking = () => {
       setError(null);
       lastFetchTime.current = Date.now();
       
-      // Update URL params
       if (!searchParams.get('tracking')) {
         setSearchParams({ tracking: normalizedCode });
       }
       
       showNotification('success', 'Gönderi başarıyla bulundu');
       
-      // Start polling for updates if shipment is active
       if (shipmentData.status === 'in_transit' || shipmentData.status === 'picked_up' || shipmentData.status === 'in_progress') {
         startPolling();
       }
@@ -156,7 +122,7 @@ export const useLiveTracking = () => {
   };
 
   const startPolling = () => {
-    if (pollingRef.current) return; // Already polling
+    if (pollingRef.current) return;
     
     setIsPolling(true);
     pollingRef.current = setInterval(async () => {
@@ -180,7 +146,6 @@ export const useLiveTracking = () => {
           const data = await response.json();
           const updatedShipment = data.shipment || data;
           
-          // Check if there are new events
           if (updatedShipment.events && updatedShipment.events.length > (shipment.events?.length || 0)) {
             showNotification('info', 'Gönderi durumu güncellendi');
           }
@@ -188,16 +153,14 @@ export const useLiveTracking = () => {
           setShipment(updatedShipment);
           lastFetchTime.current = Date.now();
           
-          // Stop polling if shipment is completed
           if (updatedShipment.status === 'completed' || updatedShipment.status === 'delivered') {
             stopPolling();
           }
         }
       } catch (error) {
         console.error('Polling error:', error);
-        // Don't show error notification for polling failures
       }
-    }, 30000); // Poll every 30 seconds
+    }, 30000);
   };
 
   const stopPolling = () => {
@@ -222,11 +185,16 @@ export const useLiveTracking = () => {
   };
 
   const getStatusInfo = (status: string) => {
+    const labelOrRaw = (s: string) => {
+      const v = String(s || '');
+      const mapped = getShipmentStatusText(v);
+      return mapped === 'Bilinmiyor' ? v : mapped;
+    };
     switch (status) {
       case 'pending':
       case 'waiting_for_offers':
         return {
-          label: 'Teklif Bekleniyor',
+          label: labelOrRaw(status === 'pending' ? 'waiting_for_offers' : status),
           color: 'text-yellow-600',
           bgColor: 'bg-yellow-50',
           borderColor: 'border-yellow-200',
@@ -235,7 +203,7 @@ export const useLiveTracking = () => {
       case 'offer_accepted':
       case 'accepted':
         return {
-          label: 'Hazırlanıyor',
+          label: status === 'preparing' ? 'Hazırlanıyor' : labelOrRaw(status),
           color: 'text-blue-600',
           bgColor: 'bg-blue-50',
           borderColor: 'border-blue-200',
@@ -244,14 +212,14 @@ export const useLiveTracking = () => {
       case 'assigned':
       case 'picked_up':
         return {
-          label: 'Alındı',
+          label: labelOrRaw(status),
           color: 'text-indigo-600',
           bgColor: 'bg-indigo-50',
           borderColor: 'border-indigo-200',
         };
       case 'in_transit':
         return {
-          label: 'Yolda',
+          label: labelOrRaw(status),
           color: 'text-purple-600',
           bgColor: 'bg-purple-50',
           borderColor: 'border-purple-200',
@@ -259,14 +227,14 @@ export const useLiveTracking = () => {
       case 'delivered':
       case 'completed':
         return {
-          label: 'Teslim Edildi',
+          label: labelOrRaw(status),
           color: 'text-green-600',
           bgColor: 'bg-green-50',
           borderColor: 'border-green-200',
         };
       default:
         return {
-          label: status,
+          label: labelOrRaw(status),
           color: 'text-gray-600',
           bgColor: 'bg-gray-50',
           borderColor: 'border-gray-200',
@@ -274,7 +242,6 @@ export const useLiveTracking = () => {
     }
   };
 
-  // Auto-track on mount if tracking number in URL
   useEffect(() => {
     const urlTrackingNumber = searchParams.get('tracking');
     if (urlTrackingNumber && !shipment) {
@@ -283,14 +250,12 @@ export const useLiveTracking = () => {
     }
   }, []);
 
-  // Cleanup polling on unmount
   useEffect(() => {
     return () => {
       stopPolling();
     };
   }, []);
 
-  // Handle visibility change for polling
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.hidden) {
@@ -307,32 +272,19 @@ export const useLiveTracking = () => {
   }, [shipment]);
 
   return {
-    // State
     trackingNumber,
     shipment,
     loading,
     error,
     notification,
     isPolling,
-    
-    // Actions
     trackShipment,
     refreshTracking,
     handleTrackingNumberChange,
     showNotification,
-    
-    // Utils
     getStatusInfo,
     lastFetchTime: lastFetchTime.current,
   };
 };
 
 export type { Shipment, TrackingEvent, Notification };
-
-
-
-
-
-
-
-

@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Package,
   Clock,
@@ -12,6 +12,7 @@ import {
   MessageSquare,
 } from 'lucide-react';
 import { createApiUrl } from '../config/api';
+import { getStatusText as getShipmentStatusText } from '../utils/shipmentStatus';
 
 /**
  * BUSINESS ENTITY: Shipment lifecycle status change record
@@ -38,53 +39,53 @@ interface StatusManagerProps {
 
 const statusConfig = {
   pending: {
-    label: 'Beklemede',
+    label: getShipmentStatusText('pending'),
     color: 'bg-gray-100 text-gray-800',
     icon: Clock,
   },
   waiting_for_offers: {
-    label: 'Teklif Bekliyor',
+    label: getShipmentStatusText('waiting_for_offers'),
     color: 'bg-yellow-100 text-yellow-800',
     icon: Clock,
   },
   offer_accepted: {
-    label: 'Teklif Kabul Edildi',
+    label: getShipmentStatusText('offer_accepted'),
     color: 'bg-blue-100 text-blue-800',
     icon: CheckCircle,
   },
   in_progress: {
-    label: 'Hazırlanıyor',
+    label: getShipmentStatusText('in_progress'),
     color: 'bg-yellow-100 text-yellow-800',
     icon: Package,
   },
   in_transit: {
-    label: 'Yolda',
+    label: getShipmentStatusText('in_transit'),
     color: 'bg-blue-100 text-blue-800',
     icon: Truck,
   },
   delivered: {
-    label: 'Teslim Edildi',
+    label: getShipmentStatusText('delivered'),
     color: 'bg-green-100 text-green-800',
     icon: CheckCircle,
   },
   completed: {
-    label: 'Tamamlandı',
+    label: getShipmentStatusText('completed'),
     color: 'bg-emerald-100 text-emerald-800',
     icon: CheckCircle,
   },
   cancelled: {
-    label: 'İptal Edildi',
+    label: getShipmentStatusText('cancelled'),
     color: 'bg-red-100 text-red-800',
     icon: X,
   },
   // Backward-compatible aliases
   waiting: {
-    label: 'Beklemede',
+    label: getShipmentStatusText('waiting'),
     color: 'bg-gray-100 text-gray-800',
     icon: Clock,
   },
   preparing: {
-    label: 'Hazırlanıyor',
+    label: getShipmentStatusText('preparing'),
     color: 'bg-yellow-100 text-yellow-800',
     icon: Package,
   },

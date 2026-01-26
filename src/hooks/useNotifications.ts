@@ -43,10 +43,8 @@ export const useNotifications = (): UseNotificationsReturn => {
   useEffect(() => {
     fetchUnreadCount();
 
-    // Refresh every 30 seconds (REST API polling instead of WebSocket)
     const interval = setInterval(fetchUnreadCount, 30000);
 
-    // Listen for custom refresh events
     const handleRefresh = () => fetchUnreadCount();
     window.addEventListener('yolnext:refresh-notifications', handleRefresh);
 
@@ -62,12 +60,3 @@ export const useNotifications = (): UseNotificationsReturn => {
     isLoading,
   };
 };
-
-
-
-
-
-
-
-
-

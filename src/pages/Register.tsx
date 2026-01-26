@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -561,6 +561,16 @@ const Register = () => {
           userType: formData.userType,
           userId: result.user?.id,
         });
+
+        // Onboarding sadece ilk kayıt sonrası 1 kez açılsın (dashboard'da bu bayrak kontrol edilir)
+        try {
+          const userId = result.user?.id ? String(result.user.id) : '';
+          const role = String(formData.userType || 'individual').toLowerCase();
+          if (userId) localStorage.setItem(`onboardingPending:${userId}:${role}`, 'true');
+        } catch {
+          // ignore
+        }
+
         // If user is tasiyici and has driverCode, show modal
         if (formData.userType === 'tasiyici' && result.user.driverCode) {
           setDriverCode(result.user.driverCode);

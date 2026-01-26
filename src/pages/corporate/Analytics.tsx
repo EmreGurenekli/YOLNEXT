@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 import {
   BarChart3,
@@ -18,6 +18,7 @@ import Breadcrumb from '../../components/shared-ui-elements/Breadcrumb';
 import LoadingState from '../../components/shared-ui-elements/LoadingState';
 import { createApiUrl } from '../../config/api';
 import { logger } from '../../utils/logger';
+import { safeJsonParse } from '../../utils/safeFetch';
 
 export default function CorporateAnalytics() {
   const [selectedPeriod, setSelectedPeriod] = useState('30days');
@@ -32,19 +33,40 @@ export default function CorporateAnalytics() {
     setIsLoading(true);
     setError(null);
     try {
-      const period = selectedPeriod === '7days' ? '7' : selectedPeriod === '30days' ? '30' : selectedPeriod === '90days' ? '90' : '365';
-      const response = await fetch(createApiUrl(`/api/analytics/dashboard/corporate?period=${period}`), {
+      const token =
+        localStorage.getItem('authToken') || localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Oturum bulunamadı. Lütfen tekrar giriş yapın.');
+      }
+
+      const storedUserRaw = localStorage.getItem('user');
+      const storedUser = storedUserRaw ? JSON.parse(storedUserRaw) : null;
+      const role =
+        String(
+          storedUser?.role ||
+            storedUser?.panel_type ||
+            storedUser?.userType ||
+            storedUser?.user_type ||
+            'corporate'
+        ).toLowerCase() || 'corporate';
+
+      const url = createApiUrl(`/api/analytics/dashboard/${role}?period=${selectedPeriod}`);
+
+      const response = await fetch(url, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem('authToken')}`,
+          Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
       });
 
+      const raw = await safeJsonParse(response);
+
       if (!response.ok) {
-        throw new Error('Analitik veriler yüklenemedi');
+        const details = String(raw?.message || raw?.error || '').trim();
+        const suffix = details ? ` (${details})` : '';
+        throw new Error(`Analitik veriler yüklenemedi${suffix}`);
       }
 
-      const raw = await response.json();
       const serverData = raw?.data || raw || {};
 
       // Normalize backend verisini UI'nin beklediği forma çevir

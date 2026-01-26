@@ -1,5 +1,5 @@
-﻿import React from 'react';
-import { cn } from '../../lib/utils';
+import React from 'react';
+import { cn } from '@/lib/utils';
 
 interface BadgeProps extends React.HTMLAttributes<HTMLDivElement> {
   variant?: 'default' | 'secondary' | 'destructive' | 'outline' | 'success';
@@ -44,14 +44,3 @@ const Badge = React.forwardRef<HTMLDivElement, BadgeProps>(
 Badge.displayName = 'Badge';
 
 export default Badge;
-
-
-
-
-
-
-
-
-
-
-

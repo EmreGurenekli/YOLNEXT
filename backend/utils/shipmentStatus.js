@@ -1,38 +1,43 @@
 /**
  * Shipment Status Management
- * Defines valid status transitions and business rules
+ * Defines valid status transitions and business rules.
  */
 
-const VALID_STATUSES = [
-  'pending',
-  'open',
-  'waiting_for_offers',
-  'offer_accepted',
-  'accepted',
-  'assigned',
-  'in_progress',
-  'picked_up',
-  'in_transit',
-  'delivered',
-  'completed',
-  'cancelled',
-];
+const { SHIPMENT_STATUS } = require('./domain');
+
+const VALID_STATUSES = Object.values(SHIPMENT_STATUS);
 
 const STATUS_TRANSITIONS = {
-  'pending': ['offer_accepted', 'cancelled'],
-  'open': ['offer_accepted', 'cancelled'],
-  'waiting_for_offers': ['offer_accepted', 'cancelled'],
-  'offer_accepted': ['in_progress', 'picked_up', 'cancelled'],
-  'accepted': ['in_progress', 'picked_up', 'cancelled'],
-  // Legacy alias: some datasets may still have status='assigned'
-  // Treat it the same as 'in_progress'
-  'assigned': ['picked_up', 'in_transit', 'cancelled'],
-  'in_progress': ['picked_up', 'in_transit', 'cancelled'],
-  'picked_up': ['in_transit', 'cancelled'],
-  'in_transit': ['delivered', 'cancelled'],
-  'delivered': ['completed', 'cancelled'],
-  'completed': [], // Terminal state
-  'cancelled': [], // Terminal state
+  [SHIPMENT_STATUS.PENDING]: [SHIPMENT_STATUS.OFFER_ACCEPTED, SHIPMENT_STATUS.CANCELLED],
+  [SHIPMENT_STATUS.OPEN]: [SHIPMENT_STATUS.OFFER_ACCEPTED, SHIPMENT_STATUS.CANCELLED],
+  [SHIPMENT_STATUS.WAITING_FOR_OFFERS]: [SHIPMENT_STATUS.OFFER_ACCEPTED, SHIPMENT_STATUS.CANCELLED],
+
+  // Offer accepted; waiting for driver assignment (normal) OR direct progress updates (legacy/operational shortcuts)
+  [SHIPMENT_STATUS.OFFER_ACCEPTED]: [
+    SHIPMENT_STATUS.IN_PROGRESS,
+    SHIPMENT_STATUS.PICKED_UP,
+    SHIPMENT_STATUS.CANCELLED,
+  ],
+
+  // Legacy alias used by some datasets
+  [SHIPMENT_STATUS.ACCEPTED]: [
+    SHIPMENT_STATUS.IN_PROGRESS,
+    SHIPMENT_STATUS.PICKED_UP,
+    SHIPMENT_STATUS.CANCELLED,
+  ],
+
+  // Legacy alias: treat like IN_PROGRESS
+  [SHIPMENT_STATUS.ASSIGNED]: [SHIPMENT_STATUS.PICKED_UP, SHIPMENT_STATUS.IN_TRANSIT, SHIPMENT_STATUS.CANCELLED],
+  [SHIPMENT_STATUS.IN_PROGRESS]: [
+    SHIPMENT_STATUS.PICKED_UP,
+    SHIPMENT_STATUS.IN_TRANSIT,
+    SHIPMENT_STATUS.CANCELLED,
+  ],
+  [SHIPMENT_STATUS.PICKED_UP]: [SHIPMENT_STATUS.IN_TRANSIT, SHIPMENT_STATUS.CANCELLED],
+  [SHIPMENT_STATUS.IN_TRANSIT]: [SHIPMENT_STATUS.DELIVERED, SHIPMENT_STATUS.CANCELLED],
+  [SHIPMENT_STATUS.DELIVERED]: [SHIPMENT_STATUS.COMPLETED, SHIPMENT_STATUS.CANCELLED],
+  [SHIPMENT_STATUS.COMPLETED]: [], // Terminal state
+  [SHIPMENT_STATUS.CANCELLED]: [], // Terminal state
 };
 
 /**
@@ -78,22 +83,23 @@ function validateStatus(status) {
  */
 function getStatusWorkflow() {
   return {
-    pending: 'Oluşturuldu',
-    open: 'İlana açık',
-    waiting_for_offers: 'Teklifler bekleniyor',
-    offer_accepted: 'Teklif kabul edildi, taşıyıcı ataması bekleniyor',
-    accepted: 'Kabul edildi',
-    assigned: 'Taşıyıcı atandı, yükleme bekleniyor',
-    in_progress: 'Taşıyıcı atandı, yükleme bekleniyor',
-    picked_up: 'Yük alındı, yola çıkış bekleniyor',
-    in_transit: 'Yolda, teslimat bekleniyor',
-    delivered: 'Teslim edildi, onay bekleniyor',
-    completed: 'Tamamlandı',
-    cancelled: 'İptal edildi',
+    [SHIPMENT_STATUS.PENDING]: 'Oluşturuldu',
+    [SHIPMENT_STATUS.OPEN]: 'İlana açık',
+    [SHIPMENT_STATUS.WAITING_FOR_OFFERS]: 'Teklifler bekleniyor',
+    [SHIPMENT_STATUS.OFFER_ACCEPTED]: 'Teklif kabul edildi, taşıyıcı ataması bekleniyor',
+    [SHIPMENT_STATUS.ACCEPTED]: 'Kabul edildi',
+    [SHIPMENT_STATUS.ASSIGNED]: 'Taşıyıcı atandı, yükleme bekleniyor',
+    [SHIPMENT_STATUS.IN_PROGRESS]: 'Taşıyıcı atandı, yükleme bekleniyor',
+    [SHIPMENT_STATUS.PICKED_UP]: 'Yük alındı, yola çıkış bekleniyor',
+    [SHIPMENT_STATUS.IN_TRANSIT]: 'Yolda, teslimat bekleniyor',
+    [SHIPMENT_STATUS.DELIVERED]: 'Teslim edildi, onay bekleniyor',
+    [SHIPMENT_STATUS.COMPLETED]: 'Tamamlandı',
+    [SHIPMENT_STATUS.CANCELLED]: 'İptal edildi',
   };
 }
 
 module.exports = {
+  SHIPMENT_STATUS,
   VALID_STATUSES,
   STATUS_TRANSITIONS,
   isValidTransition,

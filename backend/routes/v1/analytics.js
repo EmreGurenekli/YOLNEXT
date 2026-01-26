@@ -94,7 +94,29 @@ function createAnalyticsRoutes(pool, authenticateToken) {
   router.post('/metrics', express.json({ limit: '200kb' }), async (req, res) => {
     try {
       // Best-effort: accept metrics payload; storing is optional.
-      // If you want persistence later, add an analytics_metrics table.
+      // Persist when DB is available (analytics_metrics table is created by init.js).
+      if (pool) {
+        try {
+          const ts = typeof req.body?.ts === 'number' ? req.body.ts : Date.now();
+          const path = typeof req.body?.path === 'string' ? req.body.path : '';
+          const href = typeof req.body?.href === 'string' ? req.body.href : '';
+          const ua = typeof req.body?.ua === 'string' ? req.body.ua : (req.get('User-Agent') || '');
+          const ip = req.ip || '';
+          const userIdRaw = req.body?.userId ?? req.body?.user_id ?? req.body?.uid ?? null;
+          const roleRaw = req.body?.role ?? req.body?.userRole ?? req.body?.user_role ?? null;
+          const userId = userIdRaw != null && String(userIdRaw).trim() !== '' ? Number(userIdRaw) : null;
+          const role = roleRaw != null ? String(roleRaw).trim().toLowerCase() : null;
+          const metrics = req.body?.metrics && typeof req.body.metrics === 'object' ? req.body.metrics : req.body;
+
+          await pool.query(
+            `INSERT INTO analytics_metrics (ts, path, href, ua, ip, user_id, role, metrics, created_at)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,CURRENT_TIMESTAMP)`,
+            [ts, path, href, ua, ip, Number.isFinite(userId) ? userId : null, role, JSON.stringify(metrics)]
+          );
+        } catch (_) {
+          // ignore
+        }
+      }
       return res.json({ success: true });
     } catch (error) {
       return res.status(500).json({ success: false, message: 'Failed to record metrics' });
@@ -104,25 +126,48 @@ function createAnalyticsRoutes(pool, authenticateToken) {
   // Public event endpoint (Landing A/B + conversion tracking)
   router.post('/event', express.json({ limit: '200kb' }), async (req, res) => {
     try {
-      const event = typeof req.body?.event === 'string' ? req.body.event : '';
+      const event = typeof req.body?.event === 'string' ? String(req.body.event).trim().slice(0, 100) : '';
       const data = req.body?.data && typeof req.body.data === 'object' ? req.body.data : {};
       const ts = typeof req.body?.ts === 'number' ? req.body.ts : Date.now();
       const path = typeof req.body?.path === 'string' ? req.body.path : '';
+      const href = typeof req.body?.href === 'string' ? req.body.href : '';
+      const referrer = typeof req.body?.referrer === 'string' ? req.body.referrer : '';
+      const ua = typeof req.body?.ua === 'string' ? req.body.ua : (req.get('User-Agent') || '');
 
       if (!event) {
         return res.status(400).json({ success: false, message: 'event is required' });
       }
 
-      // Best-effort: for now we only log. Persist later if needed.
-      if (process.env.NODE_ENV === 'production') {
-        console.log('📈 analytics.event', {
-          event,
-          ts,
-          path,
-          ip: req.ip,
-          ua: req.get('User-Agent') || '',
-          data,
-        });
+      // Best-effort persistence (analytics_events table is created by init.js).
+      if (pool) {
+        try {
+          const userIdRaw =
+            req.body?.userId ?? req.body?.user_id ?? data?.userId ?? data?.user_id ?? data?.uid ?? null;
+          const roleRaw =
+            req.body?.role ?? req.body?.userRole ?? data?.role ?? data?.userRole ?? data?.user_role ?? null;
+
+          const userId = userIdRaw != null && String(userIdRaw).trim() !== '' ? Number(userIdRaw) : null;
+          const role = roleRaw != null ? String(roleRaw).trim().toLowerCase() : null;
+
+          await pool.query(
+            `INSERT INTO analytics_events (event, ts, path, href, referrer, ua, ip, user_id, role, data, created_at)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,CURRENT_TIMESTAMP)`,
+            [
+              event,
+              ts,
+              path,
+              href,
+              referrer,
+              ua,
+              req.ip || '',
+              Number.isFinite(userId) ? userId : null,
+              role,
+              JSON.stringify(data || {}),
+            ]
+          );
+        } catch (_) {
+          // ignore
+        }
       }
 
       return res.json({ success: true });

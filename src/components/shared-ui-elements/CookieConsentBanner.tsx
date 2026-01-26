@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { X, Settings2 } from 'lucide-react';
 import { api } from '../../services/apiClient';
@@ -13,6 +13,21 @@ export default function CookieConsentBanner({ className }: Props) {
   const [open, setOpen] = useState(!existing);
   const [showPrefs, setShowPrefs] = useState(false);
   const [analyticsEnabled, setAnalyticsEnabled] = useState(Boolean(existing?.analytics));
+
+  useEffect(() => {
+    // Prevent the banner from covering bottom actions (e.g., "İleri" / primary CTAs).
+    // We add a global class while the banner is open, so layouts can add bottom padding.
+    try {
+      if (typeof document === 'undefined') return;
+      const root = document.documentElement;
+      if (!root) return;
+      if (open) root.classList.add('yolnext-cookie-open');
+      else root.classList.remove('yolnext-cookie-open');
+      return () => root.classList.remove('yolnext-cookie-open');
+    } catch {
+      // noop
+    }
+  }, [open]);
 
   useEffect(() => {
     const handler = () => {
@@ -115,8 +130,7 @@ export default function CookieConsentBanner({ className }: Props) {
               <button
                 type='button'
                 onClick={() => {
-                  setCookieConsent({ analytics: false });
-                  setOpen(false);
+                  rejectNonEssential();
                 }}
                 className='p-2 rounded-lg hover:bg-slate-800 self-start sm:self-auto'
                 aria-label='Kapat'
@@ -179,8 +193,7 @@ export default function CookieConsentBanner({ className }: Props) {
                   <button
                     type='button'
                     onClick={() => {
-                      setCookieConsent({ analytics: false });
-                      setOpen(false);
+                      rejectNonEssential();
                     }}
                     className='px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-sm font-semibold'
                   >

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { X, Phone, MapPin, Package, Calendar, DollarSign, User, Building2, Info, Truck, Weight, Ruler, Shield, MessageSquare, Star, Clock, CheckCircle2 } from 'lucide-react';
 import { formatCurrency, formatDate } from '../../utils/format';
 import { getStatusInfo as getStatusInfoBase } from '../../utils/shipmentStatus';
@@ -66,6 +66,44 @@ const MyShipmentsModals: React.FC<MyShipmentsModalsProps> = ({
   const statusInfo = getStatusInfo(selectedShipment.status);
   const isRated = selectedShipment.user_rated || locallyRatedShipmentIds.includes(selectedShipment.id);
 
+  const timeline = useMemo(() => {
+    const s = String(selectedShipment.status || '');
+    const hasCarrier = Boolean(selectedShipment.carrier_id);
+    const hasDriver = Boolean(selectedShipment.driver_name || selectedShipment.driver_id || selectedShipment.vehicle_plate);
+
+    const done = (k: string) => {
+      if (k === 'offer') return ['offer_accepted', 'accepted', 'assigned', 'in_progress', 'picked_up', 'in_transit', 'delivered', 'completed'].includes(s);
+      if (k === 'assign') return hasCarrier && ['assigned', 'in_progress', 'picked_up', 'in_transit', 'delivered', 'completed'].includes(s) || hasDriver;
+      if (k === 'pickup') return ['picked_up', 'in_transit', 'delivered', 'completed'].includes(s);
+      if (k === 'transit') return ['in_transit', 'delivered', 'completed'].includes(s);
+      if (k === 'deliver') return ['delivered', 'completed'].includes(s);
+      if (k === 'complete') return ['completed'].includes(s);
+      return false;
+    };
+
+    const steps = [
+      { key: 'offer', title: 'Teklif kabul edildi', hint: 'Nakliyeci seçildi' },
+      { key: 'assign', title: 'Taşıyıcı ataması', hint: hasDriver ? 'Taşıyıcı atandı' : 'Taşıyıcı/araç bekleniyor' },
+      { key: 'pickup', title: 'Yük alındı', hint: 'Yükleme tamamlandı' },
+      { key: 'transit', title: 'Yolda', hint: 'Taşıma sürüyor' },
+      { key: 'deliver', title: 'Teslim', hint: 'Teslimat tamamlandı' },
+      { key: 'complete', title: 'Kapanış', hint: 'Değerlendirme / kayıt' },
+    ];
+
+    const show = ['offer_accepted', 'accepted', 'assigned', 'in_progress', 'picked_up', 'in_transit', 'delivered', 'completed'].includes(s);
+    if (!show) return null;
+
+    let nextText = 'Sıradaki adım: Nakliyeci taşıyıcı atayacak.';
+    if (hasCarrier && !hasDriver) nextText = 'Sıradaki adım: Nakliyeci taşıyıcı atayacak (taşıyıcı teklifi 30 dk içinde kabul eder).';
+    if (hasDriver && ['offer_accepted', 'accepted', 'assigned', 'in_progress'].includes(s)) nextText = 'Sıradaki adım: Yükleme alınacak.';
+    if (s === 'picked_up') nextText = 'Sıradaki adım: Yola çıkış / takip.';
+    if (s === 'in_transit') nextText = 'Sıradaki adım: Teslimat.';
+    if (s === 'delivered') nextText = 'Sıradaki adım: Teslimat onayı (varsa).';
+    if (s === 'completed') nextText = 'Süreç tamamlandı.';
+
+    return { steps, done, nextText };
+  }, [selectedShipment]);
+
   return (
     <>
       {/* Detail Modal */}
@@ -105,6 +143,35 @@ const MyShipmentsModals: React.FC<MyShipmentsModalsProps> = ({
                   </div>
                 </div>
               </div>
+
+              {/* Next steps timeline */}
+              {timeline && (
+                <div className='bg-white rounded-xl border border-slate-200 p-6'>
+                  <div className='flex items-start gap-3'>
+                    <div className='w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center'>
+                      <Truck className='w-5 h-5' />
+                    </div>
+                    <div className='flex-1'>
+                      <div className='text-sm font-bold text-slate-900'>Süreç akışı</div>
+                      <div className='text-xs text-slate-600 mt-1'>{timeline.nextText}</div>
+                    </div>
+                  </div>
+                  <div className='mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3'>
+                    {timeline.steps.map((st) => {
+                      const ok = timeline.done(st.key);
+                      return (
+                        <div key={st.key} className={`rounded-lg border p-3 ${ok ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-slate-50'}`}>
+                          <div className='flex items-center gap-2'>
+                            <CheckCircle2 className={`w-4 h-4 ${ok ? 'text-emerald-700' : 'text-slate-400'}`} />
+                            <div className={`text-sm font-semibold ${ok ? 'text-emerald-900' : 'text-slate-900'}`}>{st.title}</div>
+                          </div>
+                          <div className={`text-xs mt-1 ${ok ? 'text-emerald-700' : 'text-slate-600'}`}>{st.hint}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* Yük Bilgileri */}
               <div className="bg-slate-50 rounded-xl p-6">

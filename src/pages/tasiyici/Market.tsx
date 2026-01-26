@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { MapPin, DollarSign, Truck, ArrowRight, Search, X, Package } from 'lucide-react';
 import { useToast } from '../../contexts/ToastContext';
@@ -451,14 +451,14 @@ const Market: React.FC = () => {
             isEmpty={!loading && listings.length === 0}
             icon={Truck}
             title='Taşıyıcı Pazarı'
-            description='Pazardaki ilanlara uygun bütçe/tarih kriterleriyle teklif ver. Verdiğin teklifleri “Tekliflerim”den, kabul edilen işleri “Aktif İşler”den yönetebilirsin.'
+            description='Pazardaki ilanlara uygun bütçe/tarih kriterleriyle teklif ver. Verdiğin teklifleri “Tekliflerim”den, kabul edilen işleri “İşlerim”den yönetebilirsin.'
             primaryAction={{
               label: 'Tekliflerim',
               to: '/tasiyici/my-offers',
             }}
             secondaryAction={{
-              label: 'Aktif İşler',
-              to: '/tasiyici/active-jobs',
+              label: 'İşlerim',
+              to: '/tasiyici/islerim',
             }}
           />
         </div>

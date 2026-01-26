@@ -3,6 +3,7 @@ import { createApiUrl } from '../../config/api';
 import { useNavigate, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useAuth } from '../../contexts/AuthContext';
+import { analytics } from '../../services/businessAnalytics';
 import {
   Search,
   Clock,
@@ -42,6 +43,7 @@ import Modal from '../../components/shared-ui-elements/Modal';
 import SuccessMessage from '../../components/shared-ui-elements/SuccessMessage';
 import GuidanceOverlay from '../../components/shared-ui-elements/GuidanceOverlay';
 import { sanitizeShipmentTitle, sanitizeAddressLabel, sanitizeMessageText } from '../../utils/format';
+import { calculateCommission } from '../../utils/paymentProcessing';
 
 // Offer interface
 interface Offer {
@@ -56,6 +58,7 @@ interface Offer {
   carrierExperience: string;
   price: number;
   estimatedDelivery: string;
+  expiresAt?: string;
   message: string;
   status: 'pending' | 'accepted' | 'rejected';
   createdAt: string;
@@ -76,6 +79,7 @@ interface Offer {
 export default function Offers() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const [now, setNow] = useState(() => Date.now());
   const [filterStatus, setFilterStatus] = useState('pending');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('date');
@@ -105,6 +109,11 @@ export default function Offers() {
   const navigateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const paymentModalOpenRef = useRef(false);
   const loadingRef = useRef(false);
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(id);
+  }, []);
 
   // Define loadOffers BEFORE useEffect to prevent hoisting issues
   const loadOffers = useCallback(async () => {
@@ -178,6 +187,17 @@ export default function Offers() {
         return Number.isFinite(d.getTime()) ? d.toISOString() : '';
       };
 
+      const computeExpiresAt = (row: any): string => {
+        const direct = row?.expiresAt || row?.expires_at || row?.expiresat;
+        const directStr = String(direct || '').trim();
+        if (directStr) return directStr;
+
+        const created = row?.createdAt || row?.created_at || row?.date;
+        const createdDate = created ? new Date(created) : null;
+        if (!createdDate || !Number.isFinite(createdDate.getTime())) return '';
+        return new Date(createdDate.getTime() + 30 * 60 * 1000).toISOString();
+      };
+
       const mappedOffers: Offer[] = rawOffers.map((row: any) => ({
         id: String(row.id),
         shipmentId: row.shipmentId ? String(row.shipmentId) : (row.shipment_id ? String(row.shipment_id) : undefined),
@@ -190,6 +210,7 @@ export default function Offers() {
         carrierExperience: String(row.carrierExperience || '').trim(),
         price: toNumber(row.price ?? row.offerPrice ?? row.offer_price, 0),
         estimatedDelivery: normalizeDate(row.estimatedDelivery || row.estimated_delivery || row.deliveryDate || row.delivery_date),
+        expiresAt: computeExpiresAt(row),
         message: sanitizeMessageText(row.message || row.notes || ''),
         status: normalizeOfferStatus(row.status),
         createdAt: normalizeDate(row.createdAt || row.created_at || row.date),
@@ -364,13 +385,21 @@ export default function Offers() {
       const shipmentId = payload?.data?.shipmentId
         ? String(payload.data.shipmentId)
         : (localOffer?.shipmentId ? String(localOffer.shipmentId) : null);
+
+      analytics.track('offer_accept_success', {
+        offerId: offerToAccept,
+        shipmentId,
+        carrierId,
+      });
+
       setPaymentCarrierId(carrierId);
       setPaymentShipmentId(shipmentId);
       setPaymentPrefill(`Merhaba, ödeme detaylarını netleştirelim. İş No: #${shipmentId || ''}`.trim());
       setShowPaymentModal(true);
 
-      // Individual panel success pattern - immediate feedback, quick navigation
-      setSuccessMessage('Teklif başarıyla kabul edildi. Ödeme güvence altına alındı. Gönderilerinize yönlendiriliyorsunuz.');
+      setSuccessMessage(
+        'Teklif başarıyla kabul edildi. Ödeme detaylarını mesajlaşma üzerinden yazılı olarak netleştirmenizi öneririz. Gönderilerinize yönlendiriliyorsunuz.'
+      );
       setShowSuccessMessage(true);
       
       setOffers(prev => prev.filter(offer => offer.id !== offerToAccept));
@@ -502,7 +531,7 @@ export default function Offers() {
             isEmpty={!isLoading && offers.length === 0}
             icon={FileText}
             title='Teklif Yönetimi'
-            description='Gelen teklifleri inceleyin, nakliyeci profillerini değerlendirin ve en uygun teklifi seçin. Teklif kabul edildikten sonra taşıma süreci başlar ve ödeme güvence altına alınır.'
+            description='Gelen teklifleri inceleyin, nakliyeci profillerini değerlendirin ve en uygun teklifi seçin. Teklif kabul edildiğinde süreç başlar; ödeme detaylarını mesajlaşma üzerinden yazılı netleştirmeniz önerilir.'
             primaryAction={{
               label: 'Gönderi Oluştur',
               to: '/corporate/create-shipment',
@@ -695,6 +724,29 @@ export default function Offers() {
                       </div>
                       <div className='text-sm text-slate-500'>
                         Teslimat: {offer.estimatedDelivery}
+                      </div>
+                      {(() => {
+                        const expiresAt = String(offer.expiresAt || '').trim();
+                        if (!expiresAt) return null;
+                        const ts = new Date(expiresAt).getTime();
+                        if (!Number.isFinite(ts)) return null;
+                        const diffMs = ts - now;
+                        const minutes = Math.max(0, Math.ceil(diffMs / 60000));
+                        const isExpired = diffMs <= 0;
+                        const tone = isExpired
+                          ? 'text-red-600'
+                          : minutes <= 5
+                            ? 'text-amber-700'
+                            : 'text-slate-500';
+                        return (
+                          <div className={`mt-1 text-xs font-semibold ${tone}`}>
+                            Teklif süresi: {isExpired ? 'Doldu' : `${minutes} dk kaldı`}
+                          </div>
+                        );
+                      })()}
+                      <div className='mt-1 text-[11px] text-slate-500'>
+                        Platform hizmet bedeli (nakliyeci): ₺
+                        {calculateCommission(Number(offer.price || 0)).toLocaleString('tr-TR')}
                       </div>
                     </div>
                   </div>
@@ -1030,17 +1082,16 @@ export default function Offers() {
                   )}
                 </div>
 
-                {/* Ödeme Güvencesi Bilgisi - Gönderici için */}
+                {/* Ödeme Bilgisi - Gönderici için */}
                 {selectedOffer.status === 'pending' && (
                   <div className='mb-8 p-5 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-xl'>
                     <div className='flex items-start gap-3'>
                       <Shield className='w-6 h-6 text-green-700 flex-shrink-0 mt-0.5' />
                       <div className='flex-1'>
-                        <h5 className='text-base font-semibold text-green-900 mb-2'>Ödeme Güvencesi</h5>
+                        <h5 className='text-base font-semibold text-green-900 mb-2'>Ödeme (taraflar arasında)</h5>
                         <p className='text-sm text-green-800 leading-relaxed'>
-                          Bu teklifi kabul ettiğinizde, ödeme tutarı güvence altına alınır. 
-                          Teslimat tamamlandığında ve siz onayladığınızda ödeme nakliyeciye aktarılır. 
-                          Bu sistem sayesinde hem siz hem de nakliyeci güvende olursunuz.
+                          YolNext ödeme altyapısı sunmaz; ödeme işlemi gönderici ile nakliyeci arasında gerçekleşir.
+                          IBAN/alıcı adı/açıklama ve yükleme saatini mesajlaşma üzerinden yazılı olarak netleştirmeniz önerilir.
                         </p>
                       </div>
                     </div>

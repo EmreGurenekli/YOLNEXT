@@ -1,63 +1,6 @@
-﻿/**
- * 🛣️ YOLNEXT APPLICATION ROUTES - BUSINESS STRUCTURE DEFINITION
- * 
- * BUSINESS PURPOSE: Defines the complete application structure and user journeys
- * Maps URLs to business functions for different user types in logistics marketplace
- * 
- * ROUTE ARCHITECTURE BY USER TYPE:
- * 
- * 🌐 PUBLIC ROUTES (No authentication required):
- * / - Landing page with platform overview
- * /login, /register - User onboarding
- * /tracking - Public shipment tracking (key customer feature)
- * /about, /contact - Marketing and support pages
- * /terms, /privacy - Legal compliance (KVKK, GDPR)
- * 
- * 👤 INDIVIDUAL USER ROUTES (/individual/*):
- * /dashboard - Personal shipment overview and statistics
- * /create-shipment - Create new cargo shipment (core feature)
- * /my-shipments - Manage all shipments (most used page)
- * /live-tracking - Real-time shipment tracking
- * /profile - Account management
- * /help, /support - Customer service
- * 
- * 🏢 CORPORATE USER ROUTES (/corporate/*):
- * Similar to individual but with business features:
- * - Bulk shipment operations
- * - Company branding
- * - Invoice management
- * - Team management
- * 
- * 🚛 NAKLIYECI ROUTES (/nakliyeci/* - Logistics Companies):
- * /dashboard - Business analytics, earnings overview
- * /market - Browse available shipments (key revenue source)
- * /my-offers - Manage price quotes to customers
- * /active-jobs - Current assigned shipments
- * /settings - Company profile, vehicle fleet
- * 
- * 🚚 TASIYICI ROUTES (/tasiyici/* - Individual Carriers):
- * /dashboard - Personal earnings, performance metrics  
- * /jobs - Available pickup/delivery jobs
- * /active-jobs - Current assignments
- * /profile - Driver profile, vehicle info
- * 
- * 👨‍💼 ADMIN ROUTES (/admin/* - Platform Management):
- * /dashboard - System overview, key metrics
- * /users - User management, verification
- * /shipments - All platform shipments, dispute resolution
- * /operations - System maintenance, monitoring
- * 
- * SECURITY MODEL:
- * - Public routes accessible to everyone
- * - Protected routes require JWT authentication
- * - Role-based access control (RBAC) by user type
- * - Admin routes require special admin permissions
- */
-
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { ADMIN_SLUG } from './admin';
 
-// Public pages
 import LandingPage from '../pages/LandingPage';
 import Login from '../pages/Login';
 import Register from '../pages/Register';
@@ -74,14 +17,12 @@ import ConsumerRights from '../pages/ConsumerRights';
 import DistanceSellingContract from '../pages/DistanceSellingContract';
 import NotFoundPage from '../pages/NotFound';
 
-// Layouts
 import IndividualLayout from '../components/IndividualLayout';
 import CorporateLayout from '../components/CorporateLayout';
 import NakliyeciLayout from '../components/NakliyeciLayout';
 import TasiyiciLayout from '../components/TasiyiciLayout';
 import MobileOptimizedLayout from '../components/mobile/MobileOptimizedLayout';
 
-// Components
 import ProtectedRoute from '../components/auth/ProtectedRoute';
 import AdminGuard from '../components/admin/AdminGuard';
 import AdminLayout from '../components/admin/AdminLayout';
@@ -91,7 +32,6 @@ import CostCalculator from '../components/calculators/CostCalculator';
 import CaseStudies from '../components/case-studies/CaseStudies';
 import CommissionCalculator from '../components/calculators/CommissionCalculator';
 
-// Individual pages
 import IndividualDashboard from '../pages/individual/Dashboard';
 import CreateShipment from '../pages/individual/CreateShipment';
 import IndividualMessages from '../pages/individual/Messages';
@@ -100,10 +40,9 @@ import MyShipments from '../pages/individual/MyShipments';
 import IndividualHistory from '../pages/individual/History';
 import IndividualLiveTracking from '../pages/individual/LiveTracking';
 import IndividualSettings from '../pages/individual/Settings';
-import IndividualSupport from '../pages/individual/Support';
 import IndividualHelp from '../pages/individual/Help';
+import Complaint from '../pages/individual/Complaint';
 
-// Corporate pages
 import CorporateDashboard from '../pages/corporate/Dashboard';
 import CorporateCreateShipment from '../pages/corporate/CreateShipment';
 import CorporateAnalytics from '../pages/corporate/Analytics';
@@ -113,7 +52,6 @@ import CorporateCarriers from '../pages/corporate/Carriers';
 import CorporateHelp from '../pages/corporate/Help';
 import CorporateOffers from '../pages/corporate/Offers';
 
-// Nakliyeci pages
 import NakliyeciDashboard from '../pages/nakliyeci/Dashboard';
 import NakliyeciOffers from '../pages/nakliyeci/Offers';
 import NakliyeciAnalytics from '../pages/nakliyeci/Analytics';
@@ -127,19 +65,16 @@ import NakliyeciWallet from '../pages/nakliyeci/Wallet';
 import NakliyeciActiveShipments from '../pages/nakliyeci/ActiveShipments';
 import NakliyeciListings from '../pages/nakliyeci/Listings';
 
-// Tasiyici pages
 import TasiyiciDashboard from '../pages/tasiyici/Dashboard';
 import TasiyiciJobs from '../pages/tasiyici/Jobs';
 import TasiyiciMyOffers from '../pages/tasiyici/MyOffers';
 import TasiyiciMessages from '../pages/tasiyici/Messages';
 import TasiyiciSettings from '../pages/tasiyici/Settings';
-import TasiyiciActiveJobs from '../pages/tasiyici/ActiveJobs';
 import TasiyiciCompletedJobs from '../pages/tasiyici/CompletedJobs';
 import TasiyiciMarket from '../pages/tasiyici/Market';
 import TasiyiciIslerim from '../pages/tasiyici/MyCarrierJobs';
 import TasiyiciHelp from '../pages/tasiyici/Help';
 
-// Admin pages
 import AdminLogin from '../pages/admin/AdminLogin';
 import AdminUsers from '../pages/admin/Users';
 import AdminIndexRedirect from '../pages/admin/IndexRedirect';
@@ -149,18 +84,17 @@ import AdminDashboard from '../pages/admin/Dashboard';
 import AdminCases from '../pages/admin/DisputeCases';
 import AdminFlags from '../pages/admin/Flags';
 import AdminSupportManagement from '../pages/admin/SupportManagement';
+import AdminComplaints from '../pages/admin/Complaints';
+import AdminPlanner from '../pages/admin/Planner';
+import AdminAudit from '../pages/admin/Audit';
 import { useParams } from 'react-router-dom';
 
-// Redirect component
 const IndividualShipmentToMyShipmentsRedirect: React.FC = () => {
   const { id } = useParams();
   const sid = id ? encodeURIComponent(String(id)) : '';
   return <Navigate to={`/individual/my-shipments?shipmentId=${sid}`} replace />;
 };
 
-/**
- * Application Routes Component
- */
 export const AppRoutes: React.FC = () => {
   const adminBase = `/${ADMIN_SLUG}`;
 
@@ -168,7 +102,6 @@ export const AppRoutes: React.FC = () => {
     <>
       <CookieConsentBanner />
       <Routes>
-        {/* Public Routes */}
         <Route path='/' element={<LandingPage />} />
         <Route path='/login' element={<Login />} />
         <Route path='/register' element={<Register />} />
@@ -184,10 +117,9 @@ export const AppRoutes: React.FC = () => {
         <Route path='/consumer-rights' element={<ConsumerRights />} />
         <Route path='/distance-selling-contract' element={<DistanceSellingContract />} />
 
-        {/* Utility Routes */}
         <Route path='/dashboard' element={<IndividualDashboard />} />
         <Route path='/individual/tracking' element={<Navigate to='/individual/live-tracking' replace />} />
-        <Route path='/tasiyici/jobs' element={<Navigate to='/tasiyici/active-jobs' replace />} />
+        <Route path='/tasiyici/jobs' element={<Navigate to='/tasiyici/islerim' replace />} />
         <Route path='/onboarding' element={<OnboardingWizard />} />
         <Route path='/cost-calculator' element={<CostCalculator />} />
         <Route path='/case-studies' element={<CaseStudies />} />
@@ -201,7 +133,6 @@ export const AppRoutes: React.FC = () => {
           }
         />
 
-        {/* Admin Routes */}
         <Route path={`${adminBase}/login`} element={<AdminLogin />} />
         <Route
           path={adminBase}
@@ -221,14 +152,13 @@ export const AppRoutes: React.FC = () => {
           <Route path='ops' element={<AdminOperations />} />
           <Route path='system' element={<AdminOps />} />
           <Route path='cases' element={<AdminCases />} />
-          <Route path='complaints' element={<Navigate to={`${adminBase}/system`} replace />} />
+          <Route path='complaints' element={<AdminComplaints />} />
           <Route path='flags' element={<AdminFlags />} />
           <Route path='support' element={<AdminSupportManagement />} />
-          <Route path='planner' element={<Navigate to={`${adminBase}/ops`} replace />} />
-          <Route path='audit' element={<Navigate to={`${adminBase}/system`} replace />} />
+          <Route path='planner' element={<AdminPlanner />} />
+          <Route path='audit' element={<AdminAudit />} />
         </Route>
 
-        {/* Individual Routes */}
         <Route
           path='/individual'
           element={
@@ -241,6 +171,8 @@ export const AppRoutes: React.FC = () => {
           <Route path='create-shipment' element={<CreateShipment />} />
           <Route path='offers' element={<IndividualOffers />} />
           <Route path='my-shipments' element={<MyShipments />} />
+          <Route path='complaint' element={<Complaint />} />
+          <Route path='complaint/:shipmentId' element={<Complaint />} />
           <Route path='shipment-detail/:id' element={<IndividualShipmentToMyShipmentsRedirect />} />
           <Route path='shipments/:id' element={<IndividualShipmentToMyShipmentsRedirect />} />
           <Route path='history' element={<IndividualHistory />} />
@@ -250,7 +182,6 @@ export const AppRoutes: React.FC = () => {
           <Route path='help' element={<IndividualHelp />} />
         </Route>
 
-        {/* Corporate Routes */}
         <Route
           path='/corporate'
           element={
@@ -265,6 +196,8 @@ export const AppRoutes: React.FC = () => {
           <Route path='create-shipment' element={<CorporateCreateShipment />} />
           <Route path='shipments' element={<MyShipments basePath='/corporate' />} />
           <Route path='offers' element={<CorporateOffers />} />
+          <Route path='complaint' element={<Complaint />} />
+          <Route path='complaint/:shipmentId' element={<Complaint />} />
           <Route path='analytics' element={<CorporateAnalytics />} />
           <Route path='live-tracking' element={<IndividualLiveTracking />} />
           <Route path='tracking' element={<Navigate to='/corporate/live-tracking' replace />} />
@@ -274,7 +207,6 @@ export const AppRoutes: React.FC = () => {
           <Route path='help' element={<CorporateHelp />} />
         </Route>
 
-        {/* Nakliyeci Routes */}
         <Route
           path='/nakliyeci'
           element={
@@ -290,6 +222,8 @@ export const AppRoutes: React.FC = () => {
           <Route path='listings' element={<NakliyeciListings />} />
           <Route path='drivers' element={<NakliyeciDrivers />} />
           <Route path='active-shipments' element={<NakliyeciActiveShipments />} />
+          <Route path='complaint' element={<Complaint />} />
+          <Route path='complaint/:shipmentId' element={<Complaint />} />
           <Route path='analytics' element={<NakliyeciAnalytics />} />
           <Route path='messages' element={<NakliyeciMessages />} />
           <Route path='wallet' element={<NakliyeciWallet />} />
@@ -297,7 +231,6 @@ export const AppRoutes: React.FC = () => {
           <Route path='help' element={<NakliyeciHelp />} />
         </Route>
 
-        {/* Tasiyici Routes */}
         <Route
           path='/tasiyici'
           element={
@@ -311,26 +244,17 @@ export const AppRoutes: React.FC = () => {
           <Route path='market' element={<TasiyiciMarket />} />
           <Route path='islerim' element={<TasiyiciIslerim />} />
           <Route path='my-offers' element={<TasiyiciMyOffers />} />
-          <Route path='active-jobs' element={<TasiyiciActiveJobs />} />
+          <Route path='active-jobs' element={<Navigate to='/tasiyici/islerim' replace />} />
           <Route path='completed-jobs' element={<TasiyiciCompletedJobs />} />
+          <Route path='complaint' element={<Complaint />} />
+          <Route path='complaint/:shipmentId' element={<Complaint />} />
           <Route path='messages' element={<TasiyiciMessages />} />
           <Route path='settings' element={<TasiyiciSettings />} />
           <Route path='help' element={<TasiyiciHelp />} />
         </Route>
 
-        {/* 404 Route */}
         <Route path='*' element={<NotFoundPage />} />
       </Routes>
     </>
   );
 };
-
-
-
-
-
-
-
-
-
-

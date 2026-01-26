@@ -49,7 +49,7 @@ const TasiyiciSidebar: React.FC<TasiyiciSidebarProps> = ({ onLogout }) => {
         { name: 'İş Pazarı', href: '/tasiyici/market', icon: MapPin,
           badge: badgeCounts.pendingShipments > 0 ? badgeCounts.pendingShipments : undefined,
         },
-        { name: 'İşlerim', href: '/tasiyici/my-jobs', icon: Package },
+        { name: 'İşlerim', href: '/tasiyici/islerim', icon: Package },
         { name: 'Tamamlanan İşler', href: '/tasiyici/completed-jobs', icon: CheckCircle },
         { name: 'Mesajlar', href: '/tasiyici/messages', icon: MessageSquare,
           badge: badgeCounts.newMessages > 0 ? badgeCounts.newMessages : undefined,

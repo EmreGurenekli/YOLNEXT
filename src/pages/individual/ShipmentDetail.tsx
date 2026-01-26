@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Package,
   MapPin,
@@ -33,6 +33,7 @@ import { useToast } from '../../contexts/ToastContext';
 import { TOAST_MESSAGES, showProfessionalToast } from '../../utils/toastMessages';
 import { sanitizeShipmentTitle } from '../../utils/format';
 import { normalizeTrackingCode } from '../../utils/trackingCode';
+import { getStatusText as getShipmentStatusText } from '../../utils/shipmentStatus';
 
 interface ShipmentDetail {
   id: string;
@@ -131,7 +132,7 @@ const getStatusInfo = (status: ShipmentDetail['status']) => {
   switch (status) {
     case 'pending':
       return {
-        text: 'Beklemede',
+        text: getShipmentStatusText('pending'),
         color: 'orange',
         icon: <Clock className='w-5 h-5' />,
       };
@@ -144,7 +145,7 @@ const getStatusInfo = (status: ShipmentDetail['status']) => {
     case 'offer_accepted':
     case 'accepted':
       return {
-        text: 'Kabul Edildi',
+        text: getShipmentStatusText('accepted'),
         color: 'purple',
         icon: <CheckCircle className='w-5 h-5' />,
       };
@@ -152,31 +153,31 @@ const getStatusInfo = (status: ShipmentDetail['status']) => {
     case 'in_transit':
     case 'in_progress':
       return {
-        text: 'Yolda',
+        text: getShipmentStatusText('in_transit'),
         color: 'green',
         icon: <Truck className='w-5 h-5' />,
       };
     case 'delivered':
       return {
-        text: 'Teslim Edildi',
+        text: getShipmentStatusText('delivered'),
         color: 'gray',
         icon: <Package className='w-5 h-5' />,
       };
     case 'completed':
       return {
-        text: 'Tamamlandı',
+        text: getShipmentStatusText('completed'),
         color: 'gray',
         icon: <Package className='w-5 h-5' />,
       };
     case 'cancelled':
       return {
-        text: 'İptal Edildi',
+        text: getShipmentStatusText('cancelled'),
         color: 'red',
         icon: <XCircle className='w-5 h-5' />,
       };
     default:
       return {
-        text: 'Bilinmiyor',
+        text: getShipmentStatusText(String(status || '')),
         color: 'gray',
         icon: <AlertCircle className='w-5 h-5' />,
       };

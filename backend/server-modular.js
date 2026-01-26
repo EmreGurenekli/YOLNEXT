@@ -533,6 +533,9 @@ async function startServer() {
   try {
     errorLogger.info('Starting Modular PostgreSQL Backend with REAL data');
 
+    const RUN_MIGRATIONS = String(process.env.RUN_MIGRATIONS || '').toLowerCase() === 'true';
+    const SEED_DEV_DATA = String(process.env.SEED_DEV_DATA || '').toLowerCase() === 'true';
+
     // Test database connection
     if (pool && DATABASE_URL) {
       try {
@@ -548,34 +551,36 @@ async function startServer() {
       }
     }
 
-    // Run migrations (development only, graceful failure)
-    if (!IS_TEST && NODE_ENV !== 'production' && pool) {
-      try {
-        const MigrationRunner = require('./migrations/migration-runner');
-        const migrationRunner = new MigrationRunner(pool);
-        await migrationRunner.runMigrations();
-        errorLogger.info('Database migrations completed');
-      } catch (e) {
-        errorLogger.warn('Migrations failed (continuing)', { error: e?.message || String(e) });
-      }
-    }
-    
-    // Initialize database tables (graceful failure)
+    // Schema management:
+    // - Default: runtime schema via createTables() (no migrations) to avoid conflicts.
+    // - Optional: enable SQL migrations by setting RUN_MIGRATIONS=true (then runtime createTables is skipped).
     if (pool) {
-      try {
-        const tablesCreated = await createTables(pool);
-        if (tablesCreated) {
-          errorLogger.info('Database tables initialized successfully');
-        } else {
-          errorLogger.warn('Table creation returned false (continuing)');
+      if (RUN_MIGRATIONS) {
+        try {
+          const MigrationRunner = require('./migrations/migration-runner');
+          const migrationRunner = new MigrationRunner(pool);
+          await migrationRunner.runMigrations();
+          errorLogger.info('Database migrations completed');
+        } catch (e) {
+          errorLogger.warn('Migrations failed (continuing)', { error: e?.message || String(e) });
         }
-      } catch (error) {
-        errorLogger.warn('Table initialization failed (continuing)', { error: error.message });
+      } else {
+        try {
+          const tablesCreated = await createTables(pool);
+          if (tablesCreated) {
+            errorLogger.info('Database tables initialized successfully');
+          } else {
+            errorLogger.warn('Table creation returned false (continuing)');
+          }
+        } catch (error) {
+          errorLogger.warn('Table initialization failed (continuing)', { error: error.message });
+        }
       }
     }
 
-    // Seed data (development only, graceful failure)
-    if (NODE_ENV !== 'production' && pool) {
+    // Seed data (OFF by default). Enable with SEED_DEV_DATA=true.
+    // NOTE: User requirement is "no mock data" -> keep disabled unless explicitly requested.
+    if (NODE_ENV !== 'production' && pool && SEED_DEV_DATA) {
       try {
         await seedData(pool);
         errorLogger.info('Data seeding completed');

@@ -1,4 +1,4 @@
-﻿// RoutePlannerCorridorLoads.tsx
+// RoutePlannerCorridorLoads.tsx
 // Corridor loads component for Route Planner page - displays loads available on the corridor
 // Used in: src/pages/nakliyeci/RoutePlanner.tsx
 
@@ -15,6 +15,9 @@ interface AvailableLoad {
   price: number;
   deadline: string;
   distance: number;
+  corridorDirection?: 'outbound' | 'backhaul' | null;
+  corridorFromIndex?: number | null;
+  corridorToIndex?: number | null;
   driver: {
     id: string;
     name: string;
@@ -82,7 +85,21 @@ export default function RoutePlannerCorridorLoads({
               className='p-4 border border-slate-200 rounded-lg hover:border-slate-300 transition-colors'
             >
               <div className='flex items-start justify-between mb-2'>
-                <h4 className='font-medium text-slate-900'>{load.title}</h4>
+                <div className='min-w-0'>
+                  <div className='flex items-center gap-2'>
+                    <h4 className='font-medium text-slate-900 truncate'>{load.title}</h4>
+                    {load.corridorDirection === 'outbound' && (
+                      <span className='px-2 py-0.5 rounded-md text-[11px] font-semibold bg-blue-100 text-blue-800'>
+                        Gidiş
+                      </span>
+                    )}
+                    {load.corridorDirection === 'backhaul' && (
+                      <span className='px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-100 text-emerald-800'>
+                        Dönüş
+                      </span>
+                    )}
+                  </div>
+                </div>
                 {onLoadClick && (
                   <button
                     onClick={(e) => {

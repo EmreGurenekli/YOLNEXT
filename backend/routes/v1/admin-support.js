@@ -85,6 +85,9 @@ function createAdminSupportRoutes(pool, authenticateToken, requireAdminRole) {
   // Get all tickets for admin dashboard
   router.get('/tickets', authenticateToken, requireAdminRole, async (req, res) => {
     try {
+      // Resolve user columns (schema variants)
+      const { cols } = await resolveTable('users');
+
       const {
         status,
         category,
@@ -171,10 +174,43 @@ function createAdminSupportRoutes(pool, authenticateToken, requireAdminRole) {
         ${whereClause}
       `;
 
-      const [ticketsResult, countResult] = await Promise.all([
-        pool.query(ticketsQuery, params),
-        pool.query(countQuery, params.slice(0, -2))
-      ]);
+      let ticketsResult;
+      let countResult;
+      try {
+        [ticketsResult, countResult] = await Promise.all([
+          pool.query(ticketsQuery, params),
+          pool.query(countQuery, params.slice(0, -2))
+        ]);
+      } catch (e) {
+        // If support tables are not present in this deployment yet, return empty list (avoid 500 in UI).
+        const code = e && e.code ? String(e.code) : '';
+        if (code === '42P01') {
+          return res.json({
+            success: true,
+            data: {
+              tickets: [],
+              pagination: {
+                current_page: parseInt(page),
+                total_pages: 0,
+                total_items: 0,
+                items_per_page: parseInt(limit)
+              },
+              statistics: {
+                total_tickets: 0,
+                open_tickets: 0,
+                in_progress_tickets: 0,
+                waiting_user_tickets: 0,
+                resolved_tickets: 0,
+                closed_tickets: 0,
+                urgent_tickets: 0,
+                unassigned_tickets: 0,
+                avg_resolution_hours: 0,
+              }
+            }
+          });
+        }
+        throw e;
+      }
 
       const total = parseInt(countResult.rows[0]?.total || 0);
       const totalPages = Math.ceil(total / parseInt(limit));
@@ -195,7 +231,17 @@ function createAdminSupportRoutes(pool, authenticateToken, requireAdminRole) {
         WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
       `;
 
-      const statsResult = await pool.query(statsQuery);
+      let statsResult;
+      try {
+        statsResult = await pool.query(statsQuery);
+      } catch (e) {
+        const code = e && e.code ? String(e.code) : '';
+        if (code === '42P01') {
+          statsResult = { rows: [{}] };
+        } else {
+          throw e;
+        }
+      }
 
       res.json({
         success: true,
@@ -225,6 +271,7 @@ function createAdminSupportRoutes(pool, authenticateToken, requireAdminRole) {
   router.get('/tickets/:ticketId', authenticateToken, requireAdminRole, async (req, res) => {
     try {
       const ticketId = req.params.ticketId;
+      const { cols } = await resolveTable('users');
 
       // Get ticket details with user info
       const ticketQuery = `
@@ -246,7 +293,16 @@ function createAdminSupportRoutes(pool, authenticateToken, requireAdminRole) {
         WHERE t.id = $1
       `;
 
-      const ticketResult = await pool.query(ticketQuery, [ticketId]);
+      let ticketResult;
+      try {
+        ticketResult = await pool.query(ticketQuery, [ticketId]);
+      } catch (e) {
+        const code = e && e.code ? String(e.code) : '';
+        if (code === '42P01') {
+          return res.status(404).json({ success: false, message: 'Ticket not found' });
+        }
+        throw e;
+      }
 
       if (ticketResult.rows.length === 0) {
         return res.status(404).json({
@@ -663,7 +719,23 @@ function createAdminSupportRoutes(pool, authenticateToken, requireAdminRole) {
         ORDER BY ${nameCol}
       `;
 
-      const result = await pool.query(query);
+      let result;
+      try {
+        result = await pool.query(query);
+      } catch (e) {
+        const code = e && e.code ? String(e.code) : '';
+        if (code === '42P01') {
+          // support_tickets table missing; still return admin list
+          result = await pool.query(
+            `SELECT id, ${nameCol} as name, ${emailCol} as email, 0::int as active_tickets
+             FROM \"${schema}\".users
+             WHERE role = 'admin'
+             ORDER BY ${nameCol}`
+          );
+        } else {
+          throw e;
+        }
+      }
 
       res.json({
         success: true,

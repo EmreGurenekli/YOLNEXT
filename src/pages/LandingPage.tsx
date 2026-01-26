@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import {
   Truck,
@@ -128,14 +128,14 @@ const personaPanels = [
         'Kazanç takibi & puan sistemi',
         'Destek hattı',
         'İş pazarı',
-        'Aktif işler',
+        'İşlerim',
         'Tamamlanan işler',
         'Tekliflerim',
     ],
     stats: '8.000+ taşıyıcı',
     cta: 'Hemen Düzenli İşe Başla',
     urgency: '⚠️ Düzensiz gelir aile bütçenizi vuruyor - düzenli işe geçin',
-    pages: ['Dashboard', 'İş Pazarı', 'Aktif İşler', 'Tamamlanan İşler', 'Tekliflerim', 'Mesajlar', 'Ayarlar'],
+    pages: ['Dashboard', 'İş Pazarı', 'İşlerim', 'Tamamlanan İşler', 'Tekliflerim', 'Mesajlar', 'Ayarlar'],
   },
 ];
 

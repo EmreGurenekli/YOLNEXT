@@ -102,6 +102,9 @@ function setupRoutes(app, pool, middleware, services, guards) {
   // Register routes with rate limiting
   app.use('/api/auth', authLimiter, authRoutes);
   app.use('/api/shipments', generalLimiter, shipmentRoutes);
+  // Backward/forward compatibility: corporate panel expects this prefix.
+  // Uses the same shipments router (role-aware filtering happens inside).
+  app.use('/api/corporate/shipments', generalLimiter, shipmentRoutes);
   app.use('/api/messages', generalLimiter, messageRoutes);
   app.use('/api/offers', generalLimiter, offerRoutes);
   app.use('/api/dashboard', generalLimiter, dashboardRoutes);
@@ -128,6 +131,8 @@ function setupRoutes(app, pool, middleware, services, guards) {
   app.use('/api/admin-bulk-operations', generalLimiter, adminBulkOperationsRoutes);
   app.use('/api/support', generalLimiter, supportRoutes);
   app.use('/api/admin-support', generalLimiter, adminSupportRoutes);
+  // Backward/forward compatibility: some UIs use /api/admin/support/*
+  app.use('/api/admin/support', generalLimiter, adminSupportRoutes);
   app.use('/api/audit-trail', generalLimiter, auditTrailRoutes);
   app.use('/api/analytics', generalLimiter, analyticsRoutes);
 
