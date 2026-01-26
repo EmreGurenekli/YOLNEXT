@@ -31,8 +31,10 @@ export default function Login() {
     password: '',
   });
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<{[key: string]: string}>({});
   const navigate = useNavigate();
   const { login, demoLogin, getPanelRoute } = useAuth();
   const [abVariant] = useState(() => analytics.ab.getVariant('ab_landing_v1'));
@@ -51,30 +53,78 @@ export default function Login() {
       ...prev,
       [name]: value,
     }));
+    
+    // Clear field-specific error when user starts typing
+    if (fieldErrors[name]) {
+      setFieldErrors(prev => ({
+        ...prev,
+        [name]: '',
+      }));
+    }
+    
+    // Clear general error when user starts typing
+    if (error) {
+      setError('');
+    }
+    
+    // Real-time email validation
+    if (name === 'email') {
+      if (value && !value.includes('@')) {
+        setFieldErrors(prev => ({
+          ...prev,
+          email: 'E-posta adresi @ işareti içermelidir',
+        }));
+      } else if (value && !value.includes('.')) {
+        setFieldErrors(prev => ({
+          ...prev,
+          email: 'E-posta adresi . uzantısı içermelidir',
+        }));
+      } else if (value && (value.includes('@') && value.includes('.'))) {
+        setFieldErrors(prev => ({
+          ...prev,
+          email: '',
+        }));
+      }
+    }
+    
+    // Real-time password validation
+    if (name === 'password') {
+      if (value && value.length < 8) {
+        setFieldErrors(prev => ({
+          ...prev,
+          password: 'Şifre en az 8 karakter olmalıdır',
+        }));
+      } else if (value && value.length >= 8) {
+        setFieldErrors(prev => ({
+          ...prev,
+          password: '',
+        }));
+      }
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setFieldErrors({});
 
-    // Form validation
+    // Enhanced form validation with field-specific errors
+    const errors: { [key: string]: string } = {};
+    
     if (!formData.email.trim()) {
-      setError('E-posta adresi gereklidir');
-      return;
-    }
-
-    if (!formData.email.includes('@') || !formData.email.includes('.')) {
-      setError('Geçerli bir e-posta adresi giriniz');
-      return;
+      errors.email = 'E-posta adresi gereklidir';
+    } else if (!formData.email.includes('@') || !formData.email.includes('.')) {
+      errors.email = 'Geçerli bir e-posta adresi giriniz (örn: kullanici@alanadi.com)';
     }
 
     if (!formData.password.trim()) {
-      setError('Şifre gereklidir');
-      return;
+      errors.password = 'Şifre gereklidir';
+    } else if (formData.password.length < 8) {
+      errors.password = 'Şifre en az 8 karakter olmalıdır';
     }
 
-    if (formData.password.length < 8) {
-      setError('Şifre en az 8 karakter olmalıdır');
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
       return;
     }
 
@@ -101,7 +151,7 @@ export default function Login() {
           ab: abVariant,
           reason: 'invalid_credentials',
         });
-        setError('E-posta veya şifre hatalı');
+        setError('E-posta adresi veya şifre hatalı. Lütfen bilgilerinizi kontrol edip tekrar deneyin.');
       }
     } catch (err) {
       clearTimeout(timeoutId);
@@ -109,7 +159,7 @@ export default function Login() {
         ab: abVariant,
         reason: 'exception',
       });
-      setError('Giriş yapılırken bir hata oluştu. Lütfen tekrar deneyin.');
+      setError('Giriş yapılırken bir hata oluştu. Lütfen internet bağlantınızı kontrol edip tekrar deneyin.');
     } finally {
       clearTimeout(timeoutId);
       setIsLoading(false);
@@ -341,21 +391,27 @@ export default function Login() {
             {/* Login Form */}
             <form onSubmit={handleSubmit} className='space-y-6'>
               {error && (
-                <div className='bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg flex items-center gap-2'>
-                  <AlertCircle className='w-5 h-5' />
-                  {error}
+                <div className='bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg flex items-center gap-2 animate-pulse'>
+                  <AlertCircle className='w-5 h-5 flex-shrink-0' />
+                  <span className='text-sm'>{error}</span>
+                  <button
+                    onClick={() => setError('')}
+                    className='ml-auto text-red-400 hover:text-red-600'
+                  >
+                    <X className='w-4 h-4' />
+                  </button>
                 </div>
               )}
 
               <div>
                 <label
                   htmlFor='email'
-                  className='block text-sm font-medium text-gray-700 mb-2'
+                  className={`block text-sm font-medium mb-2 ${fieldErrors.email ? 'text-red-600' : 'text-gray-700'}`}
                 >
                   E-posta Adresi
                 </label>
                 <div className='relative'>
-                  <Mail className='absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5' />
+                  <Mail className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 ${fieldErrors.email ? 'text-red-500' : 'text-gray-400'}`} />
                   <input
                     id='email'
                     name='email'
@@ -365,36 +421,67 @@ export default function Login() {
                     autoFocus
                     value={formData.email}
                     onChange={handleInputChange}
-                    className='w-full pl-10 pr-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                    className={`w-full pl-10 pr-4 py-3 bg-white border rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:border-transparent transition-colors ${
+                      fieldErrors.email 
+                        ? 'border-red-500 text-red-900 focus:ring-red-500' 
+                        : 'border-gray-300 text-gray-900 focus:ring-blue-500'
+                    }`}
                     placeholder='ornek@email.com'
                   />
+                  {fieldErrors.email && (
+                    <div className='absolute right-3 top-1/2 transform -translate-y-1/2'>
+                      <AlertCircle className='w-5 h-5 text-red-500' />
+                    </div>
+                  )}
                 </div>
+                {fieldErrors.email && (
+                  <p className='mt-1 text-sm text-red-600 flex items-center gap-1'>
+                    <AlertCircle className='w-4 h-4' />
+                    {fieldErrors.email}
+                  </p>
+                )}
               </div>
 
               <div>
-                <label
-                  htmlFor='password'
-                  className='block text-sm font-medium text-gray-700 mb-2'
-                >
-                  Şifre
-                </label>
+                <div className='flex items-center justify-between mb-2'>
+                  <label
+                    htmlFor='password'
+                    className={`block text-sm font-medium ${fieldErrors.password ? 'text-red-600' : 'text-gray-700'}`}
+                  >
+                    Şifre
+                  </label>
+                  <label className='flex items-center text-sm text-gray-600 cursor-pointer hover:text-gray-800'>
+                    <input
+                      type='checkbox'
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                      className='mr-2 rounded border-gray-300 text-blue-600 focus:ring-blue-500'
+                    />
+                    Beni hatırla
+                  </label>
+                </div>
                 <div className='relative'>
-                  <Lock className='absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5' />
+                  <Lock className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 ${fieldErrors.password ? 'text-red-500' : 'text-gray-400'}`} />
                   <input
                     id='password'
                     name='password'
                     type={showPassword ? 'text' : 'password'}
                     required
-                    autoComplete='current-password'
+                    autoComplete={rememberMe ? 'on' : 'off'}
                     value={formData.password}
                     onChange={handleInputChange}
-                    className='w-full pl-10 pr-12 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                    className={`w-full pl-10 pr-12 py-3 bg-white border rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:border-transparent transition-colors ${
+                      fieldErrors.password 
+                        ? 'border-red-500 text-red-900 focus:ring-red-500' 
+                        : 'border-gray-300 text-gray-900 focus:ring-blue-500'
+                    }`}
                     placeholder='En az 8 karakter'
                   />
                   <button
                     type='button'
                     onClick={() => setShowPassword(!showPassword)}
-                    className='absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600'
+                    className='absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none focus:text-gray-800'
+                    title={showPassword ? 'Şifreyi gizle' : 'Şifreyi göster'}
                   >
                     {showPassword ? (
                       <EyeOff className='w-5 h-5' />
@@ -403,6 +490,12 @@ export default function Login() {
                     )}
                   </button>
                 </div>
+                {fieldErrors.password && (
+                  <p className='mt-1 text-sm text-red-600 flex items-center gap-1'>
+                    <AlertCircle className='w-4 h-4' />
+                    {fieldErrors.password}
+                  </p>
+                )}
               </div>
 
               <button
