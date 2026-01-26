@@ -195,6 +195,8 @@ export default function CreateShipment() {
     deliveryDate: '',
     publishType: urlNakliyeciId ? 'specific' : 'all',
     targetNakliyeciId: urlNakliyeciId || '', // Belirli nakliyeciye özel gönderi için
+    // Sorumluluk reddi onayı (kabul etmeden yayınlanamaz)
+    disclaimerAccepted: false,
     
     // Kategoriye özel alanlar
     // Endüstriyel & Ham Madde
@@ -703,6 +705,13 @@ export default function CreateShipment() {
     if (!isValid) {
       return;
     }
+    if (!formData.disclaimerAccepted) {
+      setErrors((prev) => ({
+        ...prev,
+        disclaimerAccepted: 'Devam etmek için "Okudum, anladım ve kabul ediyorum" seçeneğini işaretleyin.',
+      }));
+      return;
+    }
 
     setIsLoading(true);
     const timeoutId = setTimeout(() => {
@@ -861,6 +870,7 @@ export default function CreateShipment() {
           deliveryDate: '',
           publishType: 'all',
           targetNakliyeciId: '',
+          disclaimerAccepted: false,
           // Kategoriye özel alanlar
           materialType: '',
           packagingType: '',
@@ -1151,7 +1161,7 @@ export default function CreateShipment() {
             className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
           />
           <label htmlFor="isOriginalPackaging" className="text-sm font-medium text-slate-700">
-            Orijinal Ambalajında *
+            Orijinal Ambalajında (opsiyonel)
           </label>
         </div>
       );
@@ -2242,7 +2252,7 @@ export default function CreateShipment() {
           ) : (
             <button
               onClick={handlePublish}
-              disabled={isLoading}
+              disabled={isLoading || !formData.disclaimerAccepted}
               className='flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 sm:px-6 py-3 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed'
             >
               {isLoading ? (

@@ -1,4 +1,4 @@
-﻿// Step 1: Yük Bilgileri Component
+// Step 1: Yük Bilgileri Component
 // Extracted from CreateShipment.tsx for better code organization
 
 import React from 'react';
@@ -31,6 +31,16 @@ export default function CreateShipmentStep1({
   setErrors,
   mainCategories,
 }: CreateShipmentStep1Props) {
+  const isSpecialCargo = formData.mainCategory === 'special_cargo';
+
+  const requirementColorClass: Record<string, string> = {
+    red: 'text-red-600',
+    orange: 'text-orange-600',
+    blue: 'text-blue-600',
+    cyan: 'text-cyan-600',
+    yellow: 'text-yellow-600',
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -40,10 +50,16 @@ export default function CreateShipmentStep1({
         </label>
         <div className="bg-blue-50 border-l-4 border-blue-600 rounded-r-lg p-4 mb-4">
           <p className="text-sm text-slate-700 leading-relaxed">
-            <strong className="text-slate-900">Önemli:</strong> Lütfen taşınacak yükünüzün kategorisini doğru seçiniz. 
-            Doğru kategori seçimi, nakliyecilerin size en uygun ve rekabetçi fiyat tekliflerini sunabilmesi için kritik öneme sahiptir. 
-            Yanlış kategori seçimi, yanlış fiyat teklifleri almanıza neden olabilir.
+            <strong className="text-slate-900">Önemli:</strong> Doğru kategori seçimi, daha uygun ve daha hızlı teklif almanı sağlar.
           </p>
+          <details className="mt-2">
+            <summary className="text-sm text-blue-800 font-semibold cursor-pointer select-none">
+              Neden önemli?
+            </summary>
+            <p className="mt-2 text-sm text-slate-700 leading-relaxed">
+              Nakliyeciler teklif hesaplamasını kategoriye göre yapar. Yanlış kategori, yanlış fiyat/uygunsuz tekliflere neden olabilir.
+            </p>
+          </details>
         </div>
         <select
           value={formData.mainCategory ?? ''}
@@ -227,7 +243,7 @@ export default function CreateShipmentStep1({
 
                 <div className="space-y-4">
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Asansör Durumu *
+                    Asansör Durumu (opsiyonel)
                   </label>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <label className="flex items-center p-3 border-2 border-gray-200 rounded-xl hover:border-blue-300 cursor-pointer transition-all">
@@ -283,16 +299,28 @@ export default function CreateShipmentStep1({
               <>
                 <div className="space-y-2">
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Mobilya Parça Sayısı
+                    Mobilya Parça Sayısı *
                   </label>
                   <input
                     type="number"
                     value={formData.furniturePieces ?? ''}
-                    onChange={(e) => handleInputChange('furniturePieces', e.target.value)}
-                    className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md"
+                    onChange={(e) => {
+                      handleInputChange('furniturePieces', e.target.value);
+                      if (errors.furniturePieces) {
+                        setErrors((prev) => ({ ...prev, furniturePieces: '' }));
+                      }
+                    }}
+                    className={`w-full p-4 border-2 rounded-xl focus:ring-2 transition-all duration-200 bg-white shadow-sm hover:shadow-md ${
+                      errors.furniturePieces
+                        ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
+                        : 'border-gray-200 focus:ring-blue-500 focus:border-blue-500'
+                    }`}
                     placeholder="Örn: 5"
                     min="1"
                   />
+                  {errors.furniturePieces && (
+                    <p className="mt-2 text-sm text-red-600">{errors.furniturePieces}</p>
+                  )}
                 </div>
 
                 <div className="space-y-4">
@@ -315,7 +343,7 @@ export default function CreateShipmentStep1({
                 <div className="space-y-2">
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     <Weight className="w-4 h-4 inline mr-2" />
-                    Ağırlık (kg) *
+                    Ağırlık (kg){isSpecialCargo ? ' *' : ' (opsiyonel)'}
                   </label>
                   <input
                     type="number"
@@ -424,7 +452,7 @@ export default function CreateShipmentStep1({
               return (
                 <div className="space-y-4">
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Özel Gereksinimler
+                    Özel Gereksinimler (opsiyonel)
                   </label>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {relevantRequirements.map((req) => {
@@ -453,7 +481,11 @@ export default function CreateShipmentStep1({
                             }}
                             className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                           />
-                          <Icon className={`w-5 h-5 ml-3 ${isSelected ? `text-${req.color}-600` : 'text-gray-400'}`} />
+                          <Icon
+                            className={`w-5 h-5 ml-3 ${
+                              isSelected ? (requirementColorClass[req.color] || 'text-blue-600') : 'text-gray-400'
+                            }`}
+                          />
                           <span className={`ml-2 text-sm font-medium ${isSelected ? 'text-blue-900' : 'text-gray-700'}`}>
                             {req.name}
                           </span>

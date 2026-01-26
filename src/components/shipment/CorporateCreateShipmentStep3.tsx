@@ -1,4 +1,4 @@
-﻿// CorporateCreateShipmentStep3.tsx
+// CorporateCreateShipmentStep3.tsx
 // Step 3 component for Corporate CreateShipment page - Preview and Publish
 // Used in: src/pages/corporate/CreateShipment.tsx
 
@@ -24,6 +24,8 @@ export default function CorporateCreateShipmentStep3({
   nakliyeciler,
   loadingNakliyeciler,
 }: CorporateCreateShipmentStep3Props) {
+  const hasAccepted = Boolean(formData?.disclaimerAccepted);
+
   return (
     <div className='space-y-6'>
       <div className='text-center mb-8'>
@@ -169,6 +171,22 @@ export default function CorporateCreateShipmentStep3({
                   Detaylı bilgi için Kullanım Koşulları&apos;nı inceleyebilirsiniz
                 </a>
               </p>
+              <div className="pt-3 border-t border-amber-200">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={hasAccepted}
+                    onChange={(e) => handleInputChange('disclaimerAccepted', e.target.checked)}
+                    className="mt-0.5 w-5 h-5 text-amber-700 border-amber-400 rounded focus:ring-amber-500"
+                  />
+                  <span className="text-sm font-semibold text-amber-900">
+                    Okudum, anladım ve kabul ediyorum.
+                  </span>
+                </label>
+                {errors?.disclaimerAccepted && (
+                  <p className="mt-2 text-sm text-red-700">{errors.disclaimerAccepted}</p>
+                )}
+              </div>
             </div>
           </div>
         </div>

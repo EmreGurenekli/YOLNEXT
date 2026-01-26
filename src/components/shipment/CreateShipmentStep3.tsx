@@ -1,4 +1,4 @@
-﻿// Step 3: Önizleme ve Yayınlama Component
+// Step 3: Önizleme ve Yayınlama Component
 // Extracted from CreateShipment.tsx for better code organization
 
 import React from 'react';
@@ -27,6 +27,8 @@ export default function CreateShipmentStep3({
   handleInputChange,
   handlePublish,
 }: CreateShipmentStep3Props) {
+  const hasAccepted = Boolean(formData?.disclaimerAccepted);
+
   return (
     <div className="space-y-6">
       <div className="text-center mb-8">
@@ -221,66 +223,79 @@ export default function CreateShipmentStep3({
         </div>
       )}
 
-      {/* Önemli Bilgilendirme - Sorumluluk Reddi */}
-      <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-6 space-y-4 shadow-sm">
+      {/* Önemli Bilgilendirme - Sorumluluk Reddi (kabul zorunlu) */}
+      <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-6 space-y-3">
         <div className="flex items-start gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center flex-shrink-0">
-            <AlertTriangle className="w-5 h-5 text-white" />
-          </div>
+          <AlertTriangle className="w-6 h-6 text-amber-600 flex-shrink-0 mt-0.5" />
           <div className="flex-1">
-            <h3 className="text-lg font-bold text-slate-900 mb-3">Önemli Bilgilendirme ve Sorumluluk Reddi</h3>
-            <div className="space-y-3 text-sm text-slate-700 leading-relaxed">
-              <p className="font-semibold text-slate-900">
-                YolNext, göndericiler ve nakliyeciler arasında güvenli bağlantı kuran dijital bir pazaryeri platformudur.
+            <h3 className="text-lg font-semibold text-amber-900 mb-3">
+              Önemli Bilgilendirme - Sorumluluk Reddi
+            </h3>
+            <div className="space-y-3 text-sm text-amber-800 leading-relaxed">
+              <p className="font-semibold">
+                YolNext bir pazaryeri platformudur. Hiçbir sorumluluk almaz.
               </p>
               <p>
-                Platformumuz, taşımacılık hizmetlerini doğrudan sağlamaz. YolNext, sadece göndericiler ve 
-                sertifikalı nakliyeciler arasında aracılık yapan bir dijital platformdur. Taşımacılık hizmeti, 
-                seçtiğiniz nakliyeci tarafından sağlanmaktadır.
+                YolNext, göndericiler ve nakliyeciler arasında bağlantı kuran bir aracı platformdur. Taşımacılık
+                hizmetlerini bizzat sağlamaz ve sigorta hizmeti vermez.
               </p>
-              <p className="font-medium text-slate-900">
-                Sorumluluk ve Riskler: Taşımacılık sürecindeki tüm riskler (kaza, yangın, çalınma, hasar vb.) 
-                gönderici ve nakliyeci arasındadır. Bu tür durumlarda çözüm, taraflar arasında yapılacak 
-                anlaşma ile sağlanmalıdır.
+              <p className="font-medium">
+                Tüm riskler gönderici ve nakliyeci arasındadır. Kaza, yangın, çalınma gibi durumlarda taraflar arasında
+                çözülmelidir. Platform sadece tarafları buluşturan bir aracıdır.
               </p>
               <p>
-                <strong className="text-slate-900">Sigorta:</strong> İhtiyaç duyduğunuz sigorta hizmetlerini, 
-                kendi sorumluluğunuzda ve nakliyeci ile yapacağınız anlaşma çerçevesinde temin etmeniz gerekmektedir. 
-                YolNext, sigorta hizmeti sağlamamaktadır.
+                <strong>Sigorta:</strong> İhtiyaç duyuyorsanız, kendi sigortanızı yaptırmak <strong>TAMAMEN</strong>{' '}
+                sizin sorumluluğunuzdadır. YolNext hiçbir sigorta hizmeti vermez.
               </p>
-              <p className="pt-2 border-t border-blue-200">
-                <Link to="/terms" target="_blank" className="text-blue-700 underline font-semibold hover:text-blue-900 transition-colors">
-                  Detaylı bilgi için Kullanım Koşulları ve Gizlilik Politikası&apos;nı inceleyebilirsiniz →
+              <p>
+                <Link
+                  to="/terms"
+                  target="_blank"
+                  className="text-amber-900 underline font-medium hover:text-amber-700 transition-colors"
+                >
+                  Detaylı bilgi için Kullanım Koşulları&apos;nı inceleyebilirsiniz
                 </Link>
               </p>
+
+              <div className="pt-3 border-t border-amber-200">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={hasAccepted}
+                    onChange={(e) => handleInputChange('disclaimerAccepted', e.target.checked)}
+                    className="mt-0.5 w-5 h-5 text-amber-700 border-amber-400 rounded focus:ring-amber-500"
+                  />
+                  <span className="text-sm font-semibold text-amber-900">
+                    Okudum, anladım ve kabul ediyorum.
+                  </span>
+                </label>
+                {errors.disclaimerAccepted && (
+                  <p className="mt-2 text-sm text-red-700">{errors.disclaimerAccepted}</p>
+                )}
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="bg-white rounded-xl p-6 border-2 border-slate-200 shadow-sm">
-        <h3 className="text-lg font-semibold text-slate-900 mb-2">Yayınlama Tercihi</h3>
-        <p className="text-sm text-slate-600 mb-4">
-          Gönderinizin hangi nakliyeciler tarafından görülebileceğini seçiniz. Tüm nakliyecilere açık yayınlama, 
-          daha fazla teklif almanızı ve en uygun fiyatı bulmanızı sağlar.
-        </p>
+      <div className="bg-white rounded-xl p-6 border border-slate-200">
+        <h3 className="text-lg font-semibold text-slate-900 mb-4">
+          Yayınlama Tercihi
+        </h3>
         <div className="space-y-4">
-          <div className="flex items-start p-4 border-2 border-blue-200 rounded-xl bg-blue-50">
+          <div className="flex items-center">
             <input
               type="radio"
               id="all"
               name="publishType"
               value="all"
-              checked={formData.publishType === 'all'}
-              onChange={(e) => handleInputChange('publishType', e.target.value)}
-              className="w-5 h-5 text-blue-600 border-gray-300 focus:ring-blue-500 mt-0.5"
+              checked
+              readOnly
+              disabled
+              className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
             />
-            <label htmlFor="all" className="ml-3 flex-1">
-              <span className="block text-sm font-semibold text-slate-900">Tüm Nakliyecilere Açık</span>
-              <span className="block text-xs text-slate-600 mt-1">
-                Platformdaki tüm sertifikalı nakliyeciler gönderinizi görebilir ve teklif sunabilir. 
-                Bu seçenek, en rekabetçi fiyatları almanızı sağlar. (Önerilen)
-              </span>
+            <label htmlFor="all" className="ml-3 text-sm font-medium text-slate-700">
+              Tüm nakliyecilere açık (Önerilen)
             </label>
           </div>
         </div>
@@ -295,9 +310,9 @@ export default function CreateShipmentStep3({
         </div>
         <button
           onClick={handlePublish}
-          disabled={isLoading}
+          disabled={isLoading || !hasAccepted}
           className={`px-8 py-4 rounded-xl font-semibold text-white transition-all duration-300 shadow-lg hover:shadow-xl ${
-            isLoading
+            isLoading || !hasAccepted
               ? 'bg-gray-400 cursor-not-allowed'
               : 'bg-gradient-to-r from-slate-800 via-blue-900 to-indigo-900 hover:from-slate-700 hover:via-blue-800 hover:to-indigo-800'
           }`}

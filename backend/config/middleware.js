@@ -97,7 +97,10 @@ function setupMiddleware(app, pool, jwtSecret, frontendOrigin, nodeEnv) {
     // Dev note: UI route-by-route smoke tests and admin panels can legitimately
     // generate high request volumes (polling + list refresh). Keep production strict,
     // but avoid 429 noise in development.
-    max: nodeEnv === 'production' ? 100 : 1_000_000,
+    // Production note: A modern SPA can generate hundreds of API requests in 15 minutes
+    // (polling, dashboard refresh, tracking, etc.). 100 is too low and causes false 429s.
+    // Keep auth endpoints separately protected by authLimiter below.
+    max: nodeEnv === 'production' ? 2000 : 1_000_000,
     message: { success: false, message: 'Too many requests' },
   });
 

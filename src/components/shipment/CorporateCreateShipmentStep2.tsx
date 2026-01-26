@@ -1,4 +1,4 @@
-﻿// CorporateCreateShipmentStep2.tsx
+// CorporateCreateShipmentStep2.tsx
 // Step 2 component for Corporate CreateShipment page - Address Information
 // Used in: src/pages/corporate/CreateShipment.tsx
 
@@ -19,6 +19,8 @@ export default function CorporateCreateShipmentStep2({
   errors,
   setErrors,
 }: CorporateCreateShipmentStep2Props) {
+  const todayISO = new Date().toISOString().split('T')[0];
+
   return (
     <div className='space-y-6'>
       <div className='text-center mb-8'>
@@ -147,6 +149,8 @@ export default function CorporateCreateShipmentStep2({
                     setErrors(prev => ({ ...prev, pickupDate: '' }));
                   }
                 }}
+                min={todayISO}
+                max={new Date(Date.now() + 20 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
                 className={`w-full p-4 border-2 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md text-slate-700 ${
                   errors.pickupDate ? 'border-red-500' : 'border-slate-200'
                 }`}
@@ -274,6 +278,7 @@ export default function CorporateCreateShipmentStep2({
                     setErrors(prev => ({ ...prev, deliveryDate: '' }));
                   }
                 }}
+                min={formData.pickupDate || todayISO}
                 className={`w-full p-4 border-2 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md text-slate-700 ${
                   errors.deliveryDate ? 'border-red-500' : 'border-slate-200'
                 }`}
