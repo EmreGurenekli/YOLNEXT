@@ -56,7 +56,7 @@ const TasiyiciSidebar: React.FC<TasiyiciSidebarProps> = ({ onLogout }) => {
 
   // Dinamik breakpoint kontrolü - tamamen tarayıcı boyutuna göre
   // Sabit breakpoint yok, her zaman dinamik
-  const shouldShowMobileMenu = windowWidth <= 300; // Sadece çok küçük ekranlarda hamburger menü
+  const shouldShowMobileMenu = windowWidth <= 768; // Tablet ve mobil ekranlarda hamburger menü
 
   useEffect(() => {
     // Ensure we never leave the mobile overlay open across route transitions

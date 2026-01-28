@@ -42,7 +42,7 @@ const CorporateSidebar: React.FC<CorporateSidebarProps> = ({ onLogout }) => {
       const width = window.innerWidth;
       setWindowWidth(width);
       // Eğer pencere genişlerse menüyü otomatik kapat
-      if (width > 300) {
+      if (width > 768) {
         setIsMobileMenuOpen(false);
       }
     };
@@ -55,7 +55,7 @@ const CorporateSidebar: React.FC<CorporateSidebarProps> = ({ onLogout }) => {
 
   // Dinamik breakpoint kontrolü - tamamen tarayıcı boyutuna göre
   // Sabit breakpoint yok, her zaman dinamik
-  const shouldShowMobileMenu = windowWidth <= 300; // Sadece çok küçük ekranlarda hamburger menü
+  const shouldShowMobileMenu = windowWidth <= 768; // Tablet ve mobil ekranlarda hamburger menü
 
   // Debug için
   useEffect(() => {
