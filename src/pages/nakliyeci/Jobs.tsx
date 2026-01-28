@@ -1187,7 +1187,7 @@ const Jobs: React.FC = () => {
                   <label className='block text-sm font-medium text-slate-700 mb-2'>
                     Sıralama
                   </label>
-                  <div className='flex gap-2'>
+                  <div className='flex gap-2 flex-col sm:flex-row'>
                     <select
                       value={sortBy}
                       onChange={e => setSortBy(e.target.value as 'date' | 'price' | 'distance')}
@@ -1199,7 +1199,7 @@ const Jobs: React.FC = () => {
                     </select>
                     <button
                       onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                      className='px-3 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors'
+                      className='px-3 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors text-sm'
                       title={sortOrder === 'asc' ? 'Artan' : 'Azalan'}
                     >
                       {sortOrder === 'asc' ? '↑' : '↓'}

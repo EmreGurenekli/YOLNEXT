@@ -1039,9 +1039,9 @@ export default function UnifiedMessages({ userType }: UnifiedMessagesProps) {
             </div>
           </div>
 
-          <div className='flex h-[600px]' style={{ minHeight: '600px' }}>
+          <div className='flex flex-col lg:flex-row h-[600px]' style={{ minHeight: '600px' }}>
             {/* Conversations List */}
-            <div className='w-1/3 border-r border-slate-200 bg-slate-50' style={{ minHeight: '600px' }}>
+            <div className='w-full lg:w-1/3 border-r border-slate-200 bg-slate-50' style={{ minHeight: '600px' }}>
               {/* Tabs */}
               <div className='p-4 border-b border-slate-200'>
                 <div className='flex space-x-1 bg-white p-1 rounded-lg shadow-sm'>
@@ -1178,7 +1178,7 @@ export default function UnifiedMessages({ userType }: UnifiedMessagesProps) {
             </div>
 
             {/* Chat Area */}
-            <div className='flex-1 flex flex-col' style={{ minHeight: '600px' }}>
+            <div className='w-full lg:flex-1 flex flex-col' style={{ minHeight: '600px' }}>
               {selectedConversation ? (
                 <>
                   {/* Chat Header */}

@@ -749,8 +749,8 @@ export default function Offers() {
         </div>
 
         {/* Filters Card */}
-        <div className='bg-white rounded-2xl p-8 shadow-xl border border-slate-200 mb-8'>
-          <div className='grid grid-cols-1 md:grid-cols-4 gap-4'>
+        <div className='bg-white rounded-2xl p-4 sm:p-8 shadow-xl border border-slate-200 mb-8'>
+          <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4'>
             <div className='relative'>
               <Search className='absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4' />
               <input
@@ -758,7 +758,7 @@ export default function Offers() {
                 placeholder='Teklif ara...'
                 value={searchTerm}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
-                className='w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                className='w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm'
                 aria-label='Teklif ara'
               />
             </div>
@@ -766,7 +766,7 @@ export default function Offers() {
             <select
               value={filterStatus}
               onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFilterStatus(e.target.value)}
-              className='px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+              className='px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm'
               aria-label='Durum filtresi'
             >
               <option value='all'>Tüm Durumlar</option>
@@ -778,7 +778,7 @@ export default function Offers() {
             <select
               value={sortBy}
               onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setSortBy(e.target.value)}
-              className='px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+              className='px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm'
               aria-label='Sıralama seçeneği'
             >
               <option value='date'>Tarihe Göre</option>
@@ -793,7 +793,7 @@ export default function Offers() {
                 setFilterStatus('all');
                 setSortBy('date');
               }}
-              className='px-4 py-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors flex items-center justify-center gap-2'
+              className='px-4 py-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors flex items-center justify-center gap-2 text-sm'
             >
               <X className='w-4 h-4' />
               Sıfırla
@@ -960,18 +960,18 @@ export default function Offers() {
                   </div>
 
                   {/* Actions */}
-                  <div className='flex items-center justify-between'>
+                  <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3'>
                     <div className='text-sm text-slate-500'>
                       {offer.message.length > 60
                         ? offer.message.substring(0, 60) + '...'
                         : offer.message}
                     </div>
-                    <div className='flex items-center gap-2'>
+                    <div className='flex flex-wrap gap-2 justify-end'>
                       {offer.status === 'pending' && (
                         <>
                           <button
                             onClick={() => handleAcceptOffer(offer.id)}
-                            className='px-4 py-2 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white text-sm font-medium rounded-lg transition-all duration-200 shadow-md hover:shadow-lg flex items-center gap-1'
+                            className='px-3 py-2 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white text-sm font-medium rounded-lg transition-all duration-200 shadow-md hover:shadow-lg flex items-center gap-1 flex-1 sm:flex-none min-w-[100px] justify-center'
                           >
                             <CheckCircle className='w-4 h-4' />
                             Kabul Et
@@ -981,7 +981,7 @@ export default function Offers() {
                               setOfferToReject(offer.id);
                               setShowRejectModal(true);
                             }}
-                            className='px-4 py-2 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white text-sm font-medium rounded-lg transition-all duration-200 shadow-md hover:shadow-lg flex items-center gap-1'
+                            className='px-3 py-2 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white text-sm font-medium rounded-lg transition-all duration-200 shadow-md hover:shadow-lg flex items-center gap-1 flex-1 sm:flex-none min-w-[100px] justify-center'
                           >
                             <XCircle className='w-4 h-4' />
                             Reddet
@@ -990,7 +990,7 @@ export default function Offers() {
                       )}
                       <button
                         onClick={() => handleViewDetails(offer.id)}
-                        className='px-4 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 text-sm font-medium rounded-lg transition-colors flex items-center gap-1'
+                        className='px-3 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 text-sm font-medium rounded-lg transition-colors flex items-center gap-1 flex-1 sm:flex-none min-w-[80px] justify-center'
                       >
                         <Eye className='w-4 h-4' />
                         Detay
