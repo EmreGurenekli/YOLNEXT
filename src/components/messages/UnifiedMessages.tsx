@@ -1024,46 +1024,25 @@ export default function UnifiedMessages({ userType }: UnifiedMessagesProps) {
                   />
                   Yenile
                 </button>
-
-                {userType !== 'tasiyici' && (
-                  <button
-                    type='button'
-                    onClick={() => navigate(getSettingsUrl())}
-                    className='flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors'
-                  >
-                    <Settings className='w-4 h-4' />
-                    Ayarlar
-                  </button>
-                )}
               </div>
             </div>
           </div>
 
           <div className='flex flex-col lg:flex-row h-[600px]' style={{ minHeight: '600px' }}>
-            {/* Conversations List */}
-            <div className='w-full lg:w-1/3 border-r border-slate-200 bg-slate-50' style={{ minHeight: '600px' }}>
+            {/* Conversations List - Mobilde seçili konuşma varsa gizlenir */}
+            <div className={`w-full lg:w-1/3 border-r border-slate-200 bg-slate-50 ${selectedConversation ? 'hidden lg:block' : 'block'}`} style={{ minHeight: '600px' }}>
               {/* Tabs */}
               <div className='p-4 border-b border-slate-200'>
-                <div className='flex space-x-1 bg-white p-1 rounded-lg shadow-sm'>
+                <div className='bg-white p-1 rounded-lg shadow-sm'>
                   <button
                     onClick={() => setActiveTab('active')}
-                    className={`flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                    className={`w-full px-3 py-2 text-sm font-medium rounded-md transition-colors ${
                       activeTab === 'active'
                         ? 'bg-blue-500 text-white shadow-sm'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    Aktif ({conversations.filter(c => !c.isArchived).length})
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('archived')}
-                    className={`flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                      activeTab === 'archived'
-                        ? 'bg-blue-500 text-white shadow-sm'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    Arşiv ({conversations.filter(c => c.isArchived).length})
+                    Mesajlar ({conversations.filter(c => !c.isArchived).length})
                   </button>
                 </div>
               </div>
@@ -1177,14 +1156,23 @@ export default function UnifiedMessages({ userType }: UnifiedMessagesProps) {
               </div>
             </div>
 
-            {/* Chat Area */}
-            <div className='w-full lg:flex-1 flex flex-col' style={{ minHeight: '600px' }}>
+            {/* Chat Area - Mobilde tam genişlik */}
+            <div className={`w-full lg:flex-1 flex flex-col ${selectedConversation ? 'block' : 'hidden lg:block'}`} style={{ minHeight: '600px' }}>
               {selectedConversation ? (
                 <>
                   {/* Chat Header */}
-                  <div className='p-6 border-b border-slate-200 bg-white'>
+                  <div className='p-4 sm:p-6 border-b border-slate-200 bg-white'>
                     <div className='flex items-center justify-between'>
-                      <div className='flex items-center gap-4'>
+                      <div className='flex items-center gap-2 sm:gap-4 flex-1'>
+                        {/* Mobilde geri butonu */}
+                        <button
+                          onClick={() => setSelectedConversation(null)}
+                          className='lg:hidden p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors'
+                        >
+                          <svg className='w-5 h-5' fill='none' stroke='currentColor' viewBox='0 0 24 24'>
+                            <path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M15 19l-7-7 7-7' />
+                          </svg>
+                        </button>
                         <div className='relative'>
                           <div className='w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-lg'>
                             {(selectedConversation.carrierName || selectedConversation.participant || getOtherUserLabel()).charAt(0).toUpperCase()}
@@ -1210,7 +1198,7 @@ export default function UnifiedMessages({ userType }: UnifiedMessagesProps) {
                       <div className='flex items-center gap-2'>
                         <button
                           onClick={handleDeleteConversation}
-                          className='px-3 py-2 text-xs font-semibold text-red-600 border border-red-200 rounded-lg hover:text-red-700 hover:bg-red-50 transition'
+                          className='px-3 py-2 text-xs font-semibold text-red-600 border border-red-200 rounded-lg hover:text-red-700 hover:bg-red-50 transition hidden sm:block'
                         >
                           Sohbeti Sil
                         </button>
