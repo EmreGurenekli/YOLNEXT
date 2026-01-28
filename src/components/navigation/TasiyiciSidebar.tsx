@@ -43,7 +43,7 @@ const TasiyiciSidebar: React.FC<TasiyiciSidebarProps> = ({ onLogout }) => {
       const width = window.innerWidth;
       setWindowWidth(width);
       // Eğer pencere genişlerse menüyü otomatik kapat
-      if (width > 768) {
+      if (width > 480) {
         setIsMobileMenuOpen(false);
       }
     };
@@ -56,7 +56,7 @@ const TasiyiciSidebar: React.FC<TasiyiciSidebarProps> = ({ onLogout }) => {
 
   // Dinamik breakpoint kontrolü - tamamen tarayıcı boyutuna göre
   // Sabit breakpoint yok, her zaman dinamik
-  const shouldShowMobileMenu = windowWidth <= 768; // Tablet ve mobil ekranlarda hamburger menü
+  const shouldShowMobileMenu = windowWidth <= 480; // Mobil ve tablet küçük ekranlarda hamburger menü
 
   useEffect(() => {
     // Ensure we never leave the mobile overlay open across route transitions
@@ -132,7 +132,7 @@ const TasiyiciSidebar: React.FC<TasiyiciSidebarProps> = ({ onLogout }) => {
         ${!shouldShowMobileMenu ? 'translate-x-0' : ''}
       `}
         style={{ 
-          width: shouldShowMobileMenu ? '320px' : `${Math.min(256, Math.max(200, windowWidth * 0.25))}px`
+          width: shouldShowMobileMenu ? '280px' : `${Math.min(256, Math.max(200, windowWidth * 0.25))}px`
         }}
       >
         {/* Logo */}

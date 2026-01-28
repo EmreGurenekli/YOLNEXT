@@ -17,7 +17,7 @@ const IndividualLayout: React.FC = () => {
   }, []);
 
   // Dinamik sidebar genişliği
-  const sidebarWidth = windowWidth <= 768 ? 0 : Math.min(256, Math.max(200, windowWidth * 0.25));
+  const sidebarWidth = windowWidth <= 480 ? 0 : Math.min(256, Math.max(200, windowWidth * 0.25));
 
   const handleLogout = () => {
     logout();
