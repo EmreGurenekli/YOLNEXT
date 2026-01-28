@@ -1,0 +1,105 @@
+# Dependencies
+node_modules/
+dist/
+coverage/
+build/
+
+# Test files (removed - no unit tests)
+test-results/
+test-screenshots/
+test-videos/
+screenshots/
+playwright-report/
+.playwright-mcp/
+*.log
+*.cache
+tests/
+backend/tests/
+tools/legacy/
+backup/
+backend/backup/
+backend/backups/
+
+# Temporary/generated files
+microservices/api-gateway/temp_settings.html
+public/sw.js
+
+# Cursor/IDE
+.vscode/
+.cursor/
+*.code-workspace
+.idea/
+
+!.vscode/settings.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Legacy (removed)
+# /legacy/
+
+# Microservices (removed - using monolith)
+# /microservices/
+
+# Monitoring (removed - production not needed)
+# /monitoring/
+
+# Tools (removed - no tests)
+# /tools/
+
+# Test results
+playwright-report/
+test-results/
+screenshots/
+testsprite_tests/
+
+# Environment files (CRITICAL - Never commit these!)
+.env
+.env.local
+.env.development
+.env.production
+.env.*.local
+*.env
+!.env.example
+
+# Local env files used by this repo (not prefixed with dot)
+env.local
+env.development
+env.production
+
+# Sensitive data
+backend-data.json
+frontend-output.log
+backend_output.log
+*.key
+*.pem
+*.cert
+ssl/
+secrets/
+
+# Local databases
+*.sqlite
+*.sqlite3
+*.db
+
+# Local artifacts
+.local-artifacts/
+
+# Logs
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+# Allowlisted local logs for debugging (do not commit sensitive env)
+!backend-output.log
+!backend/backend-error.log
+!backend/debug_shipment_error.log
+
+# Production builds
+dist/
+build/
+
+# TypeScript build artifacts
+*.tsbuildinfo
