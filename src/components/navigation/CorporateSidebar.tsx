@@ -32,13 +32,35 @@ interface CorporateSidebarProps {
 const CorporateSidebar: React.FC<CorporateSidebarProps> = ({ onLogout }) => {
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [windowWidth, setWindowWidth] = useState(1024); // Default desktop
   const { badgeCounts } = useNotificationBadgeCounts();
   const { user } = useAuth();
 
+  // Dinamik window size takibi
   useEffect(() => {
-    // Ensure we never leave the mobile overlay open across route transitions
-    setIsMobileMenuOpen(false);
-  }, [location.pathname]);
+    const handleResize = () => {
+      const width = window.innerWidth;
+      setWindowWidth(width);
+      // Eğer pencere genişlerse menüyü otomatik kapat
+      if (width > 300) {
+        setIsMobileMenuOpen(false);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    handleResize(); // İlk değer
+
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Dinamik breakpoint kontrolü - tamamen tarayıcı boyutuna göre
+  // Sabit breakpoint yok, her zaman dinamik
+  const shouldShowMobileMenu = windowWidth <= 300; // Sadece çok küçük ekranlarda hamburger menü
+
+  // Debug için
+  useEffect(() => {
+    console.log('Window width:', windowWidth, 'shouldShowMobileMenu:', shouldShowMobileMenu);
+  }, [windowWidth, shouldShowMobileMenu]);
 
   const menuSections = [
     {
@@ -101,8 +123,9 @@ const CorporateSidebar: React.FC<CorporateSidebarProps> = ({ onLogout }) => {
 
   return (
     <>
-      {/* Mobile Menu Button */}
-      <div className='lg:hidden fixed top-4 left-4 z-50'>
+      {/* Mobile Menu Button - sadece çok küçük ekranlarda */}
+      {shouldShowMobileMenu && (
+        <div className='fixed top-4 left-4 z-50'>
         <button
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
           className='w-12 h-12 bg-white rounded-xl shadow-lg border border-slate-200 flex items-center justify-center hover:bg-slate-50 transition-colors'
@@ -113,25 +136,30 @@ const CorporateSidebar: React.FC<CorporateSidebarProps> = ({ onLogout }) => {
             <Menu className='w-6 h-6' />
           )}
         </button>
-      </div>
+        </div>
+      )}
 
       {/* Mobile Overlay */}
       {isMobileMenuOpen && (
         <div
-          className='lg:hidden fixed inset-0 bg-black bg-opacity-50 z-40'
+          className='fixed inset-0 bg-black bg-opacity-50 z-40'
           onClick={() => setIsMobileMenuOpen(false)}
         />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar - tamamen dinamik genişlik */}
       <div
         className={`
-        fixed lg:static top-0 left-0 z-50 h-full w-80 lg:w-64 
+        fixed top-0 left-0 z-50 h-full 
         bg-gradient-to-b from-slate-50 to-white shadow-xl 
         flex flex-col border-r border-slate-200
         transform transition-transform duration-300 ease-in-out
-        ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+        ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
+        ${!shouldShowMobileMenu ? 'translate-x-0' : ''}
       `}
+        style={{ 
+          width: shouldShowMobileMenu ? '320px' : `${Math.min(256, Math.max(200, windowWidth * 0.25))}px`
+        }}
       >
         {/* Logo */}
         <div className='border-b border-slate-200 bg-white overflow-hidden flex items-center justify-between h-20 px-3'>
@@ -223,7 +251,6 @@ const CorporateSidebar: React.FC<CorporateSidebarProps> = ({ onLogout }) => {
 };
 
 export default CorporateSidebar;
-
 
 
 

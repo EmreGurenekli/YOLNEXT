@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useAuth } from '../../contexts/AuthContext';
@@ -15,16 +15,10 @@ import {
   Truck,
   ArrowRight,
   Users,
-  Eye,
-  Filter,
-  Search,
-  Calendar,
-  AlertCircle,
 } from 'lucide-react';
 import LoadingState from '../../components/shared-ui-elements/LoadingState';
 import GuidanceOverlay from '../../components/shared-ui-elements/GuidanceOverlay';
 import SimpleOnboarding from '../../components/onboarding/SimpleOnboarding';
-import QuickStartChecklist from '../../components/onboarding/QuickStartChecklist';
 import { formatCurrency, formatDate, sanitizeShipmentTitle } from '../../utils/format';
 import { createApiUrl } from '../../config/api';
 import { resolveShipmentRoute } from '../../utils/shipmentRoute';
@@ -32,8 +26,6 @@ import NotificationCenter from '../../components/NotificationCenter';
 import CarrierInfoCard from '../../components/CarrierInfoCard';
 import { normalizeTrackingCode } from '../../utils/trackingCode';
 import { getStatusInfo } from '../../utils/shipmentStatus';
-import Breadcrumbs, { BreadcrumbConfig } from '../../components/shared-ui-elements/Breadcrumbs';
-import { LoadingStates, EmptyState, StatusMessage, LoadingSpinner } from '../../components/shared-ui-elements/LoadingStates';
 
 interface Shipment {
   id: string;
@@ -60,6 +52,7 @@ interface Shipment {
   volume: number;
   estimatedDelivery: string;
 }
+
 
 // Kategori çeviri mapping
 const categoryLabels: Record<string, string> = {
@@ -105,53 +98,38 @@ const Dashboard = () => {
     activeShipments: 0,
     deliveredShipments: 0,
     pendingShipments: 0,
-    totalOffers: 0,
-    averagePrice: 0,
+    cancelledShipments: 0,
     successRate: 0,
+    totalSpent: 0,
+    thisMonthSpent: 0,
+    favoriteCarriers: 0,
   });
-  const [shipments, setShipments] = useState<Shipment[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [showNotifications, setShowNotifications] = useState(false);
+  const [recentShipments, setRecentShipments] = useState<Shipment[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
 
   useEffect(() => {
-    // Onboarding sadece ilk kayıt sonrası 1 kez açılsın
-    if (!user?.id) return;
-    const role = String((user as any)?.role || 'individual').toLowerCase();
-    const perUserKey = `onboardingCompleted:${user.id}:${role}`;
-    const perUserSeen = localStorage.getItem(perUserKey) === 'true';
-    const pendingKey = `onboardingPending:${user.id}:${role}`;
-    const isPending = localStorage.getItem(pendingKey) === 'true';
-
-    if (perUserSeen) {
-      try {
-        localStorage.removeItem(pendingKey);
-      } catch {
-        // ignore
-      }
-      return;
+    // İlk giriş kontrolü - onboarding göster
+    const hasSeenOnboarding = localStorage.getItem('onboardingCompleted');
+    if (!hasSeenOnboarding && user?.id) {
+      setShowOnboarding(true);
     }
-
-    if (isPending) setShowOnboarding(true);
   }, [user?.id]);
 
   useEffect(() => {
     const loadDashboardData = async () => {
       if (!user?.id) {
-        setLoading(false);
+        setIsLoading(false);
         return;
       }
       
-      setLoading(true);
+      setIsLoading(true);
       
-      // Timeout protection
+      // Timeout protection - maksimum 10 saniye bekle
       const timeoutId = setTimeout(() => {
-        setLoading(false);
-        setError('Dashboard yüklenirken zaman aşımı oluştu. Lütfen sayfayı yenileyin.');
+        setIsLoading(false);
       }, 10000);
       
       try {
@@ -165,479 +143,743 @@ const Dashboard = () => {
               activeShipments: toNumber(statsData.activeShipments, 0),
               deliveredShipments: toNumber(statsData.completedShipments ?? statsData.deliveredShipments, 0),
               pendingShipments: toNumber(statsData.pendingShipments, 0),
-              totalOffers: toNumber(statsData.totalOffers, 0),
-              averagePrice: toNumber(statsData.averagePrice, 0),
+              cancelledShipments: toNumber(statsData.cancelledShipments ?? statsData.canceledShipments, 0),
               successRate: toNumber(statsData.successRate, 0),
+              totalSpent: toNumber(statsData.totalSpent, 0),
+              thisMonthSpent: 0,
+              favoriteCarriers: 0,
             });
           }
-        } catch (statsError) {
-          console.error('Stats API error:', statsError);
-          // Continue with default values
+        } catch (e) {
+          // keep previous stats on partial failure
         }
 
-        // Load shipments (using mock data for now)
+        // Load recent shipments using same endpoint as MyShipments for consistency
         try {
-          // Mock data since API method doesn't exist
-          const mockShipments: Shipment[] = [];
-          setShipments(mockShipments);
-        } catch (shipmentsError) {
-          console.error('Shipments error:', shipmentsError);
-          // Continue with empty array
+          const token = localStorage.getItem('authToken') || localStorage.getItem('token');
+          if (!token) {
+            setRecentShipments([]);
+          } else {
+            const params = new URLSearchParams({
+              page: '1',
+              limit: '5',
+              userId: String(user.id),
+            });
+            const response = await fetch(createApiUrl(`/api/shipments?${params.toString()}`), {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
+            });
+            const data = await response.json();
+            if (response.ok && data?.success) {
+              const shipments =
+                data.data?.shipments ||
+                data.shipments ||
+                (Array.isArray(data.data) ? data.data : []) ||
+                [];
+
+              const formattedShipments = (Array.isArray(shipments) ? shipments : []).map((shipment: any) => {
+              const { from, to } = resolveShipmentRoute(shipment);
+              const rawStatus = String(shipment?.status || '').trim().toLowerCase();
+              const normalizedStatus =
+                rawStatus === 'open' || rawStatus === 'waiting_for_offers'
+                  ? 'waiting'
+                  : rawStatus === 'offer_accepted' || rawStatus === 'accepted'
+                    ? 'offer_accepted'
+                    : rawStatus === 'in_transit' || rawStatus === 'in_progress'
+                      ? 'in_transit'
+                      : rawStatus === 'delivered' || rawStatus === 'completed'
+                        ? 'delivered'
+                        : rawStatus === 'cancelled' || rawStatus === 'canceled'
+                          ? 'cancelled'
+                          : rawStatus === 'preparing'
+                            ? 'preparing'
+                            : rawStatus || 'waiting';
+
+              const priceNumber = toNumber(
+                shipment?.displayPrice ?? shipment?.price ?? shipment?.offerPrice ?? shipment?.value,
+                0
+              );
+              const volumeNumber = toNumber(shipment?.volume ?? shipment?.volume_m3 ?? shipment?.volumeM3, 0);
+              const createdAt = shipment?.createdAt || shipment?.created_at || shipment?.createdAt;
+              const estimatedDelivery =
+                shipment?.estimatedDelivery ||
+                shipment?.estimated_delivery ||
+                shipment?.deliveryDate ||
+                shipment?.delivery_date;
+
+              return {
+                ...shipment,
+                id: shipment?.id?.toString?.() || String(shipment?.id || ''),
+                title: sanitizeShipmentTitle(shipment?.title || shipment?.productDescription || shipment?.description || 'Gönderi'),
+                status: normalizedStatus,
+                price: priceNumber,
+                volume: volumeNumber,
+                createdAt,
+                estimatedDelivery,
+                trackingCode: normalizeTrackingCode(
+                  shipment?.trackingCode ||
+                  shipment?.trackingNumber ||
+                  shipment?.tracking_number,
+                  shipment?.id
+                ),
+                from,
+                to,
+                carrierName:
+                  shipment?.carrierName ||
+                  shipment?.carrier_name ||
+                  shipment?.nakliyeciName ||
+                  shipment?.nakliyeci_name ||
+                  shipment?.assignedCarrierName ||
+                  undefined,
+                carrierEmail: shipment?.carrierEmail || shipment?.carrier_email || undefined,
+                carrierCompany: shipment?.carrierCompany || shipment?.carrier_company || undefined,
+                carrierId: shipment?.carrierId || shipment?.carrier_id || shipment?.nakliyeciId || shipment?.nakliyeci_id || undefined,
+                carrierRating: shipment?.carrierRating || 0,
+                carrierReviews: shipment?.carrierReviews || 0,
+                carrierVerified: shipment?.carrierVerified || false,
+                completedJobs: shipment?.completedJobs || 0,
+                successRate: shipment?.successRate || 0,
+                rating: toNumber(shipment?.rating, 0),
+              };
+            });
+
+              const sorted = formattedShipments
+                .slice()
+                .sort((a, b) => {
+                  const ta = new Date(a.createdAt || (a as any).updatedAt || 0).getTime();
+                  const tb = new Date(b.createdAt || (b as any).updatedAt || 0).getTime();
+                  return tb - ta;
+                })
+                .slice(0, 5);
+              setRecentShipments(sorted);
+            }
+          }
+        } catch (e) {
+          // keep previous recent shipments on partial failure
         }
 
-        // Load unread notifications count
+        // Load unread notifications count from real API
         try {
           const notificationsResponse = await notificationAPI.getUnreadCount();
-          if (notificationsResponse?.success && notificationsResponse?.data) {
-            setUnreadCount(toNumber(notificationsResponse.data.count, 0));
+          if (notificationsResponse?.success) {
+            const d = (notificationsResponse as any).data || {};
+            setUnreadCount(d.count || d.unreadCount || d.unread || 0);
           }
-        } catch (notificationsError) {
-          console.error('Notifications API error:', notificationsError);
-          // Continue with 0
+        } catch (e) {
+          // keep previous unread count on partial failure
         }
-
-        clearTimeout(timeoutId);
-        setError(null);
       } catch (error) {
-        clearTimeout(timeoutId);
-        console.error('Dashboard loading error:', error);
-        setError('Dashboard yüklenirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
+        // Global error handling - ensure loading state is cleared
+        console.error('Dashboard data loading error:', error);
       } finally {
-        setLoading(false);
+        clearTimeout(timeoutId);
+        setIsLoading(false);
       }
     };
 
     loadDashboardData();
   }, [user?.id]);
 
-  // Filter shipments based on search and status
-  const filteredShipments = shipments.filter(shipment => {
-    const matchesSearch = !searchTerm || 
-      shipment.trackingCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      shipment.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      shipment.from.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      shipment.to.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesStatus = filterStatus === 'all' || shipment.status === filterStatus;
-    
-    return matchesSearch && matchesStatus;
-  });
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'delivered':
-        return 'text-green-600 bg-green-50';
-      case 'active':
-        return 'text-blue-600 bg-blue-50';
-      case 'pending':
-        return 'text-yellow-600 bg-yellow-50';
-      case 'cancelled':
-        return 'text-red-600 bg-red-50';
-      default:
-        return 'text-gray-600 bg-gray-50';
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'delivered':
-        return <CheckCircle2 className="w-4 h-4" />;
-      case 'active':
-        return <Truck className="w-4 h-4" />;
-      case 'pending':
-        return <Clock className="w-4 h-4" />;
-      case 'cancelled':
-        return <XCircle className="w-4 h-4" />;
-      default:
-        return <Package className="w-4 h-4" />;
-    }
-  };
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'delivered':
-        return 'Teslim Edildi';
-      case 'active':
-        return 'Aktif';
-      case 'pending':
-        return 'Beklemede';
-      case 'cancelled':
-        return 'İptal Edildi';
-      default:
-        return 'Bilinmiyor';
-    }
-  };
-
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <Helmet>
-          <title>Yükleniyor - YolNext Bireysel</title>
-        </Helmet>
-        <div className="flex items-center justify-center min-h-screen">
-          <LoadingSpinner />
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <Helmet>
-          <title>Hata - YolNext Bireysel</title>
-        </Helmet>
-        <div className="flex items-center justify-center min-h-screen p-4">
-          <StatusMessage 
-            type="error" 
-            message={error}
-            onDismiss={() => setError(null)}
-          />
-        </div>
+      <div className='min-h-screen bg-gray-50 flex items-center justify-center'>
+        <LoadingState
+          message='Ana Sayfa yükleniyor...'
+          size='lg'
+          className='py-12'
+        />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className='min-h-screen bg-white'>
       <Helmet>
         <title>Ana Sayfa - YolNext Bireysel</title>
-        <meta name="description" content="YolNext bireysel gönderici paneli. Gönderilerinizi yönetin, takip edin, tasarruf edin!" />
+        <meta name='description' content='YolNext bireysel panel ana sayfası' />
       </Helmet>
 
-      {/* Breadcrumb Navigation */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="py-3">
-            <Breadcrumbs items={BreadcrumbConfig.individualDashboard} />
-          </div>
-        </div>
-      </div>
+      <div className='max-w-5xl mx-auto px-3 sm:px-4 py-4 sm:py-6'>
+        {/* Hero Section */}
+        <div className='relative overflow-hidden bg-gradient-to-br from-slate-800 via-blue-900 to-indigo-900 rounded-3xl p-6 text-white shadow-2xl mb-8'>
+          <div className='absolute inset-0 bg-gradient-to-br from-white/5 to-transparent'></div>
+          <div className='absolute top-0 right-0 w-80 h-80 bg-gradient-to-br from-blue-400/10 to-indigo-400/10 rounded-full -translate-y-40 translate-x-40'></div>
+          <div className='absolute bottom-0 left-0 w-64 h-64 bg-gradient-to-tr from-slate-400/10 to-blue-400/10 rounded-full translate-y-32 -translate-x-32'></div>
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">
-                Merhaba {(user as any)?.name || 'Kullanıcı'}!
-              </h1>
-              <p className="text-gray-600 mt-2">
-                Gönderilerinizi yönetin, takip edin, tasarruf edin! Her gönderide %30-50 daha ucuz fiyatlarla yanınızdayız.
-              </p>
-            </div>
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={() => setShowNotifications(!showNotifications)}
-                className="relative p-2 text-gray-600 hover:text-gray-900 transition-colors"
-              >
-                <Bell className="w-6 h-6" />
-                {unreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                    {unreadCount}
-                  </span>
-                )}
-              </button>
-              <Link
-                to="/individual/create-shipment"
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center transition-colors"
-              >
-                <Plus className="w-5 h-5 mr-2" />
-                Yeni Gönderi
-              </Link>
-            </div>
-          </div>
-        </div>
+          <div className='relative z-10'>
+            <div className='flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between'>
+              <div className='flex-1 min-w-0'>
+                <div className='flex items-center gap-4 mb-4'>
+                  <div className='w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl flex items-center justify-center shadow-xl border border-white/20'>
+                    <span className='text-white font-bold text-xl'>YN</span>
+                  </div>
+                  <div>
+                    <h1 className='text-3xl font-bold mb-2 bg-gradient-to-r from-white to-blue-200 bg-clip-text text-transparent'>
+                      Merhaba{' '}
+                      {user?.firstName ||
+                        user?.fullName?.split(' ')[0] ||
+                        'Kullanıcı'}
+                      ! 👋
+                    </h1>
+                    <p className='text-slate-200 text-lg leading-relaxed'>
+                      Gönderilerinizi yönetin, takip edin, <span className='text-blue-300 font-semibold'>tasarruf edin!</span>
+                      <br />
+                      <span className='text-emerald-300 font-semibold'>
+                        Her gönderide %30-50 daha ucuz
+                      </span>{' '}
+                      fiyatlarla yanınızdayız.
+                    </p>
+                  </div>
+                </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <Package className="h-8 w-8 text-blue-600" />
+                <div className='flex flex-wrap items-center gap-4'>
+                  <div className='flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-2xl px-4 py-2 border border-white/20'>
+                    <div className='w-2 h-2 bg-emerald-400 rounded-full animate-pulse shadow-lg'></div>
+                    <span className='text-slate-200 font-medium'>
+                      Çevrimiçi
+                    </span>
+                  </div>
+                  <div className='bg-white/10 backdrop-blur-sm rounded-2xl px-4 py-2 border border-white/20'>
+                    <span className='text-slate-200 font-medium'>
+                      {stats.totalShipments} Gönderi
+                    </span>
+                  </div>
+                </div>
               </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">Toplam Gönderi</dt>
-                  <dd className="text-lg font-medium text-gray-900">{stats.totalShipments}</dd>
-                </dl>
-              </div>
-            </div>
-          </div>
 
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <Truck className="h-8 w-8 text-green-600" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">Aktif Gönderi</dt>
-                  <dd className="text-lg font-medium text-gray-900">{stats.activeShipments}</dd>
-                </dl>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <CheckCircle2 className="h-8 w-8 text-blue-600" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">Teslim Edildi ✓</dt>
-                  <dd className="text-lg font-medium text-gray-900">{stats.deliveredShipments}</dd>
-                </dl>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <Clock className="h-8 w-8 text-yellow-600" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">Beklemede</dt>
-                  <dd className="text-lg font-medium text-gray-900">{stats.pendingShipments}</dd>
-                </dl>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Success Rate */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-medium text-gray-900">Başarı Oranı</h3>
-              <p className="text-sm text-gray-500">Sorunsuz teslimat oranın - yüksek = güven</p>
-            </div>
-            <div className="text-right">
-              <div className="text-2xl font-bold text-gray-900">{stats.successRate}%</div>
-              <div className="text-sm text-gray-500">Başarı Oranı</div>
-            </div>
-          </div>
-          <div className="mt-4">
-            <div className="w-full bg-gray-200 rounded-full h-2">
-              <div 
-                className="bg-green-600 h-2 rounded-full transition-all duration-300"
-                style={{ width: `${stats.successRate}%` }}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Search and Filter */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <input
-                type="text"
-                placeholder="Gönderi ara..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="relative">
-                <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <select
-                  value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value)}
-                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none"
+              <div className='flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto'>
+                <button
+                  type='button'
+                  onClick={() => setIsNotificationOpen(true)}
+                  className='relative min-w-[44px] min-h-[44px] w-12 h-12 bg-white/10 backdrop-blur-sm rounded-2xl flex items-center justify-center hover:bg-white/20 transition-all duration-300 border border-white/20'
+                  aria-label='Bildirimleri aç'
                 >
-                  <option value="all">Tüm Durumlar</option>
-                  <option value="pending">Beklemede</option>
-                  <option value="active">Aktif</option>
-                  <option value="delivered">Teslim Edildi</option>
-                  <option value="cancelled">İptal Edildi</option>
-                </select>
+                  <Bell size={20} className='text-white' />
+                  {unreadCount > 0 && (
+                    <span className='absolute -top-1 -right-1 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center font-bold shadow-lg'>
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
+                </button>
+                <Link to='/individual/create-shipment'>
+                  <button
+                    className='bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 text-white px-6 py-3 rounded-lg font-medium transition-all duration-300 flex items-center justify-center gap-2 text-base shadow-lg hover:shadow-xl w-full sm:w-auto'
+                    aria-label='Yeni gönderi oluştur'
+                  >
+                    <Plus size={20} />
+                    Gönderi Oluştur
+                  </button>
+                </Link>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Recent Shipments */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-medium text-gray-900">Son Gönderiler</h3>
-              <p className="text-sm text-gray-500">En son oluşturduğun gönderiler - hızlı erişim için buradan</p>
-              <Link
-                to="/individual/my-shipments"
-                className="text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center"
+        <div className='mb-6'>
+          <GuidanceOverlay
+            storageKey='individual.dashboard'
+            icon={Package}
+            title='Nasıl Başlayalım?'
+            description='🚀 1) Gönderi oluştur 2) Dakikalar içinde teklifler gelecek 3) En uygununu seç - bu kadar basit!'
+            primaryAction={{
+              label: 'Gönderi Oluştur',
+              to: '/individual/create-shipment',
+            }}
+            secondaryAction={{
+              label: 'Tekliflere Git',
+              to: '/individual/offers',
+            }}
+          />
+        </div>
+
+        {/* Stats Grid - ANA RENK: from-slate-800 to-blue-900 */}
+        <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6'>
+          <div
+            className='bg-white rounded-xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:border-blue-300 transition-all duration-300'
+            role='region'
+            aria-label='Toplam gönderi istatistiği'
+          >
+            <div className='flex items-center justify-between mb-4'>
+              <div
+                className='w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center'
+                aria-hidden='true'
               >
-                Tümünü Gör
-                <ArrowRight className="w-4 h-4 ml-1" />
-              </Link>
+                <Package className='w-6 h-6 text-white' />
+              </div>
+              <div className='text-right'>
+                <div
+                  className='text-2xl font-bold text-slate-900 mb-1'
+                  aria-live='polite'
+                >
+                  {stats.totalShipments}
+                </div>
+                <div className='flex items-center gap-1'>
+                  <svg
+                    className='w-3 h-3 text-blue-600'
+                    fill='none'
+                    stroke='currentColor'
+                    viewBox='0 0 24 24'
+                    aria-hidden='true'
+                  >
+                    <path
+                      strokeLinecap='round'
+                      strokeLinejoin='round'
+                      strokeWidth={2}
+                      d='M7 17l9.2-9.2M17 17V7H7'
+                    />
+                  </svg>
+                </div>
+              </div>
+            </div>
+            <div className='text-slate-700 font-semibold text-sm'>
+              Toplam Gönderi
+            </div>
+            <div className='mt-1 text-xs text-slate-500'>
+              Şimdiye kadar yaptığın tüm gönderiler
             </div>
           </div>
-          
-          {filteredShipments.length === 0 ? (
-            <div className="p-12">
-              <EmptyState
-                icon={<Package className="w-12 h-12 text-gray-400" />}
-                title="Henüz gönderi bulunmuyor"
-                description="Henüz gönderi oluşturmadınız. İlk gönderinizi oluşturarak başlayın."
-                action={{
-                  label: 'Yeni Gönderi Oluştur',
-                  onClick: () => navigate('/individual/create-shipment'),
-                }}
-              />
+
+          <div
+            className='bg-white rounded-xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:border-blue-300 transition-all duration-300'
+            role='region'
+            aria-label='Aktif gönderi istatistiği'
+          >
+            <div className='flex items-center justify-between mb-4'>
+              <div
+                className='w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center'
+                aria-hidden='true'
+              >
+                <Truck className='w-6 h-6 text-white' />
+              </div>
+              <div className='text-right'>
+                <div className='text-2xl font-bold text-slate-900 mb-1' aria-live='polite'>
+                  {stats.activeShipments}
+                </div>
+              </div>
             </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Gönderi No
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Rota
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Durum
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Nakliyeci
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Fiyat
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      İşlemler
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredShipments.map((shipment) => (
-                    <tr key={shipment.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{shipment.trackingCode}</div>
-                        <div className="text-sm text-gray-500">{safeFormatDate(shipment.createdAt)}</div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm text-gray-900">{shipment.from} → {shipment.to}</div>
-                        <div className="text-sm text-gray-500">{getCategoryLabel(shipment.category)}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(shipment.status)}`}>
-                          {getStatusIcon(shipment.status)}
-                          <span className="ml-1">{getStatusText(shipment.status)}</span>
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{shipment.carrierName || 'Atanmamış'}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {shipment.price ? formatCurrency(shipment.price) : 'Teklif Bekleniyor'}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <div className="flex space-x-2">
-                          <Link
-                            to={`/individual/shipment/${shipment.id}`}
-                            className="text-blue-600 hover:text-blue-900"
-                          >
-                            Detay
-                          </Link>
-                          {shipment.carrierId && (
-                            <Link
-                              to={`/individual/messages/${shipment.id}`}
-                              className="text-blue-600 hover:text-blue-900"
-                            >
-                              Mesaj
-                            </Link>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className='text-slate-700 font-semibold text-sm'>
+              Aktif Gönderi
             </div>
-          )}
+            <div className='mt-1 text-xs text-slate-500'>
+              Şu anda yoldaki gönderiler
+            </div>
+          </div>
+
+          <div
+            className='bg-white rounded-xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:border-blue-300 transition-all duration-300'
+            role='region'
+            aria-label='Teslim edilen gönderi istatistiği'
+          >
+            <div className='flex items-center justify-between mb-4'>
+              <div
+                className='w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center'
+                aria-hidden='true'
+              >
+                <CheckCircle2 className='w-6 h-6 text-white' />
+              </div>
+              <div className='text-right'>
+                <div className='text-2xl font-bold text-slate-900 mb-1'>
+                  {stats.deliveredShipments}
+                </div>
+                <div className='flex items-center gap-1'>
+                </div>
+              </div>
+            </div>
+            <div className='text-slate-700 font-semibold text-sm'>
+              Teslim Edildi ✓
+            </div>
+            <div className='mt-1 text-xs text-slate-500'>
+              Sorunsuz tamamlanan gönderiler
+            </div>
+          </div>
+
+          <div
+            className='bg-white rounded-xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:border-blue-300 transition-all duration-300'
+            role='region'
+            aria-label='Bekleyen gönderi istatistiği'
+          >
+            <div className='flex items-center justify-between mb-4'>
+              <div
+                className='w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center'
+                aria-hidden='true'
+              >
+                <Clock className='w-6 h-6 text-white' />
+              </div>
+              <div className='text-right'>
+                <div className='text-2xl font-bold text-slate-900 mb-1'>
+                  {stats.pendingShipments}
+                </div>
+                <div className='flex items-center gap-1'>
+                </div>
+              </div>
+            </div>
+            <div className='text-slate-700 font-semibold text-sm'>
+              Beklemede
+            </div>
+            <div className='mt-1 text-xs text-slate-500'>
+              Teklif bekleyen veya onay bekleyen
+            </div>
+          </div>
+
+          <div
+            className='bg-white rounded-xl p-6 shadow-lg border border-gray-100 hover:shadow-xl hover:border-blue-300 transition-all duration-300'
+            role='region'
+            aria-label='Başarı oranı istatistiği'
+          >
+            <div className='flex items-center justify-between mb-4'>
+              <div
+                className='w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-lg flex items-center justify-center'
+                aria-hidden='true'
+              >
+                <TrendingUp className='w-6 h-6 text-white' />
+              </div>
+              <div className='text-right'>
+                <div className='text-2xl font-bold text-slate-900 mb-1'>
+                  {stats.successRate}%
+                </div>
+                <div className='flex items-center gap-1'>
+                </div>
+              </div>
+            </div>
+            <div className='text-slate-700 font-semibold text-sm'>
+              Başarı Oranı
+            </div>
+            <div className='mt-1 text-xs text-slate-500'>
+              Sorunsuz teslimat oranın - yüksek = güven
+            </div>
+          </div>
         </div>
 
         {/* Quick Actions */}
-        <div className="mt-8 bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Hızlı İşlemler</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Link
-              to="/individual/create-shipment"
-              className="flex items-center p-4 border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-all"
-            >
-              <Package className="w-8 h-8 text-blue-600" />
-              <div className="ml-3">
-                <div className="text-sm font-medium text-gray-900">Yeni Gönderi</div>
-                <div className="text-sm text-gray-500">3 adımda oluştur, dakikalar içinde teklif al</div>
+        <div className='bg-white rounded-2xl p-8 shadow-xl border border-slate-200 mb-8'>
+          <div className='flex items-center justify-between mb-8'>
+            <div>
+              <h2 className='text-2xl font-bold text-slate-900 mb-2'>
+                Hızlı İşlemler
+              </h2>
+              <p className='text-slate-600'>
+                En çok kullandığın özellikler - tek tıkla erişim
+              </p>
+            </div>
+            <div className='w-14 h-14 bg-gradient-to-br from-slate-800 to-blue-900 rounded-2xl flex items-center justify-center shadow-lg'>
+              <svg
+                className='w-7 h-7 text-white'
+                fill='none'
+                stroke='currentColor'
+                viewBox='0 0 24 24'
+              >
+                <path
+                  strokeLinecap='round'
+                  strokeLinejoin='round'
+                  strokeWidth={2}
+                  d='M13 10V3L4 14h7v7l9-11h-7z'
+                />
+              </svg>
+            </div>
+          </div>
+          <div className='grid grid-cols-2 md:grid-cols-4 gap-6'>
+            <Link to='/individual/create-shipment'>
+              <div className='group bg-white rounded-2xl p-6 shadow-lg border border-slate-200 hover:shadow-xl hover:border-blue-300 transition-all duration-300 hover:-translate-y-2'>
+                <div className='flex flex-col items-center text-center'>
+                  <div className='w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300 mb-4'>
+                    <Plus className='w-6 h-6 text-white' />
+                  </div>
+                  <h3 className='text-lg font-bold text-slate-900 mb-2'>
+                    Yeni Gönderi
+                  </h3>
+                  <p className='text-sm text-slate-600'>
+                    3 adımda oluştur, dakikalar içinde teklif al
+                  </p>
+                  <div className='mt-3 w-8 h-1 bg-gradient-to-r from-slate-800 to-blue-900 rounded-full group-hover:w-12 transition-all duration-300'></div>
+                </div>
               </div>
             </Link>
-            
-            <Link
-              to="/individual/my-shipments"
-              className="flex items-center p-4 border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-all"
-            >
-              <Package className="w-8 h-8 text-blue-600" />
-              <div className="ml-3">
-                <div className="text-sm font-medium text-gray-900">Gönderilerim</div>
-                <div className="text-sm text-gray-500">Tüm gönderilerini tek yerden yönet</div>
+
+            <Link to='/individual/my-shipments'>
+              <div className='group bg-white rounded-2xl p-6 shadow-lg border border-slate-200 hover:shadow-xl hover:border-emerald-300 transition-all duration-300 hover:-translate-y-2'>
+                <div className='flex flex-col items-center text-center'>
+                  <div className='w-12 h-12 bg-gradient-to-br from-slate-800 to-blue-900 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300 mb-4'>
+                    <Package className='w-6 h-6 text-white' />
+                  </div>
+                  <h3 className='text-lg font-bold text-slate-900 mb-2'>
+                    Gönderilerim
+                  </h3>
+                  <p className='text-sm text-slate-600'>
+                    Tüm gönderilerini tek yerden yönet
+                  </p>
+                  <div className='mt-3 w-8 h-1 bg-gradient-to-r from-slate-800 to-blue-900 rounded-full group-hover:w-12 transition-all duration-300'></div>
+                </div>
               </div>
             </Link>
-            
-            <Link
-              to="/individual/live-tracking"
-              className="flex items-center p-4 border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-all"
-            >
-              <Eye className="w-8 h-8 text-blue-600" />
-              <div className="ml-3">
-                <div className="text-sm font-medium text-gray-900">Canlı Takip</div>
-                <div className="text-sm text-gray-500">Gönderinin nerede olduğunu anlık gör</div>
+
+            <Link to='/individual/live-tracking'>
+              <div className='group bg-white rounded-2xl p-6 shadow-lg border border-slate-200 hover:shadow-xl hover:border-purple-300 transition-all duration-300 hover:-translate-y-2'>
+                <div className='flex flex-col items-center text-center'>
+                  <div className='w-12 h-12 bg-gradient-to-br from-purple-600 to-purple-800 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300 mb-4'>
+                    <Truck className='w-6 h-6 text-white' />
+                  </div>
+                  <h3 className='text-lg font-bold text-slate-900 mb-2'>
+                    Canlı Takip
+                  </h3>
+                  <p className='text-sm text-slate-600'>
+                    Gönderinin nerede olduğunu anlık gör
+                  </p>
+                  <div className='mt-3 w-8 h-1 bg-purple-600 rounded-full group-hover:w-12 transition-all duration-300'></div>
+                </div>
               </div>
             </Link>
-            
-            <Link
-              to="/individual/messages"
-              className="flex items-center p-4 border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-all"
-            >
-              <MessageSquare className="w-8 h-8 text-blue-600" />
-              <div className="ml-3">
-                <div className="text-sm font-medium text-gray-900">Mesajlar</div>
-                <div className="text-sm text-gray-500">Nakliyecinle direkt iletişim kur</div>
+
+            <Link to='/individual/messages'>
+              <div className='group bg-white rounded-2xl p-6 shadow-lg border border-slate-200 hover:shadow-xl hover:border-amber-300 transition-all duration-300 hover:-translate-y-2'>
+                <div className='flex flex-col items-center text-center'>
+                  <div className='w-12 h-12 bg-gradient-to-br from-amber-600 to-orange-700 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300 mb-4'>
+                    <MessageSquare className='w-6 h-6 text-white' />
+                  </div>
+                  <h3 className='text-lg font-bold text-slate-900 mb-2'>
+                    Mesajlar
+                  </h3>
+                  <p className='text-sm text-slate-600'>
+                    Nakliyecinle direkt iletişim kur
+                  </p>
+                  <div className='mt-3 w-8 h-1 bg-amber-600 rounded-full group-hover:w-12 transition-all duration-300'></div>
+                </div>
               </div>
             </Link>
           </div>
         </div>
-      </div>
 
-      {/* Notifications Panel */}
-      {showNotifications && (
-        <div className="fixed right-4 top-20 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
-          <NotificationCenter 
-            isOpen={showNotifications}
-            onClose={() => setShowNotifications(false)} 
-          />
+        {/* Son Gönderiler - Tablo Tasarımı */}
+        <div className='bg-white rounded-2xl p-8 shadow-xl border border-slate-200 mb-8'>
+          <div className='flex items-center justify-between mb-6'>
+            <div>
+              <h2 className='text-2xl font-bold text-slate-900 mb-2'>
+                📦 Son Gönderiler
+              </h2>
+              <p className='text-slate-600'>En son oluşturduğun gönderiler - hızlı erişim için buradan</p>
+            </div>
+            <Link
+              to='/individual/my-shipments'
+              className='text-blue-600 hover:text-blue-700 font-medium flex items-center gap-2'
+            >
+              Tümünü Gör
+              <ArrowRight className='w-4 h-4' />
+            </Link>
+          </div>
+
+          <div className='overflow-x-auto'>
+            <table className='w-full'>
+              <thead>
+                <tr className='border-b border-slate-200 bg-gradient-to-r from-slate-50 to-blue-50'>
+                  <th className='text-left py-3 px-4 font-semibold text-slate-800'>
+                    Gönderi No
+                  </th>
+                  <th className='text-left py-3 px-4 font-semibold text-slate-800'>
+                    Rota
+                  </th>
+                  <th className='text-left py-3 px-4 font-semibold text-slate-800'>
+                    Durum
+                  </th>
+                  <th className='text-left py-3 px-4 font-semibold text-slate-800'>
+                    Nakliyeci
+                  </th>
+                  <th className='text-left py-3 px-4 font-semibold text-slate-800'>
+                    Fiyat
+                  </th>
+                  <th className='text-left py-3 px-4 font-semibold text-slate-800'>
+                    İşlemler
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentShipments.length > 0 ? (
+                  recentShipments.map(shipment => (
+                    <tr
+                      key={shipment.id}
+                      className='border-b border-slate-100 hover:bg-blue-50 transition-colors'
+                    >
+                      <td className='py-4 px-4'>
+                        <div className='font-mono text-sm font-semibold text-slate-800'>
+                          {shipment.trackingCode}
+                        </div>
+                        <div className='text-xs text-slate-500'>
+                          {safeFormatDate((shipment as any).createdAt, 'short')}
+                        </div>
+                        <div className='text-xs text-slate-500'>
+                          {shipment.title}
+                        </div>
+                      </td>
+                      <td className='py-4 px-4'>
+                        <div className='text-sm font-medium text-slate-900'>
+                          {shipment.from} → {shipment.to}
+                        </div>
+                        <div className='text-xs text-slate-500'>
+                          {getCategoryLabel(shipment.subCategory || shipment.category)}
+                        </div>
+                      </td>
+                      <td className='py-4 px-4'>
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            shipment.status === 'delivered'
+                              ? 'bg-green-100 text-green-800'
+                              : shipment.status === 'in_transit'
+                                ? 'bg-blue-100 text-blue-800'
+                                : shipment.status === 'cancelled'
+                                  ? 'bg-red-100 text-red-800'
+                                : shipment.status === 'preparing'
+                                  ? 'bg-orange-100 text-orange-800'
+                                  : 'bg-yellow-100 text-yellow-800'
+                          }`}
+                        >
+                          {shipment.status === 'in_transit' ? (
+                            <Truck className='w-3 h-3 mr-1' />
+                          ) : shipment.status === 'cancelled' ? (
+                            <XCircle className='w-3 h-3 mr-1' />
+                          ) : shipment.status === 'preparing' ? (
+                            <Package className='w-3 h-3 mr-1' />
+                          ) : shipment.status === 'delivered' ? (
+                            <CheckCircle2 className='w-3 h-3 mr-1' />
+                          ) : shipment.status === 'offer_accepted' || shipment.status === 'accepted' ? (
+                            <CheckCircle2 className='w-3 h-3 mr-1' />
+                          ) : (
+                            <Clock className='w-3 h-3 mr-1' />
+                          )}
+                          {getStatusInfo(shipment.status).text}
+                        </span>
+                      </td>
+                      <td className='py-4 px-4'>
+                        {shipment.carrierId && shipment.carrierName ? (
+                          <CarrierInfoCard
+                            carrierId={String(shipment.carrierId)}
+                            carrierName={shipment.carrierName}
+                            companyName={shipment.carrierCompany}
+                            carrierRating={shipment.carrierRating || 0}
+                            carrierReviews={shipment.carrierReviews || 0}
+                            carrierVerified={shipment.carrierVerified || false}
+                            successRate={shipment.successRate || 0}
+                            completedJobs={shipment.completedJobs || 0}
+                            variant="compact"
+                            showMessaging={false}
+                            className="max-w-xs"
+                          />
+                        ) : (
+                          <div className='text-sm font-medium text-slate-500'>
+                            {(shipment.status === 'offer_accepted' || shipment.status === 'accepted' || shipment.status === 'in_transit' || shipment.status === 'delivered')
+                              ? 'Nakliyeci Atandı'
+                              : 'Atanmamış'}
+                          </div>
+                        )}
+                      </td>
+                      <td className='py-4 px-4'>
+                        <div className='text-sm font-bold text-blue-700'>
+                          {toNumber((shipment as any).price, 0) > 0 
+                            ? formatCurrency(toNumber((shipment as any).price, 0)) 
+                            : (shipment.status === 'waiting_for_offers' || shipment.status === 'waiting' || shipment.status === 'pending' || shipment.status === 'open')
+                              ? <span className='text-slate-400 font-normal'>Teklif Bekleniyor</span>
+                              : '—'}
+                        </div>
+                        <div className='text-xs text-slate-500'>
+                          {toNumber((shipment as any).volume, 0) > 0 ? `${toNumber((shipment as any).volume, 0).toFixed(2)} m³` : ''}
+                        </div>
+                        <div className='text-xs text-slate-500'>
+                          {safeFormatDate((shipment as any).estimatedDelivery, 'short')}
+                        </div>
+                      </td>
+                      <td className='py-4 px-4'>
+                        <div className='flex items-center gap-2'>
+                          <button
+                            onClick={() => navigate(`/individual/shipments/${shipment.id}`)}
+                            className='px-3 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs font-medium rounded-lg transition-colors'
+                          >
+                            Detay
+                          </button>
+                          {shipment.status !== 'waiting' && shipment.status !== 'cancelled' && (
+                            <button
+                              onClick={() => navigate(`/individual/live-tracking?shipmentId=${encodeURIComponent(shipment.id)}`)}
+                              className='px-3 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs font-medium rounded-lg transition-colors'
+                            >
+                              Takip
+                            </button>
+                          )}
+                          {(() => {
+                              const carrierId =
+                                (shipment as any).carrierId ||
+                                (shipment as any).carrier_id ||
+                                (shipment as any).nakliyeciId ||
+                                (shipment as any).nakliyeci_id ||
+                                (shipment as any).carrier?.id ||
+                                (shipment as any).nakliyeci?.id ||
+                                null;
+                              const hasCarrier = carrierId !== null && carrierId !== undefined && String(carrierId) !== '';
+                              const canMessage = hasCarrier && shipment.status !== 'cancelled';
+                              return (
+                                <button
+                                  onClick={() => {
+                                    if (!canMessage) return;
+                                    navigate(
+                                      `/individual/messages?userId=${encodeURIComponent(String(carrierId))}&shipmentId=${encodeURIComponent(String(shipment.id))}`
+                                    );
+                                  }}
+                                  disabled={!canMessage}
+                                  className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                                    canMessage 
+                                      ? 'bg-green-100 hover:bg-green-200 text-green-700' 
+                                      : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                  }`}
+                                >
+                                  Mesaj
+                                </button>
+                              );
+                            })()}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={6} className='py-12 text-center'>
+                      <div className='bg-white rounded-2xl p-8 shadow-xl border border-slate-200'>
+                        <div className='text-center'>
+                          <div className='w-16 h-16 bg-gradient-to-br from-slate-700 to-blue-800 rounded-full mx-auto mb-4 flex items-center justify-center'>
+                            <Package className='w-8 h-8 text-white' />
+                          </div>
+                          <h3 className='text-xl font-bold text-slate-900 mb-2'>
+                            Henüz Gönderiniz Yok
+                          </h3>
+                          <p className='text-slate-600 mb-6'>
+                            İlk gönderinizi oluşturun, dakikalar içinde nakliyecilerden teklifler gelmeye başlayacak. Ortalama bekleme süresi 5-15 dakikadır.
+                          </p>
+                          <Link
+                            to='/individual/create-shipment'
+                            className='inline-flex items-center gap-2 bg-gradient-to-r from-slate-800 to-blue-900 hover:from-slate-700 hover:to-blue-800 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl'
+                          >
+                            <Plus className='w-5 h-5' />
+                            Gönderi Oluştur
+                          </Link>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-      )}
-
-      {/* Onboarding Overlay */}
+      </div>
+      <NotificationCenter
+        isOpen={isNotificationOpen}
+        onClose={() => {
+          setIsNotificationOpen(false);
+          window.dispatchEvent(new Event('yolnext:refresh-notifications'));
+          window.dispatchEvent(new Event('yolnext:refresh-badges'));
+        }}
+      />
+      {/* Onboarding Modal - İlk Giriş Rehberi */}
       {showOnboarding && (
         <SimpleOnboarding
           userType="individual"
-          onComplete={() => {
-            setShowOnboarding(false);
-            const role = String((user as any)?.role || 'individual').toLowerCase();
-            const perUserKey = `onboardingCompleted:${user?.id}:${role}`;
-            localStorage.setItem(perUserKey, 'true');
-          }}
+          onComplete={() => setShowOnboarding(false)}
         />
       )}
     </div>
@@ -645,3 +887,13 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
+
+
+
+
+
+
+
+
+
+

@@ -526,7 +526,7 @@ const LandingPage: React.FC = () => {
 
               <button
             onClick={() => setIsMenuOpen(prev => !prev)}
-            className='md:hidden p-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 transition'
+            className='md:hidden p-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 transition min-h-[44px] min-w-[44px] flex items-center justify-center'
             aria-label='Menüyü aç/kapat'
             >
             {isMenuOpen ? <XIcon className='h-5 w-5' /> : <MenuIcon className='h-5 w-5' />}
@@ -613,14 +613,14 @@ const LandingPage: React.FC = () => {
                     <div className='flex flex-col sm:flex-row gap-4'>
                       <button
                         onClick={() => handleNavigate('/register')}
-                        className='group px-8 py-4 bg-white text-slate-900 rounded-xl font-semibold text-base shadow-2xl hover:shadow-white/20 hover:bg-white/95 transition-all duration-200 flex items-center justify-center gap-2'
+                        className='group px-8 py-4 bg-white text-slate-900 rounded-xl font-semibold text-base shadow-2xl hover:shadow-white/20 hover:bg-white/95 transition-all duration-200 flex items-center justify-center gap-2 w-full max-w-[350px]'
                       >
                         Profesyonel Hesap Oluştur
                         <ArrowRight className='h-5 w-5 group-hover:translate-x-1 transition-transform' />
                       </button>
                       <button
                         onClick={() => handleNavigate('/login')}
-                        className='px-8 py-4 rounded-xl font-semibold text-base text-white bg-white/10 backdrop-blur-md border-2 border-white/30 hover:border-white/50 hover:bg-white/20 transition-all duration-200 shadow-lg'
+                        className='px-8 py-4 rounded-xl font-semibold text-base text-white bg-white/10 backdrop-blur-md border-2 border-white/30 hover:border-white/50 hover:bg-white/20 transition-all duration-200 shadow-lg w-full max-w-[350px]'
                       >
                         Kurumsal Görüşme Planla
                       </button>
@@ -763,7 +763,7 @@ const LandingPage: React.FC = () => {
         <section id='features' className='bg-white py-24'>
         <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
             <div className='text-center max-w-3xl mx-auto mb-16'>
-              <p className='text-xs font-semibold uppercase tracking-[0.4em] text-blue-600 mb-4'>Platform Özellikleri</p>
+              <p className='text-sm font-semibold uppercase tracking-[0.4em] text-blue-600 mb-4 md:text-xs'>Platform Özellikleri</p>
               <h2 className='text-4xl md:text-5xl font-bold text-slate-900 mb-6'>
                 Entegre Lojistik Platformu
               </h2>
@@ -793,7 +793,7 @@ const LandingPage: React.FC = () => {
         <section id='panels' className='bg-gradient-to-b from-white to-slate-50 py-24'>
         <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
             <div className='text-center max-w-3xl mx-auto mb-16'>
-              <p className='text-xs font-semibold uppercase tracking-[0.4em] text-blue-600 mb-4'>4 Panel</p>
+              <p className='text-sm font-semibold uppercase tracking-[0.4em] text-blue-600 mb-4 md:text-xs'>4 Panel</p>
               <h2 className='text-4xl md:text-5xl font-bold text-slate-900 mb-6'>
                 Pazar Lideri • Sektör Standardı
               </h2>
@@ -815,7 +815,7 @@ const LandingPage: React.FC = () => {
                       });
                       setSelectedUserType(panel.id);
                     }}
-                    className={`rounded-3xl border p-6 text-left transition-all ${
+                    className={`rounded-3xl border p-6 text-left transition-all w-full max-w-[320px] mx-auto ${
                       isSelected
                         ? 'border-blue-600 bg-blue-50 shadow-lg scale-105'
                         : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-md'
@@ -826,7 +826,7 @@ const LandingPage: React.FC = () => {
                     }`}>
                       <panel.icon className={`h-6 w-6 ${isSelected ? 'text-white' : 'text-slate-900'}`} />
                   </div>
-                    <p className={`text-xs font-semibold uppercase tracking-[0.2em] mb-2 ${
+                    <p className={`text-sm font-semibold uppercase tracking-[0.2em] mb-2 md:text-xs ${
                       isSelected ? 'text-blue-600' : 'text-slate-500'
                     }`}>
                       {panel.subtitle}
@@ -837,7 +837,7 @@ const LandingPage: React.FC = () => {
                     <p className={`text-sm mb-4 ${isSelected ? 'text-slate-700' : 'text-slate-600'}`}>
                       {panel.promise}
                     </p>
-                    <p className={`text-xs font-semibold ${isSelected ? 'text-blue-600' : 'text-slate-500'}`}>
+                    <p className={`text-sm font-semibold ${isSelected ? 'text-blue-600' : 'text-slate-500'} md:text-xs`}>
                       {panel.stats}
                     </p>
                   </button>
@@ -848,7 +848,7 @@ const LandingPage: React.FC = () => {
             <div className='rounded-3xl border border-slate-200 bg-white p-8 shadow-xl'>
               <div className='flex flex-wrap items-start justify-between gap-6 mb-8'>
                 <div className='space-y-2 flex-1'>
-                  <p className='text-xs font-semibold uppercase tracking-[0.2em] text-slate-500'>Seçili Panel</p>
+                  <p className='text-sm font-semibold uppercase tracking-[0.2em] text-slate-500 md:text-xs'>Seçili Panel</p>
                   <h3 className='text-3xl font-bold text-slate-900'>{selectedPersona.title}</h3>
                   <p className='text-sm text-slate-600'>{selectedPersona.stats}</p>
                   {selectedPersona.urgency && (
@@ -873,7 +873,7 @@ const LandingPage: React.FC = () => {
                       <h4 className='font-bold text-red-900'>Platform Olmadan</h4>
                     </div>
                     <p className='text-sm text-red-800 font-medium leading-relaxed'>{selectedPersona.withoutPlatform}</p>
-                    <p className='text-xs text-red-700 mt-3 italic'>{selectedPersona.painPoint}</p>
+                    <p className='text-sm text-red-700 mt-3 italic md:text-xs'>{selectedPersona.painPoint}</p>
                   </div>
                   <div className='rounded-2xl border-2 border-emerald-200 bg-emerald-50 p-6'>
                     <div className='flex items-center gap-2 mb-3'>
@@ -881,7 +881,7 @@ const LandingPage: React.FC = () => {
                       <h4 className='font-bold text-emerald-900'>Platform İle</h4>
                     </div>
                     <p className='text-sm text-emerald-800 font-medium leading-relaxed'>{selectedPersona.withPlatform}</p>
-                    <p className='text-xs text-emerald-700 mt-3 font-semibold'>{selectedPersona.promise}</p>
+                    <p className='text-sm text-emerald-700 mt-3 font-semibold md:text-xs'>{selectedPersona.promise}</p>
                   </div>
                 </div>
               )}
@@ -938,7 +938,7 @@ const LandingPage: React.FC = () => {
         <section id='workflow' className='bg-slate-900 py-24 text-white'>
         <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
             <div className='text-center max-w-3xl mx-auto mb-16'>
-              <p className='text-xs font-semibold uppercase tracking-[0.4em] text-blue-300 mb-4'>İş Akışı</p>
+              <p className='text-sm font-semibold uppercase tracking-[0.4em] text-blue-300 mb-4 md:text-xs'>İş Akışı</p>
               <h2 className='text-4xl md:text-5xl font-bold mb-6'>
                 5 Adımda Tamamlanan Süreç
               </h2>
@@ -976,7 +976,7 @@ const LandingPage: React.FC = () => {
         <section id='categories' className='bg-white py-24'>
           <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
             <div className='text-center max-w-3xl mx-auto mb-16'>
-              <p className='text-xs font-semibold uppercase tracking-[0.4em] text-blue-600 mb-4'>Kategoriler</p>
+              <p className='text-sm font-semibold uppercase tracking-[0.4em] text-blue-600 mb-4 md:text-xs'>Kategoriler</p>
               <h2 className='text-4xl md:text-5xl font-bold text-slate-900 mb-6'>
                 Her Tür Gönderi İçin Çözüm
               </h2>
@@ -1006,7 +1006,7 @@ const LandingPage: React.FC = () => {
         <section className='bg-white py-24'>
         <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
             <div className='text-center max-w-4xl mx-auto mb-16'>
-              <p className='text-xs font-semibold uppercase tracking-[0.4em] text-blue-600 mb-4'>Pazar Liderliği</p>
+              <p className='text-sm font-semibold uppercase tracking-[0.4em] text-blue-600 mb-4 md:text-xs'>Pazar Liderliği</p>
               <h2 className='text-4xl md:text-5xl font-bold text-slate-900 mb-6'>
                 Türkiye'nin #1 Lojistik Ekosistemi
               </h2>
@@ -1112,7 +1112,7 @@ const LandingPage: React.FC = () => {
                 <blockquote className='text-sm text-slate-700 mb-4 font-medium'>
                   "3 yıldır kullanıyoruz. Aylık lojistik bütçemiz 180.000 TL'den 98.000 TL'ye düştü. Entegre operasyon yönetimi sayesinde kontrol bizde artık."
                 </blockquote>
-                <div className='text-xs text-slate-600'>
+                <div className='text-sm text-slate-600 md:text-xs'>
                   <p className='font-semibold'>Ayşe Kaya - Lojistik Müdürü</p>
                   <p>Kaya Mobilya / İstanbul</p>
                 </div>
@@ -1126,7 +1126,7 @@ const LandingPage: React.FC = () => {
                 <blockquote className='text-sm text-slate-700 mb-4 font-medium'>
                   "Kapasite optimizasyonu sayesinde boş dönüş diye bir şey kalmadı. Her gün platform üzerinden yük buluyorum. Aylık kazancım 3 katına çıktı."
                 </blockquote>
-                <div className='text-xs text-slate-600'>
+                <div className='text-sm text-slate-600 md:text-xs'>
                   <p className='font-semibold'>Mehmet Özkan - Nakliyeci</p>
                   <p>Özkan Nakliyat / Ankara</p>
                 </div>

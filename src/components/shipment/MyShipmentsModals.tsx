@@ -279,7 +279,7 @@ const MyShipmentsModals: React.FC<MyShipmentsModalsProps> = ({
                                 <Star
                                   key={i}
                                   className={`w-4 h-4 ${
-                                    i < selectedShipment.carrier_rating
+                                    i < (selectedShipment.carrier_rating || 0)
                                       ? 'text-amber-400 fill-current'
                                       : 'text-gray-300'
                                   }`}

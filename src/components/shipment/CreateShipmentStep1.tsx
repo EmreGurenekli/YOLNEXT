@@ -1,7 +1,7 @@
 // Step 1: Yük Bilgileri Component
 // Extracted from CreateShipment.tsx for better code organization
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import {
   Package,
   Weight,
@@ -12,9 +12,6 @@ import {
   Clock,
   Check,
   FileText,
-  Info,
-  ChevronDown,
-  ChevronUp,
 } from 'lucide-react';
 
 interface CreateShipmentStep1Props {
@@ -35,9 +32,6 @@ export default function CreateShipmentStep1({
   mainCategories,
 }: CreateShipmentStep1Props) {
   const isSpecialCargo = formData.mainCategory === 'special_cargo';
-  const [showCategoryInfo, setShowCategoryInfo] = useState(false);
-  const [fieldErrors, setFieldErrors] = useState<{[key: string]: string}>({});
-  const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
 
   const requirementColorClass: Record<string, string> = {
     red: 'text-red-600',
@@ -47,100 +41,6 @@ export default function CreateShipmentStep1({
     yellow: 'text-yellow-600',
   };
 
-  // Real-time validation
-  const validateField = (field: string, value: any) => {
-    let error = '';
-    
-    if (touchedFields.has(field)) {
-      switch (field) {
-        case 'mainCategory':
-          if (!value) error = 'Lütfen bir kategori seçiniz';
-          break;
-        case 'productDescription':
-          if (!value || value.trim().length < 10) {
-            error = 'Lütfen en az 10 karakterlik açıklama giriniz';
-          } else if (value.length > 1000) {
-            error = 'Açıklama 1000 karakteri geçemez';
-          }
-          break;
-        case 'roomCount':
-          if (formData.mainCategory === 'house_move' && !value) {
-            error = 'Oda sayısı seçimi zorunludur';
-          }
-          break;
-        case 'buildingType':
-          if (formData.mainCategory === 'house_move' && !value) {
-            error = 'Bina tipi seçimi zorunludur';
-          }
-          break;
-        case 'weight':
-          if (isSpecialCargo && (!value || parseFloat(value) <= 0)) {
-            error = 'Ağırlık 0\'dan büyük olmalıdır';
-          } else if (value && parseFloat(value) > 50000) {
-            error = 'Ağırlık 50000 kg\'ı geçemez';
-          }
-          break;
-        case 'quantity':
-          if (!value || parseInt(value) < 1) {
-            error = 'Miktar 1\'den küçük olamaz';
-          } else if (value && parseInt(value) > 1000) {
-            error = 'Miktar 1000\'ü geçemez';
-          }
-          break;
-        case 'pickupFloor':
-          if (formData.mainCategory === 'house_move' && !value?.trim()) {
-            error = 'Toplama adresi katı zorunludur';
-          }
-          break;
-        case 'deliveryFloor':
-          if (formData.mainCategory === 'house_move' && !value?.trim()) {
-            error = 'Teslimat adresi katı zorunludur';
-          }
-          break;
-      }
-    }
-    
-    setFieldErrors(prev => ({ ...prev, [field]: error }));
-    return error;
-  };
-
-  const handleFieldChange = (field: string, value: any) => {
-    handleInputChange(field, value);
-    setTouchedFields(prev => new Set(prev).add(field));
-    validateField(field, value);
-    
-    // Clear general error when user starts typing
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: '' }));
-    }
-  };
-
-  // Auto-save form data
-  useEffect(() => {
-    const formDataString = JSON.stringify(formData);
-    localStorage.setItem('shipmentDraft', formDataString);
-  }, [formData]);
-
-  // Load draft on mount
-  useEffect(() => {
-    const savedDraft = localStorage.getItem('shipmentDraft');
-    if (savedDraft) {
-      try {
-        const draftData = JSON.parse(savedDraft);
-        // Only restore if no data exists yet
-        if (!formData.mainCategory && draftData.mainCategory) {
-          Object.keys(draftData).forEach(key => {
-            if (key !== 'mainCategory' || draftData.mainCategory) {
-              handleInputChange(key, draftData[key]);
-            }
-          });
-        }
-      } catch (error) {
-        console.error('Failed to load draft:', error);
-      }
-    }
-  }, []); // Empty dependency array to run only once
-
   return (
     <div className="space-y-6">
       <div>
@@ -149,53 +49,38 @@ export default function CreateShipmentStep1({
           Yük Kategorisi *
         </label>
         <div className="bg-blue-50 border-l-4 border-blue-600 rounded-r-lg p-4 mb-4">
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <p className="text-sm text-slate-700 leading-relaxed">
-                <strong className="text-slate-900">Önemli:</strong> Doğru kategori seçimi, daha uygun ve daha hızlı teklif almanı sağlar.
-              </p>
-              <div className="mt-2 text-xs text-slate-600">
-                💡 <strong>İpucu:</strong> Kategori seçimi, fiyat tekliflerini %30-40 oranında etkiler.
-              </div>
-            </div>
-            <button
-              onClick={() => setShowCategoryInfo(!showCategoryInfo)}
-              className="ml-2 text-blue-600 hover:text-blue-800 transition-colors"
-              aria-label="Kategori bilgisi"
-            >
-              {showCategoryInfo ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-            </button>
-          </div>
-          {showCategoryInfo && (
-            <div className="mt-3 p-3 bg-blue-100 rounded-lg">
-              <div className="flex items-start gap-2">
-                <Info className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                <div className="text-sm text-slate-700">
-                  <p className="font-semibold mb-1">Neden önemli?</p>
-                  <ul className="list-disc list-inside space-y-1 text-xs">
-                    <li>Nakliyeciler teklif hesaplamasını kategoriye göre yapar</li>
-                    <li>Yanlış kategori, yanlış fiyat/uygunsuz tekliflere neden olabilir</li>
-                    <li>Doğru kategori, daha hızlı ve daha fazla teklif almanızı sağlar</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-          )}
+          <p className="text-sm text-slate-700 leading-relaxed">
+            <strong className="text-slate-900">Önemli:</strong> Doğru kategori seçimi, daha uygun ve daha hızlı teklif almanı sağlar.
+          </p>
+          <details className="mt-2">
+            <summary className="text-sm text-blue-800 font-semibold cursor-pointer select-none">
+              Neden önemli?
+            </summary>
+            <p className="mt-2 text-sm text-slate-700 leading-relaxed">
+              Nakliyeciler teklif hesaplamasını kategoriye göre yapar. Yanlış kategori, yanlış fiyat/uygunsuz tekliflere neden olabilir.
+            </p>
+          </details>
         </div>
         <select
           value={formData.mainCategory ?? ''}
-          onChange={(e) => {
-            handleFieldChange('mainCategory', e.target.value);
+          onChangeCapture={(e) => {
+            handleInputChange('mainCategory', (e.currentTarget as HTMLSelectElement).value);
           }}
-          onBlur={() => validateField('mainCategory', formData.mainCategory)}
+          onChange={(e) => {
+            handleInputChange('mainCategory', e.currentTarget.value);
+            if (errors.mainCategory) {
+              setErrors(prev => ({ ...prev, mainCategory: '' }));
+            }
+          }}
+          onInput={(e) => {
+            handleInputChange('mainCategory', (e.currentTarget as HTMLSelectElement).value);
+          }}
           aria-label="Yük kategorisi seçin"
           aria-required="true"
-          aria-invalid={!!fieldErrors.mainCategory || !!errors.mainCategory}
-          aria-describedby={(fieldErrors.mainCategory || errors.mainCategory) ? 'mainCategory-error' : undefined}
-          className={`w-full p-4 border-2 rounded-xl focus:ring-2 transition-all duration-200 bg-white shadow-sm hover:shadow-md text-slate-700 text-lg min-h-[48px] ${
-            (fieldErrors.mainCategory || errors.mainCategory) 
-              ? 'border-red-500 focus:border-red-500 focus:ring-red-500' 
-              : 'border-slate-200 focus:border-blue-500 focus:ring-blue-500'
+          aria-invalid={!!errors.mainCategory}
+          aria-describedby={errors.mainCategory ? 'mainCategory-error' : undefined}
+          className={`w-full p-4 border-2 rounded-xl focus:ring-2 focus:ring-blue-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md text-slate-700 text-lg min-h-[48px] ${
+            errors.mainCategory ? 'border-red-500 focus:border-red-500' : 'border-slate-200 focus:border-blue-500'
           }`}
         >
           <option value="">Kategori seçiniz</option>
@@ -205,11 +90,8 @@ export default function CreateShipmentStep1({
             </option>
           ))}
         </select>
-        {(fieldErrors.mainCategory || errors.mainCategory) && (
-          <p id="mainCategory-error" className="mt-2 text-sm text-red-600 flex items-center gap-2" role="alert">
-            <AlertCircle className="w-4 h-4 flex-shrink-0" />
-            {fieldErrors.mainCategory || errors.mainCategory}
-          </p>
+        {errors.mainCategory && (
+          <p id="mainCategory-error" className="mt-2 text-sm text-red-600" role="alert">{errors.mainCategory}</p>
         )}
       </div>
 
@@ -228,36 +110,22 @@ export default function CreateShipmentStep1({
               <textarea
                 value={formData.productDescription ?? ''}
                 onChange={(e) => {
-                  handleFieldChange('productDescription', e.target.value);
+                  handleInputChange('productDescription', e.target.value);
+                  if (errors.productDescription) {
+                    setErrors(prev => ({ ...prev, productDescription: '' }));
+                  }
                 }}
-                onBlur={() => validateField('productDescription', formData.productDescription)}
+                onInput={(e) => {
+                  handleInputChange('productDescription', (e.currentTarget as HTMLTextAreaElement).value);
+                }}
                 rows={4}
                 className={`w-full p-4 border-2 rounded-xl focus:ring-2 transition-all duration-200 bg-white shadow-sm hover:shadow-md text-slate-700 resize-none ${
-                  (fieldErrors.productDescription || errors.productDescription)
-                    ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
-                    : 'border-gray-200 focus:ring-blue-500 focus:border-blue-500'
+                  errors.productDescription ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-gray-200 focus:ring-blue-500 focus:border-blue-500'
                 }`}
                 placeholder="Örnek: 3+1 daire eşyası, büyük eşyalar (koltuk takımı, yatak odası takımı, buzdolabı, çamaşır makinesi), küçük eşyalar (kutu, çanta vb.)"
               />
-              <div className="flex items-center justify-between mt-1">
-                <span className={`text-xs ${
-                  formData.productDescription?.length > 0 
-                    ? 'text-gray-500' 
-                    : 'text-gray-400'
-                }`}>
-                  {formData.productDescription?.length || 0} / 1000 karakter
-                </span>
-                {(fieldErrors.productDescription || errors.productDescription) && (
-                  <span className="text-xs text-red-600">
-                    {fieldErrors.productDescription || errors.productDescription}
-                  </span>
-                )}
-              </div>
-              {(fieldErrors.productDescription || errors.productDescription) && (
-                <p className="mt-2 text-sm text-red-600 flex items-center gap-2" role="alert">
-                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                  {fieldErrors.productDescription || errors.productDescription}
-                </p>
+              {errors.productDescription && (
+                <p className="mt-2 text-sm text-red-600">{errors.productDescription}</p>
               )}
             </div>
 
@@ -481,34 +349,22 @@ export default function CreateShipmentStep1({
                     type="number"
                     value={formData.weight ?? ''}
                     onChange={(e) => {
-                      handleFieldChange('weight', e.target.value);
+                      handleInputChange('weight', e.target.value);
+                      if (errors.weight) {
+                        setErrors(prev => ({ ...prev, weight: '' }));
+                      }
                     }}
-                    onBlur={() => validateField('weight', formData.weight)}
+                    onInput={(e) => {
+                      handleInputChange('weight', (e.currentTarget as HTMLInputElement).value);
+                    }}
+                    className={`w-full p-4 border-2 rounded-xl focus:ring-2 transition-all duration-200 bg-white shadow-sm hover:shadow-md ${
+                      errors.weight ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-gray-200 focus:ring-blue-500 focus:border-blue-500'
+                    }`}
                     step="0.1"
                     min="0.1"
-                    className={`w-full p-4 border-2 rounded-xl focus:ring-2 transition-all duration-200 bg-white shadow-sm hover:shadow-md ${
-                      (fieldErrors.weight || errors.weight)
-                        ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
-                        : 'border-gray-200 focus:ring-blue-500 focus:border-blue-500'
-                    }`}
                   />
-                  <div className="flex items-center justify-between mt-1">
-                    <span className={`text-xs ${
-                      formData.weight ? 'text-gray-500' : 'text-gray-400'
-                    }`}>
-                      {formData.weight ? `${formData.weight} kg` : 'Ağırlık belirtilmemiş'}
-                    </span>
-                    {(fieldErrors.weight || errors.weight) && (
-                      <span className="text-xs text-red-600">
-                        {fieldErrors.weight || errors.weight}
-                      </span>
-                    )}
-                  </div>
-                  {(fieldErrors.weight || errors.weight) && (
-                    <p className="mt-2 text-sm text-red-600 flex items-center gap-2" role="alert">
-                      <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                      {fieldErrors.weight || errors.weight}
-                    </p>
+                  {errors.weight && (
+                    <p className="mt-2 text-sm text-red-600">{errors.weight}</p>
                   )}
                 </div>
                 <div className="space-y-2">
@@ -519,33 +375,11 @@ export default function CreateShipmentStep1({
                   <input
                     type="number"
                     value={formData.quantity ?? ''}
-                    onChange={(e) => {
-                      handleFieldChange('quantity', e.target.value);
-                    }}
-                    onBlur={() => validateField('quantity', formData.quantity)}
+                    onChange={(e) => handleInputChange('quantity', e.target.value)}
+                    onInput={(e) => handleInputChange('quantity', (e.currentTarget as HTMLInputElement).value)}
+                    className="w-full p-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 bg-white shadow-sm hover:shadow-md"
                     min="1"
-                    className={`w-full p-4 border-2 rounded-xl focus:ring-2 transition-all duration-200 bg-white shadow-sm hover:shadow-md ${
-                      fieldErrors.quantity ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-gray-200 focus:ring-blue-500 focus:border-blue-500'
-                    }`}
                   />
-                  <div className="flex items-center justify-between mt-1">
-                    <span className={`text-xs ${
-                      formData.quantity ? 'text-gray-500' : 'text-gray-400'
-                    }`}>
-                      {formData.quantity ? `${formData.quantity} adet` : 'Miktar belirtilmemiş'}
-                    </span>
-                    {fieldErrors.quantity && (
-                      <span className="text-xs text-red-600">
-                        {fieldErrors.quantity}
-                      </span>
-                    )}
-                  </div>
-                  {fieldErrors.quantity && (
-                    <p className="mt-2 text-sm text-red-600 flex items-center gap-2" role="alert">
-                      <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                      {fieldErrors.quantity}
-                    </p>
-                  )}
                 </div>
                 <div className="md:col-span-2">
                   <label className="block text-sm font-semibold text-gray-700 mb-4">
